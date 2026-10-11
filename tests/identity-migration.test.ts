@@ -58,7 +58,7 @@ test('copy preserves existing passwords, owner identity, OAuth secrets, keys, to
     sql: 'INSERT INTO panel_session (token_hash, auth_session_id, issuer, subject, client_id, scopes, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     args: ['panel-token-hash', central.session.id, app.config.issuer, app.ownerId, token.clientId, '["openid","artifacts:read"]', Date.now() + 60_000],
   });
-  await app.client.execute("INSERT INTO oidc_transaction VALUES ('oidc-token-hash', 'oidc-state', 'oidc-nonce', 'oidc-verifier', 2000000000000)");
+  await app.client.execute("INSERT INTO oidc_transaction (token_hash, state, nonce, verifier, expires_at) VALUES ('oidc-token-hash', 'oidc-state', 'oidc-nonce', 'oidc-verifier', 2000000000000)");
   const before = await applicationRows(app.client);
   const targetMigrations = await target.client.execute('SELECT * FROM __drizzle_migrations');
   const first = await migrateIdentity({ url: app.databaseUrl }, { url: targetUrl });
