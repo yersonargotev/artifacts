@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "id": "pstack",
+      "surface_intents": [
+        {
+          "surface": "codex",
+          "version": "4.2.0",
+          "selection": {
+            "mode": "all",
+            "roots": []
+          },
+          "aliases": []
+        }
+      ]
+    }
+  ]
+}
