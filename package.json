@@ -29,6 +29,7 @@
     "jose": "6.2.12",
     "playwright": "1.64.0",
     "tsx": "4.21.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "fflate": "0.8.3"
   }
 }

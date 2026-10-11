@@ -1,8 +1,12 @@
 import { serve } from '@hono/node-server';
-import { listener, mcpConfig } from '@artifacts/config';
+import { listener, mcpConfig, required, serviceUrl } from '@artifacts/config';
+import { openDatabase } from '@artifacts/db';
+import { createArtifactStore } from '@artifacts/artifacts';
 import { createMcpApp } from './http.ts';
 
 process.loadEnvFile();
 const config = mcpConfig();
-serve({ fetch: createMcpApp(config), ...listener('MCP', 4101) });
+const { db } = await openDatabase({ url: required('DATABASE_URL'), authToken: process.env.DATABASE_AUTH_TOKEN });
+const artifacts = createArtifactStore(db, { publishOrigin: serviceUrl('PUBLISH_URL') });
+serve({ fetch: createMcpApp(config, artifacts), ...listener('MCP', 4101) });
 console.log(`MCP listening at ${config.resource}`);

@@ -9,6 +9,7 @@ import { openDatabase } from '../packages/db/src/index.ts';
 import { migrateDatabase } from '../packages/db/src/migrate.ts';
 import { createAuth } from '../apps/auth/src/auth.ts';
 import { createAuthApp } from '../apps/auth/src/http.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
 
 export async function fixture(options: { dashboard?: string } = {}) {
@@ -37,7 +38,7 @@ export async function fixture(options: { dashboard?: string } = {}) {
   assert(resourceClient.client_secret);
   const mcpOptions = { issuer: config.issuer, resource: config.resource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
   authHandler = createAuthApp(connection.db, config);
-  mcpHandler = createMcpApp(mcpOptions);
+  mcpHandler = createMcpApp(mcpOptions, createArtifactStore(connection.db, { publishOrigin: 'https://published.example.test' }));
   return {
     ...connection, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
