@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, type Browser } from 'playwright';
 import { callWhoami, fixture, grant } from './helpers.ts';
 
 const reservation = createServer().listen(0, '127.0.0.1');
@@ -21,8 +21,9 @@ const child = spawn(process.execPath, ['apps/dashboard/dist/server/entry.mjs'], 
 });
 let startupError = '';
 child.stderr.on('data', (data: Buffer) => { startupError += data.toString(); });
-const browser = await chromium.launch({ channel: 'chrome' });
+let browser: Browser | undefined;
 try {
+  browser = await chromium.launch({ channel: 'chrome' });
   let ready = false;
   let lastStatus = '';
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -32,7 +33,8 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert(ready, `Built dashboard starts independently: ${lastStatus}; ${startupError.slice(0, 200)}`);
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
   await page.goto(dashboard);
   await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
   await page.getByLabel('Correo electrónico').fill('owner@example.test');
@@ -52,9 +54,21 @@ try {
   await page.getByTestId('user-id').waitFor();
   await mkdir('.test-artifacts', { recursive: true });
   await page.screenshot({ path: '.test-artifacts/dashboard-desktop.png', fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.screenshot({ path: '.test-artifacts/dashboard-mobile.png', fullPage: true });
+  const mobile = await context.newPage();
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  await mobile.goto(dashboard);
+  await mobile.getByTestId('user-id').waitFor();
+  await mobile.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  assert.equal(await mobile.locator('header').count(), 1);
+  assert.equal(await mobile.locator('h1').count(), 1);
+  assert.equal(await mobile.locator('.identity').count(), 1);
+  assert.equal(await mobile.locator('footer').count(), 1);
+  assert(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await mobile.screenshot({ path: '.test-artifacts/dashboard-mobile.png', fullPage: true });
+  await mobile.close();
   await page.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   const revokeResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/revoke-all' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
@@ -67,7 +81,7 @@ try {
   assert(!cookies.some((cookie) => cookie.name === 'artifacts-panel' || cookie.name === 'artifacts-auth.session_token'));
   console.log('Browser proof passed: signed OIDC identity, native panel logout, central SSO, global revocation, cookies, desktop and mobile.');
 } finally {
-  await browser.close();
+  await browser?.close();
   child.kill('SIGTERM');
   if (child.exitCode === null) await once(child, 'exit');
   await app.close();

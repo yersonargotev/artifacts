@@ -13,6 +13,9 @@ export function serviceUrl(name: string, env: NodeJS.ProcessEnv = process.env): 
   if (value.username || value.password || value.search || value.hash || (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))) {
     throw new Error(`${name} requires HTTPS, or HTTP on an exact loopback host, without credentials, query, or fragment`);
   }
+  if ((name === 'AUTH_URL' || name === 'DASHBOARD_URL') && value.pathname !== '/') {
+    throw new Error(`${name} must be an origin without a path`);
+  }
   return value.href.replace(/\/$/, '');
 }
 

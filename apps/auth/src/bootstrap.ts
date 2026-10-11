@@ -27,11 +27,12 @@ try {
       if (kind === 'MCP_INTROSPECTION') await ensureResourceLink(id);
       continue;
     }
+    const redirectUri = kind === 'PANEL' ? `${config.dashboard}/auth/callback` : `${new URL(config.resource).origin}/oauth/unused`;
     const result = await auth.api.adminCreateOAuthClient({ headers, body: {
       client_name: kind === 'PANEL' ? 'Artifacts dashboard' : 'Artifacts MCP resource',
-      redirect_uris: kind === 'PANEL' ? [`${config.dashboard}/auth/callback`] : [`${new URL(config.resource).origin}/oauth/unused`],
+      redirect_uris: [redirectUri],
       token_endpoint_auth_method: 'client_secret_basic',
-      application_type: config.dashboard.startsWith('http:') ? 'native' : 'web',
+      application_type: redirectUri.startsWith('http:') ? 'native' : 'web',
       grant_types: ['authorization_code'],
       response_types: ['code'],
       scope: 'openid profile',
