@@ -4,8 +4,9 @@ import { previewPolicy, previewDocument } from '../../../../../publication/src/d
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 
-export const GET: APIRoute = async ({ locals, params, url }) => {
+export const GET: APIRoute = async ({ locals, params, url, request }) => {
   if (!locals.identity) return new Response('Acceso denegado', { status: 401 });
+  if (request.headers.get('sec-fetch-dest') !== 'iframe') return new Response('La vista previa solo está disponible dentro del panel.', { status: 403 });
   try {
     const input = exportSchema.parse({ artifactId: params.artifactId, revisionId: url.searchParams.get('revisionId') });
     const artifact = await (await getRuntime()).artifacts.read(panelActor(locals.identity), input);

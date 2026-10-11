@@ -24,6 +24,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     response.headers.set('cache-control', 'no-store');
     response.headers.set('referrer-policy', 'same-origin');
     response.headers.set('x-content-type-options', 'nosniff');
+    if (!response.headers.has('content-security-policy')) response.headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
     return response;
   } catch {
     return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: { 'cache-control': 'no-store' } });
