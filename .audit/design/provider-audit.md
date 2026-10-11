@@ -114,4 +114,3 @@ CIMD defaults omitted application type to native-compatible validation and does 
 ## Verification boundary
 
 Principle Prove It Works shaped this audit. Claims were checked against installed provider code and exported types, including the session foreign-key action. The evidence establishes provider contracts. End-to-end tests still need to prove authentication failure behavior, missing `sid`, global revoke after refresh, local panel redirects, and real CLI interoperability.
-

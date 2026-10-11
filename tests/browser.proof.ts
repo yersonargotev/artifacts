@@ -24,7 +24,7 @@ child.stderr.on('data', (data: Buffer) => { startupError += data.toString(); });
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
   let ready = false;
-  let lastStatus = ''; 
+  let lastStatus = '';
   for (let attempt = 0; attempt < 50; attempt++) {
     if (child.exitCode !== null) throw new Error(`Dashboard exited before startup: ${startupError.slice(0, 300)}`);
     ready = await fetch(dashboard).then(async (response) => { lastStatus = `${response.status} ${(await response.text()).slice(0, 120)}`; return response.ok; }).catch((error: Error) => { lastStatus = error.message; return false; });
