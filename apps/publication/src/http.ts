@@ -3,7 +3,7 @@ import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
 import { artifactReadSchema, consumeGrantSchema, readSchema, viewerSchema } from '@artifacts/artifacts/contracts';
 import type { ArtifactRead, Viewer } from '@artifacts/artifacts/contracts';
-import { attachmentResponse, documentPolicy, publicationDocument } from './document.ts';
+import { attachmentResponse, documentPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
 
 export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: string; PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 const transactionSchema = z.strictObject({ purpose: z.literal('transaction'), artifactId: z.string().min(1).max(128), state: z.string().min(32).max(128), expiresAt: z.number().int().positive() });
@@ -95,7 +95,7 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });
       }
-      return new Response(publicationDocument(artifact, (file) => `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}/files/${file.split('/').map(encodeURIComponent).join('/')}`), { headers: { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': documentPolicy } });
+      return new Response(publicationDocument(artifact, (file) => `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}/files/${file.split('/').map(encodeURIComponent).join('/')}`, supportsInteractiveHtml(request.headers.get('user-agent'))), { headers: { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': documentPolicy, 'connection-allowlist': '()', 'x-dns-prefetch-control': 'off', vary: 'User-Agent' } });
     } catch {
       return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
     }

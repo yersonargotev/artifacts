@@ -43,7 +43,13 @@ export type ArtifactSummary = { artifactId: string; title: string; headRevisionI
 export type Archive = { filename: string; mediaType: 'application/zip'; base64: string; sha256: string };
 export type ArtifactErrorCode = 'forbidden' | 'not_found' | 'conflict' | 'request_conflict' | 'invalid_grant';
 export class ArtifactError extends Error {
-  constructor(public readonly code: ArtifactErrorCode, message: string, public readonly details: Record<string, unknown> = {}) { super(message); }
+  readonly code: ArtifactErrorCode;
+  readonly details: Record<string, unknown>;
+  constructor(code: ArtifactErrorCode, message: string, details: Record<string, unknown> = {}) {
+    super(message);
+    this.code = code;
+    this.details = details;
+  }
 }
 
 export function decodeFile(file: { encoding: 'utf8' | 'base64'; data: string }): Uint8Array {

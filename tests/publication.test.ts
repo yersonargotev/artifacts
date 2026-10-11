@@ -63,14 +63,19 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert(!transactionCookie.includes('artifact-a'));
   assert(flow.admitted.headers.getSetCookie().some((value) => value.includes('Max-Age=0')));
   const cookie = cookieHeader(flow.admitted);
-  const document = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie } }));
+  const document = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Chrome/154.0.0.0 Safari/537.36' } }));
   assert.equal(document.status, 200);
   assert.equal(document.headers.get('cache-control'), 'private, no-store');
   assert.match(document.headers.get('content-security-policy')!, /connect-src 'none'/);
+  assert.equal(document.headers.get('connection-allowlist'), '()');
   const body = await document.text();
   assert(body.includes('sandbox="allow-scripts"'));
   assert(body.includes('&lt;script&gt;window.secret = 1&lt;/script&gt;'));
   assert(body.includes('/a/artifact-a/r/revision-1/files/nested/file.html'));
+  const inert = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
+  const inertBody = await inert.text();
+  assert(inertBody.includes('sandbox=""'));
+  assert(inertBody.includes('&amp;lt;script&amp;gt;window.secret = 1&amp;lt;/script&amp;gt;'));
   const download = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/files/nested/file.html`, { headers: { cookie } }));
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), Buffer.from(artifact.revision.snapshot.files[0]!.data, 'base64'));
@@ -79,7 +84,7 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.equal((await handler(flow.request)).status, 403);
   assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 403);
   assert.equal((await handler(new Request(`${publish}/a/artifact-b`, { headers: { cookie } }))).status, 303);
-  assert.equal(calls.filter((url) => url.endsWith('/read')).length, 3);
+  assert.equal(calls.filter((url) => url.endsWith('/read')).length, 4);
 });
 
 test('anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes', async () => {

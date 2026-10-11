@@ -67,6 +67,10 @@ try {
   assert.equal(deniedService.status, 403);
   const deniedWithBrowserOrigin = await fetch(`${dashboard}/internal/publication/consume`, { method: 'POST', headers: { origin: dashboard, authorization: 'Bearer incorrect', 'content-type': 'application/json' }, body: '{}' });
   assert.equal(deniedWithBrowserOrigin.status, 403);
+  for (const endpoint of ['read', 'consume']) {
+    const deniedAlias = await fetch(`${dashboard}/internal/publication/${endpoint}/`, { method: 'POST', headers: { origin: dashboard, 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(deniedAlias.status, 403);
+  }
   const authenticatedWithoutOrigin = await fetch(`${dashboard}/internal/publication/read`, { method: 'POST', headers: { authorization: `Bearer ${serviceSecret}`, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(authenticatedWithoutOrigin.status, 400);
   browser = await chromium.launch({ channel: 'chrome' });
