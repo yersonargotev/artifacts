@@ -1,3 +1,7 @@
+# Historical identity evidence
+
+This document records the earlier identity increment. Current artifact storage, Turso cutover, native Workers, and deployed Claude/Codex acceptance are recorded in [the artifact execution evidence](artifact-e2e/runtime.md).
+
 # Verified identity increment
 
 This increment implements a personal authorization server, remote MCP resource, and Astro dashboard. It provides shared identity, `whoami`, panel-only logout, and global revocation. Artifact storage and publication are the next increment.

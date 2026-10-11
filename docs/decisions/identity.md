@@ -1,3 +1,7 @@
+# Scope update
+
+The retained-artifact increment extends MCP with database-backed authoring and adds a separate publication Worker without database credentials. Its verified Turso identity migration and deployed vendor OAuth replace the earlier pending deployment gates below. See [the artifact decision](artifacts.md) and [execution evidence](../../.audit/artifact-e2e/runtime.md). The remaining text preserves the original identity decision and its verification scope.
+
 # Identity boundaries
 
 Artifacts has one immutable user ID across its authorization server, MCP server, and dashboard. Better Auth owns the OAuth and OIDC protocols. The applications own admission to their resources.

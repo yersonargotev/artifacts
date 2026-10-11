@@ -1,10 +1,53 @@
-# Artifacts identity
+# Artifacts
 
-Run one personal account across an authorization server, a remote HTTP MCP server, and an Astro dashboard. This increment provides login, `whoami`, panel logout, and global revocation. It does not store or publish artifacts.
+Create an artifact from Claude Code or Codex, retain every revision in Turso, and open its published revision at a stable authenticated URL. The Astro panel lists artifacts, displays revision history, previews selected revisions, and exports their original bytes.
 
-## Start locally
+## Deployed services
 
-Use Node 24 or newer and pnpm 12.8.1. Run these commands from the repository root.
+| Service | URL |
+| --- | --- |
+| Panel | https://artifacts-panel.yersonargotev.workers.dev |
+| MCP | https://artifacts-mcp.yersonargotev.workers.dev/mcp |
+| Authorization | https://artifacts-auth.yersonargotev.workers.dev |
+| Publication | https://artifacts-view.yersonargotev.workers.dev |
+
+The publication Worker is separate from the panel. It receives no database or authoring credentials. Every document and attachment request checks the live central session and artifact owner through the authenticated internal service. Anonymous document requests redirect to login; anonymous attachments return 401. Revoked access returns 403. Backend failures return 503 without content.
+
+## Connect a client
+
+Register the deployed HTTP MCP and complete its OAuth browser login. Existing local registrations can remain under another name.
+
+```sh
+codex mcp add artifacts-cloud --url https://artifacts-mcp.yersonargotev.workers.dev/mcp
+codex mcp login artifacts-cloud --scopes openid,profile,offline_access,artifacts:read,artifacts:write,artifacts:publish
+
+claude mcp add --scope user --transport http artifacts-cloud https://artifacts-mcp.yersonargotev.workers.dev/mcp
+claude mcp login artifacts-cloud
+```
+
+The Artifacts account authenticates the MCP connection. Each CLI also needs its own working model-provider login.
+
+Ask a client to call `artifacts_create` with a complete snapshot and a unique `requestId`. The snapshot contains:
+
+```json
+{
+  "metadata": { "title": "Example", "description": "My first artifact" },
+  "content": { "kind": "html", "text": "<h1>Hello</h1>" },
+  "files": []
+}
+```
+
+Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve artifacts. `artifacts_update` saves a complete snapshot with `expectedRevisionId`. `artifacts_publish` selects a retained `revisionId` with `expectedPublicationVersion`, using zero for the first publication. Its returned URL stays unchanged when you publish another revision. `artifacts_export` returns a deterministic ZIP for an explicit retained revision. `whoami` still returns the canonical account and session.
+
+Matching mutation retries use the same `requestId` and arguments. Changed arguments under that ID fail. Concurrent updates and publication changes reject stale expected versions. [The store contract](packages/artifacts/README.md) describes the schemas, limits, pagination, permissions, and archive format.
+
+Snapshots support self-contained HTML, Markdown, and text, plus downloadable attachments. The initial limit is 1 MiB decoded total and 32 files per revision. Relative executable assets and multi-file websites are outside this increment. Markdown and text display as inert text.
+
+Interactive HTML runs in an opaque sandbox with no parent access, cookies, storage, forms, popups, or top navigation. Chrome 152 and newer receives the enforced connection allowlist; current acceptance uses Chrome 154. Other browsers receive escaped HTML source with scripts disabled. This compatibility fallback preserves authentication, downloads, and export. [Chrome's documentation](https://developer.chrome.com/blog/connection-allowlist-announcement) explains why CSP alone does not cover WebRTC and all navigation channels.
+
+## Run locally
+
+Use Node 24 or newer and pnpm 12.8.1.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -14,94 +57,50 @@ pnpm identity:bootstrap
 pnpm dev
 ```
 
-`configure` creates `.env` with random secrets and a local file database URL. It preserves an existing file. The file has mode `0600` and is ignored by Git. `identity:bootstrap` preserves the owner ID and existing client secrets when repeated.
+`configure` creates an ignored mode-0600 `.env` and preserves an existing file. Read the owner credentials in your editor. Bootstrap preserves existing identities and configured client secrets.
 
-Open `.env` in your local editor to read `OWNER_EMAIL` and `OWNER_PASSWORD`. Open [the dashboard](http://127.0.0.1:4321) and sign in. Keep the configured hostnames. Changing `127.0.0.1` to `localhost` changes cookie ownership.
+Local hosts are authorization `http://localhost:4100`, MCP `http://127.0.0.1:4101/mcp`, panel `http://127.0.0.1:4321`, and publication `http://[::1]:4102`. Keep these distinct cookie hosts. `pnpm dev` supervises all four services. Each also has a `dev:<service>` command; use `dev:dashboard` for the panel.
 
-Run each service independently when you need separate terminals.
+This workspace's existing account has been migrated to Turso. A fresh clone configured with `pnpm configure` starts with a local database. For a remote database, set `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the private environment file.
 
-```sh
-pnpm dev:auth
-pnpm dev:mcp
-pnpm dev:dashboard
-```
+Panel logout closes only the panel session. **Cerrar todas las sesiones** opens the authorization app's confirmation form and revokes browser and CLI access together.
 
-The authorization server listens at `http://localhost:4100`. The MCP resource is `http://127.0.0.1:4101/mcp`. Public signup is disabled.
+## Migrate an existing identity
 
-## Connect a CLI
-
-Add `http://127.0.0.1:4101/mcp` as a remote HTTP MCP server in Codex or Claude Code. Start its OAuth login and approve access. Request `artifacts:read` and `offline_access` when the CLI exposes a scope option. Call `whoami` to compare the user ID with the dashboard.
-
-For Codex, register the server and complete the browser login.
+Stop source writers and back up the source database and environment file. Apply the same committed schema to source and target, then run:
 
 ```sh
-codex mcp add artifacts --url http://127.0.0.1:4101/mcp
-codex mcp login artifacts --scopes artifacts:read,offline_access
+pnpm identity:migrate --source-env .env --target-env .env.turso
 ```
 
-For Claude Code, register it in your chosen project and complete the browser login. Approve that project's MCP configuration when Claude asks.
+The migration uses a consistent source snapshot and one destination transaction. It preserves all application tables and typed values, checks exact rows and foreign keys, rejects incompatible or conflicting target state, and can replay before destination writers start. It does not change either environment file. Change the database configuration only after verification.
+
+Preserve `BETTER_AUTH_SECRET` with the copied signing keys. Public issuer or callback changes require fresh confidential clients and fresh CLI OAuth, using the same canonical owner. The bootstrap supports an explicitly selected private file:
 
 ```sh
-claude mcp add --scope project --transport http artifacts http://127.0.0.1:4101/mcp
-claude mcp login artifacts
+ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap
 ```
 
-Open a CLI conversation and ask it to call the Artifacts `whoami` tool. MCP login authenticates your Artifacts account; the CLI also needs its own working model-provider login to run a conversation.
-
-Panel logout closes only that browser session. **Cerrar todas las sesiones** opens the authorization app's confirmation form. Submit that form to revoke all browser and CLI access. A new login can authorize a new connection afterward.
-
-## Verify the increment
+## Verify
 
 ```sh
 pnpm check
-pnpm build
 pnpm test
 pnpm test:browser
+pnpm build:workers
 ```
 
-The integration suite uses disposable databases and actual HTTP requests. It checks PKCE, introspection, OAuth replay, refresh rotation, revocation, OIDC state, durable panel sessions, and callback races.
+The tests use disposable identities and databases. `test:browser` builds the Node panel and runs actual Chrome proofs for identity, artifact publication, revision history, historical ZIP bytes, anonymous and revoked access, native forms, sandbox isolation, HTTP and UDP containment, and mobile layout. It never revokes the normal account.
 
-`test:browser` also starts the built dashboard against disposable auth and MCP servers. It uses an installed Google Chrome through Playwright. It checks real native forms, both logout paths, cookie deletion, and mobile overflow. It writes screenshots to ignored `.test-artifacts`. It does not change personal CLI configuration or revoke the normal local account.
-
-## Configure separate hosts
-
-Use `.env.example` as a configuration reference. For Turso, set `DATABASE_URL` to the libSQL URL and set `DATABASE_AUTH_TOKEN`. Run migrations once through `packages/db` before starting any service.
-
-To verify a remote libSQL database separately from the running local services, create a private, ignored `.env.turso` with `DATABASE_URL` and `DATABASE_AUTH_TOKEN`. Restrict its permissions to `0600`, then run:
+The live acceptance runners retain private ignored evidence and require authenticated CLI registrations. The browser runner also requires the selected deployment origins and owner credentials. They create a real artifact and retain its revisions.
 
 ```sh
-pnpm verify:turso
+node --env-file=.env.deploy --import tsx scripts/verify-artifact-clients.ts create
+node --env-file=.env.deploy --import tsx scripts/verify-deployed-artifact.ts first
+node --env-file=.env.deploy --import tsx scripts/verify-artifact-clients.ts modify
+node --env-file=.env.deploy --import tsx scripts/verify-deployed-artifact.ts final
 ```
 
-The proof applies the committed migrations twice and checks transaction rollback, committed reads through Node and web clients, application revocation, foreign-key cascades, and rejection of dangling panel sessions. It removes its synthetic identities afterward. The normal `.env` and local CLI sessions remain in use; this is a database proof, not a deployed OAuth or browser test.
+Use a fresh `ARTIFACTS_PROOF_RUN` and `ARTIFACTS_PROOF_DIR` for another end-to-end acceptance run. The final browser proof checks the stable URL, both revisions, exact panel/CLI archive equality, anonymous denial, and revocation of a separate test browser session while preserving the original client session.
 
-This proof provisions the schema without copying the local identity. Before moving the existing account to Turso, migrate its user and confidential client records together; local client IDs refer to records in the local database.
-
-Set separate HTTPS public URLs for `AUTH_URL`, `MCP_URL`, and `DASHBOARD_URL`. `AUTH_URL` and `DASHBOARD_URL` must use different hostnames. Preserve the configured issuer and resource identifiers after issuing credentials. Register fresh confidential clients when their callback origin changes.
-
-`AUTH_BIND_HOST`, `AUTH_PORT`, `MCP_BIND_HOST`, and `MCP_PORT` control internal listeners independently of the public URLs. The defaults bind loopback on ports 4100 and 4101. Configure the reverse proxy to forward the original host. Terminate HTTPS at the proxy. Each application requires only its own configuration and database access where applicable. The MCP server needs its introspection client ID and secret but no database credentials or owner password.
-
-Build and start the dashboard separately with the environment already loaded.
-
-```sh
-pnpm build
-node --env-file=.env apps/dashboard/dist/server/entry.mjs
-```
-
-The Astro Node adapter reads `HOST` and `PORT` for its listener. The workspace dependencies must remain installed beside the build. They preserve libSQL's native driver resolution.
-
-The authorization and MCP entrypoints run with `pnpm dev:auth` and `pnpm dev:mcp` without a watcher. Their scripts load `.env`. Supply a protected environment file on the deployment host.
-
-## Update the schema
-
-Generate Better Auth's schema from the pinned plugin composition, review the result, then create a migration.
-
-```sh
-pnpm --filter @artifacts/auth exec auth generate --config ./schema.config.ts --adapter drizzle --dialect sqlite --output ../../packages/db/src/auth-schema.ts --yes
-pnpm db:generate
-pnpm db:migrate
-```
-
-Read [the identity decision](docs/decisions/identity.md) for ownership, availability, and the tracked Better Auth refresh-family race. Remote Turso database semantics passed the standalone proof; deployed OAuth, MCP, and dashboard enforcement still require verification.
-
-Read [the runtime evidence](.audit/runtime-evidence.md) and [the final independent review](.audit/reviews/security-fix-review.md) for the verified scope and remaining external limitations.
+See [deployment instructions](docs/deployment.md), [artifact architecture](docs/decisions/artifacts.md), [execution evidence](.audit/artifact-e2e/runtime.md), and the independent [domain review](.audit/artifact-e2e/review.md) and [publication review](.audit/artifact-e2e/publication-review.md).
