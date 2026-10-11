@@ -37,9 +37,9 @@ export function createMcpAuthorizer(config: ReturnType<typeof mcpConfig>) {
         headers: { authorization: `Basic ${Buffer.from(`${encodeURIComponent(config.clientId)}:${encodeURIComponent(config.clientSecret)}`).toString('base64')}`, 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ token, token_type_hint: 'access_token' }),
         signal: AbortSignal.timeout(3000),
-        redirect: 'error',
+        redirect: 'manual',
       });
-      if (!response.ok) return { kind: 'unavailable' };
+      if (response.status !== 200) return { kind: 'unavailable' };
       const body: unknown = await response.json();
       const status = z.object({ active: z.boolean() }).safeParse(body);
       if (!status.success) return { kind: 'unavailable' };

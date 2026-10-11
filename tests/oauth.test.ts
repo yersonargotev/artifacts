@@ -45,6 +45,13 @@ test('MCP challenges missing credentials, rejects invalid claims and scope, and 
     assert.equal(forbidden.status, 403);
     assert.match(forbidden.headers.get('www-authenticate')!, /insufficient_scope/);
     assert.equal((await callWhoami(app.config.resource, token.access_token)).status, 200);
+    let followedRedirect = false;
+    app.setAuthHandler(async (request) => {
+      if (new URL(request.url).pathname === '/redirected-introspection') followedRedirect = true;
+      return new Response(null, { status: 302, headers: { location: `${app.config.origin}/redirected-introspection` } });
+    });
+    assert.equal((await callWhoami(app.config.resource, token.access_token)).status, 503);
+    assert.equal(followedRedirect, false);
     app.setAuthHandler(async () => new Response('unavailable', { status: 503 }));
     assert.equal((await callWhoami(app.config.resource, token.access_token)).status, 503);
     app.setAuthHandler(async () => new Promise<Response>(() => {}));
@@ -77,11 +84,19 @@ test('refresh rotation replays the same response during grace and rejects reuse 
     const original = await grant(app);
     const renewed = await refresh(app, original.clientId, original.refresh_token);
     assert.equal(renewed.status, 200);
-    const tokens = await renewed.json() as { access_token: string; refresh_token: string };
+    const tokens = await renewed.json() as { access_token: string; refresh_token: string; expires_in: number; expires_at: number };
     assert.notEqual(tokens.refresh_token, original.refresh_token);
+    const replayRequestedAt = Math.floor(Date.now() / 1000);
     const replay = await refresh(app, original.clientId, original.refresh_token);
     assert.equal(replay.status, 200);
-    assert.deepEqual(await replay.json(), tokens);
+    const replayed = await replay.json() as typeof tokens;
+    const { expires_in: originalExpiresIn, ...credentials } = tokens;
+    const { expires_in: replayExpiresIn, ...replayedCredentials } = replayed;
+    assert.deepEqual(replayedCredentials, credentials);
+    assert.equal(replayed.expires_at, tokens.expires_at);
+    assert(replayExpiresIn > 0 && replayExpiresIn <= originalExpiresIn);
+    assert(replayExpiresIn <= Math.max(0, tokens.expires_at - replayRequestedAt));
+    assert(replayExpiresIn >= Math.max(0, tokens.expires_at - Math.floor(Date.now() / 1000)));
     await app.db.update(oauthRefreshToken).set({ rotationReplayExpiresAt: new Date(Date.now() - 1000) }).where(and(eq(oauthRefreshToken.clientId, original.clientId), isNotNull(oauthRefreshToken.rotatedAt)));
     assert.equal((await refresh(app, original.clientId, original.refresh_token)).status, 400);
     assert.equal((await refresh(app, original.clientId, tokens.refresh_token)).status, 400);
