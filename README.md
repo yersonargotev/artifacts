@@ -67,6 +67,16 @@ The integration suite uses disposable databases and actual HTTP requests. It che
 
 Use `.env.example` as a configuration reference. For Turso, set `DATABASE_URL` to the libSQL URL and set `DATABASE_AUTH_TOKEN`. Run migrations once through `packages/db` before starting any service.
 
+To verify a remote libSQL database separately from the running local services, create a private, ignored `.env.turso` with `DATABASE_URL` and `DATABASE_AUTH_TOKEN`. Restrict its permissions to `0600`, then run:
+
+```sh
+pnpm verify:turso
+```
+
+The proof applies the committed migrations twice and checks transaction rollback, committed reads through Node and web clients, application revocation, foreign-key cascades, and rejection of dangling panel sessions. It removes its synthetic identities afterward. The normal `.env` and local CLI sessions remain in use; this is a database proof, not a deployed OAuth or browser test.
+
+This proof provisions the schema without copying the local identity. Before moving the existing account to Turso, migrate its user and confidential client records together; local client IDs refer to records in the local database.
+
 Set separate HTTPS public URLs for `AUTH_URL`, `MCP_URL`, and `DASHBOARD_URL`. `AUTH_URL` and `DASHBOARD_URL` must use different hostnames. Preserve the configured issuer and resource identifiers after issuing credentials. Register fresh confidential clients when their callback origin changes.
 
 `AUTH_BIND_HOST`, `AUTH_PORT`, `MCP_BIND_HOST`, and `MCP_PORT` control internal listeners independently of the public URLs. The defaults bind loopback on ports 4100 and 4101. Configure the reverse proxy to forward the original host. Terminate HTTPS at the proxy. Each application requires only its own configuration and database access where applicable. The MCP server needs its introspection client ID and secret but no database credentials or owner password.
@@ -92,6 +102,6 @@ pnpm db:generate
 pnpm db:migrate
 ```
 
-Read [the identity decision](docs/decisions/identity.md) for ownership, availability, and the tracked Better Auth refresh-family race. Remote Turso and cloud deployment require separate verification.
+Read [the identity decision](docs/decisions/identity.md) for ownership, availability, and the tracked Better Auth refresh-family race. Remote Turso database semantics passed the standalone proof; deployed OAuth, MCP, and dashboard enforcement still require verification.
 
 Read [the runtime evidence](.audit/runtime-evidence.md) and [the final independent review](.audit/reviews/security-fix-review.md) for the verified scope and remaining external limitations.

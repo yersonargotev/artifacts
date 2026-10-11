@@ -169,6 +169,9 @@ importers:
       '@hono/node-server':
         specifier: 2.1.4
         version: 2.1.4(hono@4.13.13)
+      '@libsql/client':
+        specifier: 0.18.0
+        version: 0.18.0
       '@types/node':
         specifier: 24.10.1
         version: 24.10.1
