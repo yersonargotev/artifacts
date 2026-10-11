@@ -1,0 +1,22 @@
+{
+  "name": "artifacts",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check": "tsc --noEmit && pnpm --filter @artifacts/dashboard check",
+    "build": "pnpm --filter @artifacts/dashboard build",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:generate": "pnpm --filter @artifacts/db generate",
+    "db:migrate": "tsx packages/db/src/migrate.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3",
+    "drizzle-orm": "0.45.4"
+  }
+}

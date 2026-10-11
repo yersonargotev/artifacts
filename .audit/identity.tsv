@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-10-11T04:04:02Z	frame	Build identity increment only	User authorized implementation of previously proposed first increment	Clean greenfield repository dfaa03a; settled auth policy	NOT VERIFIED
+2026-10-11T04:07:50Z	design	Prefer app-local identity boundaries	Panel and MCP validate different credentials; shared DB is already settled	/tmp/artifacts-identity-design/root-assessment.md; two full independent candidates	Cross-judge pending
+2026-10-11T04:09:26Z	design	Choose app-local boundaries	Root and independent cross-judge agree on smaller interface for different credentials	/tmp/artifacts-identity-design/judgment.md; local21/25 shared18/25	VERIFIED design comparison; runtime pending
+2026-10-11T04:14:00Z	foundation	Generate provider schema from auth 1.7.7 CLI	Avoid missing current resource and assertion tables	pnpm test; pnpm exec tsc --noEmit	PASS
+2026-10-11T04:14:00Z	dependencies	Use TypeScript6.0.3 and Astro check0.9.10; align jose6.2.12	Checker0.9.6 excludesTS6; divergent jose peer instances broke plugin types	pnpm peers check; pnpm exec tsc --noEmit	PASS
