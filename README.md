@@ -32,6 +32,22 @@ The authorization server listens at `http://localhost:4100`. The MCP resource is
 
 Add `http://127.0.0.1:4101/mcp` as a remote HTTP MCP server in Codex or Claude Code. Start its OAuth login and approve access. Request `artifacts:read` and `offline_access` when the CLI exposes a scope option. Call `whoami` to compare the user ID with the dashboard.
 
+For Codex, register the server and complete the browser login.
+
+```sh
+codex mcp add artifacts --url http://127.0.0.1:4101/mcp
+codex mcp login artifacts --scopes artifacts:read,offline_access
+```
+
+For Claude Code, register it in your chosen project and complete the browser login. Approve that project's MCP configuration when Claude asks.
+
+```sh
+claude mcp add --scope project --transport http artifacts http://127.0.0.1:4101/mcp
+claude mcp login artifacts
+```
+
+Open a CLI conversation and ask it to call the Artifacts `whoami` tool. MCP login authenticates your Artifacts account; the CLI also needs its own working model-provider login to run a conversation.
+
 Panel logout closes only that browser session. **Cerrar todas las sesiones** opens the authorization app's confirmation form. Submit that form to revoke all browser and CLI access. A new login can authorize a new connection afterward.
 
 ## Verify the increment
@@ -77,3 +93,5 @@ pnpm db:migrate
 ```
 
 Read [the identity decision](docs/decisions/identity.md) for ownership, availability, and the tracked Better Auth refresh-family race. Remote Turso and cloud deployment require separate verification.
+
+Read [the runtime evidence](.audit/runtime-evidence.md) and [the final independent review](.audit/reviews/security-fix-review.md) for the verified scope and remaining external limitations.
