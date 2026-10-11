@@ -1,4 +1,5 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
+import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
 import { artifactReadSchema, consumeGrantSchema, readSchema, viewerSchema } from '@artifacts/artifacts/contracts';
 import type { ArtifactRead, Viewer } from '@artifacts/artifacts/contracts';
@@ -13,12 +14,6 @@ const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).rep
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
 const privateHeaders = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
 
-function origin(value: string) {
-  const url = new URL(value);
-  if (url.pathname !== '/' || url.search || url.hash || url.username || url.password || (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) throw new Error('Publication requires a public HTTPS origin or an exact loopback HTTP origin');
-  return url.origin;
-}
-
 function cookie(request: Request, name: string) {
   return request.headers.get('cookie')?.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1);
 }
@@ -28,10 +23,10 @@ function setCookie(name: string, value: string, expiresAt: number) {
 }
 
 export function createPublicationApp(environment: PublicationEnvironment, fetchBackend: typeof fetch = fetch) {
-  const dashboardOrigin = origin(environment.DASHBOARD_URL);
-  const publishOrigin = origin(environment.PUBLISH_URL);
-  if (environment.PUBLICATION_SERVICE_SECRET.length < 32 || environment.PUBLICATION_COOKIE_SECRET.length < 32) throw new Error('Publication secrets must contain at least 32 characters');
-  const key = crypto.subtle.digest('SHA-256', new TextEncoder().encode(environment.PUBLICATION_COOKIE_SECRET)).then((digest) => new Uint8Array(digest));
+  const config = publicationConfig(environment);
+  const dashboardOrigin = config.dashboard;
+  const publishOrigin = config.origin;
+  const key = crypto.subtle.digest('SHA-256', new TextEncoder().encode(config.cookieSecret)).then((digest) => new Uint8Array(digest));
   async function encrypt(payload: object, expiresAt: number) {
     return new EncryptJWT({ data: payload }).setProtectedHeader({ alg: 'dir', enc: 'A256GCM' }).setIssuedAt().setExpirationTime(Math.floor(expiresAt / 1000)).setIssuer(publishOrigin).setAudience(publishOrigin).encrypt(await key);
   }
@@ -41,7 +36,7 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
   }
   async function backend(path: string, body: object) {
     try {
-      const response = await fetchBackend(`${dashboardOrigin}/internal/publication/${path}`, { method: 'POST', redirect: 'manual', headers: { authorization: `Bearer ${environment.PUBLICATION_SERVICE_SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
+      const response = await fetchBackend(`${dashboardOrigin}/internal/publication/${path}`, { method: 'POST', redirect: 'manual', headers: { authorization: `Bearer ${config.serviceSecret}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
       if (response.status !== 200) {
         if ([401, 403, 404, 409].includes(response.status)) return { denied: true as const };
         throw new Error('Publication backend unavailable');

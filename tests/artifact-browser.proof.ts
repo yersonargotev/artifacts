@@ -191,6 +191,12 @@ try {
   assert.equal(manifest.revision.id, created.revision.id);
   assert.equal(manifest.metadata.custom.retained, true);
   await panel.setViewportSize({ width: 390, height: 844 });
+  await panel.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  assert.equal(await panel.locator('header').count(), 1);
+  assert.equal(await panel.locator('h1').count(), 1);
   assert(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png', fullPage: true });
   const anonymous = await browser.newContext();
