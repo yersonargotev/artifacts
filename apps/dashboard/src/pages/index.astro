@@ -1,0 +1,25 @@
+---
+import { getRuntime } from '../runtime.ts';
+const identity = Astro.locals.identity;
+const { config } = await getRuntime();
+const failed = Astro.url.searchParams.get('login') === 'failed';
+const revoked = Astro.url.searchParams.has('revoked');
+---
+<!doctype html>
+<html lang="es">
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Tu espacio · Artifacts</title></head>
+  <body>
+    <header><a class="wordmark" href="/">Artifacts</a><span>Tu espacio</span></header>
+    <main>
+      {identity ? <>
+        <section class="welcome"><h1>Hola, {identity.name}.</h1><p>Tu cuenta está lista para conectar las herramientas con las que creas.</p></section>
+        <section class="identity"><div class="monogram" aria-hidden="true">{identity.name.slice(0, 1).toLowerCase()}.</div><div><h2>Tu identidad</h2><p>Este identificador es el mismo en el panel y en tus herramientas.</p><code data-testid="user-id">{identity.userId}</code><dl><dt>Conexión</dt><dd>Sesión activa</dd><dt>Permisos del panel</dt><dd>Identidad y perfil</dd></dl></div></section>
+        <section class="tools"><h2>Conecta tus herramientas</h2><p>Agrega este servidor MCP en Claude Code o Codex e inicia sesión con tu cuenta.</p><code>{process.env.MCP_URL}</code><p>La herramienta <strong>whoami</strong> te permite comprobar la conexión.</p></section>
+        <footer><form method="post" action="/auth/logout"><button class="secondary">Cerrar sesión del panel</button></form><a href={`${config.auth}/revoke-all`}>Cerrar todas las sesiones</a></footer>
+      </> : <section class="welcome logged-out"><div class="monogram" aria-hidden="true">a.</div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para conectar tus herramientas y comprobar tu identidad.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" href="/auth/login">Iniciar sesión</a></section>}
+    </main>
+  </body>
+</html>
+<style>
+:global(*){box-sizing:border-box}:global(body){margin:0;background:#eaf0f5;color:#132943;font-family:Optima,Candara,'Segoe UI',sans-serif;font-size:17px}header{display:flex;align-items:center;justify-content:space-between;padding:28px clamp(24px,6vw,88px);border-bottom:1px solid #c7d5e3}.wordmark{font-size:28px;font-weight:600;letter-spacing:-1px;text-decoration:none;color:#132943}header span{color:#48617b}main{max-width:1080px;margin:0 auto;padding:60px 32px 36px}h1{font-size:clamp(34px,5vw,58px);font-weight:500;letter-spacing:-1.5px;line-height:1.08;margin:0 0 24px}h2{font-size:25px;font-weight:500;margin:0 0 14px}p{line-height:1.6;max-width:58ch}a{color:#2546c0}.welcome{margin-bottom:48px}.welcome>p{max-width:48ch}.identity{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:40px;padding:36px;background:white;border-radius:8px}.monogram{font-family:Georgia,serif;font-size:142px;line-height:1;color:#3154d9;letter-spacing:-12px}.identity p{margin-top:0;color:#48617b}code{display:block;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,monospace;font-size:14px;line-height:1.6;background:#eaf0f5;padding:14px 16px;border-radius:4px}dl{display:grid;grid-template-columns:auto 1fr;gap:8px 24px;margin-bottom:0}dt{color:#48617b}dd{margin:0}.tools{margin:40px 0 48px;max-width:720px}.tools code{border:1px solid #b6c8d9;background:transparent}footer{border-top:1px solid #c7d5e3;padding-top:28px;display:flex;align-items:center;gap:32px}button,.button{display:inline-block;font:inherit;text-decoration:none;border:0;border-radius:4px;background:#3154d9;color:white;padding:14px 22px;cursor:pointer}.secondary{background:transparent;color:#132943;border:1px solid #9baec2}a:focus-visible,button:focus-visible{outline:3px solid #6885ff;outline-offset:4px}.logged-out .monogram{font-size:120px;margin-bottom:35px}.logged-out{max-width:700px}.logged-out p{margin-bottom:30px}[role=alert]{color:#a32035}@media(max-width:620px){header{padding:22px 24px}main{padding:40px 24px}.identity{grid-template-columns:1fr;gap:18px;padding:26px}.identity .monogram{font-size:82px}footer{align-items:flex-start;flex-direction:column;gap:24px}dl{grid-template-columns:1fr;gap:7px}dd+dt{margin-top:10px}.tools{margin-bottom:34px}}
+</style>

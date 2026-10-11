@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@hono/node-server": "2.1.4",
     "@modelcontextprotocol/server": "2.3.1",
     "jose": "6.2.12",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@artifacts/config": "workspace:*"
   }
 }
