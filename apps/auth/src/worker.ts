@@ -9,7 +9,9 @@ const runtimes = new WeakMap<AuthWorkerEnvironment, Promise<ReturnType<typeof cr
 async function createRuntime(env: AuthWorkerEnvironment) {
   const config = authConfig(env);
   const { db } = await openDatabase({ url: env.DATABASE_URL, authToken: env.DATABASE_AUTH_TOKEN });
-  return createAuthHandler(db, config, createAuth(db, config, { fetchClientMetadataResource, isMetadataDocumentUrlAllowed }));
+  const auth = createAuth(db, config, { fetchClientMetadataResource, isMetadataDocumentUrlAllowed });
+  await auth.$context;
+  return createAuthHandler(db, config, auth);
 }
 
 export default {

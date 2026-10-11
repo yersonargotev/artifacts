@@ -14,7 +14,7 @@ export function isMetadataDocumentUrlAllowed(value: string): boolean {
   }
 }
 
-export const fetchClientMetadataResource: ClientMetadataTransport['fetchClientMetadataResource'] = async (input, init) => {
+export async function fetchClientMetadataResource(...[input, init]: Parameters<ClientMetadataTransport['fetchClientMetadataResource']>): Promise<Response> {
   const request = new Request(input, { ...init, redirect: 'manual' });
   if (!isMetadataDocumentUrlAllowed(request.url)) throw new TypeError('CIMD resource is not approved');
   if (request.method !== 'GET' && request.method !== 'HEAD') throw new TypeError('CIMD supports GET and HEAD only');
@@ -24,4 +24,4 @@ export const fetchClientMetadataResource: ClientMetadataTransport['fetchClientMe
     throw new TypeError('CIMD redirects are forbidden');
   }
   return response;
-};
+}

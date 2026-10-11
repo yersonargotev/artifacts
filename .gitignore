@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .astro/
+.worker/
+.wrangler/
+.cloudflare/
 .env
 .env.*
 !.env.example

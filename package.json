@@ -19,13 +19,17 @@
     "dev:dashboard": "tsx scripts/dashboard.ts",
     "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts",
     "verify:turso": "tsx scripts/verify-turso.ts",
-    "dev": "tsx scripts/dev.ts"
+    "dev": "tsx scripts/dev.ts",
+    "build:workers": "tsx scripts/build-workers.ts",
+    "deploy:worker": "tsx scripts/deploy-worker.ts",
+    "dev:publication": "tsx apps/publication/src/server.ts"
   },
   "devDependencies": {
     "@hono/node-server": "2.1.4",
     "@libsql/client": "0.18.0",
     "@types/node": "24.10.1",
     "drizzle-orm": "0.45.4",
+    "esbuild": "0.27.4",
     "jose": "6.2.12",
     "playwright": "1.64.0",
     "tsx": "4.21.0",
