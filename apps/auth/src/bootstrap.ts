@@ -5,7 +5,8 @@ import { openDatabase } from '@artifacts/db';
 import { oauthClient, oauthClientResource, user } from '@artifacts/db/schema';
 import { createAuth } from './auth.ts';
 
-process.loadEnvFile();
+const envFile = process.env.ARTIFACTS_ENV_FILE ?? '.env';
+process.loadEnvFile(envFile);
 const config = authConfig();
 const { db, client } = await openDatabase({ url: required('DATABASE_URL'), authToken: process.env.DATABASE_AUTH_TOKEN });
 const auth = createAuth(db, config, true);
@@ -42,12 +43,12 @@ try {
       subject_type: 'public',
     } });
     if (!result.client_secret) throw new Error('Confidential client did not receive a secret');
-    await appendFile('.env', `${kind}_CLIENT_ID=${result.client_id}\n${kind}_CLIENT_SECRET=${result.client_secret}\n`);
+    await appendFile(envFile, `${kind}_CLIENT_ID=${result.client_id}\n${kind}_CLIENT_SECRET=${result.client_secret}\n`);
     process.env[`${kind}_CLIENT_ID`] = result.client_id;
     if (kind === 'MCP_INTROSPECTION') await ensureResourceLink(result.client_id);
   }
   await auth.api.signOut({ headers });
-  await chmod('.env', 0o600);
+  await chmod(envFile, 0o600);
   console.log('Owner and confidential clients are ready. Existing identities and secrets were preserved.');
 } finally {
   client.close();
