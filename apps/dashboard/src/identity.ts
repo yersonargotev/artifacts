@@ -11,6 +11,13 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const random = () => randomBytes(32).toString('base64url');
 export type PanelIdentity = Readonly<{ userId: string; sessionId: string; name: string; clientId: string; scopes: string[]; expiresAt: Date }>;
 
+export function localReturnPath(value: string, origin: string) {
+  if (!value.startsWith('/') || value.startsWith('//') || /[\\\x00-\x1f\x7f]/.test(value)) throw new Error('Login return path must be local');
+  const url = new URL(value, origin);
+  if (url.origin !== origin || url.hash) throw new Error('Login return path must be local');
+  return `${url.pathname}${url.search}`;
+}
+
 export function createPanelIdentity(db: Database, config: ReturnType<typeof dashboardConfig>) {
   let provider: Promise<oidc.Configuration> | undefined;
   function getProvider() {
@@ -19,13 +26,14 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
     }).catch((error) => { provider = undefined; throw error; });
   }
   return {
-    async startLogin() {
+    async startLogin(returnPath = '/') {
+      returnPath = localReturnPath(returnPath, config.origin);
       const client = await getProvider();
       const token = random();
       const state = oidc.randomState();
       const nonce = oidc.randomNonce();
       const verifier = oidc.randomPKCECodeVerifier();
-      await db.insert(oidcTransaction).values({ tokenHash: hash(token), state, nonce, verifier, expiresAt: new Date(Date.now() + 600_000) });
+      await db.insert(oidcTransaction).values({ tokenHash: hash(token), state, nonce, verifier, returnPath, expiresAt: new Date(Date.now() + 600_000) });
       const url = oidc.buildAuthorizationUrl(client, { redirect_uri: `${config.origin}/auth/callback`, scope: 'openid profile', state, nonce, code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256' });
       return { token, url };
     },
@@ -46,7 +54,7 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
         await tx.insert(panelSession).values({ tokenHash: hash(panelToken), authSessionId: sid, issuer: claims.iss, subject, clientId: config.clientId, scopes: (tokens.scope ?? 'openid profile').split(' '), expiresAt: central.expiresAt });
         return central.expiresAt;
       });
-      return { token: panelToken, expiresAt };
+      return { token: panelToken, expiresAt, returnPath: localReturnPath(transaction.returnPath, config.origin) };
     },
     async load(token: string | undefined): Promise<PanelIdentity | undefined> {
       if (!token || !/^[\w-]{43}$/.test(token)) return;

@@ -9,7 +9,7 @@ export const GET: APIRoute = async ({ cookies, url, redirect }) => {
   try {
     const session = await identity.completeLogin(url, transaction);
     cookies.set(panelCookie, session.token, { ...cookieOptions, expires: session.expiresAt });
-    return redirect('/', 303);
+    return redirect(session.returnPath, 303);
   } catch {
     return redirect('/?login=failed', 303);
   }

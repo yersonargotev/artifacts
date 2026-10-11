@@ -1,9 +1,19 @@
 import { defineMiddleware } from 'astro:middleware';
+import { serviceUrl } from '@artifacts/config';
 import { panelCookie } from './identity.ts';
 import { getRuntime } from './runtime.ts';
+import { publicationServiceAuthorized, servicePaths } from './publication.ts';
 
 export const onRequest = defineMiddleware(async (context, next) => {
   try {
+    if (servicePaths.has(context.url.pathname)) {
+      if (!publicationServiceAuthorized(context.request, process.env.PUBLICATION_SERVICE_SECRET)) return new Response('Access denied', { status: 403, headers: { 'cache-control': 'private, no-store' } });
+      if (context.url.origin !== serviceUrl('DASHBOARD_URL')) return new Response('Invalid host', { status: 400 });
+      const response = await next();
+      response.headers.set('cache-control', 'private, no-store');
+      response.headers.set('x-content-type-options', 'nosniff');
+      return response;
+    }
     const { config, identity } = await getRuntime();
     if (context.url.host !== new URL(config.origin).host) return new Response('Invalid host', { status: 400 });
     if (!['GET', 'HEAD', 'OPTIONS'].includes(context.request.method) && context.request.headers.get('origin') !== config.origin) return new Response('Origin denied', { status: 403 });

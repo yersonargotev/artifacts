@@ -1,0 +1,14 @@
+{
+  "name": "@artifacts/publication",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@artifacts/artifacts": "workspace:*",
+    "@artifacts/config": "workspace:*",
+    "jose": "6.2.12",
+    "zod": "4.6.5"
+  }
+}
