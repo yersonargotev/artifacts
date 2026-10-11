@@ -1,0 +1,25 @@
+# Identity boundaries
+
+Artifacts has one immutable user ID across its authorization server, MCP server, and dashboard. Better Auth owns the OAuth and OIDC protocols. The applications own admission to their resources.
+
+We chose the [app-local design](../../.audit/design/local/sketch.md) over the [shared policy package](../../.audit/design/shared/DESIGN.md). The [independent assessment](../../.audit/design/judgment.md) preferred fewer interfaces for applications that validate different credentials. `packages/config` shares static scope names and configuration validation. It does not decide authorization. `packages/db` owns all tables and migrations.
+
+MCP accepts a JWT only after signature, issuer, resource audience, expiry, and required claims pass. Every protected HTTP request also performs authenticated RFC 7662 introspection. MCP reconciles subject, session, client, audience, expiry, and scopes against the signed token. An absent or empty session ID is rejected. A successful introspection result is never cached. Signing keys may be cached.
+
+The confidential introspection client is linked to the MCP resource identifier. Better Auth permits cross-client introspection only through that link. The provider's JWT issuance takes `sub` and `sid` from the authenticated user and session. Its introspection checks session existence and expiry. It does not independently compare the session's user ID to the signed subject. Integration tests verify the issuance relationship. MCP trusts the configured issuer's signature and checks that introspection returns the same identity.
+
+The dashboard is a confidential OIDC client. `openid-client` validates the code exchange, state, nonce, issuer, audience, and ID-token signature. A durable transaction holds the PKCE verifier and is deleted atomically before code exchange. The callback requires a live central session whose user matches the verified subject. Email does not link accounts.
+
+The browser receives only a random opaque session cookie. The database stores its SHA-256 hash. Every page request joins the panel session to the central session and checks both expirations. A foreign key cascades central-session deletion into panel-session deletion. Callback insertion and central deletion cannot leave an admitted dangling session. The tests hold a real token response while deleting the central session, then release the callback.
+
+Panel logout deletes only the panel session. Global revocation authenticates the central session and deletes every central session belonging to that user. The cascade removes panel sessions. OAuth grant cleanup follows as a best-effort operation. Both mutation forms require an exact same-origin `Origin` header. HTML uses `Referrer-Policy: same-origin` because `no-referrer` changes native POST form origins to `null` in browsers.
+
+Access tokens last five minutes. Refresh tokens have a seven-day rolling lifetime and a thirty-second rotation replay interval. Central sessions last thirty days without refresh or positive cookie caching. The dashboard session cannot outlive its central session.
+
+Better Auth 1.7.7 has a known concurrent refresh-family invalidation race. A transaction-enabled adapter does not repair the provider's read-before-write algorithm. A refresh operation can overlap family invalidation and produce another token. Central-session deletion is the revocation boundary. The generated refresh-session foreign key uses `ON DELETE SET NULL`. A surviving refresh can therefore mint a JWT with `sid: null`; MCP rejects it. Tests cover rotation, grace replay, expired replay, overlapping invalidation, and access after deletion. The expired replay test advances the persisted replay deadline instead of waiting thirty seconds. Review this dependency behavior before upgrading Better Auth.
+
+CIMD uses the provider's Node transport, including DNS and redirect defenses. DCR remains enabled for older clients. A narrow adapter classifies an omitted application type as native only for public clients whose redirects all use exact HTTP loopback hosts. The provider checks redirect paths and hostnames, while allowing the loopback port to change. SDK 2 uses its stateless legacy fallback so clients speaking the 2025 protocol can connect.
+
+Local development uses distinct cookie hosts. The authorization app uses `localhost`, and the dashboard uses `127.0.0.1`. Cookies are host-only, HttpOnly, and SameSite=Lax. HTTPS configurations also set Secure. All non-loopback public URLs require HTTPS. Local confidential OIDC registration uses `application_type: native` because this provider rejects web-client loopback redirects. Production HTTPS registration uses `web`.
+
+Local file libSQL proves the migration, foreign-key, and transaction behavior in the verification suite. Remote Turso connectivity and deployed enforcement remain unverified without a real Turso configuration. A dashboard can remain available during an authorization HTTP outage because it checks the shared database. A database outage fails closed. MCP requires authorization HTTP availability for each request.
