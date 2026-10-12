@@ -5,7 +5,25 @@ description: "Verify Artifacts through its real Astro panel, protected publicati
 
 # Verify Artifacts
 
-Read the [feature map](features/README.md), then the requested feature recipe. Use the existing production handlers and built panel with a disposable local identity. This skill proves local Node behavior; live Claude/Codex acceptance and deployed Workers are separate paths described in the map.
+Read the [feature map](features/README.md), then the requested feature recipe. The disposable recipes use the existing production handlers and built panel with a local identity. The [retained artifact recipe](features/retained.md) verifies an existing saved revision through a supplied authenticated browser context or private storage state. It supports deployed and local URLs without authoring or account mutations. Live Claude/Codex acceptance is a separate path described in the map.
+
+## Verify a retained revision
+
+Use an independent saved full `ArtifactRead`, an exact selected panel URL with `revisionId`, and the [typed declarative configuration](features/retained.md). Publication coverage requires that the selected saved revision is currently published. Omit `publicationUrl` for an unpublished selection. The report explicitly records that publication was not requested.
+
+```sh
+node --import tsx .agents/skills/verify-artifacts/scripts/verify-retained.ts \
+  --config /private/path/retained-config.json \
+  --storage-state /private/path/browser-state.json
+```
+
+The CLI opens actual Chrome with the supplied state. It never accepts a login password, creates an account, authors a revision, publishes, logs out or revokes a session. Normal protected viewer admission can consume its one-use viewer grant through the existing GET handoff. The callable `verifyRetainedArtifact(context, config)` preserves the supplied context and closes only its own pages.
+
+Complete exact-state markers must match the saved artifact ID, revision ID, SHA-256 and publication version. A partial, malformed or mismatched marker set fails. Only a page with all four marker attributes absent can use the supported legacy proof. That proof compares the displayed panel ID and digest, actual pinned preview response, complete deterministic downloaded ZIP, unique publication revision sequence, exact `srcdoc`, and complete revision-bound attachment bytes. The panel independently rereads publication revision/version before and after publication checks.
+
+Every viewport reloads the real frame before content expectations. The verifier checks wrapper and frame overflow, CSP, containment headers, sandbox and console/page errors. It records private screenshots, ZIPs and a typed `result.json`. It omits traces, storage state, raw authentication requests and query strings from evidence. A failed check returns `status: "failed"`; the CLI exits with code 1.
+
+Run the pure config/archive tests with `node --import tsx --test tests/retained-verification.test.ts`. Run the Chrome contract tests with `node --import tsx --test tests/retained-verification.browser.proof.ts`. Run the actual local application proof with `pnpm build && node --import tsx tests/retained-browser.proof.ts`. The proof uses the existing migrated disposable fixture, completes setup/login first, invokes the same callable verifier, then compares persisted authoring/account/session rows and browser methods to prove no mutations during verification.
 
 ## Launch
 
