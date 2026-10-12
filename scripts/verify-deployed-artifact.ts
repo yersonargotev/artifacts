@@ -58,6 +58,7 @@ try {
     assert.equal(response.headers()['connection-allowlist'], '()');
     await page.frameLocator('iframe').getByRole('button', { name: 'Try the artifact', exact: true }).click();
     await page.frameLocator('iframe').getByRole('button', { name: 'Interaction verified', exact: true }).waitFor();
+    await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
     const attachment = new URL((await page.getByRole('link', { name: 'notes.txt', exact: true }).getAttribute('href'))!, evidence.publicationUrl).href;
     const authenticatedFile = await context.request.get(attachment);
     assert.equal(authenticatedFile.status(), 200);
@@ -77,12 +78,16 @@ try {
     const panel = await context.newPage();
     await panel.goto(dashboard);
     if (await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).count()) await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
+    await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+    await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
     await panel.getByTestId('user-id').waitFor();
     assert.equal(await panel.getByTestId('user-id').textContent(), original.ownerId);
     await panel.getByRole('link', { name: original.revision.snapshot.metadata.title, exact: true }).click();
     await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).waitFor();
     await panel.getByRole('link', { name: 'Ver revisión 2', exact: true }).waitFor();
-    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
+    await panel.screenshot({ path: resolve(directory, 'deployed-history-selection.png') });
+    await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === original.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
     await panel.frameLocator('iframe').getByRole('heading', { name: 'Created by Claude', exact: true }).waitFor();
     const downloadEvent = panel.waitForEvent('download');
     await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();

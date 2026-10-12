@@ -41,6 +41,10 @@ try {
   await page.getByLabel('Correo electrónico').fill('owner@example.test');
   await page.getByLabel('Contraseña').fill(app.password);
   await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await mkdir('.test-artifacts', { recursive: true });
+  await page.screenshot({ path: '.test-artifacts/library-desktop.png' });
+  await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
   await page.getByTestId('user-id').waitFor();
   assert.equal(await page.getByTestId('user-id').textContent(), app.ownerId);
   const token = await grant(app);
@@ -52,12 +56,17 @@ try {
   await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();
   assert.equal((await callWhoami(app.config.resource, token.access_token)).status, 200);
   await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
+  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
   await page.getByTestId('user-id').waitFor();
   await mkdir('.test-artifacts', { recursive: true });
   await page.screenshot({ path: '.test-artifacts/dashboard-desktop.png', fullPage: true });
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });
   await mobile.goto(dashboard);
+  await mobile.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await mobile.screenshot({ path: '.test-artifacts/library-mobile.png' });
+  await mobile.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
   await mobile.getByTestId('user-id').waitFor();
   await mobile.evaluate(async () => {
     await document.fonts.ready;

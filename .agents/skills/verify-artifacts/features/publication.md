@@ -15,10 +15,10 @@ An owner opens a published artifact at one stable authenticated URL, interacts w
 ## How to get to it (user POV)
 
 - After `artifacts_publish`, open its returned stable URL.
-- In an artifact's panel detail page, choose `Abrir publicación` under `Revisiones y publicación`. To select another publication, open that retained revision and choose its `Publicar revisión N` button.
+- In an artifact's panel detail page, choose `Abrir publicación` above the preview. To select another publication, open that retained revision and choose its `Publicar revisión N` button.
 - If signed out, complete the account login and return to the original publication.
 - Interact with the document inside the frame titled `Contenido del artefacto`.
-- Choose a filename link under the `Archivos adjuntos` navigation region.
+- Open the native `Archivos` disclosure, then choose a filename link under the `Archivos adjuntos` navigation region. `Información` exposes the complete title, description and revision provenance.
 - Reload the bookmarked URL after another retained revision is published.
 
 ## Driving it with control.ts (Playwright + HTTP MCP)
@@ -32,7 +32,7 @@ Preconditions:
 - **Publish and open.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive publication --run .test-artifacts/verify-artifacts/publication-run`. The recipe creates and publishes revision 1 through HTTP MCP, opens the returned URL, fills `Correo electrónico` and `Contraseña`, and submits the exact `Iniciar sesión` button. The browser returns to the publication URL and `frameLocator('iframe')` contains the exact heading `Verification revision 1`.
 - **Interact.** The same drive clicks the exact `Try interaction` button inside the publication iframe and waits for `Interaction verified`. Capture the action and changed button state in the actual served wrapper.
 - **Republish.** The same drive updates through MCP and publishes revision 2. Its publication result must equal the first URL; revisiting that URL shows the exact iframe heading `Verification revision 2` rather than revision 1.
-- **Download.** The same drive chooses the exact `notes.txt` link, waits for the browser download, and compares its saved bytes with `Revision 1 attachment.\n`. A working filename link alone does not prove byte preservation.
+- **Download.** The same drive records opening `Archivos`, opens that native disclosure, then chooses the exact `notes.txt` link, waits for the browser download, and compares its saved bytes with `Revision 1 attachment.\n`. A working filename link alone does not prove byte preservation.
 - **Anonymous denial.** The same drive opens the document in a separate unauthenticated context. The resulting page exposes `Correo electrónico` and has no artifact iframe; a current attachment request without following redirects returns 401. This drive checks the rendered login boundary and the attachment status. Exact document admission status/body checks are extended coverage, because the browser follows the document redirects.
 - **Retain proof and stop.** Inspect `.test-artifacts/verify-artifacts/publication-run/publication/actions.jsonl`, `result.json`, both revision screenshots/snapshots, `trace.zip`, and the downloaded `notes.txt`, then run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts cleanup --run .test-artifacts/verify-artifacts/publication-run`. Confirm evidence remains.
 

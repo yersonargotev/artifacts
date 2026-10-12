@@ -69,7 +69,11 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
       let html = publicationDocument(expected, (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}`, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
-      if (failure === 'sequence') html = html.replace('Revisión 1</span>', 'Revisión 2</span>');
+      if (failure === 'sequence') {
+        assert(html.includes('Revisión 1</span>'), 'Sequence corruption must target the actual rendered revision');
+        html = html.replace('Revisión 1</span>', 'Revisión 2</span>');
+        assert(html.includes('Revisión 2</span>'), 'Sequence corruption must change the actual rendered revision');
+      }
       if (failure === 'srcdoc') html = html.replace(escapeHtml(snapshot.content.text), escapeHtml('<h1>Wrong revision bytes</h1>'));
       if (failure === 'overflow') html = html.replace('<main', '<div style="width:2000px">Overflow</div><main');
       response.end(html);
