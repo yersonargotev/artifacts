@@ -10,8 +10,9 @@ import { eq } from 'drizzle-orm';
 import { unzipSync, strFromU8 } from 'fflate';
 import { chromium, type Browser } from 'playwright';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
-import { session } from '../packages/db/src/schema.ts';
+import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
+import { publishSelectedRevision } from '../apps/dashboard/src/publish.ts';
 import { fixture } from './helpers.ts';
 
 const reservation = createServer().listen(0, '127.0.0.1');
@@ -83,6 +84,10 @@ try {
   await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
   await page.waitForURL(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  assert.equal(await page.locator('main').getAttribute('data-artifact-id'), created.artifactId);
+  assert.equal(await page.locator('main').getAttribute('data-revision-id'), created.revision.id);
+  assert.equal(await page.locator('main').getAttribute('data-revision-sha256'), created.revision.sha256);
+  assert.equal(await page.locator('main').getAttribute('data-publication-version'), '1');
   assert.equal(new URL(page.url()).search, '');
   const viewerCookies = (await context.cookies(publish)).filter((cookie) => cookie.name.startsWith('__Host-artifacts-viewer-'));
   assert.equal(viewerCookies.length, 1);
@@ -203,6 +208,203 @@ try {
   assert.equal(await panel.locator('h1').count(), 1);
   assert(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png', fullPage: true });
+  const reviewOne = await store.create(actor, {
+    requestId: randomBytes(16).toString('hex'),
+    snapshot: {
+      metadata: { title: 'Review <img src=x onerror="document.body.dataset.reviewEscaped=1">', description: 'Original review description', custom: { unsafe: '<script>document.body.dataset.reviewEscaped=1</script>', retained: true } },
+      content: { kind: 'html', text: '<h1>Saved review one</h1><p>Retained source.</p>' },
+      files: [
+        { path: 'changed.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAE=' },
+        { path: 'encoding.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'same bytes' },
+        { path: 'removed.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'removed' },
+        { path: 'unsafe"&<img>.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'escaped path' },
+      ],
+    },
+  });
+  const reviewUrl = `${dashboard}/artifacts/${reviewOne.artifactId}`;
+  const publishUrl = `${reviewUrl}/publish`;
+  await panel.setViewportSize({ width: 1280, height: 900 });
+  await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}`);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '0');
+  assert.equal(await panel.locator('.revision-state').innerText(), `Seleccionada\nRevisión 1\n${reviewOne.revision.id}\nMás reciente\nRevisión 1\n${reviewOne.revision.id}\nPublicada\nSin publicar`);
+  const singleRevisionComparison = {
+    forms: await panel.locator('.compare-form').count(),
+    selectors: await panel.getByLabel('Comparar la seleccionada con', { exact: true }).count(),
+    comparisons: await panel.locator('.content-comparison').count(),
+    emptyState: await panel.getByText('No hay otra revisión disponible para comparar.', { exact: true }).count(),
+    selfLinks: await panel.getByRole('link', { name: 'Comparar con revisión 1', exact: true }).count(),
+    publicationNotice: await panel.getByText('Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.', { exact: true }).count(),
+  };
+  await panel.screenshot({ path: '.test-artifacts/artifact-comparison-single.png', fullPage: true });
+  const unpublishedOne = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: reviewOne.revision.snapshot });
+  const unpublishedTwo = await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: unpublishedOne.artifactId, expectedRevisionId: unpublishedOne.revision.id, snapshot: { ...unpublishedOne.revision.snapshot, content: { kind: 'text', text: 'Second unpublished revision' } } });
+  const unpublishedUrl = `${dashboard}/artifacts/${unpublishedOne.artifactId}`;
+  await panel.goto(unpublishedUrl);
+  const unpublishedComparison = {
+    selected: await panel.locator('.artifact-detail').getAttribute('data-revision-id'),
+    target: await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(),
+    options: await panel.locator('#compareTo option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)),
+    contents: await panel.locator('.content-comparison pre').allTextContents(),
+  };
+  await panel.screenshot({ path: '.test-artifacts/artifact-comparison-unpublished.png', fullPage: true });
+  assert.deepEqual({ singleRevisionComparison, unpublishedComparison }, {
+    singleRevisionComparison: { forms: 0, selectors: 0, comparisons: 0, emptyState: 1, selfLinks: 0, publicationNotice: 1 },
+    unpublishedComparison: { selected: unpublishedTwo.revision.id, target: unpublishedOne.revision.id, options: [unpublishedOne.revision.id], contents: [unpublishedOne.revision.snapshot.content.text, unpublishedTwo.revision.snapshot.content.text] },
+  });
+  await panel.getByRole('button', { name: 'Comparar', exact: true }).click();
+  assert.equal(new URL(panel.url()).searchParams.get('revisionId'), unpublishedTwo.revision.id);
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), unpublishedOne.revision.id);
+  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
+  assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedTwo.revision.id);
+  assert.deepEqual(await panel.locator('#compareTo option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)), [unpublishedTwo.revision.id]);
+  await panel.goto(`${unpublishedUrl}?before=1`);
+  assert.equal(await panel.locator('.revision-list li').count(), 0);
+  assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedOne.revision.id);
+  await panel.goto(`${unpublishedUrl}?revisionId=${unpublishedTwo.revision.id}&compareTo=${unpublishedTwo.revision.id}`);
+  assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedOne.revision.id);
+  assert.equal(await panel.locator('.content-comparison pre').first().innerText(), unpublishedOne.revision.snapshot.content.text);
+  assert.equal(await panel.locator('.content-comparison pre').last().innerText(), unpublishedTwo.revision.snapshot.content.text);
+  await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}&compareTo=${reviewOne.revision.id}`);
+  assert.equal(await panel.locator('.compare-form, .content-comparison').count(), 0);
+  assert.equal(await panel.getByText('No hay otra revisión disponible para comparar.', { exact: true }).count(), 1);
+  const firstPanelCommand = await panel.locator('.publish-form input').evaluateAll((inputs) => Object.fromEntries(inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value]))) as Record<string, string>;
+  assert.equal(firstPanelCommand.revisionId, reviewOne.revision.id);
+  assert.equal(firstPanelCommand.expectedPublicationVersion, '0');
+  const nativeFirstPost = panel.waitForResponse((response) => response.url() === publishUrl && response.request().method() === 'POST');
+  await panel.getByRole('button', { name: 'Publicar revisión 1', exact: true }).click();
+  assert.equal((await nativeFirstPost).status(), 200);
+  assert.equal(await panel.locator('[data-publication-result]').getAttribute('data-publication-result'), 'published');
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.revisionId, reviewOne.revision.id);
+  const reviewTwo = await store.update(actor, {
+    requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, expectedRevisionId: reviewOne.revision.id,
+    snapshot: {
+      metadata: { title: 'Browser workflow review', description: 'Changed <script>document.body.dataset.reviewEscaped=1</script>', custom: { unsafe: '<img src=x onerror="document.body.dataset.reviewEscaped=1">', retained: false } },
+      content: { kind: 'text', text: '<script>document.body.dataset.reviewEscaped=1</script>\n' + 'content'.repeat(180) },
+      files: [
+        { path: 'added.md', mediaType: 'text/markdown', encoding: 'utf8', data: '# Added' },
+        { path: 'changed.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AQID' },
+        { path: 'encoding.txt', mediaType: 'text/plain', encoding: 'base64', data: Buffer.from('same bytes').toString('base64') },
+        { path: 'unsafe"&<img>.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'escaped path' },
+      ],
+    },
+  });
+  let reviewHead = reviewTwo;
+  for (let sequence = 3; sequence <= 7; sequence++) reviewHead = await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, expectedRevisionId: reviewHead.revision.id, snapshot: reviewTwo.revision.snapshot });
+  await panel.goto(dashboard);
+  const reviewCard = panel.locator('.artifact-list li').filter({ has: panel.getByRole('link', { name: 'Browser workflow review', exact: true }) });
+  assert.equal(await reviewCard.locator('.pending').innerText(), 'Cambios pendientes de publicación');
+  await panel.goto(`${reviewUrl}?revisionId=${reviewTwo.revision.id}&compareTo=${reviewOne.revision.id}`);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-artifact-id'), reviewOne.artifactId);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewTwo.revision.sha256);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '1');
+  assert.equal(await panel.locator('.revision-state').innerText(), `Seleccionada\nRevisión 2\n${reviewTwo.revision.id}\nMás reciente\nRevisión 7\n${reviewHead.revision.id}\nPublicada\nRevisión 1\n${reviewOne.revision.id}`);
+  assert.equal(await panel.locator('.inventory tbody tr').count(), 4);
+  assert.equal(await panel.locator('.inventory tbody tr').filter({ hasText: 'changed.bin' }).locator('td').nth(1).innerText(), '3');
+  assert.equal(await panel.locator('.comparison tbody tr').count(), 3);
+  assert.equal(await panel.locator('.content-comparison pre').nth(0).innerText(), reviewOne.revision.snapshot.content.text);
+  assert.equal(await panel.locator('.content-comparison pre').nth(1).innerText(), reviewTwo.revision.snapshot.content.text);
+  assert.deepEqual(await panel.locator('.file-changes h4').allTextContents(), ['added.md Agregado', 'changed.bin Modificado', 'encoding.txt Modificado', 'removed.txt Eliminado']);
+  assert.equal(await panel.locator('.comparison tbody tr').filter({ hasText: 'Metadatos personalizados' }).locator('td').nth(1).innerText(), JSON.stringify(reviewTwo.revision.snapshot.metadata.custom, null, 2));
+  assert.equal(await panel.locator('.artifact-detail script, .artifact-detail img').count(), 0);
+  assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
+  assert.equal(await panel.locator('.revision-list li').count(), 5);
+  await panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).click();
+  assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewTwo.revision.id);
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
+  assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
+  assert.equal(await panel.locator('.revision-list li').count(), 2);
+  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
+  assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), reviewHead.revision.id);
+  await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();
+  await panel.goto(`${reviewUrl}?revisionId=${reviewTwo.revision.id}&compareTo=${reviewOne.revision.id}`);
+  await panel.setViewportSize({ width: 390, height: 844 });
+  await panel.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  assert.equal(await panel.locator('header').count(), 1);
+  assert.equal(await panel.locator('h1').count(), 1);
+  assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.equal(await panel.frameLocator('.preview').locator('pre').innerText(), reviewTwo.revision.snapshot.content.text);
+  assert.equal(await panel.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
+  await panel.screenshot({ path: '.test-artifacts/artifact-review-mobile.png' });
+  await panel.locator('.comparison').scrollIntoViewIfNeeded();
+  await panel.screenshot({ path: '.test-artifacts/artifact-comparison-mobile.png' });
+  const commandFields = await panel.locator('.publish-form input').evaluateAll((inputs) => Object.fromEntries(inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value]))) as Record<string, string>;
+  const panelCookieHeader = (await context.cookies(dashboard)).map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
+  const nativePost = (fields: Record<string, string>, headers: Record<string, string> = { origin: dashboard }) => fetch(publishUrl, { method: 'POST', headers: { cookie: panelCookieHeader, 'content-type': 'application/x-www-form-urlencoded', ...headers }, body: new URLSearchParams(fields), redirect: 'manual' });
+  assert.equal((await nativePost(commandFields, {})).status, 403);
+  assert.equal((await nativePost(commandFields, { origin: collectorOrigin })).status, 403);
+  assert.equal((await fetch(publishUrl, { method: 'POST', headers: { origin: dashboard, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(commandFields) })).status, 401);
+  assert.equal((await context.request.get(publishUrl)).status(), 405);
+  assert.equal((await nativePost({ ...commandFields, artifactId: created.artifactId })).status, 400);
+  assert.equal((await nativePost({ ...commandFields, revisionId: created.revision.id })).status, 404);
+  assert.equal((await nativePost({ ...commandFields, extra: 'unexpected' })).status, 400);
+  assert.equal((await nativePost({ ...commandFields, requestId: 'short' })).status, 400);
+  for (const version of ['', '-1', '1.1', '1e0', '01', '9007199254740992']) assert.equal((await nativePost({ ...commandFields, expectedPublicationVersion: version })).status, 400);
+  for (const extra of `&revisionId=${reviewTwo.revision.id} &requestId=%ZZ &requestId=%ED%A0%80`.split(' ')) {
+    const malformed = await fetch(publishUrl, { method: 'POST', headers: { cookie: panelCookieHeader, origin: dashboard, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(commandFields).toString() + extra });
+    assert.equal(malformed.status, 400);
+  }
+  assert.equal((await fetch(publishUrl, { method: 'POST', headers: { cookie: panelCookieHeader, origin: dashboard, 'content-type': 'application/json' }, body: JSON.stringify(commandFields) })).status, 400);
+  const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other review owner', email: 'review-other@example.test', password: app.password } });
+  await app.auth.api.signInEmail({ body: { email: 'review-other@example.test', password: app.password } });
+  const outsiderSession = await app.db.select().from(session).where(eq(session.userId, outsider.user.id)).get();
+  assert(outsiderSession);
+  const outsiderArtifact = await store.create({ ...actor, userId: outsider.user.id, sessionId: outsiderSession.id }, { requestId: randomBytes(16).toString('hex'), snapshot: reviewOne.revision.snapshot });
+  assert.equal((await context.request.post(`${dashboard}/artifacts/${outsiderArtifact.artifactId}/publish`, { headers: { origin: dashboard }, form: { ...commandFields, artifactId: outsiderArtifact.artifactId, revisionId: outsiderArtifact.revision.id, expectedPublicationVersion: '0' } })).status(), 404);
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
+  const retryRequestId = commandFields.requestId!;
+  await app.client.execute(`CREATE TRIGGER review_publish_outage BEFORE INSERT ON artifact_command WHEN NEW.request_id = '${retryRequestId}' BEGIN SELECT RAISE(FAIL, 'Controlled publication outage'); END`);
+  try {
+    const failedPost = panel.waitForResponse((response) => response.url() === publishUrl && response.request().method() === 'POST');
+    await panel.getByRole('button', { name: 'Publicar revisión 2', exact: true }).click();
+    assert.equal((await failedPost).status(), 503);
+    assert.equal(await panel.locator('[data-publication-result]').getAttribute('data-publication-result'), 'uncertain');
+    const retryFields = await panel.locator('.publish-form input').evaluateAll((inputs) => Object.fromEntries(inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value])));
+    assert.deepEqual(retryFields, commandFields);
+    assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
+  } finally { await app.client.execute('DROP TRIGGER review_publish_outage'); }
+  const retryPost = panel.waitForResponse((response) => response.url() === publishUrl && response.request().method() === 'POST');
+  await panel.getByRole('button', { name: 'Reintentar publicación', exact: true }).click();
+  assert.equal((await retryPost).status(), 200);
+  assert.equal(await panel.locator('[data-publication-result]').getAttribute('data-publication-result'), 'published');
+  const savedReview = await store.read(actor, { artifactId: reviewOne.artifactId });
+  assert.equal(savedReview.publication?.version, 2);
+  assert.equal(savedReview.publication?.revisionId, reviewTwo.revision.id);
+  assert.equal(savedReview.headRevisionId, reviewHead.revision.id);
+  const exactReplay = await nativePost(commandFields);
+  assert.equal(exactReplay.status, 200);
+  assert.match(await exactReplay.text(), /data-publication-result="published"/);
+  assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, retryRequestId))).length, 1);
+  const requestConflict = await nativePost({ ...commandFields, revisionId: reviewOne.revision.id });
+  assert.equal(requestConflict.status, 409);
+  assert.match(await requestConflict.text(), /data-publication-result="conflict"/);
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 2);
+  const stalePost = await nativePost({ ...commandFields, requestId: randomBytes(16).toString('hex') });
+  assert.equal(stalePost.status, 409);
+  const staleHtml = await stalePost.text();
+  assert.match(staleHtml, /Versión 2/);
+  assert(!staleHtml.includes('class="publish-form"'));
+  await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, revisionId: reviewHead.revision.id, expectedPublicationVersion: 2 });
+  const superseded = await nativePost(commandFields);
+  assert.equal(superseded.status, 200);
+  const supersededHtml = await superseded.text();
+  assert.match(supersededHtml, /data-publication-result="superseded"/);
+  assert.match(supersededHtml, /Versión 3/);
+  assert(supersededHtml.includes(`revisionId=${reviewHead.revision.id}`));
+  const readbackCommand = { artifactId: reviewOne.artifactId, revisionId: reviewOne.revision.id, expectedPublicationVersion: 3, requestId: randomBytes(16).toString('hex') };
+  const uncertainReadback = await publishSelectedRevision({ publish: store.publish, read: async () => { throw new Error('Independent read unavailable after commit'); } }, actor, readbackCommand);
+  assert.deepEqual(uncertainReadback, { kind: 'uncertain' });
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 4);
+  const confirmedReadback = await publishSelectedRevision(store, actor, readbackCommand);
+  assert.equal(confirmedReadback.kind, 'published');
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 4);
+  assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, readbackCommand.requestId))).length, 1);
   const anonymous = await browser.newContext();
   const anonymousPage = await anonymous.newPage();
   await anonymousPage.goto(secondPublication.url);
@@ -225,7 +427,7 @@ try {
   publicationHandler = createPublicationApp({ DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret }, async () => { throw new Error('Backend disconnected'); });
   assert.equal((await fetch(secondPublication.url, { headers: { cookie: viewerHeader }, redirect: 'manual' })).status, 503);
   publicationHandler = beforeOutage;
-  console.log('Artifact browser proof passed. Stable publication, clean one-use handoff, sandbox isolation, exact historical export, revision-bound attachments, mobile layout, anonymous denial, central revocation and backend outage.');
+  console.log('Artifact browser proof passed. Owner-only publication wording, single-revision comparison empty state, distinct unpublished comparison defaults and cleared self-comparisons, exact markers, bounded retained history, escaped revision comparisons and inventory, native pinned publication, unchanged retries, conflicts and independent read-back, stable publication, clean one-use handoff, sandbox isolation, exact historical export, revision-bound attachments, mobile layout, anonymous denial, central revocation and backend outage.');
 } finally {
   await browser?.close();
   child.kill('SIGTERM');

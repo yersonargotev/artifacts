@@ -17,7 +17,7 @@
     "dev:auth": "tsx apps/auth/src/server.ts",
     "dev:mcp": "tsx apps/mcp/src/server.ts",
     "dev:dashboard": "tsx scripts/dashboard.ts",
-    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/publication-network.proof.ts",
+    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/publication-network.proof.ts && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts",
     "verify:turso": "tsx scripts/verify-turso.ts",
     "dev": "tsx scripts/dev.ts",
     "build:workers": "tsx scripts/build-workers.ts",
@@ -26,7 +26,9 @@
     "dev:publication": "tsx apps/publication/src/server.ts",
     "identity:migrate": "tsx scripts/migrate-identity.ts",
     "verify:artifact-clients": "tsx scripts/verify-artifact-clients.ts",
-    "verify:deployed-artifact": "tsx scripts/verify-deployed-artifact.ts"
+    "verify:deployed-artifact": "tsx scripts/verify-deployed-artifact.ts",
+    "verify:retained-artifact": "tsx .agents/skills/verify-artifacts/scripts/verify-retained.ts",
+    "test:retained-browser": "pnpm build && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts"
   },
   "devDependencies": {
     "@hono/node-server": "2.1.4",

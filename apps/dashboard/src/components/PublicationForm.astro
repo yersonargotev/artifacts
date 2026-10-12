@@ -1,0 +1,12 @@
+---
+import type { PublishCommand } from '../publish.ts';
+interface Props { command: PublishCommand; label: string }
+const { command, label } = Astro.props;
+---
+<form class="publish-form" method="post" action={`/artifacts/${encodeURIComponent(command.artifactId)}/publish`}>
+  <input type="hidden" name="artifactId" value={command.artifactId} />
+  <input type="hidden" name="revisionId" value={command.revisionId} />
+  <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
+  <input type="hidden" name="requestId" value={command.requestId} />
+  <button>{label}</button>
+</form>

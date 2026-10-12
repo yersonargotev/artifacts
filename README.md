@@ -106,3 +106,21 @@ node --env-file=.env.deploy --import tsx scripts/verify-deployed-artifact.ts fin
 Use a fresh `ARTIFACTS_PROOF_RUN` and `ARTIFACTS_PROOF_DIR` for another end-to-end acceptance run. The final browser proof checks the stable URL, both revisions, exact panel/CLI archive equality, anonymous denial, and revocation of a separate test browser session while preserving the original client session.
 
 See [deployment instructions](docs/deployment.md), [artifact architecture](docs/decisions/artifacts.md), [execution evidence](.audit/artifact-e2e/runtime.md), and the independent [domain review](.audit/artifact-e2e/review.md) and [publication review](.audit/artifact-e2e/publication-review.md).
+
+## Review and publish a saved revision
+
+Open an artifact in the panel to see the selected, latest, and published revisions. The list identifies unpublished changes. Each selected revision has an attachment inventory and an escaped comparison of content, metadata, and changed files. History navigation keeps the selected revision and comparison.
+
+Choose **Publicar revisión** to publish the revision you reviewed. The form pins its revision, observed publication version, and request ID. A conflict requires another deliberate review. An uncertain result offers the same command for retry. The resulting page independently reads the publication and reports a concurrent replacement. Publication still requires the owner's Artifacts login.
+
+For client edits, use the [prepared editing helper](packages/artifacts/README.md#prepare-and-retry-an-edit) to preserve fields and attachment bytes you did not change. MCP responses remain complete by default. Optional compact responses and summarized history omit content and attachment payloads. A full read or export still verifies the retained bytes.
+
+To verify an existing saved revision in its actual panel and optional protected publication, use an independently fetched full `artifacts_read`, a preauthenticated private browser state, and declarative content expectations:
+
+```sh
+pnpm verify:retained-artifact --config /absolute/private/verification.json --storage-state /absolute/private/browser-state.json
+```
+
+The [retained verification recipe](.agents/skills/verify-artifacts/features/retained.md) defines the config and evidence. The verifier checks the actual sandbox, exact preview response and ZIP, publication identity, attachment bytes, interactions, console errors, and mobile overflow. It does not create or publish artifacts or revoke sessions. Current deployments without identity markers use exact legacy evidence. Partial markers fail.
+
+`pnpm test:browser` includes the retained verifier's browser contracts and a real local Astro proof. `pnpm test:retained-browser` runs that subset. Unit tests do not require Chrome. Deployed verification remains separate from local feature proof.
