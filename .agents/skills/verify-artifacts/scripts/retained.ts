@@ -210,6 +210,16 @@ async function overflow(page: Page, frame: Frame) {
   assert(content.scrollWidth <= content.width + 1, `Content frame overflows horizontally by ${content.scrollWidth - content.width}px`);
 }
 
+async function viewerBounds(page: Page) {
+  const bounds = await page.evaluate(() => {
+    const header = document.querySelector('header')!.getBoundingClientRect();
+    const frame = document.querySelector('main > iframe')!.getBoundingClientRect();
+    return { height: innerHeight, header: header.height, frame: frame.height, bottom: frame.bottom, scrollHeight: document.documentElement.scrollHeight };
+  });
+  assert(bounds.header <= bounds.height * .45 + 1, 'Viewer disclosures must leave the majority of the viewport for the artifact');
+  assert(bounds.frame >= bounds.height * .55 - 1 && bounds.bottom <= bounds.height + 1 && bounds.scrollHeight <= bounds.height + 1, 'Viewer frame must fill the usable remainder without wrapper overflow');
+}
+
 export async function verifyRetainedArtifact(context: BrowserContext, input: RetainedVerificationConfig): Promise<RetainedVerificationReport> {
   const config = parseRetainedVerificationConfig(input);
   const { expected } = config;
@@ -306,6 +316,16 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         assert.equal(await publishedIframe.getAttribute('src'), null, 'Publication must use its retained srcdoc');
         assert.equal(await publishedIframe.getAttribute('srcdoc'), previewDocument(expected, report.interactive), 'Publication srcdoc bytes differ from the retained revision');
         const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive);
+        await overflow(publication, publishedFrame);
+        const fileSummary = publication.locator('summary').filter({ hasText: /^Archivos \(/ });
+        const informationSummary = publication.locator('summary').filter({ hasText: /^Información$/ });
+        const disclosed = await fileSummary.count() === 1 && await informationSummary.count() === 1;
+        if (disclosed) await viewerBounds(publication);
+        const frameCapture = join(config.evidenceDirectory, `publication-${index}-frame.png`);
+        await publishedIframe.screenshot({ path: frameCapture });
+        await chmod(frameCapture, 0o600);
+        await capture(publication, `publication-${index}-closed`);
+        if (await fileSummary.count()) await fileSummary.click();
         const files = expected.revision.snapshot.files;
         const attachmentLinks = publication.locator('nav[aria-label="Archivos adjuntos"] a');
         assert.equal(await publication.locator('a').count(), files.length, 'Publication must contain only its complete retained attachment link inventory');
@@ -313,6 +333,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         for (const file of files) {
           const link = attachmentLinks.filter({ hasText: new RegExp(`^${file.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) });
           assert.equal(await link.count(), 1, `Publication must have one attachment link for ${file.path}`);
+          await link.waitFor({ state: 'visible' });
           const url = new URL((await link.getAttribute('href'))!, config.publicationUrl);
           const path = `/a/${encodeURIComponent(expected.artifactId)}/r/${encodeURIComponent(expected.revision.id)}/files/${file.path.split('/').map(encodeURIComponent).join('/')}`;
           assert.equal(url.href, new URL(path, config.publicationUrl).href, `Attachment must bind the exact artifact, revision and normalized path for ${file.path}`);
@@ -328,6 +349,13 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         assert.equal(publishedFrame.url(), 'about:srcdoc', 'Content expectations must not replace the publication frame');
         await overflow(publication, publishedFrame);
         await capture(publication, `publication-${index}`);
+        if (disclosed) {
+          await informationSummary.press('Enter');
+          assert.equal(await publication.locator('details[open]').count(), 2, 'Both native viewer disclosures must open');
+          await overflow(publication, publishedFrame);
+          await viewerBounds(publication);
+          await capture(publication, `publication-${index}-open`);
+        }
       }
       report.viewports.push(result);
     }

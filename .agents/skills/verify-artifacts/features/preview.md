@@ -4,7 +4,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 
 ## Sub-features
 
-- `preview-list` opens an artifact from `Tus artefactos` and displays its title and description.
+- `preview-list` opens an artifact from `Tus artefactos` and displays its title and selected revision. Full metadata is available under `Información`.
 - `preview-current` displays the newest draft and its revision badge.
 - `preview-history` selects a retained revision without replacing its saved content.
 - `preview-interaction` runs the supported HTML interaction in the actual preview iframe.
@@ -16,7 +16,8 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 
 - Sign in at the panel root, find an artifact under `Tus artefactos`, and choose its title link.
 - Open the artifact's saved detail URL directly; a signed-out owner must complete login before viewing it.
-- Choose `Ver revisión 1` or another revision link in `Historial`.
+- Choose a native `Revisión seleccionada` option and submit `Ver revisión`, or follow `Ver revisión 1` or another revision link in `Historial`. The selector covers the loaded history page and required references.
+- The preview follows the selected actions. Open `Información` for full metadata. Use the `Archivos`, `Comparar revisiones` and `Historial` anchors for the visible secondary sections.
 - Use `Ver más artefactos` on a sufficiently populated list, or `Ver revisiones anteriores` when history spans pages.
 - Resize the browser or open the same detail URL on a mobile viewport.
 
@@ -28,7 +29,7 @@ Preconditions:
 - Actual Chrome is available at version 152 or newer for the interactive path. Source-only fallback cannot pass an interaction assertion.
 
 - **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/preview-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/preview-run`.
-- **Create and browse.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run`. The recipe creates two retained revisions through HTTP MCP, signs in through the panel's login UI, and chooses `getByRole('link', { name: 'Verification artifact', exact: true })`. The detail page exposes `getByRole('heading', { name: 'Historial', exact: true })`, contains two revision rows, and its actual preview initially shows `Verification revision 2`.
+- **Create and browse.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run`. The recipe creates two retained revisions through HTTP MCP, signs in through the panel's login UI, waits for the visible `Tus artefactos` library heading, and chooses `getByRole('link', { name: 'Verification artifact', exact: true })`. The detail page exposes `getByRole('heading', { name: 'Historial', exact: true })`, contains two revision rows, and its actual preview initially shows `Verification revision 2`.
 - **Select history.** The same drive follows the exact `Ver revisión 1` and `Ver revisión 2` link names as required by its recipe. Inside `frameLocator('.preview')`, the selected document heading must match its revision. Record the selection action and resulting iframe content; merely finding both history links does not prove selection.
 - **Interact in the frame.** The same drive clicks the preview's exact `Try interaction` button and waits for its exact `Interaction verified` state inside `frameLocator('.preview')`. This proves interaction in the served preview frame, rather than an extracted raw HTML page.
 - **Inspect mobile.** The same drive opens the detail page at its mobile viewport, waits for history and actual iframe content, and verifies no horizontal page overflow. Retain the mobile screenshot alongside the desktop action/state evidence.

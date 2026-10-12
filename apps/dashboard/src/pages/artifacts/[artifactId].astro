@@ -11,6 +11,9 @@ const { artifact, history, head, published, compared, summary, comparison, revis
 const { revision, publication } = artifact;
 const revisionUrl = (revisionId: string, action = '', compareTo = compared?.id) => `/artifacts/${encodeURIComponent(artifact.artifactId)}${action}?${new URLSearchParams({ revisionId, ...(!action && compareTo && compareTo !== revisionId ? { compareTo } : {}) })}`;
 const command = { artifactId: artifact.artifactId, revisionId: revision.id, expectedPublicationVersion: publication?.version ?? 0, requestId: crypto.randomUUID() };
+const selectionOptions = [revision, ...revisions].sort((a, b) => b.sequence - a.sequence);
+const explicitComparison = Astro.url.searchParams.get('compareTo');
+const selectedPublication = publication?.revisionId === revision.id ? publication : undefined;
 const pending = publication && publication.revisionId !== artifact.headRevisionId;
 const date = (value: string) => new Date(value).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
 const metadataLabels = { title: 'Título', description: 'Descripción', custom: 'Metadatos personalizados' };
@@ -19,18 +22,36 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
 ---
 <Panel title={revision.snapshot.metadata.title} section="Tu artefacto">
 <section class="artifact-detail" data-artifact-id={artifact.artifactId} data-revision-id={revision.id} data-revision-sha256={revision.sha256} data-publication-version={publication?.version ?? 0}>
-  <a class="back" href="/">Volver a tu espacio</a>
-  <section class="welcome"><h1>{revision.snapshot.metadata.title}</h1><p>{revision.snapshot.metadata.description}</p></section>
-  <section class="publication">
-    <h2>Revisiones y publicación</h2>
-    <dl class="revision-state"><dt>Seleccionada</dt><dd><a href={revisionUrl(revision.id)}>Revisión {revision.sequence}</a><code>{revision.id}</code></dd><dt>Más reciente</dt><dd><a href={revisionUrl(head.id)}>Revisión {head.sequence}</a><code>{head.id}</code></dd><dt>Publicada</dt><dd>{published ? <><a href={revisionUrl(published.id)}>Revisión {published.sequence}</a><code>{published.id}</code></> : 'Sin publicar'}</dd></dl>
-    {publication ? <><p>Versión {publication.version}. El enlace conserva la dirección cuando publicas otra revisión.</p><p class="publication-state">{pending ? 'Hay cambios pendientes de publicación en la revisión más reciente.' : 'La revisión más reciente está publicada.'}</p><a class="secondary button" href={publication.url}>Abrir publicación</a><code>{publication.url}</code></> : <p class="muted">Este artefacto aún no está publicado.</p>}
-    <p>Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.</p>
-    <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />
+  <a class="back" href="/">Volver a tus artefactos</a>
+  <h1>{revision.snapshot.metadata.title}</h1>
+  <form class="revision-select" method="get" action={Astro.url.pathname}>
+    {before && <input type="hidden" name="before" value={before} />}
+    {explicitComparison && <input type="hidden" name="compareTo" value={explicitComparison} />}
+    <label for="revisionId">Revisión seleccionada</label>
+    <select id="revisionId" name="revisionId">{selectionOptions.map((item) => <option value={item.id} selected={item.id === revision.id}>Revisión {item.sequence}{item.id === published?.id ? ' · publicada' : ''}{item.id === head.id ? ' · más reciente' : ''}</option>)}</select>
+    <button class="secondary">Ver revisión</button>
+  </form>
+  <dl class="revision-state"><div><dt>Seleccionada</dt><dd><a href={revisionUrl(revision.id)}>Revisión {revision.sequence}</a></dd></div><div><dt>Más reciente</dt><dd><a href={revisionUrl(head.id)}>Revisión {head.sequence}</a></dd></div><div><dt>Publicada</dt><dd>{published ? <a href={revisionUrl(published.id)}>Revisión {published.sequence}</a> : 'Sin publicar'}</dd></div></dl>
+  <p class="publication-state">{publication ? pending ? 'Hay cambios pendientes de publicación en la revisión más reciente.' : 'La revisión más reciente está publicada.' : 'Este artefacto aún no está publicado.'}</p>
+  <div class="actions">
+    {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
+    <a class="secondary button" href={revisionUrl(revision.id, '/export')}>Descargar revisión {revision.sequence}</a>
+    {publication && !selectedPublication && <a class="secondary button" href={publication.url}>Abrir publicación</a>}
+  </div>
+  <section class="selected-preview">
+    <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={revisionUrl(revision.id, '/preview')}></iframe>
+    <details class="artifact-info">
+      <summary>Información</summary>
+      <h2>Revisión {revision.sequence}</h2>
+      {revision.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{selectedPublication && <span class="badge">Publicada</span>}
+      <dl><dt>Título</dt><dd>{revision.snapshot.metadata.title}</dd><dt>Descripción</dt><dd>{revision.snapshot.metadata.description}</dd>{revision.snapshot.metadata.custom !== undefined && <><dt>Metadatos personalizados</dt><dd><pre>{JSON.stringify(revision.snapshot.metadata.custom, null, 2)}</pre></dd></>}<dt>Artefacto</dt><dd>{artifact.artifactId}</dd><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{revision.authorClientId}</dd><dt>Creada</dt><dd>{date(revision.createdAt)} UTC</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl>
+      {publication && <><p>Versión {publication.version}. El enlace conserva la dirección cuando publicas otra revisión.</p><code>{publication.url}</code></>}
+      <p>Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.</p>
+    </details>
   </section>
-  <section><div class="revision-title"><h2>Revisión {revision.sequence}</h2>{revision.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{revision.id === publication?.revisionId && <span class="badge">Publicada</span>}</div><p class="muted">Creada el {date(revision.createdAt)} UTC.</p><div class="actions"><a class="secondary button" href={revisionUrl(revision.id, '/export')}>Descargar revisión {revision.sequence}</a></div><iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={revisionUrl(revision.id, '/preview')}></iframe><dl><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{revision.authorClientId}</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl></section>
-  <section class="inventory"><h2>Archivos de la revisión {revision.sequence}</h2><p>La descarga de esta revisión incluye estos archivos con sus bytes originales.</p>{summary.files.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Archivo</th><th scope="col">Tipo y codificación</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead><tbody>{summary.files.map((file) => <tr><th scope="row">{file.path}</th><td>{file.mediaType}<br />{file.encoding}</td><td>{file.decodedBytes}</td><td><code>{file.sha256}</code></td></tr>)}</tbody></table></div> : <p class="muted">Esta revisión no tiene archivos adjuntos.</p>}</section>
-  <section class="comparison">
+  <nav class="section-links" aria-label="Secciones de la revisión"><a href="#files">Archivos ({summary.files.length})</a><a href="#comparison">Comparar revisiones</a><a href="#history">Historial</a></nav>
+  <section class="inventory" id="files"><h2>Archivos de la revisión {revision.sequence}</h2><p>La descarga de esta revisión incluye estos archivos con sus bytes originales.</p>{summary.files.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Archivo</th><th scope="col">Tipo y codificación</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead><tbody>{summary.files.map((file) => <tr><th scope="row">{file.path}</th><td>{file.mediaType}<br />{file.encoding}</td><td>{file.decodedBytes}</td><td><code>{file.sha256}</code></td></tr>)}</tbody></table></div> : <p class="muted">Esta revisión no tiene archivos adjuntos.</p>}</section>
+  <section class="comparison" id="comparison">
     <h2>Comparar revisiones</h2>
     {revisions.length > 0 && <form class="compare-form" method="get" action={Astro.url.pathname}><input type="hidden" name="revisionId" value={revision.id} />{before && <input type="hidden" name="before" value={before} />}<label for="compareTo">Comparar la seleccionada con</label><select id="compareTo" name="compareTo">{revisions.map((item) => <option value={item.id} selected={item.id === compared?.id}>Revisión {item.sequence}{item.id === published?.id ? ' · publicada' : ''}{item.id === head.id ? ' · más reciente' : ''}</option>)}</select><button class="secondary">Comparar</button></form>}
     {comparison && compared ? <>
@@ -40,6 +61,6 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
       <h3>Archivos</h3>{comparison.files.length ? <ul class="file-changes">{comparison.files.map((row) => <li><h4>{row.path} <span class="badge">{fileLabels[row.change]}</span></h4><div class="file-comparison">{[{ label: `Revisión ${compared.sequence}`, file: row.before }, { label: `Seleccionada, revisión ${revision.sequence}`, file: row.after }].map(({ label, file }) => <div><p>{label}</p>{file ? <><p>{file.mediaType} · {file.encoding} · {file.decodedBytes} bytes</p><code>{file.sha256}</code></> : <p class="muted">Sin archivo</p>}</div>)}</div></li>)}</ul> : <p class="muted">Los archivos no cambiaron.</p>}
     </> : <p class="muted">No hay otra revisión disponible para comparar.</p>}
   </section>
-  <section class="artifacts"><h2>Historial</h2><p>Cada revisión conserva el contenido completo y los archivos que tenía al guardarse.</p><ol class="revision-list">{history.items.map((item) => <li><div class="revision-title"><h3>Revisión {item.sequence}</h3>{item.id === revision.id && <span class="badge">Seleccionada</span>}{item.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{item.id === publication?.revisionId && <span class="badge">Publicada</span>}</div><p>{item.snapshot.metadata.title}</p><p>{date(item.createdAt)} UTC · {item.authorClientId}</p><div class="actions"><a href={revisionUrl(item.id)}>Ver revisión {item.sequence}</a>{item.id !== revision.id && <a href={revisionUrl(revision.id, '', item.id)}>Comparar con revisión {item.sequence}</a>}<a href={revisionUrl(item.id, '/export')}>Descargar revisión {item.sequence}</a></div></li>)}</ol>{history.nextBeforeSequence && <a href={`/artifacts/${encodeURIComponent(artifact.artifactId)}?${new URLSearchParams({ revisionId: revision.id, ...(compared ? { compareTo: compared.id } : {}), before: String(history.nextBeforeSequence) })}`}>Ver revisiones anteriores</a>}</section>
+  <section class="artifacts" id="history"><h2>Historial</h2><p>Cada revisión conserva el contenido completo y los archivos que tenía al guardarse.</p><ol class="revision-list">{history.items.map((item) => <li><div class="revision-title"><h3>Revisión {item.sequence}</h3>{item.id === revision.id && <span class="badge">Seleccionada</span>}{item.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{item.id === publication?.revisionId && <span class="badge">Publicada</span>}</div><p>{item.snapshot.metadata.title}</p><p>{date(item.createdAt)} UTC · {item.authorClientId}</p><div class="actions"><a href={revisionUrl(item.id)}>Ver revisión {item.sequence}</a>{item.id !== revision.id && <a href={revisionUrl(revision.id, '', item.id)}>Comparar con revisión {item.sequence}</a>}<a href={revisionUrl(item.id, '/export')}>Descargar revisión {item.sequence}</a></div></li>)}</ol>{history.nextBeforeSequence && <a href={`/artifacts/${encodeURIComponent(artifact.artifactId)}?${new URLSearchParams({ revisionId: revision.id, ...(compared ? { compareTo: compared.id } : {}), before: String(history.nextBeforeSequence) })}`}>Ver revisiones anteriores</a>}</section>
 </section>
 </Panel>

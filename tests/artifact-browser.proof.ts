@@ -2,18 +2,43 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import { serve } from '@hono/node-server';
 import { eq } from 'drizzle-orm';
 import { unzipSync, strFromU8 } from 'fflate';
-import { chromium, type Browser } from 'playwright';
+import { chromium, type Browser, type Page, type Locator } from 'playwright';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { publishSelectedRevision } from '../apps/dashboard/src/publish.ts';
 import { fixture } from './helpers.ts';
+
+async function assertPreviewInViewport(page: Page) {
+  await page.evaluate(() => scrollTo(0, 0));
+  const bounds = await page.locator('.preview').evaluate((frame) => {
+    const box = frame.getBoundingClientRect();
+    return { top: box.top, visibleHeight: Math.min(box.bottom, innerHeight) - Math.max(box.top, 0) };
+  });
+  assert(bounds.top >= 0 && bounds.visibleHeight >= 180, 'The selected preview must begin in the initial viewport with usable height');
+}
+
+async function assertViewerBounds(page: Page) {
+  const bounds = await page.evaluate(() => {
+    const header = document.querySelector('header')!.getBoundingClientRect();
+    const frame = document.querySelector('main > iframe')!.getBoundingClientRect();
+    return { height: innerHeight, headerHeight: header.height, frameTop: frame.top, frameBottom: frame.bottom, frameHeight: frame.height, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, width: innerWidth };
+  });
+  assert(bounds.headerHeight <= bounds.height * .45 + 1, 'The complete viewer header must leave the majority of the viewport for the artifact');
+  assert(bounds.frameHeight >= bounds.height * .55 - 1 && bounds.frameBottom <= bounds.height + 1 && bounds.frameTop >= 0, 'The viewer frame must fill the usable remainder of the viewport');
+  assert(bounds.scrollHeight <= bounds.height + 1 && bounds.scrollWidth <= bounds.width + 1, 'The viewer wrapper must stay within its viewport');
+}
+
+async function captureTarget(page: Page, target: Locator, name: string) {
+  await target.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `.test-artifacts/${name}.png` });
+}
 
 const reservation = createServer().listen(0, '127.0.0.1');
 await once(reservation, 'listening');
@@ -100,6 +125,7 @@ try {
   assert(transactionCookie);
   assert.equal((await fetch(callbackUrl, { headers: { cookie: transactionCookie }, redirect: 'manual' })).status, 403);
   assert.equal((await fetch(callbackUrl, { redirect: 'manual' })).status, 403);
+  await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
   const oldAttachment = new URL((await page.getByRole('link', { name: 'nested/file.html', exact: true }).getAttribute('href'))!, publish).href;
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('link', { name: 'nested/file.html', exact: true }).click();
@@ -164,6 +190,7 @@ try {
   assert.deepEqual(collected, []);
   const viewerHeader = viewerCookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
   assert.equal((await fetch(oldAttachment, { headers: { cookie: viewerHeader }, redirect: 'manual' })).status, 403);
+  await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
   const attachment = new URL((await page.getByRole('link', { name: 'nested/file.html', exact: true }).getAttribute('href'))!, publish).href;
   const currentDownload = await fetch(attachment, { headers: { cookie: viewerHeader } });
   assert.equal(currentDownload.status, 200);
@@ -173,6 +200,20 @@ try {
   const panel = await context.newPage();
   await panel.goto(dashboard);
   await panel.getByRole('link', { name: 'Browser proof artifact', exact: true }).click();
+  await panel.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
+  assert.equal(await panel.locator('.publish-form').count(), 0, 'The currently published selection must not offer redundant publication');
+  assert.equal(await panel.locator('.actions').first().getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), secondPublication.url);
+  assert.equal(await panel.locator('.actions').first().locator('.button').first().innerText(), 'Abrir publicación');
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), updated.revision.id);
+  await assertPreviewInViewport(panel);
+  await panel.screenshot({ path: '.test-artifacts/artifact-published-desktop.png' });
+  await Promise.all([panel.waitForURL(secondPublication.url), panel.locator('.actions').first().getByRole('link', { name: 'Abrir publicación', exact: true }).click()]);
+  await panel.frameLocator('main > iframe').getByRole('heading', { name: 'Updated document', exact: true }).waitFor();
+  assert.equal(await panel.locator('main').getAttribute('data-artifact-id'), created.artifactId);
+  assert.equal(await panel.locator('main').getAttribute('data-revision-id'), updated.revision.id);
+  assert.equal(await panel.locator('main').getAttribute('data-revision-sha256'), updated.revision.sha256);
+  assert.equal(await panel.locator('main').getAttribute('data-publication-version'), '2');
+  await panel.goto(`${dashboard}/artifacts/${created.artifactId}`);
   await panel.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
   assert.equal(await panel.locator('.revision-list li').count(), 2);
   assert(await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).count());
@@ -186,7 +227,9 @@ try {
   assert.equal(previewDenied?.status(), 403);
   assert.equal(await directPreview.locator('script').count(), 0);
   await directPreview.close();
+  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'history-before-click');
   await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+  await panel.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id);
   await panel.frameLocator('.preview').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
   const exportEvent = panel.waitForEvent('download');
   await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();
@@ -207,7 +250,8 @@ try {
   assert.equal(await panel.locator('header').count(), 1);
   assert.equal(await panel.locator('h1').count(), 1);
   assert(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png', fullPage: true });
+  await assertPreviewInViewport(panel);
+  await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png' });
   const reviewOne = await store.create(actor, {
     requestId: randomBytes(16).toString('hex'),
     snapshot: {
@@ -226,7 +270,7 @@ try {
   await panel.setViewportSize({ width: 1280, height: 900 });
   await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}`);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '0');
-  assert.equal(await panel.locator('.revision-state').innerText(), `Seleccionada\nRevisión 1\n${reviewOne.revision.id}\nMás reciente\nRevisión 1\n${reviewOne.revision.id}\nPublicada\nSin publicar`);
+  assert.equal(await panel.locator('.revision-state').innerText(), 'Seleccionada\nRevisión 1\nMás reciente\nRevisión 1\nPublicada\nSin publicar');
   const singleRevisionComparison = {
     forms: await panel.locator('.compare-form').count(),
     selectors: await panel.getByLabel('Comparar la seleccionada con', { exact: true }).count(),
@@ -251,10 +295,12 @@ try {
     singleRevisionComparison: { forms: 0, selectors: 0, comparisons: 0, emptyState: 1, selfLinks: 0, publicationNotice: 1 },
     unpublishedComparison: { selected: unpublishedTwo.revision.id, target: unpublishedOne.revision.id, options: [unpublishedOne.revision.id], contents: [unpublishedOne.revision.snapshot.content.text, unpublishedTwo.revision.snapshot.content.text] },
   });
-  await panel.getByRole('button', { name: 'Comparar', exact: true }).click();
+  await captureTarget(panel, panel.getByRole('button', { name: 'Comparar', exact: true }), 'comparison-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('compareTo') === unpublishedOne.revision.id), panel.getByRole('button', { name: 'Comparar', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), unpublishedTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), unpublishedOne.revision.id);
-  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'unpublished-history-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === unpublishedOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedTwo.revision.id);
   assert.deepEqual(await panel.locator('#compareTo option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)), [unpublishedTwo.revision.id]);
@@ -299,7 +345,22 @@ try {
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewTwo.revision.sha256);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '1');
-  assert.equal(await panel.locator('.revision-state').innerText(), `Seleccionada\nRevisión 2\n${reviewTwo.revision.id}\nMás reciente\nRevisión 7\n${reviewHead.revision.id}\nPublicada\nRevisión 1\n${reviewOne.revision.id}`);
+  assert.equal(await panel.locator('.revision-state').innerText(), 'Seleccionada\nRevisión 2\nMás reciente\nRevisión 7\nPublicada\nRevisión 1');
+  assert.deepEqual(await panel.locator('.revision-state a').evaluateAll((links) => links.map((link) => new URL((link as HTMLAnchorElement).href).searchParams.get('revisionId'))), [reviewTwo.revision.id, reviewHead.revision.id, reviewOne.revision.id]);
+  await assertPreviewInViewport(panel);
+  await panel.screenshot({ path: '.test-artifacts/artifact-review-desktop.png' });
+  await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
+  assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Revisión$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.id);
+  assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^SHA-256$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.sha256);
+  await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
+  for (const [label, id] of [['Archivos (4)', 'files'], ['Comparar revisiones', 'comparison'], ['Historial', 'history']]) {
+    const anchor = panel.getByRole('navigation', { name: 'Secciones de la revisión', exact: true }).getByRole('link', { name: label, exact: true });
+    await captureTarget(panel, anchor, `review-anchor-${id}`);
+    await anchor.click();
+    assert.equal(new URL(panel.url()).hash, `#${id}`);
+    const bounds = await panel.locator(`#${id} h2`).boundingBox();
+    assert(bounds && bounds.y >= 0 && bounds.y < 900, 'Secondary anchors must reach their visible section headings');
+  }
   assert.equal(await panel.locator('.inventory tbody tr').count(), 4);
   assert.equal(await panel.locator('.inventory tbody tr').filter({ hasText: 'changed.bin' }).locator('td').nth(1).innerText(), '3');
   assert.equal(await panel.locator('.comparison tbody tr').count(), 3);
@@ -310,13 +371,44 @@ try {
   assert.equal(await panel.locator('.artifact-detail script, .artifact-detail img').count(), 0);
   assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
   assert.equal(await panel.locator('.revision-list li').count(), 5);
-  await panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).click();
+  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }), 'history-pagination-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('before') === '3'), panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
   assert.equal(await panel.locator('.revision-list li').count(), 2);
-  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+  await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewOne.revision.id);
+  const selectorGet = panel.waitForRequest((request) => new URL(request.url()).pathname === new URL(reviewUrl).pathname && request.isNavigationRequest());
+  await captureTarget(panel, panel.getByRole('button', { name: 'Ver revisión', exact: true }), 'selector-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
+  assert.equal((await selectorGet).method(), 'GET');
+  assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewOne.revision.id);
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
+  assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewOne.revision.id);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewOne.revision.sha256);
+  assert.equal(await panel.locator('.publish-form').count(), 0);
+  assert.equal(await panel.locator('.actions').first().locator('.button').first().innerText(), 'Abrir publicación');
+  assert.equal(await panel.getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), `${publish}/a/${reviewOne.artifactId}`);
+  await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();
+  assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
+  assert.equal(new URL((await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
+  await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewTwo.revision.id);
+  await captureTarget(panel, panel.getByRole('button', { name: 'Ver revisión', exact: true }), 'selector-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewTwo.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
+  assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
+  assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewTwo.revision.sha256);
+  assert.equal(await panel.locator('.publish-form input[name="revisionId"]').inputValue(), reviewTwo.revision.id);
+  assert.equal(await panel.locator('.publish-form input[name="expectedPublicationVersion"]').inputValue(), '1');
+  assert.equal(await panel.frameLocator('.preview').locator('pre').innerText(), reviewTwo.revision.snapshot.content.text);
+  assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), reviewTwo.revision.id);
+  assert.equal(new URL((await panel.getByRole('link', { name: 'Descargar revisión 2', exact: true }).first().getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewTwo.revision.id);
+  assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
+  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'published-history-before-click');
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), reviewHead.revision.id);
   await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();
@@ -331,6 +423,7 @@ try {
   assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await panel.frameLocator('.preview').locator('pre').innerText(), reviewTwo.revision.snapshot.content.text);
   assert.equal(await panel.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
+  await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-review-mobile.png' });
   await panel.locator('.comparison').scrollIntoViewIfNeeded();
   await panel.screenshot({ path: '.test-artifacts/artifact-comparison-mobile.png' });
@@ -405,6 +498,52 @@ try {
   assert.equal(confirmedReadback.kind, 'published');
   assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 4);
   assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, readbackCommand.requestId))).length, 1);
+  const readable = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: { metadata: { title: 'Guía de revisión de entregas', description: 'Un documento retenido con sus notas de revisión.' }, content: { kind: 'html', text: '<main style="max-width:720px;margin:40px auto;padding:0 24px;font:18px/1.6 system-ui;color:#132943"><h1>Revisar una entrega</h1><p>Comprueba el contenido guardado y descarga las notas antes de publicar una revisión.</p><h2>Contenido de la entrega</h2><ul><li>Documento completo de la revisión.</li><li>Notas originales como archivo adjunto.</li></ul></main>' }, files: [{ path: 'notas.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Notas originales de la entrega.\n' }] } });
+  const readablePublication = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: readable.artifactId, revisionId: readable.revision.id, expectedPublicationVersion: 0 });
+  const longTitle = 'Guía de revisión de entregas con documentación completa y referencias para todos los equipos. '.repeat(3).slice(0, 256);
+  const longDescription = 'Esta revisión conserva los criterios de aceptación, las decisiones y los archivos originales de la entrega. '.repeat(24);
+  const long = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: { ...readable.revision.snapshot, metadata: { title: longTitle, description: longDescription } } });
+  const longPublication = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: long.artifactId, revisionId: long.revision.id, expectedPublicationVersion: 0 });
+  for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+    await page.setViewportSize(viewport);
+    await page.goto(readablePublication.url);
+    await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
+    await assertViewerBounds(page);
+    const iframeBounds = await page.locator('main > iframe').boundingBox();
+    const headingBounds = await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).boundingBox();
+    const loadedFrame = await (await page.locator('main > iframe').elementHandle())!.contentFrame();
+    assert(loadedFrame && iframeBounds && headingBounds);
+    const contentViewport = await loadedFrame.evaluate(() => ({ width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth }));
+    assert.equal(contentViewport.width, viewport.width, 'The actual publication frame must use the selected viewport width');
+    assert(headingBounds.y >= iframeBounds.y && headingBounds.y + headingBounds.height <= viewport.height, 'The actual readable document heading must fit within the visible frame');
+    await writeFile(`.test-artifacts/publication-geometry-${name}.json`, `${JSON.stringify({ viewport, iframeBounds, headingBounds, contentViewport }, null, 2)}\n`);
+    await page.locator('main > iframe').screenshot({ path: `.test-artifacts/publication-frame-${name}.png` });
+    await page.screenshot({ path: `.test-artifacts/publication-${name}.png` });
+    await page.goto(longPublication.url);
+    await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
+    await assertViewerBounds(page);
+    await page.locator('main > iframe').screenshot({ path: `.test-artifacts/publication-long-frame-${name}.png` });
+    await page.screenshot({ path: `.test-artifacts/publication-long-${name}.png` });
+    await page.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
+    await page.locator('summary').filter({ hasText: /^Archivos \(/ }).press('Enter');
+    assert.equal(await page.locator('details[open]').count(), 2);
+    assert.equal(await page.locator('.information dt').filter({ hasText: /^Título$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longTitle.trim());
+    assert.equal(await page.locator('.information dt').filter({ hasText: /^Descripción$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longDescription.trim());
+    await assertViewerBounds(page);
+    await page.screenshot({ path: `.test-artifacts/publication-long-open-${name}.png` });
+    await page.getByRole('link', { name: 'notas.txt', exact: true }).focus();
+    const attachmentBounds = await page.getByRole('link', { name: 'notas.txt', exact: true }).boundingBox();
+    assert(attachmentBounds && attachmentBounds.y >= 0 && attachmentBounds.y + attachmentBounds.height <= viewport.height * .45 + 1, 'An attachment must remain focusable within the scrolling viewer header');
+    await panel.setViewportSize(viewport);
+    await panel.goto(`${dashboard}/artifacts/${long.artifactId}?revisionId=${long.revision.id}`);
+    await panel.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
+    await assertPreviewInViewport(panel);
+    await panel.screenshot({ path: `.test-artifacts/artifact-long-${name}.png` });
+    await captureTarget(panel, panel.locator('summary').filter({ hasText: /^Información$/ }), `artifact-long-information-${name}`);
+    await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
+    assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Título$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longTitle.trim());
+    assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Descripción$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longDescription.trim());
+  }
   const anonymous = await browser.newContext();
   const anonymousPage = await anonymous.newPage();
   await anonymousPage.goto(secondPublication.url);
@@ -414,6 +553,8 @@ try {
   assert.equal((await anonymous.request.get(`${dashboard}/artifacts/${created.artifactId}/export?revisionId=${created.revision.id}`)).status(), 401);
   await anonymous.close();
   await panel.goto(dashboard);
+  await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
   await panel.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();

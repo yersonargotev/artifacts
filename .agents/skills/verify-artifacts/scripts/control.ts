@@ -247,6 +247,9 @@ async function drive(feature: Feature) {
       await record('Start isolated Chrome context', { version: browserVersion, viewport: { width: 1280, height: 900 } });
       if (feature === 'identity') {
         await login(page);
+        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+        await record('Open Cuenta', {});
+        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
         await page.getByTestId('user-id').waitFor();
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
         await capture(page, 'signed-in');
@@ -261,6 +264,9 @@ async function drive(feature: Feature) {
         await capture(page, 'panel-logged-out');
         await record('Reenter panel through central SSO', {});
         await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
+        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+        await record('Open Cuenta', {});
+        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
         await page.getByTestId('user-id').waitFor();
         await record('Choose Cerrar todas las sesiones and confirm', {});
         await page.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
@@ -299,6 +305,8 @@ async function drive(feature: Feature) {
           await page.frameLocator('iframe').getByRole('button', { name: 'Interaction verified', exact: true }).waitFor();
           assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
           await capture(page, 'published-r2');
+          await record('Open Archivos', {});
+          await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
           const attachment = new URL((await page.getByRole('link', { name: 'notes.txt', exact: true }).getAttribute('href'))!, instance.view).href;
           await record('Download publication attachment', { name: 'notes.txt', url: attachment });
           const downloadPromise = page.waitForEvent('download');
@@ -320,7 +328,7 @@ async function drive(feature: Feature) {
           checks.push('Real MCP publication versions retain stable URL', 'Browser login and viewer admission', 'Published iframe interaction', 'Exact attachment bytes', 'Anonymous document login and attachment 401');
         } else {
           await login(page);
-          await page.getByTestId('user-id').waitFor();
+          await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
           await capture(page, 'artifact-list');
           await record('Choose Verification artifact from list', {});
           await page.getByRole('link', { name: 'Verification artifact', exact: true }).click();
@@ -335,7 +343,9 @@ async function drive(feature: Feature) {
             await capture(page, 'preview-r2-desktop');
           }
           await record('Choose Ver revisión 1 from history', {});
-          await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+          await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
+          await page.screenshot({ path: join(directory, 'history-r1-target.png') });
+          await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
           await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
           if (feature === 'export') {
             await record('Download selected historical revision 1', {});
@@ -358,7 +368,9 @@ async function drive(feature: Feature) {
           } else {
             await capture(page, 'preview-r1-desktop');
             await record('Choose Ver revisión 2 and use 390px viewport', {});
-            await page.getByRole('link', { name: 'Ver revisión 2', exact: true }).click();
+            await page.getByRole('link', { name: 'Ver revisión 2', exact: true }).scrollIntoViewIfNeeded();
+            await page.screenshot({ path: join(directory, 'history-r2-target.png') });
+            await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === updated.revision.id), page.getByRole('link', { name: 'Ver revisión 2', exact: true }).click()]);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
             await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
