@@ -1,0 +1,3 @@
+interface:
+  display_name: "Verificar Artifacts"
+  short_description: "Prueba flujos reales en una instancia aislada"

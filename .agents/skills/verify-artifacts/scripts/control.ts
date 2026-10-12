@@ -1,0 +1,396 @@
+#!/usr/bin/env -S node --import tsx
+import assert from 'node:assert/strict';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import { once } from 'node:events';
+import { createServer, type Server } from 'node:net';
+import { mkdir, readFile, writeFile, appendFile, open, rm, stat } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { serve } from '@hono/node-server';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { unzipSync, strFromU8 } from 'fflate';
+import { fixture, grant } from '../../../../tests/helpers.ts';
+import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
+import { artifactReadSchema, publishResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
+
+const root = resolve(import.meta.dirname, '../../../..');
+const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
+const script = resolve(import.meta.filename);
+const features = ['identity', 'authoring', 'preview', 'publication', 'export'] as const;
+type Feature = typeof features[number];
+type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
+type Credentials = { controlToken: string; accessToken: string; password: string };
+type ToolResult = { isError?: boolean; structuredContent: Record<string, any> };
+const args = process.argv.slice(2);
+const command = args[0];
+const runIndex = args.indexOf('--run');
+const run = resolve(root, runIndex >= 0 ? args[runIndex + 1] ?? '' : `.test-artifacts/verify-artifacts/${Date.now()}-${randomUUID().slice(0, 8)}`);
+assert(run.startsWith(join(root, '.test-artifacts/verify-artifacts/')), 'Run directories must be below .test-artifacts/verify-artifacts/');
+const runtime = join(run, 'runtime');
+const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+const hash = (data: Uint8Array) => createHash('sha256').update(data).digest('hex');
+const json = async (path: string, value: unknown) => writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+async function load<T>(path: string): Promise<T> { return JSON.parse(await readFile(path, 'utf8')) as T; }
+async function listen(server: Server) { if (!server.listening) await once(server, 'listening'); const address = server.address(); assert(address && typeof address === 'object'); return address.port; }
+async function close(server: Server) { if ('closeAllConnections' in server) (server as Server & { closeAllConnections(): void }).closeAllConnections(); if (server.listening) await new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done())); }
+async function freePanelPort() { const reservation = createServer().listen(0, '127.0.0.1'); const port = await listen(reservation); await close(reservation); return port; }
+async function stopChild(child: ChildProcess) { if (child.exitCode !== null || child.signalCode !== null) return; child.kill('SIGTERM'); await Promise.race([once(child, 'exit'), delay(3000)]); if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await once(child, 'exit'); } }
+
+async function tool(instance: Instance, credentials: Credentials, name: string, input: unknown = {}): Promise<{ status: number; result?: ToolResult }> {
+  const response = await fetch(instance.mcp, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${credentials.accessToken}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: input } }), signal: AbortSignal.timeout(8000) });
+  if (response.status !== 200) return { status: response.status };
+  const body = await response.text();
+  const payload = body.startsWith('event:') ? body.split('\n').find((line) => line.startsWith('data:'))?.slice(5) : body;
+  assert(payload, 'MCP response has JSON payload');
+  const parsed = JSON.parse(payload) as { error?: unknown; result?: ToolResult };
+  assert(!parsed.error && parsed.result, 'MCP transport returned a tool result');
+  return { status: response.status, result: parsed.result };
+}
+
+async function ownedInstance(): Promise<{ instance: Instance; credentials: Credentials }> {
+  const instance = await load<Instance>(join(run, 'instance.json'));
+  const credentials = await load<Credentials>(join(runtime, 'credentials.json'));
+  const response = await fetch(instance.control, { headers: { authorization: `Bearer ${credentials.controlToken}` }, signal: AbortSignal.timeout(3000) });
+  assert.equal(response.status, 200, 'Owned supervisor answers');
+  const current = await response.json() as { id: string; pid: number; panelPid: number };
+  assert.equal(current.id, instance.id, 'Supervisor instance identity matches');
+  assert.equal(current.pid, instance.pid, 'Supervisor PID matches');
+  assert.equal(current.panelPid, instance.panelPid, 'Owned panel PID matches');
+  return { instance, credentials };
+}
+
+async function doctor() {
+  const { instance, credentials } = await ownedInstance();
+  assert.equal(hash(await readFile(entry)), instance.build, 'Panel build has not changed during the run');
+  for (const url of [`${instance.auth}/health`, `${new URL(instance.mcp).origin}/health`, instance.panel]) {
+    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    assert.equal(response.status, 200, `Service responds at ${url}`);
+  }
+  const denied = await fetch(`${instance.view}/a/doctor-nonexistent`, { redirect: 'manual', signal: AbortSignal.timeout(3000) });
+  assert.equal(denied.status, 303, 'Viewer starts protected admission without a cookie');
+  const identity = await tool(instance, credentials, 'whoami');
+  assert.equal(identity.status, 200, 'MCP token remains active');
+  assert.equal(identity.result?.structuredContent.userId, instance.ownerId, 'MCP identity matches disposable owner');
+  assert(!identity.result?.isError, 'MCP identity tool succeeds');
+  const proof = { status: 'passed', checkedAt: new Date().toISOString(), instance: instance.id, pid: instance.pid, panelPid: instance.panelPid, build: instance.build, ownerId: instance.ownerId, surfaces: ['auth', 'mcp', 'panel', 'view'], liveMcpSession: true };
+  await json(join(run, 'doctor.json'), proof);
+  return { instance, credentials, proof };
+}
+
+async function supervisor() {
+  process.chdir(root);
+  let app: Awaited<ReturnType<typeof fixture>> | undefined;
+  let panel: ChildProcess | undefined;
+  const servers: Server[] = [];
+  let shuttingDown = false;
+  let resolveStop!: () => void;
+  const stopped = new Promise<void>((done) => { resolveStop = done; });
+  const requestStop = () => { shuttingDown = true; resolveStop(); };
+  process.on('SIGTERM', requestStop);
+  process.on('SIGINT', requestStop);
+  const expiry = setTimeout(requestStop, 15 * 60_000);
+  try {
+    const panelOrigin = `http://localhost:${await freePanelPort()}`;
+    let viewHandler: (request: Request) => Promise<Response> = async () => new Response('Starting', { status: 503 });
+    const view = serve({ fetch: (request) => viewHandler(request), hostname: '::1', port: 0 });
+    servers.push(view);
+    const viewOrigin = `http://[::1]:${await listen(view)}`;
+    app = await fixture({ dashboard: panelOrigin, publishOrigin: viewOrigin });
+    const serviceSecret = randomBytes(32).toString('hex');
+    const cookieSecret = randomBytes(32).toString('hex');
+    viewHandler = createPublicationApp({ DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
+    const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Verification panel', application_type: 'native', redirect_uris: [`${panelOrigin}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
+    assert(client.client_secret);
+    const log = await open(join(run, 'panel.log'), 'a', 0o600);
+    panel = spawn(process.execPath, [entry], { cwd: root, env: { PATH: process.env.PATH, DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: new URL(panelOrigin).port, HOST: '127.0.0.1' }, stdio: ['ignore', log.fd, log.fd] });
+    await log.close();
+    panel.once('error', requestStop);
+    panel.once('exit', () => { if (!shuttingDown) requestStop(); });
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      assert(!shuttingDown && panel.exitCode === null, 'Panel stayed alive during startup; inspect panel.log');
+      ready = await fetch(panelOrigin, { signal: AbortSignal.timeout(1500) }).then((response) => response.status === 200).catch(() => false);
+      if (ready) break;
+      await delay(100);
+    }
+    assert(ready, 'Built panel is ready');
+    const tokens = await grant(app, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
+    const controlToken = randomBytes(32).toString('hex');
+    const id = randomUUID();
+    const control = serve({ hostname: '127.0.0.1', port: 0, fetch: async (request) => {
+      if (request.method !== 'GET' || new URL(request.url).pathname !== '/doctor' || request.headers.get('authorization') !== `Bearer ${controlToken}`) return new Response('Denied', { status: 403 });
+      return Response.json({ id, pid: process.pid, panelPid: panel?.pid }, { headers: { 'cache-control': 'no-store' } });
+    } });
+    servers.push(control);
+    const instance: Instance = { id, pid: process.pid, panelPid: panel.pid!, build: hash(await readFile(entry)), ownerId: app.ownerId, auth: app.config.origin, mcp: app.config.resource, panel: panelOrigin, view: viewOrigin, control: `http://127.0.0.1:${await listen(control)}/doctor`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
+    await json(join(runtime, 'credentials.json'), { controlToken, accessToken: tokens.access_token, password: app.password } satisfies Credentials);
+    await json(join(run, 'instance.json'), instance);
+    console.log(JSON.stringify({ ready: true, run, auth: instance.auth, mcp: instance.mcp, panel: instance.panel, view: instance.view }));
+    await stopped;
+  } finally {
+    clearTimeout(expiry);
+    if (panel) await stopChild(panel);
+    for (const server of servers.reverse()) await close(server);
+    await app?.close();
+    await rm(runtime, { recursive: true, force: true });
+    await json(join(run, 'cleanup.json'), { status: 'stopped', cleanedAt: new Date().toISOString(), pid: process.pid, runtimeRemoved: true, disposableDatabaseRemoved: true });
+  }
+}
+
+async function launch() {
+  await stat(entry).catch(() => { throw new Error('Build the panel first: pnpm build'); });
+  await mkdir(resolve(run, '..'), { recursive: true, mode: 0o700 });
+  await mkdir(run, { mode: 0o700 });
+  await mkdir(runtime, { mode: 0o700 });
+  const log = await open(join(run, 'supervisor.log'), 'a', 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
+  await log.close();
+  child.unref();
+  try {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      assert(child.exitCode === null, 'Supervisor exited; inspect supervisor.log');
+      const instance = await load<Instance>(join(run, 'instance.json')).catch(() => undefined);
+      if (instance) { await doctor(); console.log(JSON.stringify({ ready: true, run, panel: instance.panel, mcp: instance.mcp, auth: instance.auth, view: instance.view })); return; }
+      await delay(100);
+    }
+    throw new Error('Supervisor readiness timed out; inspect supervisor.log');
+  } catch (error) {
+    await stopChild(child);
+    await rm(runtime, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function cleanup() {
+  const prior = await load<{ status: string }>(join(run, 'cleanup.json')).catch(() => undefined);
+  if (prior?.status === 'stopped') { console.log(JSON.stringify({ ...prior, run, alreadyStopped: true })); return; }
+  const { instance } = await ownedInstance();
+  process.kill(instance.pid, 'SIGTERM');
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const proof = await load<{ status: string }>(join(run, 'cleanup.json')).catch(() => undefined);
+    if (proof?.status === 'stopped') { console.log(JSON.stringify({ ...proof, run })); return; }
+    await delay(100);
+  }
+  throw new Error('Owned supervisor did not confirm cleanup; inspect logs and owned PIDs in instance.json');
+}
+
+const firstSnapshot = { metadata: { title: 'Verification artifact', description: 'Disposable user-path proof.' }, content: { kind: 'html' as const, text: '<!doctype html><html lang="en"><meta charset="utf-8"><title>Verification artifact</title><h1>Verification revision 1</h1><button onclick="this.textContent=\'Interaction verified\'">Try interaction</button></html>' }, files: [{ path: 'notes.txt', mediaType: 'text/plain', encoding: 'utf8' as const, data: 'Revision 1 attachment.\n' }] };
+const secondSnapshot = { ...firstSnapshot, content: { ...firstSnapshot.content, text: firstSnapshot.content.text.replace('Verification revision 1', 'Verification revision 2') } };
+
+async function drive(feature: Feature) {
+  const { instance, credentials } = await doctor();
+  await open(join(run, 'drive.lock'), 'wx', 0o600).then((file) => file.close());
+  const directory = join(run, feature);
+  await mkdir(directory, { mode: 0o700 });
+  const checks: string[] = [];
+  const record = (action: string, result: unknown) => appendFile(join(directory, 'actions.jsonl'), `${JSON.stringify({ time: new Date().toISOString(), action, result })}\n`, { mode: 0o600 });
+  async function call(name: string, input: unknown = {}, allowError = false) {
+    const response = await tool(instance, credentials, name, input);
+    await record(`MCP ${name}`, { input, ...response });
+    assert.equal(response.status, 200, `${name} HTTP result`);
+    assert(response.result, `${name} tool response`);
+    if (!allowError) assert(!response.result.isError, `${name} tool succeeded`);
+    return response.result.structuredContent;
+  }
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  async function capture(page: Page, label: string) {
+    await page.screenshot({ path: join(directory, `${label}.png`), fullPage: true });
+    await writeFile(join(directory, `${label}.aria.yml`), await page.locator('body').ariaSnapshot(), { mode: 0o600 });
+    await record(`Capture ${label}`, { url: page.url(), screenshot: `${label}.png`, aria: `${label}.aria.yml` });
+  }
+  async function login(page: Page, fromPanel = true) {
+    if (fromPanel) {
+      await record('Open panel and choose Iniciar sesión', { url: instance.panel });
+      await page.goto(instance.panel);
+      await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
+    }
+    await page.getByLabel('Correo electrónico').fill('owner@example.test');
+    await page.getByLabel('Contraseña').fill(credentials.password);
+    await record('Submit Iniciar sesión', { email: 'owner@example.test', password: 'omitted' });
+    await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+  }
+  let status = 'failed';
+  try {
+    if (feature === 'authoring') {
+      const input = { requestId: randomUUID(), snapshot: firstSnapshot };
+      const created = artifactReadSchema.parse(await call('artifacts_create', input));
+      assert.deepEqual(artifactReadSchema.parse(await call('artifacts_create', input)), created);
+      const retained = artifactReadSchema.parse(await call('artifacts_read', { artifactId: created.artifactId, revisionId: created.revision.id }));
+      assert.deepEqual(retained.revision.snapshot, firstSnapshot);
+      const updated = artifactReadSchema.parse(await call('artifacts_update', { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.revision.id, snapshot: secondSnapshot }));
+      assert.equal(updated.revision.parentRevisionId, created.revision.id);
+      assert.equal(updated.publication, null);
+      const stale = await call('artifacts_update', { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.revision.id, snapshot: firstSnapshot }, true);
+      assert.equal(stale.error, 'conflict');
+      const historical = artifactReadSchema.parse(await call('artifacts_read', { artifactId: created.artifactId, revisionId: created.revision.id }));
+      assert.deepEqual(historical.revision.snapshot, firstSnapshot);
+      const history = await call('artifacts_history', { artifactId: created.artifactId });
+      assert.deepEqual(history.items.map((item: { id: string }) => item.id), [updated.revision.id, created.revision.id]);
+      const listed = await call('artifacts_list');
+      assert(listed.items.some((item: { artifactId: string }) => item.artifactId === created.artifactId));
+      const published = publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId: created.artifactId, revisionId: updated.revision.id, expectedPublicationVersion: 0 }));
+      const read = artifactReadSchema.parse(await call('artifacts_read', { artifactId: created.artifactId }));
+      assert.equal(published.revisionId, updated.revision.id);
+      assert.equal(read.headRevisionId, updated.revision.id);
+      assert.equal(read.revision.id, updated.revision.id);
+      assert.deepEqual(read.revision.snapshot, secondSnapshot);
+      assert.equal(read.publication?.revisionId, published.revisionId);
+      checks.push('Real HTTP-MCP create/replay/read/update/history/list/publish', 'Immutable historical snapshot', 'Stale update rejected', 'Publication independently read back');
+    } else {
+      browser = await chromium.launch({ channel: 'chrome' });
+      context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      await context.tracing.start({ screenshots: true, snapshots: true });
+      const page = await context.newPage();
+      const browserVersion = browser.version();
+      assert(Number(browserVersion.split('.')[0]) >= 152, 'Chrome 152+ is required for interactive HTML proof');
+      await record('Start isolated Chrome context', { version: browserVersion, viewport: { width: 1280, height: 900 } });
+      if (feature === 'identity') {
+        await login(page);
+        await page.getByTestId('user-id').waitFor();
+        assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
+        await capture(page, 'signed-in');
+        await record('Choose Cerrar sesión del panel', {});
+        const responsePromise = page.waitForResponse((response) => new URL(response.url()).pathname === '/auth/logout' && response.request().method() === 'POST');
+        await page.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
+        const response = await responsePromise;
+        assert.equal(response.status(), 303);
+        assert.equal(await response.request().headerValue('origin'), instance.panel);
+        await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();
+        await call('whoami');
+        await capture(page, 'panel-logged-out');
+        await record('Reenter panel through central SSO', {});
+        await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
+        await page.getByTestId('user-id').waitFor();
+        await record('Choose Cerrar todas las sesiones and confirm', {});
+        await page.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
+        await page.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
+        await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();
+        const denied = await tool(instance, credentials, 'whoami');
+        assert.equal(denied.status, 401);
+        await record('Read MCP identity after global revoke', denied);
+        const cookies = await context.cookies();
+        assert(!cookies.some((cookie) => ['artifacts-panel', 'artifacts-auth.session_token'].includes(cookie.name)));
+        await capture(page, 'globally-revoked');
+        checks.push('Browser login owner matches MCP owner', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
+      } else {
+        const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
+        const firstPublication = feature === 'publication' ? publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 })) : undefined;
+        if (firstPublication) {
+          await record('Open protected publication before login', { url: firstPublication.url });
+          await page.goto(firstPublication.url);
+          await capture(page, 'publication-login');
+          await login(page, false);
+          await page.waitForURL(firstPublication.url);
+          await page.frameLocator('iframe').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
+          await capture(page, 'published-r1');
+        }
+        const updated = artifactReadSchema.parse(await call('artifacts_update', { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.revision.id, snapshot: secondSnapshot }));
+        assert.deepEqual(artifactReadSchema.parse(await call('artifacts_read', { artifactId: created.artifactId, revisionId: updated.revision.id })).revision.snapshot, secondSnapshot);
+        if (feature === 'publication') {
+          assert(firstPublication);
+          const secondPublication = publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId: created.artifactId, revisionId: updated.revision.id, expectedPublicationVersion: 1 }));
+          assert.equal(secondPublication.url, firstPublication.url);
+          await record('Reload unchanged publication URL', { url: secondPublication.url });
+          await page.goto(secondPublication.url);
+          await page.frameLocator('iframe').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
+          await record('Interact inside published sandbox', { button: 'Try interaction' });
+          await page.frameLocator('iframe').getByRole('button', { name: 'Try interaction', exact: true }).click();
+          await page.frameLocator('iframe').getByRole('button', { name: 'Interaction verified', exact: true }).waitFor();
+          assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
+          await capture(page, 'published-r2');
+          const attachment = new URL((await page.getByRole('link', { name: 'notes.txt', exact: true }).getAttribute('href'))!, instance.view).href;
+          await record('Download publication attachment', { name: 'notes.txt', url: attachment });
+          const downloadPromise = page.waitForEvent('download');
+          await page.getByRole('link', { name: 'notes.txt', exact: true }).click();
+          await (await downloadPromise).saveAs(join(directory, 'notes.txt'));
+          assert.equal(await readFile(join(directory, 'notes.txt'), 'utf8'), firstSnapshot.files[0]!.data);
+          const anonymous = await browser.newContext();
+          try {
+            const anonymousPage = await anonymous.newPage();
+            await record('Open publication in anonymous context', { url: secondPublication.url });
+            await anonymousPage.goto(secondPublication.url);
+            await anonymousPage.getByLabel('Correo electrónico').waitFor();
+            assert.equal(await anonymousPage.locator('iframe').count(), 0);
+            const denied = await anonymous.request.get(attachment, { maxRedirects: 0 });
+            assert.equal(denied.status(), 401);
+            await record('Anonymous attachment request', { status: denied.status() });
+            await capture(anonymousPage, 'anonymous-denied');
+          } finally { await anonymous.close(); }
+          checks.push('Real MCP publication versions retain stable URL', 'Browser login and viewer admission', 'Published iframe interaction', 'Exact attachment bytes', 'Anonymous document login and attachment 401');
+        } else {
+          await login(page);
+          await page.getByTestId('user-id').waitFor();
+          await capture(page, 'artifact-list');
+          await record('Choose Verification artifact from list', {});
+          await page.getByRole('link', { name: 'Verification artifact', exact: true }).click();
+          await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
+          assert.equal(await page.locator('.revision-list li').count(), 2);
+          await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
+          if (feature === 'preview') {
+            await record('Click Try interaction inside actual panel preview', {});
+            await page.frameLocator('.preview').getByRole('button', { name: 'Try interaction', exact: true }).click();
+            await page.frameLocator('.preview').getByRole('button', { name: 'Interaction verified', exact: true }).waitFor();
+            assert.equal(await page.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
+            await capture(page, 'preview-r2-desktop');
+          }
+          await record('Choose Ver revisión 1 from history', {});
+          await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+          await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
+          if (feature === 'export') {
+            await record('Download selected historical revision 1', {});
+            const downloadPromise = page.waitForEvent('download');
+            await page.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();
+            await (await downloadPromise).saveAs(join(directory, 'browser-revision-1.zip'));
+            const archive = await call('artifacts_export', { artifactId: created.artifactId, revisionId: created.revision.id });
+            const bytes = Buffer.from(archive.base64, 'base64');
+            assert.equal(hash(bytes), archive.sha256);
+            await writeFile(join(directory, 'mcp-revision-1.zip'), bytes, { mode: 0o600 });
+            assert.deepEqual(await readFile(join(directory, 'browser-revision-1.zip')), bytes);
+            const members = unzipSync(bytes);
+            assert.equal(strFromU8(members['content.html']!), firstSnapshot.content.text);
+            assert.equal(strFromU8(members['files/notes.txt']!), firstSnapshot.files[0]!.data);
+            const manifest = JSON.parse(strFromU8(members['artifact.json']!));
+            assert.equal(manifest.artifactId, created.artifactId);
+            assert.equal(manifest.revision.id, created.revision.id);
+            await capture(page, 'historical-export');
+            checks.push('Browser selected-revision download', 'MCP historical export matches browser ZIP exactly', 'ZIP hash, manifest, original content and attachment bytes');
+          } else {
+            await capture(page, 'preview-r1-desktop');
+            await record('Choose Ver revisión 2 and use 390px viewport', {});
+            await page.getByRole('link', { name: 'Ver revisión 2', exact: true }).click();
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
+            await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+            await capture(page, 'preview-r2-mobile');
+            checks.push('Real MCP creates two retained revisions', 'Panel list and history select each revision', 'Interaction inside actual sandbox iframe', 'Desktop and 390px mobile without page overflow');
+          }
+        }
+      }
+    }
+    status = 'passed';
+  } catch (error) {
+    await record('Failure', { message: error instanceof Error ? error.message : String(error) });
+    if (context) for (const page of context.pages()) await capture(page, 'failure').catch(() => undefined);
+    throw error;
+  } finally {
+    await context?.tracing.stop({ path: join(directory, 'trace.zip') });
+    await browser?.close();
+    const result = { status, feature, instance: instance.id, checks, finishedAt: new Date().toISOString(), evidence: directory, scope: 'Isolated local Node services, real HTTP MCP and built Astro panel; not deployed Worker or actual Claude/Codex client acceptance.' };
+    await json(join(directory, 'result.json'), result);
+    console.log(JSON.stringify(result));
+  }
+}
+
+try {
+  if (command === 'launch') await launch();
+  else if (command === 'serve') await supervisor();
+  else if (command === 'doctor') { const { proof } = await doctor(); console.log(JSON.stringify(proof)); }
+  else if (command === 'cleanup') await cleanup();
+  else if (command === 'drive') { const feature = args[1]; assert(features.includes(feature as Feature), `Choose drive ${features.join('|')}`); await drive(feature as Feature); }
+  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE --run PATH | cleanup --run PATH');
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

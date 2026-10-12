@@ -12,7 +12,7 @@ import { createAuthApp } from '../apps/auth/src/http.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
 
-export async function fixture(options: { dashboard?: string } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
@@ -38,7 +38,7 @@ export async function fixture(options: { dashboard?: string } = {}) {
   assert(resourceClient.client_secret);
   const mcpOptions = { issuer: config.issuer, resource: config.resource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
   authHandler = createAuthApp(connection.db, config);
-  mcpHandler = createMcpApp(mcpOptions, createArtifactStore(connection.db, { publishOrigin: 'https://published.example.test' }));
+  mcpHandler = createMcpApp(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test' }));
   return {
     ...connection, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
