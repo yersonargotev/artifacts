@@ -2,6 +2,8 @@
 
 Create an artifact from Claude Code or Codex, retain every revision in Turso, and open its published revision at a stable authenticated URL. The Astro panel lists artifacts, displays revision history, previews selected revisions, and exports their original bytes.
 
+`main` is the canonical branch and GitHub default. It contains the complete deployed implementation. Create short-lived feature branches from `main`, integrate completed work there, and remove those branches after integration. Worker deployments use the explicit commands in [deployment instructions](docs/deployment.md).
+
 ## Deployed services
 
 | Service | URL |

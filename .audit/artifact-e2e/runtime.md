@@ -77,7 +77,7 @@ Snapshots accept at most 1 MiB decoded data and 32 attachments. HTML is self-con
 
 Authorization, MCP, panel, and viewer have separate workers.dev HTTPS origins owned by the account. No purchased/custom DNS domain was supplied or configured. The unrelated existing `landing` Worker was untouched. The viewer has two publication secrets and no database credential. Database-backed services have their own declared bindings.
 
-The branch is `feat/artifacts-e2e`. This repository has no Git remote, so commits and evidence are local; no PR or remote merge is claimed.
+At the time of the original acceptance, the branch was `feat/artifacts-e2e` and the repository had no Git remote; no PR or remote merge was claimed. The repository was subsequently pushed to `https://github.com/yersonargotev/artifacts`. The complete implementation is now consolidated in `main`, which is the GitHub default branch.
 
 ## Principles that changed choices
 
