@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["apps/auth/**/*.ts", "apps/mcp/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["apps/auth/**/*.ts", "apps/mcp/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", ".agents/skills/verify-artifacts/scripts/**/*.ts"]
 }
