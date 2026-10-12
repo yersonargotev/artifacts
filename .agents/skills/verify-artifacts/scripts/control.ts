@@ -344,7 +344,6 @@ async function drive(feature: Feature) {
           }
           await record('Choose Ver revisión 1 from history', {});
           await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-          await page.screenshot({ path: join(directory, 'history-r1-target.png') });
           await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
           await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
           if (feature === 'export') {
@@ -369,7 +368,6 @@ async function drive(feature: Feature) {
             await capture(page, 'preview-r1-desktop');
             await record('Choose Ver revisión 2 and use 390px viewport', {});
             await page.getByRole('link', { name: 'Ver revisión 2', exact: true }).scrollIntoViewIfNeeded();
-            await page.screenshot({ path: join(directory, 'history-r2-target.png') });
             await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === updated.revision.id), page.getByRole('link', { name: 'Ver revisión 2', exact: true }).click()]);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();

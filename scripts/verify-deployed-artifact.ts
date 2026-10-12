@@ -86,7 +86,6 @@ try {
     await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).waitFor();
     await panel.getByRole('link', { name: 'Ver revisión 2', exact: true }).waitFor();
     await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-    await panel.screenshot({ path: resolve(directory, 'deployed-history-selection.png') });
     await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === original.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
     await panel.frameLocator('iframe').getByRole('heading', { name: 'Created by Claude', exact: true }).waitFor();
     const downloadEvent = panel.waitForEvent('download');

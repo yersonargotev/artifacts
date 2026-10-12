@@ -8,7 +8,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { serve } from '@hono/node-server';
 import { eq } from 'drizzle-orm';
 import { unzipSync, strFromU8 } from 'fflate';
-import { chromium, type Browser, type Page, type Locator } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
@@ -33,11 +33,6 @@ async function assertViewerBounds(page: Page) {
   assert(bounds.headerHeight <= bounds.height * .45 + 1, 'The complete viewer header must leave the majority of the viewport for the artifact');
   assert(bounds.frameHeight >= bounds.height * .55 - 1 && bounds.frameBottom <= bounds.height + 1 && bounds.frameTop >= 0, 'The viewer frame must fill the usable remainder of the viewport');
   assert(bounds.scrollHeight <= bounds.height + 1 && bounds.scrollWidth <= bounds.width + 1, 'The viewer wrapper must stay within its viewport');
-}
-
-async function captureTarget(page: Page, target: Locator, name: string) {
-  await target.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `.test-artifacts/${name}.png` });
 }
 
 const reservation = createServer().listen(0, '127.0.0.1');
@@ -227,10 +222,18 @@ try {
   assert.equal(previewDenied?.status(), 403);
   assert.equal(await directPreview.locator('script').count(), 0);
   await directPreview.close();
-  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'history-before-click');
-  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
-  await panel.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id);
-  await panel.frameLocator('.preview').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  for (let selection = 0; selection < 3; selection++) {
+    if (selection > 0) {
+      await panel.goto(`${dashboard}/artifacts/${created.artifactId}`);
+      await panel.frameLocator('.preview').getByRole('heading', { name: 'Updated document', exact: true }).waitFor();
+    }
+    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
+    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
+    await panel.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id);
+    await panel.frameLocator('.preview').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+    assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), created.revision.id);
+    assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), created.revision.id);
+  }
   const exportEvent = panel.waitForEvent('download');
   await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();
   const archive = await exportEvent;
@@ -295,11 +298,11 @@ try {
     singleRevisionComparison: { forms: 0, selectors: 0, comparisons: 0, emptyState: 1, selfLinks: 0, publicationNotice: 1 },
     unpublishedComparison: { selected: unpublishedTwo.revision.id, target: unpublishedOne.revision.id, options: [unpublishedOne.revision.id], contents: [unpublishedOne.revision.snapshot.content.text, unpublishedTwo.revision.snapshot.content.text] },
   });
-  await captureTarget(panel, panel.getByRole('button', { name: 'Comparar', exact: true }), 'comparison-before-click');
+  await panel.getByRole('button', { name: 'Comparar', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('compareTo') === unpublishedOne.revision.id), panel.getByRole('button', { name: 'Comparar', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), unpublishedTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), unpublishedOne.revision.id);
-  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'unpublished-history-before-click');
+  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === unpublishedOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedTwo.revision.id);
@@ -355,7 +358,7 @@ try {
   await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
   for (const [label, id] of [['Archivos (4)', 'files'], ['Comparar revisiones', 'comparison'], ['Historial', 'history']]) {
     const anchor = panel.getByRole('navigation', { name: 'Secciones de la revisión', exact: true }).getByRole('link', { name: label, exact: true });
-    await captureTarget(panel, anchor, `review-anchor-${id}`);
+    await anchor.scrollIntoViewIfNeeded();
     await anchor.click();
     assert.equal(new URL(panel.url()).hash, `#${id}`);
     const bounds = await panel.locator(`#${id} h2`).boundingBox();
@@ -371,7 +374,7 @@ try {
   assert.equal(await panel.locator('.artifact-detail script, .artifact-detail img').count(), 0);
   assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
   assert.equal(await panel.locator('.revision-list li').count(), 5);
-  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }), 'history-pagination-before-click');
+  await panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('before') === '3'), panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
@@ -380,7 +383,7 @@ try {
   assert.equal(await panel.locator('.revision-list li').count(), 2);
   await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewOne.revision.id);
   const selectorGet = panel.waitForRequest((request) => new URL(request.url()).pathname === new URL(reviewUrl).pathname && request.isNavigationRequest());
-  await captureTarget(panel, panel.getByRole('button', { name: 'Ver revisión', exact: true }), 'selector-before-click');
+  await panel.getByRole('button', { name: 'Ver revisión', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
   assert.equal((await selectorGet).method(), 'GET');
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewOne.revision.id);
@@ -395,7 +398,7 @@ try {
   assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
   assert.equal(new URL((await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
   await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewTwo.revision.id);
-  await captureTarget(panel, panel.getByRole('button', { name: 'Ver revisión', exact: true }), 'selector-before-click');
+  await panel.getByRole('button', { name: 'Ver revisión', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewTwo.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
@@ -407,7 +410,7 @@ try {
   assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), reviewTwo.revision.id);
   assert.equal(new URL((await panel.getByRole('link', { name: 'Descargar revisión 2', exact: true }).first().getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewTwo.revision.id);
   assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
-  await captureTarget(panel, panel.getByRole('link', { name: 'Ver revisión 1', exact: true }), 'published-history-before-click');
+  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), reviewHead.revision.id);
@@ -539,7 +542,7 @@ try {
     await panel.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
     await assertPreviewInViewport(panel);
     await panel.screenshot({ path: `.test-artifacts/artifact-long-${name}.png` });
-    await captureTarget(panel, panel.locator('summary').filter({ hasText: /^Información$/ }), `artifact-long-information-${name}`);
+    await panel.locator('summary').filter({ hasText: /^Información$/ }).scrollIntoViewIfNeeded();
     await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
     assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Título$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longTitle.trim());
     assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Descripción$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longDescription.trim());
