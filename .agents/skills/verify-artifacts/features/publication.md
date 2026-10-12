@@ -15,7 +15,7 @@ An owner opens a published artifact at one stable authenticated URL, interacts w
 ## How to get to it (user POV)
 
 - After `artifacts_publish`, open its returned stable URL.
-- In an artifact's panel detail page, choose `Abrir publicación` under `Publicación actual`.
+- In an artifact's panel detail page, choose `Abrir publicación` under `Revisiones y publicación`. To select another publication, open that retained revision and choose its `Publicar revisión N` button.
 - If signed out, complete the account login and return to the original publication.
 - Interact with the document inside the frame titled `Contenido del artefacto`.
 - Choose a filename link under the `Archivos adjuntos` navigation region.
@@ -39,7 +39,7 @@ Preconditions:
 ## Gotchas
 
 - A published artifact is protected, even though its URL is stable. The publication host deliberately differs from the panel and authorization hosts; preserve that cookie separation.
-- The draft head and published revision can differ. Only `artifacts_publish` selects what the stable URL serves.
+- The draft head and published revision can differ. `artifacts_publish` and the panel publication form select what the stable URL serves. Neither advances the draft head.
 - Attachment URLs include a revision ID. An old attachment URL after republication is denied; use the current page's filename link rather than reusing an old link.
 - A download must preserve bytes, serve as an attachment, and avoid execution. Binary/nested attachments, obsolete attachment links, and content-disposition checks are additional cases in `tests/artifact-browser.proof.ts`.
 - The fixed drive covers the returned publication URL. The panel's `Abrir publicación` link is a distinct entry point; report it unverified unless actually clicked.
