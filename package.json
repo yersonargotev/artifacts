@@ -22,6 +22,7 @@
     "dev": "tsx scripts/dev.ts",
     "build:workers": "tsx scripts/build-workers.ts",
     "deploy:worker": "tsx scripts/deploy-worker.ts",
+    "release:production": "tsx scripts/release-production.ts",
     "dev:publication": "tsx apps/publication/src/server.ts",
     "identity:migrate": "tsx scripts/migrate-identity.ts",
     "verify:artifact-clients": "tsx scripts/verify-artifact-clients.ts",
