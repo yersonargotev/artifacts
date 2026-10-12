@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
 import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, publishSchema, readSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
+import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
   const authorize = createMcpAuthorizer(config);
@@ -47,17 +48,26 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
         const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
         const mutation = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
         server.registerTool('artifacts_create', {
-          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, or text and downloadable attachments. Limit 1 MiB decoded total and 32 files. Published HTML must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments.',
+          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, or text and downloadable attachments. Limit 1 MiB decoded total and 32 files. Published HTML must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments. Optional response=compact omits content, custom metadata, and file data from the result.',
           inputSchema: createSchema, annotations: mutation,
-        }, async (input) => execute(() => artifacts.create(principal, input)));
+        }, async (input) => execute(async () => {
+          const result = await artifacts.create(principal, input);
+          return input.response === 'compact' ? compactArtifactRead(result) : result;
+        }));
         server.registerTool('artifacts_read', {
-          title: 'Read artifact', description: 'Read an owned artifact head or an explicit retained revision, including all metadata and file bytes.',
+          title: 'Read artifact', description: 'Read an owned artifact head or an explicit retained revision, including all metadata and file bytes. Optional response=compact returns identity, metadata summary, content size, and attachment digests without payloads.',
           inputSchema: readSchema, annotations: readOnly,
-        }, async (input) => execute(() => artifacts.read(principal, input)));
+        }, async (input) => execute(async () => {
+          const result = await artifacts.read(principal, input);
+          return input.response === 'compact' ? compactArtifactRead(result) : result;
+        }));
         server.registerTool('artifacts_update', {
-          title: 'Update artifact', description: 'Save a complete new snapshot only if expectedRevisionId is the current head. Existing revisions remain immutable. Requires artifacts:write. Retry with the same requestId and arguments.',
+          title: 'Update artifact', description: 'Read the current head with a full response, preserve untouched metadata including custom, content, and files, then send the complete next snapshot with that head as expectedRevisionId. Requires artifacts:write. Retry transport failures with the same requestId and arguments. A conflict stops the edit and requires a deliberate new operation. Optional response=compact omits content, custom metadata, and file data from the result; use a full read for byte verification.',
           inputSchema: updateSchema, annotations: mutation,
-        }, async (input) => execute(() => artifacts.update(principal, input)));
+        }, async (input) => execute(async () => {
+          const result = await artifacts.update(principal, input);
+          return input.response === 'compact' ? compactArtifactRead(result) : result;
+        }));
         server.registerTool('artifacts_publish', {
           title: 'Publish artifact revision', description: 'Select a retained revision at a stable protected URL. Requires artifacts:publish and the current expectedPublicationVersion, or zero if unpublished. Published HTML is self-contained with downloadable attachments. Retry with the same requestId and arguments.',
           inputSchema: publishSchema, annotations: mutation,
@@ -71,9 +81,12 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           inputSchema: listSchema, annotations: readOnly,
         }, async (input) => execute(() => artifacts.list(principal, input)));
         server.registerTool('artifacts_history', {
-          title: 'Read artifact history', description: 'Read retained revisions newest first with bounded beforeSequence pagination.',
+          title: 'Read artifact history', description: 'Read retained revisions newest first with bounded beforeSequence pagination. Optional response=summary omits content, custom metadata, and file data from each revision.',
           inputSchema: historySchema, annotations: readOnly,
-        }, async (input) => execute(() => artifacts.history(principal, input)));
+        }, async (input) => execute(async () => {
+          const result = await artifacts.history(principal, input);
+          return input.response === 'summary' ? { ...result, items: await Promise.all(result.items.map(summarizeRevision)) } : result;
+        }));
       }
       return server;
     }, { legacy: 'stateless' });

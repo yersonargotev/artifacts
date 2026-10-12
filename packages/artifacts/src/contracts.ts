@@ -22,18 +22,31 @@ export const snapshotSchema = z.strictObject({
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
 });
 
-export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema });
-export const readSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional() });
-export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema });
+const response = z.enum(['full', 'compact']).optional();
+export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, response });
+export const readSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
+export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema, response });
 export const publishSchema = z.strictObject({ requestId, artifactId: identifier, revisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
 export const exportSchema = z.strictObject({ artifactId: identifier, revisionId: identifier });
 export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional() });
-export const historySchema = z.strictObject({ artifactId: identifier, limit: z.number().int().min(1).max(10).default(5), beforeSequence: z.number().int().positive().optional() });
+export const historySchema = z.strictObject({ artifactId: identifier, limit: z.number().int().min(1).max(10).default(5), beforeSequence: z.number().int().positive().optional(), response: z.enum(['full', 'summary']).optional() });
 export const issueGrantSchema = z.strictObject({ artifactId: identifier, state: z.string().min(16).max(256) });
 export const consumeGrantSchema = issueGrantSchema.extend({ code: z.string().min(32).max(128) });
 export const viewerSchema = z.strictObject({ artifactId: identifier, userId: identifier, sessionId: identifier, expiresAt: z.number().int().positive() });
 
 export type Snapshot = z.infer<typeof snapshotSchema>;
+export type ReadonlyJsonValue = string | number | boolean | null | { readonly [key: string]: ReadonlyJsonValue } | readonly ReadonlyJsonValue[];
+export type UpdateInput = {
+  readonly requestId: string;
+  readonly artifactId: string;
+  readonly expectedRevisionId: string;
+  readonly snapshot: {
+    readonly metadata: { readonly title: string; readonly description: string; readonly custom?: ReadonlyJsonValue };
+    readonly content: Readonly<Snapshot['content']>;
+    readonly files: readonly Readonly<Snapshot['files'][number]>[];
+  };
+  readonly response?: 'full' | 'compact';
+};
 export type Actor = Readonly<{ userId: string; sessionId: string; clientId: string; scopes: readonly string[] }>;
 export type Viewer = z.infer<typeof viewerSchema>;
 export type Publication = z.infer<typeof publicationSchema>;

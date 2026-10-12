@@ -3,24 +3,13 @@ import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, exportSchema, historySchema, issueGrantSchema, listSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type Publication, type Revision, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, exportSchema, historySchema, issueGrantSchema, listSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { canonicalJson, sha256 } from './serialization.ts';
 
 export * from './contracts.ts';
 
 type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 type RevisionRow = typeof artifactRevision.$inferSelect;
-
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) => {
-    if (item && typeof item === 'object' && !Array.isArray(item)) return Object.fromEntries(Object.entries(item).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0));
-    return item;
-  });
-}
-
-async function sha256(value: string | Uint8Array): Promise<string> {
-  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value);
-  return Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
-}
 
 function revision(row: RevisionRow): Revision {
   return { id: row.id, parentRevisionId: row.parentRevisionId, sequence: row.sequence, authorUserId: row.authorUserId, authorClientId: row.authorClientId, createdAt: row.createdAt.toISOString(), sha256: row.sha256, snapshot: snapshotSchema.parse(JSON.parse(row.snapshot)) };
@@ -110,7 +99,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       });
     },
 
-    async update(actor: Actor, value: z.input<typeof updateSchema>): Promise<ArtifactRead> {
+    async update(actor: Actor, value: UpdateInput): Promise<ArtifactRead> {
       const input = updateSchema.parse(value);
       const snapshot = canonicalJson(input.snapshot);
       const digest = await sha256(snapshot);
