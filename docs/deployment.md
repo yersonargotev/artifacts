@@ -1,5 +1,7 @@
 # Deploy native Workers
 
+## Deploy checked local bundles
+
 Build the services from the repository root.
 
 ```sh
@@ -34,3 +36,25 @@ pnpm deploy:worker view --secrets-file /absolute/private/view.env
 All services use distinct `workers.dev` hostnames. The configurations explicitly enable runtime `process.env` bindings through `nodejs_compat_populate_process_env`. The panel uses those bindings for its existing runtime and internal publication service checks. Auth and MCP also receive typed environment objects at their Worker entrypoints.
 
 The authorization Worker's CIMD transport approves only the exact Codex and Claude metadata document URLs in `apps/auth/src/metadata-worker.ts`. It never follows redirects or fetches unapproved JWKS locations. The local Node service retains the pinned DNS transport. Codex metadata returned 403 in the earlier local workerd probe. Both actual deployed CLI OAuth flows subsequently succeeded through the exact vendor transport; Claude created and published a revision and Codex updated, published, read history, and exported its original revision. The local probe result did not establish production reachability. [Execution evidence](../.audit/artifact-e2e/runtime.md) records the final observed gates.
+
+## Configure GitHub production releases
+
+1. [Create a Cloudflare API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/) for the production account. Grant `Account Workers Scripts Edit` and `Account Account Settings Read`. The account read permission supports release preflight. These Workers use `workers.dev` hostnames and require no zone routing permission.
+2. Create the GitHub environment `production`. Restrict its deployment branches to `main` with a custom branch policy. The workflow separately requires a push to `main` and three successful validation jobs.
+3. Add the environment variable `CLOUDFLARE_ACCOUNT_ID` with the intended account ID.
+4. Add the environment secret `CLOUDFLARE_API_TOKEN`. [GitHub's environment secret instructions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-an-environment) cover the UI and CLI. The CLI prompts for the value without placing it in a command argument.
+
+```sh
+gh secret set --env production CLOUDFLARE_API_TOKEN
+```
+
+5. Prepare a private JSON object with the complete runtime binding union defined in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Use the existing production values and confidential clients. Do not pass owner credentials to CI.
+6. Add that object as the environment secret `ARTIFACTS_RUNTIME_SECRETS`. Keep the input file outside the repository.
+
+```sh
+gh secret set --env production ARTIFACTS_RUNTIME_SECRETS < /absolute/private/runtime.json
+```
+
+7. Merge the checked changes into `main`. Production downloads that run's checked Worker artifact, preflights all services, deploys them in order, and performs read-only HTTP smoke checks.
+
+The [CI/CD release contract](ci-cd.md) describes artifact integrity, current-main skips, retries, partial-release behavior, and manual database operations. Manual workflow dispatch runs validation without deploying production.
