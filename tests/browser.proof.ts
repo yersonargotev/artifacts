@@ -66,6 +66,7 @@ try {
   await mobile.goto(dashboard);
   await mobile.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
   await mobile.screenshot({ path: '.test-artifacts/library-mobile.png' });
+  await mobile.locator('.library-navigation > summary').click();
   await mobile.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
   await mobile.getByTestId('user-id').waitFor();
   await mobile.evaluate(async () => {

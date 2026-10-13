@@ -253,6 +253,15 @@ async function drive(feature: Feature) {
         await page.getByTestId('user-id').waitFor();
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
         await capture(page, 'signed-in');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(instance.panel);
+        await page.locator('.library-navigation > summary').click();
+        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+        await page.getByTestId('user-id').waitFor();
+        assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        await capture(page, 'signed-in-mobile');
+        await page.setViewportSize({ width: 1280, height: 900 });
         await record('Choose Cerrar sesión del panel', {});
         const responsePromise = page.waitForResponse((response) => new URL(response.url()).pathname === '/auth/logout' && response.request().method() === 'POST');
         await page.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
@@ -278,9 +287,24 @@ async function drive(feature: Feature) {
         const cookies = await context.cookies();
         assert(!cookies.some((cookie) => ['artifacts-panel', 'artifacts-auth.session_token'].includes(cookie.name)));
         await capture(page, 'globally-revoked');
-        checks.push('Browser login owner matches MCP owner', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
+        checks.push('Browser login owner matches MCP owner', 'Mobile native navigation and account disclosure without overflow', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
+        let libraryDemo: { artifact: ReturnType<typeof artifactReadSchema.parse>; publication: ReturnType<typeof publishResultSchema.parse> } | undefined;
+        if (feature === 'preview') {
+          const demoSnapshot = {
+            metadata: { title: 'Guía de revisión de entregas', description: 'Criterios y notas guardados para revisar una entrega.' },
+            content: { kind: 'html' as const, text: '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;background:#fbfaf7;color:#252b31;font:17px/1.6 system-ui}main{max-width:800px;margin:0 auto;padding:48px 28px}h1{font:42px/1.15 Georgia,serif;letter-spacing:-1px;margin:0 0 24px}h2{font-size:21px;margin-top:36px}p{max-width:65ch}li{margin:8px 0}button{font:inherit;border:1px solid #c6c6bf;background:white;color:#252b31;border-radius:8px;padding:10px 16px;margin-top:18px}@media(max-width:600px){main{padding:32px 24px}h1{font-size:34px}}</style><main><h1>Revisar una entrega</h1><p>Comprueba el contenido guardado y sus archivos antes de publicar una revisión.</p><h2>Qué revisar</h2><ul><li>El documento contiene las decisiones acordadas.</li><li>Los archivos conservan sus bytes originales.</li><li>La revisión seleccionada es la que quieres publicar.</li></ul><button onclick="this.textContent=\'Revisión comprobada\'">Comprobar revisión</button></main></html>' },
+            files: [{ path: 'notas.txt', mediaType: 'text/plain', encoding: 'utf8' as const, data: 'Notas originales de la entrega.\n' }],
+          };
+          const demo = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: demoSnapshot }));
+          const publication = publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId: demo.artifactId, revisionId: demo.revision.id, expectedPublicationVersion: 0 }));
+          const pending = artifactReadSchema.parse(await call('artifacts_update', { requestId: randomUUID(), artifactId: demo.artifactId, expectedRevisionId: demo.revision.id, snapshot: { ...demoSnapshot, metadata: { ...demoSnapshot.metadata, description: 'Criterios actualizados, pendientes de publicación.' } } }));
+          libraryDemo = { artifact: pending, publication };
+          await call('artifacts_create', { requestId: randomUUID(), snapshot: { ...demoSnapshot, metadata: { title: 'Notas para publicar una entrega', description: 'Un borrador para la próxima entrega.' } } });
+          const complete = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: { ...demoSnapshot, metadata: { title: 'Resumen de decisiones del proyecto y referencias para el equipo', description: 'Decisiones retenidas y listas para consultar.' } } }));
+          await call('artifacts_publish', { requestId: randomUUID(), artifactId: complete.artifactId, revisionId: complete.revision.id, expectedPublicationVersion: 0 });
+        }
         const firstPublication = feature === 'publication' ? publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 })) : undefined;
         if (firstPublication) {
           await record('Open protected publication before login', { url: firstPublication.url });
@@ -306,6 +330,7 @@ async function drive(feature: Feature) {
           assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
           await capture(page, 'published-r2');
           await record('Open Archivos', {});
+          await page.locator('.title-menu > summary').click();
           await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
           const attachment = new URL((await page.getByRole('link', { name: 'notes.txt', exact: true }).getAttribute('href'))!, instance.view).href;
           await record('Download publication attachment', { name: 'notes.txt', url: attachment });
@@ -330,6 +355,35 @@ async function drive(feature: Feature) {
           await login(page);
           await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
           await capture(page, 'artifact-list');
+          if (libraryDemo) {
+            assert.equal(await page.locator('.artifact-list li').count(), 4);
+            assert.equal(await page.locator('.artifact-list .pending').count(), 1);
+            const rowTrigger = page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true });
+            await rowTrigger.focus();
+            await rowTrigger.press('Space');
+            await page.waitForFunction(() => document.activeElement?.textContent === 'Ver artefacto');
+            await page.keyboard.press('ArrowDown');
+            assert.equal(await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).evaluate((item) => item === document.activeElement), true);
+            assert.equal(new URL((await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).getAttribute('href'))!, instance.panel).searchParams.get('revisionId'), libraryDemo.artifact.revision.id);
+            assert.equal(await page.getByRole('menuitem', { name: 'Abrir publicación', exact: true }).getAttribute('href'), libraryDemo.publication.url);
+            await capture(page, 'artifact-list-menu');
+            await page.keyboard.press('Escape');
+            await page.getByRole('menu').waitFor({ state: 'hidden' });
+            await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Opciones de Guía de revisión de entregas');
+            assert.equal(await rowTrigger.evaluate((trigger) => trigger === document.activeElement), true);
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.goto(instance.panel);
+            await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+            await capture(page, 'artifact-list-mobile');
+            await page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true }).click();
+            const menuBounds = await page.getByRole('menu').boundingBox();
+            assert(menuBounds && menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 390);
+            await capture(page, 'artifact-list-mobile-menu');
+            await page.keyboard.press('Escape');
+            await page.setViewportSize({ width: 1280, height: 900 });
+            await page.goto(instance.panel);
+          }
           await record('Choose Verification artifact from list', {});
           await page.getByRole('link', { name: 'Verification artifact', exact: true }).click();
           await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
@@ -337,7 +391,9 @@ async function drive(feature: Feature) {
           await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
           if (feature === 'preview') {
             await record('Click Try interaction inside actual panel preview', {});
-            await page.frameLocator('.preview').getByRole('button', { name: 'Try interaction', exact: true }).click();
+            const interaction = page.frameLocator('.preview').getByRole('button', { name: 'Try interaction', exact: true });
+            await interaction.scrollIntoViewIfNeeded();
+            await interaction.click();
             await page.frameLocator('.preview').getByRole('button', { name: 'Interaction verified', exact: true }).waitFor();
             assert.equal(await page.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
             await capture(page, 'preview-r2-desktop');
@@ -347,9 +403,10 @@ async function drive(feature: Feature) {
           await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
           await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
           if (feature === 'export') {
+            await page.getByRole('button', { name: 'Menú de Verification artifact', exact: true }).click();
             await record('Download selected historical revision 1', {});
             const downloadPromise = page.waitForEvent('download');
-            await page.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();
+            await page.getByRole('menuitem', { name: 'Descargar revisión 1', exact: true }).click();
             await (await downloadPromise).saveAs(join(directory, 'browser-revision-1.zip'));
             const archive = await call('artifacts_export', { artifactId: created.artifactId, revisionId: created.revision.id });
             const bytes = Buffer.from(archive.base64, 'base64');
@@ -374,6 +431,22 @@ async function drive(feature: Feature) {
             await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
             await capture(page, 'preview-r2-mobile');
+            if (libraryDemo) {
+              const demoUrl = `${instance.panel}/artifacts/${libraryDemo.artifact.artifactId}?${new URLSearchParams({ revisionId: libraryDemo.artifact.revision.id })}`;
+              for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+                await page.setViewportSize(viewport);
+                await page.goto(demoUrl);
+                await page.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
+                await capture(page, `demo-detail-${name}`);
+                await page.getByRole('button', { name: 'Menú de Guía de revisión de entregas', exact: true }).click();
+                await capture(page, `demo-detail-menu-${name}`);
+                await page.keyboard.press('Escape');
+                await page.goto(libraryDemo.publication.url);
+                await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
+                await capture(page, `demo-publication-${name}`);
+              }
+              checks.push('Real MCP library drafts, publication and pending state', 'Row menu keyboard, exact-head download and stable publication links', 'Library desktop and 390px rows and menu without overflow');
+            }
             checks.push('Real MCP creates two retained revisions', 'Panel list and history select each revision', 'Interaction inside actual sandbox iframe', 'Desktop and 390px mobile without page overflow');
           }
         }

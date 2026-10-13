@@ -72,6 +72,7 @@ try {
     else assert.equal(packets, 0, `${path} sends no UDP packets`);
     observations.push({ path, packets, javascriptInteractive: path !== '/fallback' });
     if (path === '/publication') {
+      await page.locator('.title-menu > summary').click();
       await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
       const event = page.waitForEvent('download');
       await page.getByRole('link', { name: 'proof.txt', exact: true }).click();

@@ -19,7 +19,7 @@ A connected tool creates an artifact, saves complete immutable revisions, retrie
 - Read or list artifacts; update using the current `expectedRevisionId`; inspect retained revisions through history.
 - Publish an explicit retained `revisionId` with `expectedPublicationVersion: 0` for first publication, then the current version for later publication.
 - Open the returned URL or use the panel's `Abrir publicación` link. The panel has no create or content edit form.
-- To publish from the panel, select a retained revision and choose `Publicar revisión N` under `Revisiones y publicación`. The form pins that revision and the observed publication version. The confirmation reports the independent publication readback.
+- To publish from the panel, select a retained revision and choose `Publicar revisión N` in the header. The form pins that revision and the observed publication version. The confirmation reports the independent publication readback.
 
 ## Driving it with control.ts (Playwright + HTTP MCP)
 
