@@ -1,61 +1,12 @@
 ---
-const { title = 'Tus artefactos', section = 'Tus artefactos' } = Astro.props;
+import '../styles/panel.css';
+const { title = 'Tus artefactos', section = 'Tus artefactos', library = false } = Astro.props;
 ---
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
   <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>{title} · Artifacts</title></head>
-  <body><header><a class="wordmark" href="/">Artifacts</a><span>{section}</span></header><main><slot /></main></body>
+  <body class:list={['panel', { 'library-shell': library }]}>
+    {library ? <aside class="library-sidebar"><slot name="sidebar" /></aside> : <slot name="header"><header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>{section}</span></header></slot>}
+    <main class="panel-main"><slot /></main>
+  </body>
 </html>
-<style is:global>
-*{box-sizing:border-box}
-body{margin:0;background:#f5f7fa;color:#132943;font-family:system-ui,sans-serif;font-size:16px}
-body>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 24px;border-bottom:1px solid #d5dfe9;background:white}
-.wordmark{font-size:22px;font-weight:650;letter-spacing:-.6px;text-decoration:none;color:#132943;display:flex;align-items:center;min-height:44px}
-header span,.muted{color:#48617b}
-main{max-width:1440px;margin:0 auto;padding:24px}
-h1{font-size:clamp(28px,3vw,32px);font-weight:650;letter-spacing:-.7px;line-height:1.2;margin:0 0 16px}
-h2{font-size:23px;font-weight:600;line-height:1.3;margin:0 0 14px}
-p{line-height:1.55;max-width:75ch}
-a{color:#3154d9}
-button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;font:inherit;text-decoration:none;border:1px solid transparent;border-radius:4px;background:#3154d9;color:white;padding:10px 16px;cursor:pointer}
-.secondary{background:white;color:#132943;border-color:#9baec2}
-a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #3154d9;outline-offset:3px}
-code{display:block;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,monospace;font-size:14px;line-height:1.6;background:#eef2f7;padding:12px 14px;border-radius:4px}
-dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 24px;margin-bottom:0}
-dt{color:#48617b}dd{margin:0;overflow-wrap:anywhere}
-details{border-top:1px solid #d5dfe9;padding:0 0 16px}
-summary{cursor:pointer;min-height:44px;padding:12px 0;font-weight:600}
-details>h2{margin-top:12px}
-[role=alert]{color:#a32035}
-.home{max-width:1040px;margin:auto}.home .artifacts{margin:0 0 32px}
-.home-settings{max-width:760px}.home-settings details{padding-bottom:12px}
-.identity p,.tools p{color:#48617b}
-.tools code{border:1px solid #c7d5e3}
-footer{display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin-top:24px}
-.logged-out{max-width:700px;padding:40px 0}.logged-out p{margin-bottom:30px}.monogram{font-size:82px;line-height:1;color:#3154d9;letter-spacing:-8px;margin-bottom:24px}
-.artifacts{margin:36px 0}
-.artifact-list,.revision-list{list-style:none;padding:0;margin:20px 0}
-.artifact-list li,.revision-list li{padding:20px 0;border-top:1px solid #d5dfe9}
-.artifact-list h3{margin:0 0 10px;font-weight:600;font-size:22px;overflow-wrap:anywhere}
-.artifact-list p,.revision-list p{margin:8px 0;color:#48617b}
-.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.badge{display:inline-block;border:1px solid #9baec2;border-radius:4px;padding:4px 8px;font-size:14px}
-.pending{margin-left:8px;background:#fff9e9}
-.back{display:inline-flex;align-items:center;min-height:44px;margin-bottom:8px}
-.artifact-detail{min-width:0}.artifact-detail h1{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;margin-bottom:12px}
-.revision-select,.compare-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0}
-select{max-width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #9baec2;background:white;color:#132943;font:inherit;border-radius:4px}
-.revision-state{display:flex;flex-wrap:wrap;gap:12px 28px;margin:12px 0}
-.revision-state>div{display:grid;gap:4px}.revision-state dd{font-weight:600;min-height:44px;display:flex;align-items:center}.revision-state a{display:inline-flex;align-items:center;min-height:44px}
-.publication-state{color:#48617b;font-size:14px;line-height:1.45;margin:12px 0;overflow-wrap:anywhere}
-.preview{display:block;width:100%;height:65vh;height:65dvh;min-height:280px;border:1px solid #d5dfe9;background:white;margin:16px 0 0}
-.artifact-info{margin-top:16px}.artifact-info h2,.artifact-info p{overflow-wrap:anywhere}.artifact-info .badge{margin-bottom:12px}.artifact-info pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font:14px/1.5 ui-monospace,SFMono-Regular,monospace}
-.section-links{display:flex;flex-wrap:wrap;gap:8px 24px;margin:8px 0 24px}.section-links a{display:inline-flex;align-items:center;min-height:44px}
-.inventory,.comparison{margin-top:36px}#files,#comparison,#history{scroll-margin-top:16px}
-.revision-title{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.revision-title h3{margin:0;font-size:20px;font-weight:600}.revision-list .actions{margin-top:14px}.revision-list .actions a,.artifact-list h3 a,.artifact-list li>a,footer>a{display:inline-flex;align-items:center;min-height:44px}
-.publication{padding:24px;background:white;border:1px solid #d5dfe9;border-radius:4px;margin-bottom:24px}.publication code{margin-top:14px}.publication .publish-form{margin-top:20px}
-.table-scroll{max-width:100%;overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:15px;table-layout:fixed}th,td{text-align:left;vertical-align:top;border-top:1px solid #d5dfe9;padding:14px 12px;overflow-wrap:anywhere}thead th{color:#48617b;font-weight:500}table code{padding:0;background:transparent;font-size:12px}
-table pre,.content-comparison pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.6 ui-monospace,SFMono-Regular,monospace;margin:0;max-height:420px;overflow:auto}
-.content-comparison,.file-comparison{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}.content-comparison pre{padding:18px;background:white;border-radius:4px}.comparison h3{margin-top:30px;font-weight:600}.comparison h4{font-size:17px;font-weight:600;margin:14px 0;overflow-wrap:anywhere}.file-changes{list-style:none;padding:0}.file-changes li{border-top:1px solid #d5dfe9;padding:12px 0}.file-comparison p{margin:6px 0;overflow-wrap:anywhere}.inventory th:first-child{width:25%}.inventory th:nth-child(2){width:25%}.inventory th:nth-child(3){width:10%}.inventory th:nth-child(4){width:40%}
-@media(max-width:620px){body>header{padding:8px 16px}main{padding:16px}.revision-select{gap:8px}.revision-select label{width:100%}.revision-select select{flex:1;min-width:0;width:0}.revision-select button{flex:none}.revision-state{gap:12px 20px}.actions{gap:8px}.pending{margin:8px 0 0}.content-comparison,.file-comparison{grid-template-columns:minmax(0,1fr);gap:12px}.compare-form{align-items:stretch;flex-direction:column}.table-scroll table{min-width:560px}.publication{padding:18px}dl:not(.revision-state){grid-template-columns:minmax(0,1fr);gap:7px}dd+dt{margin-top:10px}.section-links{gap:4px 18px}}
-</style>

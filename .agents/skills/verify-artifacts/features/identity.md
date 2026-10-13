@@ -15,7 +15,7 @@ An owner signs in to see their artifacts and the same account ID used by connect
 
 - Open the panel root and choose `Iniciar sesión`.
 - Open a protected artifact or publication while signed out; its authentication path returns to the requested page. Publication handoff is mapped separately in [publication](./publication.md).
-- On the signed-in panel, open `Cuenta` to inspect the account ID, choose `Cerrar sesión del panel`, or choose the `Cerrar todas las sesiones` link and confirm on the account page.
+- On the signed-in panel, open `Cuenta` to inspect the account ID, choose `Cerrar sesión del panel`, or choose the `Cerrar todas las sesiones` link and confirm on the account page. On mobile, open `Navegación` first.
 - A newly connected OAuth client can open the account page titled `Conectar una herramienta`, with `Permitir acceso` and `Cancelar` buttons.
 
 ## Driving it with control.ts (Playwright + HTTP MCP)
@@ -27,6 +27,7 @@ Preconditions:
 
 - **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/identity-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/identity-run`. The helper reports healthy owned services and a valid disposable MCP identity.
 - **Execute the user path.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive identity --run .test-artifacts/verify-artifacts/identity-run`. Its browser recipe chooses `getByRole('link', { name: 'Iniciar sesión', exact: true })`, fills `getByLabel('Correo electrónico')` and `getByLabel('Contraseña')`, and submits `getByRole('button', { name: 'Iniciar sesión', exact: true })`. The visible `Tus artefactos` heading confirms the panel is ready. The recipe opens the native `Cuenta` disclosure, then `getByTestId('user-id')` must equal MCP `whoami.userId`.
+- **Inspect mobile account controls.** The same drive reloads at 390px, opens the native `Navegación` and `Cuenta` disclosures, and checks the same account ID without page overflow. It captures the mobile account view before returning to desktop for logout.
 - **Panel logout and SSO.** The same drive chooses `getByRole('button', { name: 'Cerrar sesión del panel', exact: true })`. The signed-out panel exposes the login link while the original MCP token still reaches `whoami`. Choosing that login link again restores the library through central SSO. Reopening `Cuenta` exposes `user-id` and the session actions.
 - **Global logout.** The same drive chooses the exact `Cerrar todas las sesiones` link, then the exact button with that name on the confirmation form. The panel returns to its login entry and the previously valid MCP token is denied. Record both the confirmation action and the denied response.
 - **Retain proof and stop.** Inspect `.test-artifacts/verify-artifacts/identity-run/identity/actions.jsonl`, `result.json`, browser snapshots/screenshots, and `trace.zip`, then run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts cleanup --run .test-artifacts/verify-artifacts/identity-run`. Confirm the screenshots and action/result records still exist after cleanup.

@@ -3,6 +3,7 @@ import { getRuntime } from '../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../publication.ts';
 import { loadArtifactReview } from '../../review.ts';
 import PublicationForm from '../../components/PublicationForm.astro';
+import ArtifactTitleMenu from '../../components/ArtifactTitleMenu.tsx';
 import Panel from '../../layouts/Panel.astro';
 if (!Astro.locals.identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
 const result = await getRuntime().then(({ artifacts }) => loadArtifactReview(artifacts, panelActor(Astro.locals.identity!), Astro.params.artifactId, Astro.url.searchParams)).catch((error: unknown) => artifactErrorResponse(error));
@@ -21,9 +22,21 @@ const fileLabels = { added: 'Agregado', removed: 'Eliminado', changed: 'Modifica
 const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 ---
 <Panel title={revision.snapshot.metadata.title} section="Tu artefacto">
+<header slot="header" class="artifact-toolbar">
+  <a class="home-link" href="/" aria-label="Volver a tus artefactos"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v10H3z" /><path d="M9 20v-7h6v7" /></svg></a>
+  <h1><ArtifactTitleMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={[
+    { label: `Descargar revisión ${revision.sequence}`, href: revisionUrl(revision.id, '/export'), icon: 'download', group: 'revision' },
+    { label: 'Información', href: '#information', icon: 'information', group: 'sections' },
+    { label: `Archivos (${summary.files.length})`, href: '#files', icon: 'files', group: 'sections' },
+    { label: 'Comparar revisiones', href: '#comparison', icon: 'comparison', group: 'sections' },
+    { label: 'Historial', href: '#history', icon: 'history', group: 'sections' },
+    { label: 'Tus artefactos', href: '/', icon: 'library', group: 'destinations' },
+    ...(publication ? [{ label: 'Abrir publicación', href: publication.url, icon: 'publication' as const, group: 'destinations' as const }] : []),
+  ]} client:load /></h1>
+  <span class="toolbar-revision">Revisión {revision.sequence}</span>
+  {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
+</header>
 <section class="artifact-detail" data-artifact-id={artifact.artifactId} data-revision-id={revision.id} data-revision-sha256={revision.sha256} data-publication-version={publication?.version ?? 0}>
-  <a class="back" href="/">Volver a tus artefactos</a>
-  <h1>{revision.snapshot.metadata.title}</h1>
   <form class="revision-select" method="get" action={Astro.url.pathname}>
     {before && <input type="hidden" name="before" value={before} />}
     {explicitComparison && <input type="hidden" name="compareTo" value={explicitComparison} />}
@@ -33,14 +46,9 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
   </form>
   <dl class="revision-state"><div><dt>Seleccionada</dt><dd><a href={revisionUrl(revision.id)}>Revisión {revision.sequence}</a></dd></div><div><dt>Más reciente</dt><dd><a href={revisionUrl(head.id)}>Revisión {head.sequence}</a></dd></div><div><dt>Publicada</dt><dd>{published ? <a href={revisionUrl(published.id)}>Revisión {published.sequence}</a> : 'Sin publicar'}</dd></div></dl>
   <p class="publication-state">{publication ? pending ? 'Hay cambios pendientes de publicación en la revisión más reciente.' : 'La revisión más reciente está publicada.' : 'Este artefacto aún no está publicado.'}</p>
-  <div class="actions">
-    {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
-    <a class="secondary button" href={revisionUrl(revision.id, '/export')}>Descargar revisión {revision.sequence}</a>
-    {publication && !selectedPublication && <a class="secondary button" href={publication.url}>Abrir publicación</a>}
-  </div>
   <section class="selected-preview">
     <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={revisionUrl(revision.id, '/preview')}></iframe>
-    <details class="artifact-info">
+    <details class="artifact-info" id="information">
       <summary>Información</summary>
       <h2>Revisión {revision.sequence}</h2>
       {revision.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{selectedPublication && <span class="badge">Publicada</span>}
@@ -50,9 +58,9 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
     </details>
   </section>
   <nav class="section-links" aria-label="Secciones de la revisión"><a href="#files">Archivos ({summary.files.length})</a><a href="#comparison">Comparar revisiones</a><a href="#history">Historial</a></nav>
-  <section class="inventory" id="files"><h2>Archivos de la revisión {revision.sequence}</h2><p>La descarga de esta revisión incluye estos archivos con sus bytes originales.</p>{summary.files.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Archivo</th><th scope="col">Tipo y codificación</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead><tbody>{summary.files.map((file) => <tr><th scope="row">{file.path}</th><td>{file.mediaType}<br />{file.encoding}</td><td>{file.decodedBytes}</td><td><code>{file.sha256}</code></td></tr>)}</tbody></table></div> : <p class="muted">Esta revisión no tiene archivos adjuntos.</p>}</section>
+  <section class="inventory" id="files"><h2 tabindex="-1">Archivos de la revisión {revision.sequence}</h2><p>La descarga de esta revisión incluye estos archivos con sus bytes originales.</p>{summary.files.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Archivo</th><th scope="col">Tipo y codificación</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead><tbody>{summary.files.map((file) => <tr><th scope="row">{file.path}</th><td>{file.mediaType}<br />{file.encoding}</td><td>{file.decodedBytes}</td><td><code>{file.sha256}</code></td></tr>)}</tbody></table></div> : <p class="muted">Esta revisión no tiene archivos adjuntos.</p>}</section>
   <section class="comparison" id="comparison">
-    <h2>Comparar revisiones</h2>
+    <h2 tabindex="-1">Comparar revisiones</h2>
     {revisions.length > 0 && <form class="compare-form" method="get" action={Astro.url.pathname}><input type="hidden" name="revisionId" value={revision.id} />{before && <input type="hidden" name="before" value={before} />}<label for="compareTo">Comparar la seleccionada con</label><select id="compareTo" name="compareTo">{revisions.map((item) => <option value={item.id} selected={item.id === compared?.id}>Revisión {item.sequence}{item.id === published?.id ? ' · publicada' : ''}{item.id === head.id ? ' · más reciente' : ''}</option>)}</select><button class="secondary">Comparar</button></form>}
     {comparison && compared ? <>
       <p>De la <a href={revisionUrl(compared.id)}>revisión {compared.sequence}</a> a la seleccionada, revisión {revision.sequence}.</p>
@@ -61,6 +69,6 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
       <h3>Archivos</h3>{comparison.files.length ? <ul class="file-changes">{comparison.files.map((row) => <li><h4>{row.path} <span class="badge">{fileLabels[row.change]}</span></h4><div class="file-comparison">{[{ label: `Revisión ${compared.sequence}`, file: row.before }, { label: `Seleccionada, revisión ${revision.sequence}`, file: row.after }].map(({ label, file }) => <div><p>{label}</p>{file ? <><p>{file.mediaType} · {file.encoding} · {file.decodedBytes} bytes</p><code>{file.sha256}</code></> : <p class="muted">Sin archivo</p>}</div>)}</div></li>)}</ul> : <p class="muted">Los archivos no cambiaron.</p>}
     </> : <p class="muted">No hay otra revisión disponible para comparar.</p>}
   </section>
-  <section class="artifacts" id="history"><h2>Historial</h2><p>Cada revisión conserva el contenido completo y los archivos que tenía al guardarse.</p><ol class="revision-list">{history.items.map((item) => <li><div class="revision-title"><h3>Revisión {item.sequence}</h3>{item.id === revision.id && <span class="badge">Seleccionada</span>}{item.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{item.id === publication?.revisionId && <span class="badge">Publicada</span>}</div><p>{item.snapshot.metadata.title}</p><p>{date(item.createdAt)} UTC · {item.authorClientId}</p><div class="actions"><a href={revisionUrl(item.id)}>Ver revisión {item.sequence}</a>{item.id !== revision.id && <a href={revisionUrl(revision.id, '', item.id)}>Comparar con revisión {item.sequence}</a>}<a href={revisionUrl(item.id, '/export')}>Descargar revisión {item.sequence}</a></div></li>)}</ol>{history.nextBeforeSequence && <a href={`/artifacts/${encodeURIComponent(artifact.artifactId)}?${new URLSearchParams({ revisionId: revision.id, ...(compared ? { compareTo: compared.id } : {}), before: String(history.nextBeforeSequence) })}`}>Ver revisiones anteriores</a>}</section>
+  <section class="artifacts" id="history"><h2 tabindex="-1">Historial</h2><p>Cada revisión conserva el contenido completo y los archivos que tenía al guardarse.</p><ol class="revision-list">{history.items.map((item) => <li><div class="revision-title"><h3>Revisión {item.sequence}</h3>{item.id === revision.id && <span class="badge">Seleccionada</span>}{item.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{item.id === publication?.revisionId && <span class="badge">Publicada</span>}</div><p>{item.snapshot.metadata.title}</p><p>{date(item.createdAt)} UTC · {item.authorClientId}</p><div class="actions"><a href={revisionUrl(item.id)}>Ver revisión {item.sequence}</a>{item.id !== revision.id && <a href={revisionUrl(revision.id, '', item.id)}>Comparar con revisión {item.sequence}</a>}<a href={revisionUrl(item.id, '/export')}>Descargar revisión {item.sequence}</a></div></li>)}</ol>{history.nextBeforeSequence && <a href={`/artifacts/${encodeURIComponent(artifact.artifactId)}?${new URLSearchParams({ revisionId: revision.id, ...(compared ? { compareTo: compared.id } : {}), before: String(history.nextBeforeSequence) })}`}>Ver revisiones anteriores</a>}</section>
 </section>
 </Panel>

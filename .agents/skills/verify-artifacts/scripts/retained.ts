@@ -288,7 +288,10 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
       assert.deepEqual(await realPreview.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
       const frame = await contentFrame(panel, iframe, true);
       assert.equal(frame.url(), previewUrl, 'Actual content frame must load the exact pinned preview URL');
-      const exactExport = panel.getByRole('link', { name: `Descargar revisión ${expected.revision.sequence}`, exact: true }).first();
+      const titleMenu = panel.locator('.artifact-title-trigger');
+      const hasTitleMenu = await titleMenu.count() === 1;
+      if (hasTitleMenu) await titleMenu.click();
+      const exactExport = panel.getByRole(hasTitleMenu ? 'menuitem' : 'link', { name: `Descargar revisión ${expected.revision.sequence}`, exact: true }).first();
       assert.equal(new URL((await exactExport.getAttribute('href'))!, config.panelUrl).href, exportUrl, 'Selected export URL must pin the expected revision');
       const downloadPromise = panel.waitForEvent('download');
       await exactExport.click();
@@ -325,7 +328,9 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         await publishedIframe.screenshot({ path: frameCapture });
         await chmod(frameCapture, 0o600);
         await capture(publication, `publication-${index}-closed`);
-        if (await fileSummary.count()) await fileSummary.click();
+        const titleSummary = publication.locator('.title-menu > summary');
+        if (await titleSummary.count()) await titleSummary.click();
+        if (await fileSummary.count()) await fileSummary.press('Enter');
         const files = expected.revision.snapshot.files;
         const attachmentLinks = publication.locator('nav[aria-label="Archivos adjuntos"] a');
         assert.equal(await publication.locator('a').count(), files.length, 'Publication must contain only its complete retained attachment link inventory');
@@ -351,7 +356,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         await capture(publication, `publication-${index}`);
         if (disclosed) {
           await informationSummary.press('Enter');
-          assert.equal(await publication.locator('details[open]').count(), 2, 'Both native viewer disclosures must open');
+          assert.equal(await publication.locator('.information[open], .files[open]').count(), 2, 'Both native viewer disclosures must open');
           await overflow(publication, publishedFrame);
           await viewerBounds(publication);
           await capture(publication, `publication-${index}-open`);

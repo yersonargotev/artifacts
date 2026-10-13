@@ -5,3 +5,5 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+overrides:
+  '@astrojs/react>@vitejs/plugin-react': 6.1.1
