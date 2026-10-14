@@ -29,6 +29,38 @@ claude mcp login artifacts-cloud
 
 The Artifacts account authenticates the MCP connection. Each CLI also needs its own working model-provider login.
 
+## Install the Artifacts skill
+
+The canonical skill is [skills/artifacts](skills/artifacts/SKILL.md). It includes
+the MCP contract, HTML authoring guidance, and Codex connection metadata. Update
+these files with the service contract. The skills under `.agents/skills` support
+development of this repository.
+
+Review any existing local edits before replacing an installed copy. For a
+personal Codex installation, copy the complete directory from this checkout:
+
+```sh
+mkdir -p ~/.agents/skills
+cp -R skills/artifacts ~/.agents/skills/
+```
+
+Installed copies are not the source for future changes.
+
+The skill defaults to the hosted `artifacts-cloud` connection listed above.
+Installing the skill does not register the MCP server or complete OAuth login.
+Complete [Connect a client](#connect-a-client) before using it. To use another
+deployment, register its MCP endpoint under a distinct connection name and name
+that connection in your request. The bundled Codex dependency metadata describes
+the default hosted connection.
+
+Distribution through
+[packy-catalog](https://github.com/yersonargotev/packy-catalog) is pending. Packy
+requires a publicly accessible upstream commit, and this application repository
+is private. Keep the canonical source here and use the personal installation
+above until a verifiable distribution source is available.
+
+## Call the MCP tools
+
 Ask a client to call `artifacts_create` with a complete snapshot and a unique `requestId`. The snapshot contains:
 
 ```json
