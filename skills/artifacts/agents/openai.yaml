@@ -1,0 +1,10 @@
+interface:
+  display_name: "Artifacts"
+  short_description: "Create and revise artifacts through the Artifacts MCP"
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "artifacts-cloud"
+      description: "Retained artifacts with authenticated publication"
+      transport: "streamable_http"
+      url: "https://artifacts-mcp.yersonargotev.workers.dev/mcp"
