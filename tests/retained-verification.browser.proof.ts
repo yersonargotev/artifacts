@@ -20,13 +20,13 @@ function config(directory: string, origin = 'http://localhost'): RetainedVerific
   return { expected: { ...saved, publication: { ...saved.publication!, url: `${origin}/a/artifact-retained` } }, panelUrl: `${origin}/artifacts/artifact-retained?revisionId=revision-one`, publicationUrl: `${origin}/a/artifact-retained`, viewports: [{ width: 1280, height: 900 }, { width: 390, height: 844 }], expectations: [{ kind: 'text', selector: '#total', text: '5.00' }, { kind: 'click', selector: '#change' }, { kind: 'text', selector: '#total', text: '28.40' }], evidenceDirectory: directory };
 }
 
-type Failure = 'none' | 'partial' | 'publication-partial' | 'wrong-marker' | 'sequence' | 'srcdoc' | 'preview-url' | 'archive' | 'attachment-bytes' | 'attachment-binding' | 'publication-moved' | 'console' | 'page' | 'overflow' | 'frame-overflow';
+type Failure = 'none' | 'partial' | 'publication-partial' | 'wrong-marker' | 'sequence' | 'srcdoc' | 'content-binding' | 'content-bytes' | 'content-policy' | 'content-network' | 'preview-url' | 'archive' | 'attachment-bytes' | 'attachment-binding' | 'publication-moved' | 'console' | 'page' | 'overflow' | 'frame-overflow';
 let browser: Browser;
 let directory: string;
 before(async () => { directory = await mkdtemp(join(tmpdir(), 'retained-contract-')); browser = await chromium.launch({ channel: 'chrome' }); });
 after(async () => { await browser?.close(); await rm(directory, { recursive: true, force: true }); });
 
-async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectation = false) {
+async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectation = false, transport: 'response' | 'srcdoc' = 'response') {
   let expected: ArtifactRead;
   let panelReads = 0;
   const requests: { method: string; path: string }[] = [];
@@ -63,12 +63,20 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       response.setHeader('x-content-type-options', 'nosniff');
       response.setHeader('content-security-policy', "default-src 'none'; sandbox");
       response.end(Buffer.from(failure === 'attachment-bytes' ? [0, 1, 254] : [0, 1, 255]));
-    } else if (url.pathname.startsWith('/a/')) {
-      response.setHeader('content-security-policy', documentPolicy);
-      response.setHeader('connection-allowlist', '()');
+    } else if (url.pathname.endsWith('/content')) {
+      assert.equal(request.headers['sec-fetch-dest'], 'iframe', 'Publication contract must load an actual iframe response');
+      response.setHeader('content-security-policy', failure === 'content-policy' ? previewPolicy.replace("connect-src 'none'", "connect-src 'self'") : previewPolicy);
+      if (failure !== 'content-network') response.setHeader('connection-allowlist', '()');
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
-      let html = publicationDocument(expected, (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}`, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
+      response.end(previewDocument(failure === 'content-bytes' ? { ...expected, revision: { ...expected.revision, snapshot: { ...expected.revision.snapshot, content: { kind: 'html', text: '<h1>Wrong revision bytes</h1>' } } } } : expected, true));
+    } else if (url.pathname.startsWith('/a/')) {
+      response.setHeader('content-security-policy', transport === 'srcdoc' ? documentPolicy.replace("script-src 'none'", "script-src 'unsafe-inline'") : documentPolicy);
+      if (transport === 'srcdoc') response.setHeader('connection-allowlist', '()');
+      response.setHeader('x-dns-prefetch-control', 'off');
+      response.setHeader('content-type', 'text/html; charset=utf-8');
+      let html = publicationDocument(expected, { library: 'https://panel.example.test/', content: `/a/artifact-retained/r/${failure === 'content-binding' ? 'revision-two' : 'revision-one'}/content`, attachment: (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}` }, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
+      if (transport === 'srcdoc') html = html.replace(/src="[^"]*"/, `srcdoc="${escapeHtml(previewDocument(expected, true))}"`);
       if (failure === 'sequence') {
         assert(html.includes('Revisión 1</span>'), 'Sequence corruption must target the actual rendered revision');
         html = html.replace('Revisión 1</span>', 'Revisión 2</span>');
@@ -82,7 +90,7 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
   await once(server, 'listening');
   const address = server.address();
   assert(address && typeof address === 'object');
-  const input = config(join(directory, `${mode}-${failure}-${falseExpectation}`), `http://127.0.0.1:${address.port}`);
+  const input = config(join(directory, `${mode}-${failure}-${falseExpectation}-${transport}`), `http://127.0.0.1:${address.port}`);
   expected = input.expected;
   if (['console', 'page', 'frame-overflow'].includes(failure)) {
     expected = structuredClone(expected);
@@ -115,12 +123,27 @@ for (const mode of ['markers', 'legacy'] as const) test(`browser verifier accept
   assert.deepEqual(report.attachments, [{ path: 'nested/bytes.bin', bytes: 3, sha256: '26a66b061e8f48f39927c312f25293959729eee95978e2892d49d3512a5cc092' }]);
 });
 
+test('browser verifier accepts exact legacy srcdoc transport with its original network policy', async () => {
+  const report = await run('legacy', 'none', false, 'srcdoc');
+  assert.equal(report.status, 'passed', JSON.stringify(report.errors));
+  assert.equal(report.publication, 'verified');
+});
+
+test('browser verifier rejects corrupted legacy srcdoc bytes', async () => {
+  const report = await run('legacy', 'srcdoc', false, 'srcdoc');
+  assert.equal(report.status, 'failed');
+  assert.match(report.errors.at(-1)!.message, /srcdoc bytes differ/);
+});
+
 for (const [mode, failure, message] of [
   ['markers', 'partial', /partial, malformed or mismatched/],
   ['markers', 'wrong-marker', /partial, malformed or mismatched/],
   ['legacy', 'publication-partial', /partial, malformed or mismatched/],
   ['legacy', 'sequence', /sequence differs/],
-  ['legacy', 'srcdoc', /srcdoc bytes differ/],
+  ['legacy', 'content-binding', /frame must pin the exact retained revision/],
+  ['legacy', 'content-bytes', /content bytes differ/],
+  ['legacy', 'content-policy', /content CSP differs/],
+  ['legacy', 'content-network', /content connection policy differs/],
   ['legacy', 'preview-url', /preview URL must pin/],
   ['legacy', 'archive', /ZIP bytes differ/],
   ['legacy', 'attachment-bytes', /Attachment bytes differ/],

@@ -28,11 +28,16 @@ async function assertViewerBounds(page: Page) {
   const bounds = await page.evaluate(() => {
     const header = document.querySelector('header')!.getBoundingClientRect();
     const frame = document.querySelector('main > iframe')!.getBoundingClientRect();
-    return { height: innerHeight, headerHeight: header.height, frameTop: frame.top, frameBottom: frame.bottom, frameHeight: frame.height, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, width: innerWidth };
+    const home = document.querySelector('.home')!.getBoundingClientRect();
+    const title = document.querySelector('.title-menu > summary')!.getBoundingClientRect();
+    const revision = document.querySelector('.title-row > span')!.getBoundingClientRect();
+    return { height: innerHeight, headerHeight: header.height, frameTop: frame.top, frameBottom: frame.bottom, frameHeight: frame.height, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, width: innerWidth, homeWidth: home.width, homeHeight: home.height, homeLeft: home.left, homeRight: home.right, titleLeft: title.left, titleRight: title.right, titleWidth: title.width, revisionLeft: revision.left, revisionRight: revision.right };
   });
   assert(bounds.headerHeight <= bounds.height * .45 + 1, 'The complete viewer header must leave the majority of the viewport for the artifact');
   assert(bounds.frameHeight >= bounds.height * .55 - 1 && bounds.frameBottom <= bounds.height + 1 && bounds.frameTop >= 0, 'The viewer frame must fill the usable remainder of the viewport');
   assert(bounds.scrollHeight <= bounds.height + 1 && bounds.scrollWidth <= bounds.width + 1, 'The viewer wrapper must stay within its viewport');
+  assert(bounds.homeWidth >= 44 && bounds.homeHeight >= 44, 'The library home link must keep a 44px target');
+  assert(bounds.homeLeft >= 0 && bounds.homeRight <= bounds.titleLeft && bounds.titleWidth > 0 && bounds.titleRight <= bounds.revisionLeft && bounds.revisionRight <= bounds.width, 'Home, title menu and revision must fit without overlap');
 }
 
 const reservation = createServer().listen(0, '127.0.0.1');
@@ -120,6 +125,14 @@ try {
   assert(transactionCookie);
   assert.equal((await fetch(callbackUrl, { headers: { cookie: transactionCookie }, redirect: 'manual' })).status, 403);
   assert.equal((await fetch(callbackUrl, { redirect: 'manual' })).status, 403);
+  const home = page.getByRole('link', { name: 'Volver a la biblioteca', exact: true });
+  assert.equal(await home.getAttribute('href'), `${dashboard}/`);
+  await home.click();
+  await page.waitForURL(`${dashboard}/`);
+  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
+  await page.goto(firstPublication.url);
+  await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
   await page.locator('.title-menu > summary').click();
   await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
   const oldAttachment = new URL((await page.getByRole('link', { name: 'nested/file.html', exact: true }).getAttribute('href'))!, publish).href;
@@ -163,9 +176,17 @@ try {
   assert.equal(secondPublication.url, firstPublication.url);
   const forbiddenRequests: string[] = [];
   page.on('requestfinished', (request) => { if (request.url().startsWith(collectorOrigin) || request.url().startsWith(`${dashboard}/artifacts/`)) forbiddenRequests.push(request.url()); });
+  const contentLoaded = page.waitForResponse((response) => response.url() === `${publish}/a/${created.artifactId}/r/${updated.revision.id}/content`);
   const publishedResponse = await page.goto(secondPublication.url);
   assert.equal(publishedResponse?.status(), 200);
   assert.equal(publishedResponse?.headers()['cache-control'], 'private, no-store');
+  assert.equal(publishedResponse?.headers()['connection-allowlist'], undefined);
+  assert.equal(publishedResponse?.headers()['cross-origin-opener-policy'], 'same-origin');
+  const servedContent = await contentLoaded;
+  assert.equal(servedContent.status(), 200);
+  assert.equal(servedContent.headers()['connection-allowlist'], '()');
+  assert.equal(servedContent.headers()['cross-origin-opener-policy'], 'same-origin');
+  assert.match(servedContent.headers()['content-security-policy']!, /frame-ancestors 'self'; sandbox allow-scripts$/);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Updated document', exact: true }).waitFor();
   await page.frameLocator('iframe').locator('#proof').filter({ hasText: 'blocked' }).waitFor();
   const results = JSON.parse((await page.frameLocator('iframe').locator('#proof').textContent())!) as Record<string, string>;

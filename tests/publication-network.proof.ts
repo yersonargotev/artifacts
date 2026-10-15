@@ -20,6 +20,7 @@ const artifact: ArtifactRead = {
     metadata: { title: 'Network containment proof', description: 'Disposable browser fixture' }, files: [],
     content: { kind: 'html', text: `<h1>Interactive document</h1><button onclick="this.textContent='Interaction works'">Try interaction</button><p id="ready">pending</p><script>
       document.getElementById('ready').textContent = 'executed';
+      try { top.opener.postMessage('retained-opener-secret', '*'); } catch {}
       (async () => {
         let peer;
         try {
@@ -34,14 +35,16 @@ const artifact: ArtifactRead = {
 };
 const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
   const path = new URL(request.url).pathname;
+  if (path === '/opener') return new Response(`<!doctype html><h1>External opener</h1><button onclick="window.open('${origin}/control')">Open control</button><button onclick="window.open('${origin}/publication')">Open publication</button><script>window.received = []; addEventListener('message', event => window.received.push(event.data));</script>`, { headers: { 'content-type': 'text/html' } });
   if (path === '/file') return new Response('download works', { headers: { 'content-disposition': 'attachment; filename="proof.txt"' } });
   if (path === '/panel') return new Response('<!doctype html><iframe title="Preview" sandbox="allow-scripts" src="/preview"></iframe>', { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
-  const interactive = path !== '/fallback';
+  const interactive = !path.startsWith('/fallback');
   const wrapper = path === '/publication' || path === '/fallback';
   const snapshot = wrapper ? { ...artifact, revision: { ...artifact.revision, snapshot: { ...artifact.revision.snapshot, files: [{ path: 'proof.txt', mediaType: 'text/plain', encoding: 'utf8' as const, data: 'download works' }] } } } : artifact;
   const headers: Record<string, string> = { 'content-type': 'text/html', 'content-security-policy': wrapper ? documentPolicy : interactive ? previewPolicy : inertPreviewPolicy };
-  if (path !== '/control') headers['connection-allowlist'] = '()';
-  return new Response(wrapper ? publicationDocument(snapshot, () => '/file', interactive) : previewDocument(snapshot, interactive), { headers });
+  if (!wrapper && path !== '/control') headers['connection-allowlist'] = '()';
+  if (path !== '/control') headers['cross-origin-opener-policy'] = 'same-origin';
+  return new Response(wrapper ? publicationDocument(snapshot, { library: '/panel', content: `${path}/content`, attachment: () => '/file' }, interactive) : previewDocument(snapshot, interactive), { headers });
 } });
 await once(server, 'listening');
 const address = server.address();
@@ -86,9 +89,29 @@ try {
     }
     await context.close();
   }
+  const context = await browser.newContext();
+  try {
+    const opener = await context.newPage();
+    await opener.goto(`http://localhost:${address.port}/opener`);
+    for (const kind of ['control', 'publication'] as const) {
+      await opener.evaluate(() => { (window as unknown as { received: string[] }).received = []; });
+      const opened = opener.waitForEvent('popup');
+      await opener.getByRole('button', { name: `Open ${kind}`, exact: true }).click();
+      const popup = await opened;
+      const content = kind === 'control' ? popup : popup.frameLocator('iframe');
+      await content.locator('#ready').filter({ hasText: 'executed' }).waitFor();
+      await opener.waitForTimeout(200);
+      const received = await opener.evaluate(() => (window as unknown as { received: string[] }).received);
+      assert.deepEqual(received, kind === 'control' ? ['retained-opener-secret'] : [], `${kind} must prove the cross-origin opener boundary`);
+      observations.push({ opener: kind, receivedMessages: received.length });
+      await popup.close();
+    }
+  } finally {
+    await context.close();
+  }
   await mkdir('.test-artifacts', { recursive: true });
   await writeFile('.test-artifacts/publication-network.json', JSON.stringify({ browser: browser.version(), observations }, null, 2));
-  console.log('Browser network proof passed: active UDP control, no WebRTC traffic from either protected surface, working interaction/download, inert fallback.');
+  console.log('Browser network proof passed: active UDP and opener controls, no WebRTC traffic or opener messages from protected publication, working interaction/download, inert fallback.');
 } finally {
   await browser.close();
   await new Promise<void>((done) => server.close(() => done()));
