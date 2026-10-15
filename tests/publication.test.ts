@@ -63,19 +63,43 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert(!transactionCookie.includes('artifact-a'));
   assert(flow.admitted.headers.getSetCookie().some((value) => value.includes('Max-Age=0')));
   const cookie = cookieHeader(flow.admitted);
-  const document = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Chrome/154.0.0.0 Safari/537.36' } }));
+  const document = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Chrome/154.0.0.0 Safari/537.36', forwarded: 'host=attacker.example;proto=http', 'x-forwarded-host': 'attacker.example', referer: 'https://attacker.example/' } }));
   assert.equal(document.status, 200);
   assert.equal(document.headers.get('cache-control'), 'private, no-store');
   assert.match(document.headers.get('content-security-policy')!, /connect-src 'none'/);
-  assert.equal(document.headers.get('connection-allowlist'), '()');
+  assert.match(document.headers.get('content-security-policy')!, /script-src 'none'/);
+  assert.equal(document.headers.get('connection-allowlist'), null);
+  assert.equal(document.headers.get('x-dns-prefetch-control'), 'off');
+  assert.equal(document.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(document.headers.get('cross-origin-opener-policy'), 'same-origin');
   const body = await document.text();
+  assert.match(body, /<a class="home" href="https:\/\/panel\.example\.test\/" rel="noreferrer" aria-label="Volver a la biblioteca"/);
   assert(body.includes('sandbox="allow-scripts"'));
-  assert(body.includes('&lt;script&gt;window.secret = 1&lt;/script&gt;'));
+  assert(body.includes('src="/a/artifact-a/r/revision-1/content"'));
+  assert(!body.includes('srcdoc='));
+  assert(!body.includes('window.secret'));
   assert(body.includes('/a/artifact-a/r/revision-1/files/nested/file.html'));
+  const content = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': 'Mozilla/5.0 Chrome/154.0.0.0 Safari/537.36' } }));
+  assert.equal(content.status, 200);
+  assert.equal(content.headers.get('connection-allowlist'), '()');
+  assert.match(content.headers.get('content-security-policy')!, /frame-ancestors 'self'; sandbox allow-scripts$/);
+  assert.match(content.headers.get('content-security-policy')!, /connect-src 'none'/);
+  assert.equal(content.headers.get('cache-control'), 'private, no-store');
+  assert.equal(content.headers.get('x-dns-prefetch-control'), 'off');
+  assert.equal(content.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(content.headers.get('cross-origin-opener-policy'), 'same-origin');
+  assert((await content.text()).includes('<script>window.secret = 1</script>'));
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie } }))).status, 403);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }))).status, 403);
   const inert = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
   const inertBody = await inert.text();
   assert(inertBody.includes('sandbox=""'));
-  assert(inertBody.includes('&amp;lt;script&amp;gt;window.secret = 1&amp;lt;/script&amp;gt;'));
+  const inertContent = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
+  assert.equal(inertContent.status, 200);
+  assert.match(inertContent.headers.get('content-security-policy')!, /script-src 'none'/);
+  assert.match(inertContent.headers.get('content-security-policy')!, /; sandbox$/);
+  assert.equal(inertContent.headers.get('connection-allowlist'), '()');
+  assert((await inertContent.text()).includes('&lt;script&gt;window.secret = 1&lt;/script&gt;'));
   const download = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/files/nested/file.html`, { headers: { cookie } }));
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), Buffer.from(artifact.revision.snapshot.files[0]!.data, 'base64'));
@@ -84,13 +108,14 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.equal((await handler(flow.request)).status, 403);
   assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 403);
   assert.equal((await handler(new Request(`${publish}/a/artifact-b`, { headers: { cookie } }))).status, 303);
-  assert.equal(calls.filter((url) => url.endsWith('/read')).length, 4);
+  assert.equal(calls.filter((url) => url.endsWith('/read')).length, 8);
 });
 
 test('anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes', async () => {
   let calls = 0;
   const handler = createPublicationApp(environment(), async () => { calls++; return new Response(null, { status: 503 }); });
   assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/revision-1/files/nested/file.html`))).status, 401);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { 'sec-fetch-dest': 'iframe' } }))).status, 401);
   const begin = await handler(new Request(`${publish}/a/artifact-a`));
   const state = new URL(begin.headers.get('location')!).searchParams.get('state')!;
   const callback = `${publish}/callback?${new URLSearchParams({ artifactId: 'artifact-a', state, code: 'a'.repeat(43) })}`;
@@ -112,10 +137,12 @@ test('backend outages, redirects and malformed content fail closed after valid a
     });
     const flow = await authorize(handler);
     assert.equal(flow.admitted.status, 303);
-    const response = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie: cookieHeader(flow.admitted) } }));
-    assert.equal(response.status, failure === 'revoked' ? 403 : 503);
-    assert(!(await response.text()).includes('Protected bytes'));
-    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    for (const path of ['/a/artifact-a', '/a/artifact-a/r/revision-1/content']) {
+      const response = await handler(new Request(`${publish}${path}`, { headers: { cookie: cookieHeader(flow.admitted), 'sec-fetch-dest': 'iframe' } }));
+      assert.equal(response.status, failure === 'revoked' ? 403 : 503);
+      assert(!(await response.text()).includes('Protected bytes'));
+      assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    }
   }
   const outage = createPublicationApp(environment(), async () => { throw new Error('Disconnected'); });
   assert.equal((await authorize(outage)).admitted.status, 503);

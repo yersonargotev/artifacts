@@ -162,11 +162,11 @@ async function panelPublication(page: Page, expected: ArtifactRead, mode: Identi
   }
 }
 
-async function policy(response: BrowserResponse, value: string, name: string) {
+async function policy(response: BrowserResponse, value: string, name: string, context: 'document' | 'wrapper' = 'document') {
   assert.equal(response.status(), 200, `${name} must respond successfully`);
   const headers = response.headers();
   assert.equal(headers['content-security-policy'], value, `${name} CSP differs`);
-  assert.equal(headers['connection-allowlist'], '()', `${name} must retain connection containment`);
+  assert.equal(headers['connection-allowlist'], context === 'document' ? '()' : undefined, `${name} connection policy differs`);
   assert.equal(headers['x-dns-prefetch-control'], 'off', `${name} must disable DNS prefetch`);
   assert(['private, no-store', 'no-store'].includes(headers['cache-control']!), `${name} must forbid storage`);
 }
@@ -309,16 +309,35 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
       const result: RetainedVerificationReport['viewports'][number] = { ...viewport, panel: panelMode };
       if (publication) {
         await publication.setViewportSize(viewport);
-        const response = await publication.goto(config.publicationUrl!);
+        const contentUrl = new URL(`/a/${encodeURIComponent(expected.artifactId)}/r/${encodeURIComponent(expected.revision.id)}/content`, config.publicationUrl).href;
+        const contentResponses: BrowserResponse[] = [];
+        const collectContent = (response: BrowserResponse) => { if (response.url() === contentUrl) contentResponses.push(response); };
+        publication.on('response', collectContent);
+        const response = await publication.goto(config.publicationUrl!).finally(() => publication.off('response', collectContent));
         assert(response, 'Publication must return a response');
         assert.equal(publication.url(), config.publicationUrl, 'Publication admission must end at the expected stable URL');
-        await policy(response, documentPolicy, 'Protected publication');
         result.publication = await identity(publication, expected);
         if (result.publication === 'legacy') assert.equal(await publication.locator('header span').textContent(), `Revisión ${expected.revision.sequence}`, 'Legacy publication revision sequence differs');
         const publishedIframe = publication.locator('main > iframe');
-        assert.equal(await publishedIframe.getAttribute('src'), null, 'Publication must use its retained srcdoc');
-        assert.equal(await publishedIframe.getAttribute('srcdoc'), previewDocument(expected, report.interactive), 'Publication srcdoc bytes differ from the retained revision');
+        const legacySrcdoc = await publishedIframe.getAttribute('srcdoc');
         const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive);
+        const expectedFrameUrl = legacySrcdoc === null ? contentUrl : 'about:srcdoc';
+        if (legacySrcdoc !== null) {
+          await policy(response, documentPolicy.replace("script-src 'none'", "script-src 'unsafe-inline'"), 'Legacy protected publication');
+          assert.equal(await publishedIframe.getAttribute('src'), null, 'Legacy publication must use only its retained srcdoc');
+          assert.equal(legacySrcdoc, previewDocument(expected, report.interactive), 'Publication srcdoc bytes differ from the retained revision');
+        } else {
+          await policy(response, documentPolicy, 'Protected publication wrapper', 'wrapper');
+          assert.equal(response.headers()['cross-origin-opener-policy'], 'same-origin', 'Publication wrapper must isolate cross-origin openers');
+          assert.equal(new URL((await publishedIframe.getAttribute('src'))!, config.publicationUrl).href, contentUrl, 'Publication frame must pin the exact retained revision');
+          assert.equal(contentResponses.length, 1, 'Publication must load one actual retained content response');
+          const contentResponse = contentResponses[0]!;
+          assert.equal(contentResponse.frame(), publishedFrame, 'Retained content response must belong to the actual publication iframe');
+          await policy(contentResponse, report.interactive ? previewPolicy : inertPreviewPolicy, 'Protected publication content');
+          assert.equal(contentResponse.headers()['cross-origin-opener-policy'], 'same-origin', 'Publication content must isolate cross-origin openers');
+          assert.deepEqual(await contentResponse.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Publication content bytes differ from the retained revision');
+        }
+        assert.equal(publishedFrame.url(), expectedFrameUrl, 'Publication must display the exact retained content frame');
         await overflow(publication, publishedFrame);
         const fileSummary = publication.locator('summary').filter({ hasText: /^Archivos \(/ });
         const informationSummary = publication.locator('summary').filter({ hasText: /^Información$/ });
@@ -333,7 +352,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         if (await fileSummary.count()) await fileSummary.press('Enter');
         const files = expected.revision.snapshot.files;
         const attachmentLinks = publication.locator('nav[aria-label="Archivos adjuntos"] a');
-        assert.equal(await publication.locator('a').count(), files.length, 'Publication must contain only its complete retained attachment link inventory');
+        assert.equal(await publication.locator('a[download]').count(), files.length, 'Publication must contain only its complete retained attachment download inventory');
         assert.equal(await attachmentLinks.count(), files.length, 'Publication must display the complete attachment inventory');
         for (const file of files) {
           const link = attachmentLinks.filter({ hasText: new RegExp(`^${file.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) });
@@ -351,7 +370,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
           assert.equal(response.headers()['content-security-policy'], "default-src 'none'; sandbox", 'Attachment must retain its inert CSP');
         }
         await expectations(publishedFrame, config.expectations, timeout);
-        assert.equal(publishedFrame.url(), 'about:srcdoc', 'Content expectations must not replace the publication frame');
+        assert.equal(publishedFrame.url(), expectedFrameUrl, 'Content expectations must not replace the publication frame');
         await overflow(publication, publishedFrame);
         await capture(publication, `publication-${index}`);
         if (disclosed) {
@@ -366,7 +385,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
     }
     if (observer) { await checkPublicationState(); report.checks.push('Independent publication revision and version after browser checks'); report.publication = 'verified'; }
     report.checks.push('Exact selected panel identity, actual preview response and complete downloaded archive', 'Real sandbox and CSP', 'Fresh content expectations and wrapper/frame overflow at every viewport');
-    if (publication) report.checks.push('Exact publication identity and srcdoc, complete revision-bound attachment inventory and bytes');
+    if (publication) report.checks.push('Exact publication identity and retained content bytes, complete revision-bound attachment inventory and bytes');
     assert.deepEqual(report.errors, [], 'Browser emitted console/page errors or attempted mutation');
     report.status = 'passed';
   } catch (error) {

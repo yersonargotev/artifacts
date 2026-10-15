@@ -1,12 +1,16 @@
 ---
 import '../styles/panel.css';
-const { title = 'Tus artefactos', section = 'Tus artefactos', library = false } = Astro.props;
+const { title = 'Tus artefactos', section = 'Tus artefactos', library = false, detail = false } = Astro.props;
 ---
 <!doctype html>
 <html lang="es" class="dark">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>{title} · Artifacts</title></head>
-  <body class:list={['panel', { 'library-shell': library }]}>
-    {library ? <aside class="library-sidebar"><slot name="sidebar" /></aside> : <slot name="header"><header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>{section}</span></header></slot>}
-    <main class="panel-main"><slot /></main>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#1e1e2e" /><title>{title} · Artifacts</title></head>
+  <body class:list={['panel', { 'library-shell': library, 'detail-shell': detail }]}>
+    <a class="skip-link" href="#main-content">Ir al contenido</a>
+    {library && <aside class="library-sidebar" aria-label="Espacio de trabajo"><slot name="sidebar" /></aside>}
+    <div class="panel-workspace">
+      <slot name="header"><header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>{section}</span></header></slot>
+      <main class="panel-main" id="main-content"><slot /></main>
+    </div>
   </body>
 </html>

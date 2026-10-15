@@ -5,8 +5,11 @@ import { loadArtifactReview } from '../../review.ts';
 import PublicationForm from '../../components/PublicationForm.astro';
 import ArtifactTitleMenu from '../../components/ArtifactTitleMenu.tsx';
 import Panel from '../../layouts/Panel.astro';
+import LibrarySidebar from '../../components/LibrarySidebar.astro';
+import Icon from '../../components/Icon.astro';
 if (!Astro.locals.identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
-const result = await getRuntime().then(({ artifacts }) => loadArtifactReview(artifacts, panelActor(Astro.locals.identity!), Astro.params.artifactId, Astro.url.searchParams)).catch((error: unknown) => artifactErrorResponse(error));
+const { config, artifacts } = await getRuntime();
+const result = await loadArtifactReview(artifacts, panelActor(Astro.locals.identity), Astro.params.artifactId, Astro.url.searchParams).catch((error: unknown) => artifactErrorResponse(error));
 if (result instanceof Response) return result;
 const { artifact, history, head, published, compared, summary, comparison, revisions, before } = result;
 const { revision, publication } = artifact;
@@ -21,9 +24,10 @@ const metadataLabels = { title: 'Título', description: 'Descripción', custom: 
 const fileLabels = { added: 'Agregado', removed: 'Eliminado', changed: 'Modificado' };
 const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 ---
-<Panel title={revision.snapshot.metadata.title} section="Tu artefacto">
+<Panel title={revision.snapshot.metadata.title} section="Tu artefacto" library detail>
+<LibrarySidebar slot="sidebar" identity={Astro.locals.identity} authUrl={config.auth} active={false} />
 <header slot="header" class="artifact-toolbar">
-  <a class="home-link" href="/" aria-label="Volver a tus artefactos"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v10H3z" /><path d="M9 20v-7h6v7" /></svg></a>
+  <a class="home-link" href="/" aria-label="Volver a tus artefactos"><Icon name="arrow-left" size={20} /></a>
   <h1><ArtifactTitleMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={[
     { label: `Descargar revisión ${revision.sequence}`, href: revisionUrl(revision.id, '/export'), icon: 'download', group: 'revision' },
     { label: 'Información', href: '#information', icon: 'information', group: 'sections' },
@@ -37,6 +41,7 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
   {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
 </header>
 <section class="artifact-detail" data-artifact-id={artifact.artifactId} data-revision-id={revision.id} data-revision-sha256={revision.sha256} data-publication-version={publication?.version ?? 0}>
+  <div class="review-controls">
   <form class="revision-select" method="get" action={Astro.url.pathname}>
     {before && <input type="hidden" name="before" value={before} />}
     {explicitComparison && <input type="hidden" name="compareTo" value={explicitComparison} />}
@@ -46,7 +51,9 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
   </form>
   <dl class="revision-state"><div><dt>Seleccionada</dt><dd><a href={revisionUrl(revision.id)}>Revisión {revision.sequence}</a></dd></div><div><dt>Más reciente</dt><dd><a href={revisionUrl(head.id)}>Revisión {head.sequence}</a></dd></div><div><dt>Publicada</dt><dd>{published ? <a href={revisionUrl(published.id)}>Revisión {published.sequence}</a> : 'Sin publicar'}</dd></div></dl>
   <p class="publication-state">{publication ? pending ? 'Hay cambios pendientes de publicación en la revisión más reciente.' : 'La revisión más reciente está publicada.' : 'Este artefacto aún no está publicado.'}</p>
+  </div>
   <section class="selected-preview">
+    <div class="preview-heading"><span><Icon name="file-text" size={16} />Vista previa</span><span>Revisión {revision.sequence}<span class="format-badge">{revision.snapshot.content.kind}</span></span></div>
     <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={revisionUrl(revision.id, '/preview')}></iframe>
     <details class="artifact-info" id="information">
       <summary>Información</summary>

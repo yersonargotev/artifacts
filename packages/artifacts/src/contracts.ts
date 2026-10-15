@@ -29,6 +29,11 @@ export const updateSchema = z.strictObject({ requestId, artifactId: identifier, 
 export const publishSchema = z.strictObject({ requestId, artifactId: identifier, revisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
 export const exportSchema = z.strictObject({ artifactId: identifier, revisionId: identifier });
 export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional() });
+export const libraryQuerySchema = z.strictObject({
+  q: z.string().trim().max(256).default(''),
+  status: z.enum(['all', 'published', 'unpublished', 'pending']).default('all'),
+  cursor: identifier.optional(),
+});
 export const historySchema = z.strictObject({ artifactId: identifier, limit: z.number().int().min(1).max(10).default(5), beforeSequence: z.number().int().positive().optional(), response: z.enum(['full', 'summary']).optional() });
 export const issueGrantSchema = z.strictObject({ artifactId: identifier, state: z.string().min(16).max(256) });
 export const consumeGrantSchema = issueGrantSchema.extend({ code: z.string().min(32).max(128) });
@@ -53,6 +58,12 @@ export type Publication = z.infer<typeof publicationSchema>;
 export type Revision = z.infer<typeof revisionSchema>;
 export type ArtifactRead = z.infer<typeof artifactReadSchema>;
 export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; publication: Publication | null };
+export type ArtifactLibraryQuery = z.infer<typeof libraryQuerySchema>;
+export type ArtifactLibraryPage = {
+  items: ArtifactSummary[];
+  nextCursor: string | null;
+  counts: { all: number; published: number; unpublished: number; pending: number };
+};
 export type Archive = { filename: string; mediaType: 'application/zip'; base64: string; sha256: string };
 export type ArtifactErrorCode = 'forbidden' | 'not_found' | 'conflict' | 'request_conflict' | 'invalid_grant';
 export class ArtifactError extends Error {

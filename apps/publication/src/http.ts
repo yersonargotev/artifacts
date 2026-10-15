@@ -3,7 +3,7 @@ import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
 import { artifactReadSchema, consumeGrantSchema, readSchema, viewerSchema } from '@artifacts/artifacts/contracts';
 import type { ArtifactRead, Viewer } from '@artifacts/artifacts/contracts';
-import { attachmentResponse, documentPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
+import { attachmentResponse, documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
 
 export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: string; PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 const transactionSchema = z.strictObject({ purpose: z.literal('transaction'), artifactId: z.string().min(1).max(128), state: z.string().min(32).max(128), expiresAt: z.number().int().positive() });
@@ -12,7 +12,7 @@ const transactionCookie = '__Host-artifacts-publication-transaction';
 const cookieName = (artifactId: string) => `__Host-artifacts-viewer-${base64url(new TextEncoder().encode(artifactId))}`;
 const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
-const privateHeaders = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+const privateHeaders = { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cross-origin-opener-policy': 'same-origin' };
 
 function cookie(request: Request, name: string) {
   return request.headers.get('cookie')?.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1);
@@ -25,6 +25,7 @@ function setCookie(name: string, value: string, expiresAt: number) {
 export function createPublicationApp(environment: PublicationEnvironment, fetchBackend: typeof fetch = fetch) {
   const config = publicationConfig(environment);
   const dashboardOrigin = config.dashboard;
+  const libraryUrl = new URL('/', dashboardOrigin).href;
   const publishOrigin = config.origin;
   const key = crypto.subtle.digest('SHA-256', new TextEncoder().encode(config.cookieSecret)).then((digest) => new Uint8Array(digest));
   async function encrypt(payload: object, expiresAt: number) {
@@ -81,12 +82,13 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
           return new Response('El enlace de acceso ha vencido. Abre de nuevo la publicación.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(transactionCookie, '', 0) } });
         }
       }
-      const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/files\/(.+))?$/.exec(url.pathname);
+      const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/(content|files\/(.+)))?$/.exec(url.pathname);
       if (!route || url.search) return new Response('No encontrado', { status: 404, headers: privateHeaders });
       const { artifactId, revisionId } = readSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) });
-      const path = route[3] ? decodeURIComponent(route[3]) : undefined;
+      const contentRequest = route[3] === 'content';
+      const path = route[4] ? decodeURIComponent(route[4]) : undefined;
       const viewer = await admit(request, artifactId);
-      if (!viewer) return path ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
+      if (!viewer) return path || contentRequest ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
       const result = await backend('read', { viewer, artifactId, ...(revisionId ? { revisionId } : {}) });
       if ('denied' in result) return new Response('Tu sesión o esta publicación ya no están disponibles.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(cookieName(artifactId), '', 0) } });
       const artifact: ArtifactRead = artifactReadSchema.parse(result.value);
@@ -95,7 +97,14 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });
       }
-      return new Response(publicationDocument(artifact, (file) => `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}/files/${file.split('/').map(encodeURIComponent).join('/')}`, supportsInteractiveHtml(request.headers.get('user-agent'))), { headers: { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': documentPolicy, 'connection-allowlist': '()', 'x-dns-prefetch-control': 'off', vary: 'User-Agent' } });
+      const interactive = supportsInteractiveHtml(request.headers.get('user-agent'));
+      const headers = { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'x-dns-prefetch-control': 'off', vary: 'User-Agent' };
+      if (contentRequest) {
+        if (request.headers.get('sec-fetch-dest') !== 'iframe') return new Response('El contenido solo está disponible dentro de su publicación.', { status: 403, headers: privateHeaders });
+        return new Response(previewDocument(artifact, interactive), { headers: { ...headers, 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()' } });
+      }
+      const revisionPath = `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}`;
+      return new Response(publicationDocument(artifact, { library: libraryUrl, content: `${revisionPath}/content`, attachment: (file) => `${revisionPath}/files/${file.split('/').map(encodeURIComponent).join('/')}` }, interactive), { headers: { ...headers, 'content-security-policy': documentPolicy } });
     } catch {
       return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
     }

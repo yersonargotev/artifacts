@@ -33,7 +33,11 @@ Keep filters and tabs local to the document. Do not depend on host URL synchroni
 
 ## Check the result
 
-Inspect the generated document at a narrow and a wide viewport when browser tools are available. Exercise its main controls with keyboard and pointer input. Check long labels, empty results, focus visibility, and reduced motion where applicable.
+When browser tools are available, inspect the generated document at a narrow viewport around 375 px and a wide viewport around 1280 px, or the user's requested sizes. Verify that body content fits, labels remain legible, and only intentionally wide tables or code regions scroll locally. Check the artifact itself rather than relying on the surrounding application's appearance.
+
+Exercise every distinct action with keyboard and pointer input. Observe the expected output or state change, including input errors, reset behavior, and empty filter results where applicable. Confirm that focus stays visible and follows opened and dismissed overlays. Check reduced motion when animation is present. Inspect the console for runtime errors and confirm that required content and controls work without external requests.
+
+Finish when each relevant check passes or an unavailable check is identified. Fix observed failures and repeat affected checks. Source inspection establishes markup and script intent; report browser behavior as verified only after observing it.
 
 For a requested audit, identify each issue by element or source location and state its correction. Distinguish source inspection from browser verification. Do not turn ordinary artifact delivery into an unsolicited audit report.
 
