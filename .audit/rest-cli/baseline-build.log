@@ -1,0 +1,21 @@
+$ pnpm --filter @artifacts/dashboard build
+$ astro build
+21:59:59 [WARN] [config] Shiki syntax highlighting uses inline styles that are not compatible with Content Security Policy (CSP). Consider using Prism syntax highlighting instead, or disable CSP if Shiki is required.
+21:59:59 [WARN] [csp] `security.csp.scriptDirective` defines `script-src` resources ('self') as well as `script-src-attr` resources or hashes. Because `script-src-attr` override `script-src` for their scope (browsers do not fall back), those `script-src` resources will not apply there. Add them to the corresponding `kind` if needed.
+21:59:59 [@astrojs/node] Enabling sessions with filesystem storage
+21:59:59 [vite] Re-optimizing dependencies because vite config has changed
+21:59:59 [types] Generated 143ms
+21:59:59 [build] output: "server"
+21:59:59 [build] mode: "server"
+21:59:59 [build] directory: /Users/argote/Documents/dev/artifacts/apps/dashboard/dist/
+21:59:59 [build] adapter: @astrojs/node
+21:59:59 [build] Collecting build info...
+21:59:59 [build] ✓ Completed in 164ms.
+21:59:59 [build] Building server entrypoints...
+21:59:59 [vite] ✓ built in 73ms
+21:59:59 [vite] ✓ built in 218ms
+21:59:59 [vite] ✓ built in 127ms
+21:59:59 [build] Rearranging server assets...
+21:59:59 [build] ✓ Completed in 445ms.
+21:59:59 [build] Server built in 616ms
+21:59:59 [build] Complete!

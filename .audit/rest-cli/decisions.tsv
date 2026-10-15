@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-15T02:59:15Z	frame	Define completion through authenticated operations and cross-transport state	Ownership, revocation and retries require real transport proof	.audit/rest-cli/frame.md	open
+2026-10-15T03:02:19Z	auth	Probe public-client logout against the actual OAuth provider	Installed comments disagree with actual public refresh-token revocation	tests/helpers.ts; .audit/rest-cli/oauth-probe.md	Refresh revocation 200; JWT revocation 400; existing JWT still valid
+2026-10-15T03:12:27Z	design	Select shared-core adapters with canonical-resource REST paths	Independent comparison found MCP-to-REST serialization unnecessary for equivalent operations	.audit/rest-cli/design-judgment.md; .audit/rest-cli/implementation-contract.md	accepted for implementation
