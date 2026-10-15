@@ -29,27 +29,15 @@ Keep the full revision within 1 MiB of decoded content, metadata, file names, me
 
 Interactive HTML follows the server's current Chrome compatibility policy. Other browsers may display escaped source. Do not promise interaction in every browser.
 
-## Design HTML artifacts
+## Author HTML
 
-When creating or changing an HTML artifact's layout, styling, or interactions, read [the interface guidelines](references/web-design-guidelines.md). For a new visual design, also read [the Artifacts Mocha style](references/catppuccin-mocha.md).
+For new layouts, restyling, or interaction changes, read [visual design](references/visual-design.md) and [interface guidelines](references/web-design-guidelines.md). For beginner explanations or requests for big pictures and few words, also read [visual explanations](references/visual-explanations.md).
 
-Use Artifacts Mocha as the default visual direction. An explicit user design or an existing artifact's established style takes precedence. Preserve that style for content-only edits. These references apply to the artifact document, not the surrounding Artifacts application.
+Follow the user's visual direction and an existing artifact's established style. Choose the composition for the document's purpose. When a dark digital canvas suits an unspecified design, use [Catppuccin Mocha with Blue](references/catppuccin-mocha.md). These references style the artifact document; the surrounding application is separate.
 
-Use the bundled guidance directly. Remote source links provide attribution, not a required fetch step. Apply the snapshot and sandbox constraints above when a general web guideline assumes capabilities unavailable to Artifacts.
+Use the bundled guidance directly. Remote source links provide attribution, not a required fetch step. Apply the snapshot and sandbox constraints above when a general web guideline assumes unavailable capabilities.
 
-### Explain with big pictures and few words
-
-When the user requests a visual HTML explanation for a beginner, assume no prior knowledge. Identify the topic from the conversation. Ask for it only if it is missing or ambiguous.
-
-Build a visual sequence with one idea per scene. Start with a concrete example the reader can recognize, then show how the parts connect or change. Use large illustrations, diagrams, or pictures to carry the explanation. Decorative icons and oversized headings do not replace explanatory images.
-
-Pair each visual with a short heading and a brief caption. Use familiar words and define necessary terms where they first appear. Keep labels close to what they explain. Preserve essential qualifications and the limits of an analogy even when the user asks for few words.
-
-Use inline SVG or CSS for diagrams. Use embedded raster images when the subject benefits from illustrations or photographs. Resize and compress them to fit the snapshot budget while keeping details readable. If image tools are unavailable, use a clear diagram when it can convey the concept faithfully. Report any requested imagery you cannot provide.
-
-Make the main visual dominant and its labels legible on narrow and wide screens. Give meaningful images text alternatives. Add interaction only when it helps the reader understand a relationship or change. Keep the core explanation accessible without operating a control.
-
-Before saving, check that the sequence explains the topic with its pictures and short captions, without a separate essay. Apply the interface guidelines' visual checks and report any checks you could not run.
+Finish the relevant visual and interaction checks before saving. Fix observed failures and repeat the affected checks. When browser verification is unavailable, inspect the source and disclose that visual behavior remains unverified.
 
 ## Create or revise
 
