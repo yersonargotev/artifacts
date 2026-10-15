@@ -1,31 +1,23 @@
 ---
 import { getRuntime } from '../runtime.ts';
 import { panelActor } from '../publication.ts';
-import { listSchema } from '@artifacts/artifacts/contracts';
+import { libraryQuerySchema } from '@artifacts/artifacts/contracts';
 import Panel from '../layouts/Panel.astro';
 import ArtifactLibrary from '../components/ArtifactLibrary.astro';
+import LibrarySidebar from '../components/LibrarySidebar.astro';
+import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
 const { config, artifacts } = await getRuntime();
 const failed = Astro.url.searchParams.get('login') === 'failed';
 const revoked = Astro.url.searchParams.has('revoked');
-const listed = identity ? await artifacts.list(panelActor(identity), listSchema.parse({ cursor: Astro.url.searchParams.get('cursor') ?? undefined })) : undefined;
+const status = libraryQuerySchema.shape.status.safeParse(Astro.url.searchParams.get('status') ?? undefined);
+const parsed = libraryQuerySchema.safeParse({ q: Astro.url.searchParams.get('q') ?? undefined, status: status.success ? status.data : 'all', cursor: Astro.url.searchParams.get('cursor') ?? undefined });
+if (!parsed.success) return new Response('Los parámetros de búsqueda no son válidos.', { status: 400 });
+const query = parsed.data;
+const listed = identity ? await artifacts.queryLibrary(panelActor(identity), query) : undefined;
 ---
 <Panel library={Boolean(identity)}>
-  {identity && <Fragment slot="sidebar">
-    <header class="sidebar-brand"><a class="wordmark" href="/">Artifacts</a></header>
-    <details class="library-navigation" open><summary>Navegación <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 9 6 6 6-6" /></svg></summary><div class="sidebar-content">
-      <nav aria-label="Navegación principal"><a class="sidebar-link" href="/" aria-current="page"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>Tus artefactos</a></nav>
-      <details class="tools"><summary>Conecta tus herramientas</summary><p>Agrega este servidor MCP en Claude Code o Codex e inicia sesión con tu cuenta.</p><code>{process.env.MCP_URL}</code><p>Usa <strong>artifacts_create</strong>, <strong>artifacts_update</strong> y <strong>artifacts_publish</strong> para crear, revisar y publicar. Cada revisión conserva su contenido y sus archivos.</p><p>Los documentos publicados son independientes. Los archivos adjuntos se descargan desde su publicación.</p></details>
-      <details class="identity"><summary>Cuenta</summary><h2>{identity.name}</h2><p>Este identificador es el mismo en el panel y en tus herramientas.</p><code data-testid="user-id">{identity.userId}</code><dl><dt>Conexión</dt><dd>Sesión activa</dd><dt>Permisos del panel</dt><dd>Identidad y artefactos propios</dd></dl><footer><form method="post" action="/auth/logout"><button class="secondary">Cerrar sesión del panel</button></form><a href={`${config.auth}/revoke-all`}>Cerrar todas las sesiones</a></footer></details>
-    </div></details>
-  </Fragment>}
-  {identity ? <ArtifactLibrary items={listed!.items} nextCursor={listed!.nextCursor} /> : <section class="welcome logged-out"><div class="monogram" aria-hidden="true">a.</div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" href="/auth/login">Iniciar sesión</a></section>}
+  {identity && <LibrarySidebar slot="sidebar" identity={identity} authUrl={config.auth} />}
+  {identity && <header slot="header" class="workspace-toolbar"><span class="workspace-breadcrumb"><Icon name="layout-dashboard" size={17} />Espacio de trabajo<Icon name="chevron-right" size={14} /><span>Biblioteca</span></span><span class="session-indicator">Sesión activa</span></header>}
+  {identity ? <ArtifactLibrary page={listed!} query={query} /> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>
-<script>
-  const navigation = document.querySelector('.library-navigation');
-  if (navigation instanceof HTMLDetailsElement) {
-    const desktop = matchMedia('(min-width: 761px)');
-    navigation.open = desktop.matches;
-    desktop.addEventListener('change', () => { navigation.open = desktop.matches; });
-  }
-</script>

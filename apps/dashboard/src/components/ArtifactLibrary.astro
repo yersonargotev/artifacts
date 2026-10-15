@@ -1,34 +1,43 @@
 ---
-import type { ArtifactSummary } from '@artifacts/artifacts/contracts';
+import type { ArtifactLibraryPage, ArtifactLibraryQuery } from '@artifacts/artifacts/contracts';
 import ArtifactRowMenu from './ArtifactRowMenu.tsx';
-interface Props { items: readonly ArtifactSummary[]; nextCursor?: string | null }
-const { items, nextCursor } = Astro.props;
-const groups = new Map<string, ArtifactSummary[]>();
-for (const artifact of items) {
-  const day = artifact.createdAt.slice(0, 10);
-  const group = groups.get(day);
-  if (group) group.push(artifact);
-  else groups.set(day, [artifact]);
-}
+import Icon from './Icon.astro';
+import { Input } from './ui/input.tsx';
+import { Badge } from './ui/badge.tsx';
+interface Props { page: ArtifactLibraryPage; query: ArtifactLibraryQuery }
+const { page: { items, nextCursor, counts }, query } = Astro.props;
+const filters = [{ value: 'all', label: 'Todos' }, { value: 'published', label: 'Publicados' }, { value: 'unpublished', label: 'Sin publicar' }, { value: 'pending', label: 'Cambios pendientes' }] as const;
+const urlFor = (status = query.status, cursor?: string) => {
+  const params = new URLSearchParams({ ...(query.q ? { q: query.q } : {}), ...(status !== 'all' ? { status } : {}), ...(cursor ? { cursor } : {}) });
+  return params.size ? `/?${params}` : '/';
+};
+const total = counts[query.status];
+const filtered = Boolean(query.q || query.status !== 'all');
 const date = (value: string) => new Date(value).toLocaleDateString('es', { dateStyle: 'medium', timeZone: 'UTC' });
 ---
 <section class="artifact-library">
-  <h1>Tus artefactos</h1>
-  {items.length ? Array.from(groups, ([day, artifacts]) => <section class="library-group" aria-label={`Artefactos creados el ${date(day)}`}>
-    <h2>Creado el {date(day)}</h2>
-    <ul class="artifact-list">{artifacts.map((artifact) => {
-      const detailUrl = `/artifacts/${encodeURIComponent(artifact.artifactId)}`;
-      return <li>
-        <span class="artifact-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h4M9 12h6M9 16h6" /></svg></span>
-        <div class="artifact-row-content"><h3><a href={detailUrl}>{artifact.title}</a></h3>{artifact.publication && artifact.publication.revisionId !== artifact.headRevisionId && <p class="pending">Cambios pendientes de publicación</p>}<p class="row-created">Creado el {date(artifact.createdAt)}</p></div>
-        <span class="row-publication">{artifact.publication ? `Publicado · versión ${artifact.publication.version}` : 'Sin publicar'}</span>
-        <ArtifactRowMenu title={artifact.title} actions={[
-          { label: 'Ver artefacto', href: detailUrl },
-          { label: 'Descargar revisión más reciente', href: `${detailUrl}/export?${new URLSearchParams({ revisionId: artifact.headRevisionId })}` },
-          ...(artifact.publication ? [{ label: 'Abrir publicación', href: artifact.publication.url }] : []),
-        ]} client:load />
-      </li>;
-    })}</ul>
-  </section>) : <div class="library-empty"><span class="artifact-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h4M9 12h6M9 16h6" /></svg></span><h2>Aún no tienes artefactos</h2><p>Crea uno desde Claude Code o Codex con las herramientas de Artifacts.</p></div>}
-  {nextCursor && <a class="library-next" href={`/?${new URLSearchParams({ cursor: nextCursor })}`}>Ver más artefactos</a>}
+  <div class="library-heading"><div><h1>Tus artefactos</h1><p>Todo lo que creas, en un solo lugar.</p></div><button class="button connect-button" type="button" aria-label="Conectar herramientas" data-open-tools><Icon name="plug-connected" size={18} /><span>Conectar herramientas</span></button></div>
+  <form class="library-search" role="search" aria-label="Buscar en tus artefactos" method="get" action="/">
+    <div class="search-input"><Icon name="search" size={19} /><Input id="artifact-search" type="search" name="q" defaultValue={query.q} maxLength={256} placeholder="Buscar por título o identificador..." aria-label="Buscar artefactos" /></div>
+    {query.status !== 'all' && <input type="hidden" name="status" value={query.status} />}
+    <button class="secondary" type="submit">Buscar</button>
+  </form>
+  <nav class="library-filters" aria-label="Filtrar por publicación">{filters.map(({ value, label }) => <a href={urlFor(value)} aria-current={query.status === value ? 'page' : undefined} aria-label={`${label} (${counts[value]})`}>{label}<span>{counts[value]}</span></a>)}</nav>
+  <div class="library-results"><p role="status">{total} {total === 1 ? 'artefacto' : 'artefactos'}{query.q ? <> para <strong>"{query.q}"</strong></> : ''}{query.cursor && total > 0 ? <span class="results-continuation">, continuación de resultados</span> : ''}</p>{filtered && <a class="clear-filters" href="/">Limpiar filtros</a>}</div>
+  {items.length ? <div class="library-card" data-slot="card"><div class="library-table-heading" aria-hidden="true"><span>Nombre</span><span>Publicación</span><span>Creado</span><span></span></div><ul class="artifact-list">{items.map((artifact) => {
+    const detailUrl = `/artifacts/${encodeURIComponent(artifact.artifactId)}`;
+    const pending = artifact.publication && artifact.publication.revisionId !== artifact.headRevisionId;
+    return <li>
+      <span class="artifact-icon" aria-hidden="true"><Icon name="file-text" size={23} /></span>
+      <div class="artifact-row-content"><h2><a href={detailUrl}>{artifact.title}</a></h2>{pending ? <p class="pending"><span></span>Cambios pendientes de publicación</p> : <p class="row-kind">Artefacto</p>}</div>
+      <div class="row-publication"><Badge className={artifact.publication ? 'publication-badge is-published' : 'publication-badge'}>{artifact.publication ? <><Icon name="world" size={13} />Publicado</> : 'Sin publicar'}</Badge>{artifact.publication && <span class="publication-version">Versión {artifact.publication.version}</span>}</div>
+      <time class="row-created" datetime={artifact.createdAt}>{date(artifact.createdAt)}</time>
+      <ArtifactRowMenu title={artifact.title} actions={[
+        { label: 'Ver artefacto', href: detailUrl },
+        { label: 'Descargar revisión más reciente', href: `${detailUrl}/export?${new URLSearchParams({ revisionId: artifact.headRevisionId })}` },
+        ...(artifact.publication ? [{ label: 'Abrir publicación', href: artifact.publication.url }] : []),
+      ]} client:load />
+    </li>;
+  })}</ul></div> : <div class="library-empty" data-slot="card"><span class="empty-icon"><Icon name={filtered ? 'search' : 'layers-intersect'} size={30} /></span><h2>{filtered ? 'No hay resultados' : 'Tu próximo proyecto empieza aquí'}</h2><p>{filtered ? 'Prueba con otro título o cambia los filtros de publicación.' : 'Crea tu primer artefacto desde Claude Code o Codex. Aquí podrás revisarlo, descargarlo y publicarlo.'}</p>{filtered ? <a class="button secondary" href="/">Limpiar búsqueda y filtros</a> : <button type="button" data-open-tools><Icon name="plug-connected" size={18} />Conectar herramientas</button>}</div>}
+  <div class="library-pagination">{query.cursor && <a class="secondary button" href={urlFor()}>Volver al inicio</a>}{nextCursor && <a class="library-next secondary button" href={urlFor(query.status, nextCursor)}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}</div>
 </section>

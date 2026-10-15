@@ -1,17 +1,11 @@
 import { Button } from './ui/button.tsx';
 import { Fragment, useRef } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu.tsx';
+import Icon from './Icon.tsx';
+import type { IconName } from './icons.ts';
 
-const iconPaths = {
-  download: 'M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5',
-  information: 'M12 11v6m0-10v1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
-  files: 'M6 3h8l4 4v14H6zM14 3v5h4',
-  comparison: 'M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4',
-  history: 'M3 4v5h5M3 9a9 9 0 1 1 0 6m9-9v6l4 2',
-  library: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
-  publication: 'M14 3h7v7m0-7-11 11M11 3H3v18h18v-8',
-};
-export type ArtifactLink = Readonly<{ label: string; href: string; icon?: keyof typeof iconPaths; group?: 'revision' | 'sections' | 'destinations' }>;
+const iconNames = { download: 'download', information: 'info-circle', files: 'file-text', comparison: 'arrows-diff', history: 'history', library: 'layout-dashboard', publication: 'external-link' } as const satisfies Record<string, IconName>;
+export type ArtifactLink = Readonly<{ label: string; href: string; icon?: keyof typeof iconNames; group?: 'revision' | 'sections' | 'destinations' }>;
 type Props = Readonly<{ title: string; revisionLabel: string; actions: readonly ArtifactLink[] }>;
 
 export default function ArtifactTitleMenu({ title, revisionLabel, actions }: Props) {
@@ -19,7 +13,7 @@ export default function ArtifactTitleMenu({ title, revisionLabel, actions }: Pro
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) navigationTarget.current = null; }}>
       <DropdownMenuTrigger render={<Button variant="ghost" className="artifact-title-trigger" />} aria-label={`Menú de ${title}`}>
-        <span>{title}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m6 9 6 6 6-6" /></svg>
+        <span>{title}</span><Icon name="chevron-down" size={16} />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="artifact-menu" finalFocus={() => navigationTarget.current ?? true}>
         <DropdownMenuGroup>
@@ -37,7 +31,7 @@ export default function ArtifactTitleMenu({ title, revisionLabel, actions }: Pro
             } else {
               navigationTarget.current = target.querySelector<HTMLElement>('h2') ?? target;
             }
-          }}>{icon && <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><path d={iconPaths[icon]} /></svg>}{label}</DropdownMenuItem></Fragment>)}
+          }}>{icon && <Icon name={iconNames[icon]} size={18} />}{label}</DropdownMenuItem></Fragment>)}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
