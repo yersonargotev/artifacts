@@ -1,0 +1,16 @@
+{
+  "auth": {
+    "builtFiles": 5
+  },
+  "mcp": {
+    "builtFiles": 5,
+    "restAdapterBundled": true,
+    "cliOrNodeSQLiteBundled": false
+  },
+  "panel": {
+    "builtFiles": 13
+  },
+  "view": {
+    "builtFiles": 5
+  }
+}

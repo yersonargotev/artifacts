@@ -1,0 +1,17 @@
+(node:7037) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ REST-only HTTP creates, reads, edits, publishes, paginates and exports exact retained bytes (258.535292ms)
+✔ REST validates HTTP boundaries and complete route-bound commands before store mutation (185.426792ms)
+✔ REST and MCP share retained state, exact replay, and competing publication expectations (179.75675ms)
+✔ two independent HTTP writers produce one head winner and one conflict without an extra revision (147.874292ms)
+✔ REST ownership, scopes, and central revocation apply before command receipt replay (282.648958ms)
+✔ canonical root audiences remain compatible and ArtifactError keeps one runtime identity (134.346209ms)
+✔ lost committed HTTP create, update, and publish responses replay their exact receipts (162.149584ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2023.258167

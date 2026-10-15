@@ -8,8 +8,7 @@ $ astro check
 [7m25[0m       execute: [...(config.issuer.startsWith('http:') ? [oidc.allowInsecureRequests] : []), oidc.enableNonRepudiationChecks], timeout: 5,
 [7m  [0m [93m                                                              ~~~~~~~~~~~~~~~~~~~~~[0m
 
-Result (35 files): 
+Result (35 files):
 - 0 errors
 - 0 warnings
 - 1 hint
-

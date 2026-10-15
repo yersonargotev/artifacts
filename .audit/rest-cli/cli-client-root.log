@@ -1,0 +1,17 @@
+(node:8856) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ typed client uses real REST for full commands, projections, conflicts, edit preparation, and binary export (238.971833ms)
+✔ typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry (166.085166ms)
+✔ typed client accepts a ten-revision page with maximum JSON escaping (307.507041ms)
+✔ CLI subprocesses retain exact operations and recover lost create, update, and publish responses (2515.716167ms)
+✔ CLI complete command files, edits, conflicts, request path safety, and owner binding preserve exact inputs (1821.226166ms)
+✔ CLI retains the same request ID independently for two resources and creates each operation exclusively (1478.258792ms)
+✔ CLI help works without configuration and invalid options fail before authoring (621.834458ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7780.57825

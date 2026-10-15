@@ -1,0 +1,21 @@
+{
+  "verifiedLinks": [
+    {
+      "package": "artifacts-cli-0.1.0.tgz",
+      "target": "https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/README.md#use-the-standalone-cli-or-rest-client"
+    },
+    {
+      "package": "artifacts-cli-0.1.0.tgz",
+      "target": "https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/skills/artifacts-cli/SKILL.md"
+    },
+    {
+      "package": "artifacts-artifacts-0.1.0.tgz",
+      "target": "https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/packages/client/README.md"
+    },
+    {
+      "package": "artifacts-rest-0.1.0.tgz",
+      "target": "https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/README.md#use-the-standalone-cli-or-rest-client"
+    }
+  ],
+  "result": "All packaged README links resolve to retained repository files; no parent-directory links remain"
+}

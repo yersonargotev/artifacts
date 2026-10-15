@@ -24,9 +24,9 @@ Default deployment composes REST and MCP in the existing Worker. A reusable Fetc
 
 ## Retries and local state
 
-The CLI retains a complete mutation before sending it. Its operation binds the exact arguments, request ID, expected versions, owner and resource. Retrying preserves omitted response fields and returns the original receipt. Conflicts stop the operation. A new read and deliberate new command are required to incorporate another writer's changes.
+The CLI retains a complete mutation before sending it. Its operation binds the exact arguments, request ID, expected versions, owner and resource. One invocation uses the same access token for identity, edit preparation and submission, so a concurrent login cannot change its owner between requests. Retrying preserves omitted response fields and returns the original receipt. Conflicts stop the operation. A new read and deliberate new command are required to incorporate another writer's changes.
 
-Private SQLite credential state serializes refresh and logout between CLI processes. Login generations prevent a delayed callback from restoring signed-out credentials. Node 24 already meets the repository runtime requirement, but its SQLite API is experimental. That risk is confined to private CLI storage and is covered by subprocess tests. Uncertain refresh state must survive process death before the provider request begins.
+A private SQLite lock file serializes refresh and logout between CLI processes. A separate credential database commits refresh-attempt uncertainty before the network request, so process death cannot erase that marker. Login generations prevent a delayed callback from restoring signed-out credentials. Node 24 already meets the repository runtime requirement, but its SQLite API is experimental. That risk is confined to private CLI storage and is covered by subprocess tests. Uncertain refresh state must survive process death before the provider request begins.
 
 Logout revokes refresh credentials when possible and clears local credentials. The installed provider does not revoke self-contained access JWTs. A copied JWT may remain valid until expiry. Existing central-session revocation remains the immediate cross-client boundary. The [real provider probe](../../.audit/rest-cli/oauth-probe.md) records that behavior.
 
