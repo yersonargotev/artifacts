@@ -195,6 +195,7 @@ async function drive(feature: Feature) {
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   async function capture(page: Page, label: string) {
+    await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
     await page.screenshot({ path: join(directory, `${label}.png`), fullPage: true });
     await writeFile(join(directory, `${label}.aria.yml`), await page.locator('body').ariaSnapshot(), { mode: 0o600 });
     await record(`Capture ${label}`, { url: page.url(), screenshot: `${label}.png`, aria: `${label}.aria.yml` });

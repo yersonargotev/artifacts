@@ -328,11 +328,13 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
           assert.equal(legacySrcdoc, previewDocument(expected, report.interactive), 'Publication srcdoc bytes differ from the retained revision');
         } else {
           await policy(response, documentPolicy, 'Protected publication wrapper', 'wrapper');
+          assert.equal(response.headers()['cross-origin-opener-policy'], 'same-origin', 'Publication wrapper must isolate cross-origin openers');
           assert.equal(new URL((await publishedIframe.getAttribute('src'))!, config.publicationUrl).href, contentUrl, 'Publication frame must pin the exact retained revision');
           assert.equal(contentResponses.length, 1, 'Publication must load one actual retained content response');
           const contentResponse = contentResponses[0]!;
           assert.equal(contentResponse.frame(), publishedFrame, 'Retained content response must belong to the actual publication iframe');
           await policy(contentResponse, report.interactive ? previewPolicy : inertPreviewPolicy, 'Protected publication content');
+          assert.equal(contentResponse.headers()['cross-origin-opener-policy'], 'same-origin', 'Publication content must isolate cross-origin openers');
           assert.deepEqual(await contentResponse.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Publication content bytes differ from the retained revision');
         }
         assert.equal(publishedFrame.url(), expectedFrameUrl, 'Publication must display the exact retained content frame');

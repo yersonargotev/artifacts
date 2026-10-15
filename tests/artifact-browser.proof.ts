@@ -133,8 +133,10 @@ try {
   await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
   await page.goto(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
-  await page.locator('.title-menu > summary').click();
-  await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
+  await page.locator('.title-menu > summary').press('Enter');
+  await page.locator('.title-menu[open]').waitFor();
+  await page.locator('summary').filter({ hasText: /^Archivos \(/ }).press('Enter');
+  await page.locator('.files[open]').waitFor();
   const oldAttachment = new URL((await page.getByRole('link', { name: 'nested/file.html', exact: true }).getAttribute('href'))!, publish).href;
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('link', { name: 'nested/file.html', exact: true }).click();
@@ -220,6 +222,7 @@ try {
   await panel.getByRole('link', { name: 'Browser proof artifact', exact: true }).click();
   await panel.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
   const panelResponse = await context.request.get(panel.url());
+  assert.equal(panelResponse.headers()['cross-origin-opener-policy'], 'same-origin');
   const panelPolicy = panelResponse.headers()['content-security-policy'];
   assert.match(panelPolicy, /script-src 'self' 'sha256-/);
   assert.match(panelPolicy, /script-src-attr 'none'/);
@@ -634,6 +637,13 @@ try {
   assert.equal((await fetch(secondPublication.url, { headers: { cookie: viewerHeader }, redirect: 'manual' })).status, 503);
   publicationHandler = beforeOutage;
   console.log('Artifact browser proof passed. Owner-only publication wording, single-revision comparison empty state, distinct unpublished comparison defaults and cleared self-comparisons, exact markers, bounded retained history, escaped revision comparisons and inventory, native pinned publication, unchanged retries, conflicts and independent read-back, stable publication, clean one-use handoff, sandbox isolation, exact historical export, revision-bound attachments, mobile layout, anonymous denial, central revocation and backend outage.');
+} catch (error) {
+  await mkdir('.test-artifacts/artifact-browser-failure', { recursive: true });
+  for (const [index, page] of (browser?.contexts().flatMap((context) => context.pages()) ?? []).entries()) {
+    await page.screenshot({ path: `.test-artifacts/artifact-browser-failure/page-${index}.png`, fullPage: true }).catch(() => undefined);
+    await writeFile(`.test-artifacts/artifact-browser-failure/page-${index}.aria.yml`, await page.locator('body').ariaSnapshot()).catch(() => undefined);
+  }
+  throw error;
 } finally {
   await browser?.close();
   child.kill('SIGTERM');

@@ -20,7 +20,7 @@ function config(directory: string, origin = 'http://localhost'): RetainedVerific
   return { expected: { ...saved, publication: { ...saved.publication!, url: `${origin}/a/artifact-retained` } }, panelUrl: `${origin}/artifacts/artifact-retained?revisionId=revision-one`, publicationUrl: `${origin}/a/artifact-retained`, viewports: [{ width: 1280, height: 900 }, { width: 390, height: 844 }], expectations: [{ kind: 'text', selector: '#total', text: '5.00' }, { kind: 'click', selector: '#change' }, { kind: 'text', selector: '#total', text: '28.40' }], evidenceDirectory: directory };
 }
 
-type Failure = 'none' | 'partial' | 'publication-partial' | 'wrong-marker' | 'sequence' | 'srcdoc' | 'content-binding' | 'content-bytes' | 'content-policy' | 'content-network' | 'preview-url' | 'archive' | 'attachment-bytes' | 'attachment-binding' | 'publication-moved' | 'console' | 'page' | 'overflow' | 'frame-overflow';
+type Failure = 'none' | 'partial' | 'publication-partial' | 'wrong-marker' | 'sequence' | 'srcdoc' | 'content-binding' | 'content-bytes' | 'content-policy' | 'content-network' | 'content-opener' | 'wrapper-opener' | 'preview-url' | 'archive' | 'attachment-bytes' | 'attachment-binding' | 'publication-moved' | 'console' | 'page' | 'overflow' | 'frame-overflow';
 let browser: Browser;
 let directory: string;
 before(async () => { directory = await mkdtemp(join(tmpdir(), 'retained-contract-')); browser = await chromium.launch({ channel: 'chrome' }); });
@@ -67,12 +67,14 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       assert.equal(request.headers['sec-fetch-dest'], 'iframe', 'Publication contract must load an actual iframe response');
       response.setHeader('content-security-policy', failure === 'content-policy' ? previewPolicy.replace("connect-src 'none'", "connect-src 'self'") : previewPolicy);
       if (failure !== 'content-network') response.setHeader('connection-allowlist', '()');
+      if (failure !== 'content-opener') response.setHeader('cross-origin-opener-policy', 'same-origin');
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
       response.end(previewDocument(failure === 'content-bytes' ? { ...expected, revision: { ...expected.revision, snapshot: { ...expected.revision.snapshot, content: { kind: 'html', text: '<h1>Wrong revision bytes</h1>' } } } } : expected, true));
     } else if (url.pathname.startsWith('/a/')) {
       response.setHeader('content-security-policy', transport === 'srcdoc' ? documentPolicy.replace("script-src 'none'", "script-src 'unsafe-inline'") : documentPolicy);
       if (transport === 'srcdoc') response.setHeader('connection-allowlist', '()');
+      if (transport === 'response' && failure !== 'wrapper-opener') response.setHeader('cross-origin-opener-policy', 'same-origin');
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
       let html = publicationDocument(expected, { library: 'https://panel.example.test/', content: `/a/artifact-retained/r/${failure === 'content-binding' ? 'revision-two' : 'revision-one'}/content`, attachment: (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}` }, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
@@ -144,6 +146,8 @@ for (const [mode, failure, message] of [
   ['legacy', 'content-bytes', /content bytes differ/],
   ['legacy', 'content-policy', /content CSP differs/],
   ['legacy', 'content-network', /content connection policy differs/],
+  ['legacy', 'content-opener', /content must isolate cross-origin openers/],
+  ['legacy', 'wrapper-opener', /wrapper must isolate cross-origin openers/],
   ['legacy', 'preview-url', /preview URL must pin/],
   ['legacy', 'archive', /ZIP bytes differ/],
   ['legacy', 'attachment-bytes', /Attachment bytes differ/],
