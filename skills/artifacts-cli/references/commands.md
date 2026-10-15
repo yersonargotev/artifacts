@@ -1,0 +1,133 @@
+# Command workflow
+
+Check the installed `artifacts --help` before use. These examples use the canonical resource selected for the task. `ARTIFACT_ID` and `REVISION_ID` stand for IDs observed in actual command output.
+
+## Authenticate
+
+```sh
+export ARTIFACTS_SERVER=https://artifacts.example.test/mcp
+artifacts login
+artifacts whoami
+```
+
+Replace the example with the selected resource before executing it. Every command reads `ARTIFACTS_SERVER` or an explicit `--server RESOURCE`. Login does not save a default resource. `--state-dir DIR` or `ARTIFACTS_STATE_DIR` selects an isolated private state directory. For automation, `ARTIFACTS_ACCESS_TOKEN` supplies an already authorized bearer token. Do not echo it or put it in an argument.
+
+Use `--no-browser` when the environment cannot open a browser automatically. Open the printed authorization URL and keep the CLI running for its loopback callback. A remote machine's loopback callback must be reachable by the browser used for login. Do not replace the callback with an arbitrary public listener.
+
+`logout` clears local credentials and attempts refresh-token revocation. Copied access JWTs can remain valid until expiry. The existing account page's global session revocation stops access across CLI, REST, MCP, and panel. Local logout does not claim to perform that global action.
+
+## Create a complete snapshot
+
+Save this JSON as `snapshot.json`, replacing its content with the requested artifact.
+
+```json
+{
+  "metadata": {
+    "title": "Project note",
+    "description": "A retained note",
+    "custom": { "source": "requested content" }
+  },
+  "content": {
+    "kind": "html",
+    "text": "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Project note</title><main><h1>Project note</h1><p>Retained content.</p></main></html>"
+  },
+  "files": [
+    {
+      "path": "notes.txt",
+      "mediaType": "text/plain",
+      "encoding": "utf8",
+      "data": "Retained attachment.\n"
+    }
+  ]
+}
+```
+
+`metadata.description` and `files` are required even when empty. Content kind is `html`, `markdown`, or `text`. Binary files use `encoding: "base64"` and canonical padded base64. Paths are unique normalized relative paths. Do not use empty, dot, parent, absolute, backslash, percent, or colon path segments. A file cannot also be another file's directory.
+
+```sh
+artifacts create --snapshot snapshot.json
+artifacts list --limit 25
+artifacts read ARTIFACT_ID --out saved.json
+```
+
+Keep the request ID printed for the mutation. Successful JSON goes to stdout; diagnostics and recovery instructions go to stderr. Exit zero indicates command success. A nonzero exit must be inspected before claiming completion.
+
+## Edit without losing retained data
+
+For a title change, save `changes.json` with only the requested field.
+
+```json
+{ "metadata": { "title": "Reviewed project note" } }
+```
+
+```sh
+artifacts edit ARTIFACT_ID --changes changes.json
+artifacts read ARTIFACT_ID --out current.json
+```
+
+For a complete replacement, read the current head, preserve untouched data in `next-snapshot.json`, and use that observed revision.
+
+```sh
+artifacts update ARTIFACT_ID --snapshot next-snapshot.json --expected-revision REVISION_ID
+```
+
+A complete command file can preserve a caller-owned request ID, snapshot, and expected revision. Use `artifacts create --command create.json`, `artifacts update --command update.json`, or `artifacts publish --command publish.json`. Do not add `response: "full"` to an existing command that omitted it. Optional response modes affect exact mutation identity.
+
+Command files contain the command itself, without the CLI's retained-operation wrapper.
+
+| Command | Required JSON fields |
+| --- | --- |
+| `create` | `requestId`, `snapshot` |
+| `update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` |
+| `publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` |
+
+`requestId` is a caller-chosen string of 8 to 128 characters. Create and update also accept optional `response` with value `full` or `compact`. This complete update example replaces a snapshot. Substitute the observed IDs and preserve all required content and attachments in its `snapshot`.
+
+```json
+{
+  "requestId": "reviewed-update-001",
+  "artifactId": "OBSERVED_ARTIFACT_ID",
+  "expectedRevisionId": "OBSERVED_HEAD_REVISION_ID",
+  "snapshot": {
+    "metadata": { "title": "Reviewed project note", "description": "A retained note" },
+    "content": { "kind": "text", "text": "Reviewed content." },
+    "files": []
+  }
+}
+```
+
+Create uses the same `requestId` and complete `snapshot` fields without artifact or expected-revision IDs. A complete publication command has this shape. Replace zero with the observed publication version when already published.
+
+```json
+{
+  "requestId": "reviewed-publish-001",
+  "artifactId": "OBSERVED_ARTIFACT_ID",
+  "revisionId": "SELECTED_REVISION_ID",
+  "expectedPublicationVersion": 0
+}
+```
+
+## Inspect history and publish
+
+```sh
+artifacts history ARTIFACT_ID --summary
+artifacts read ARTIFACT_ID --revision REVISION_ID --out historical.json
+artifacts publish ARTIFACT_ID --revision REVISION_ID --expected-version 0
+```
+
+The publication example applies only to an unpublished artifact. For an existing publication, replace zero with the `publication.version` observed in a current read. After publishing, read again and compare current publication with the returned receipt.
+
+History returns `nextBeforeSequence`; pass it as `--before-sequence N` to continue. List returns `nextCursor`; pass it as `--cursor CURSOR`. Do not substitute an offset or assume that one page contains everything.
+
+## Retry and export
+
+```sh
+artifacts retry REQUEST_ID
+artifacts export ARTIFACT_ID --revision REVISION_ID --out artifact.zip
+```
+
+`retry` loads the saved complete operation. It does not prepare a new edit or change expected versions. Keep the record after an uncertain result. The server checks current authority before replaying an original receipt.
+
+`read --out` and `export --out` create files exclusively. Use a new destination if one already exists. Do not delete an existing output merely to rerun an example.
+
+The archive contains `artifact.json`, `content.html`, `content.md`, or `content.txt`, and attachments under `files/`. Inspect the manifest's artifact and revision IDs, content, and required attachment bytes. Exporting the same retained revision through REST, MCP, or the panel must yield identical ZIP bytes.
