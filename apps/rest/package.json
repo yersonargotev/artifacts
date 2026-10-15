@@ -1,0 +1,12 @@
+{
+  "name": "@artifacts/rest-server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@hono/node-server": "2.1.4",
+    "@artifacts/rest": "workspace:*",
+    "@artifacts/config": "workspace:*",
+    "@artifacts/db": "workspace:*",
+    "@artifacts/artifacts": "workspace:*"
+  }
+}

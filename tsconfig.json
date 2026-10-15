@@ -8,7 +8,18 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["apps/auth/**/*.ts", "apps/mcp/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", ".agents/skills/verify-artifacts/scripts/**/*.ts"]
+  "include": [
+    "apps/auth/**/*.ts",
+    "apps/mcp/**/*.ts",
+    "packages/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    ".agents/skills/verify-artifacts/scripts/**/*.ts",
+    "apps/cli/**/*.ts",
+    "apps/rest/**/*.ts"
+  ]
 }

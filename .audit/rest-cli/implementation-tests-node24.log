@@ -1,0 +1,131 @@
+✔ immutable revisions retain metadata and bytes, while publication advances independently (502.923583ms)
+✔ mutations replay receipts, reject changed arguments, and enforce authority before replay (230.576709ms)
+✔ competing updates and publishers produce one winner and report current versions (721.095458ms)
+✔ owner filters and revision membership prevent reads or publication through another artifact (384.647375ms)
+✔ publication grants are bound, one-use, and recheck live sessions and selected revisions (242.590041ms)
+✔ snapshot validation rejects malformed bytes, unsafe paths, extra fields, and oversized payloads (4.709625ms)
+✔ MCP artifact tools use verified OAuth identity and individual operation scopes (959.630417ms)
+✔ database constraints reject historical rewrites and cross-artifact pointers (166.327958ms)
+✔ grant consumption races admit once and expired sessions and grants fail closed (163.671125ms)
+✔ bootstrap registers independent mixed-origin clients and preserves owner IDs, secrets, and resource links (6950.549708ms)
+✔ bootstrap appends public callback clients to the selected private environment file (1653.838792ms)
+(node:34761) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ CLI native login reuses its public registration, keeps private state, and clears and revokes logout (3820.099375ms)
+✔ CLI callback rejects an incorrect path, state, issuer, and duplicate parameters before accepting the real grant (802.802625ms)
+✔ CLI logout advances the epoch while the browser waits and a late callback cannot restore credentials (1416.293417ms)
+✔ concurrent CLI commands serialize refresh and both use the rotated credentials (1138.595875ms)
+✔ SIGKILL after provider rotation releases the SQLite lock and preserves uncertainty without replaying refresh (837.903208ms)
+✔ CLI rejects resource metadata mismatches and reports unconfirmed revocation without retaining local tokens (826.893833ms)
+✔ CLI cancels browser login on SIGTERM and closes its exact loopback listener (440.790708ms)
+✔ CLI verifies ID token signatures before saving the login (473.027542ms)
+✔ CLI refuses issuer metadata with foreign, plaintext, or credential-bearing OAuth endpoints (874.016541ms)
+✔ CLI never follows a redirect carrying refresh credentials (665.218958ms)
+✔ CLI logout waits for in-flight refresh and revokes the rotated token before the next command (938.493958ms)
+✔ CLI isolates DCR registrations and credentials by canonical resource (902.526208ms)
+✔ a stalled refresh times out, releases coordination, and requires login without a second token request (10600.943333ms)
+✔ SIGTERM after the callback aborts token exchange and cannot save a partial login (426.071958ms)
+✔ a changed resource issuer cannot receive the previous issuer refresh token during login (694.497834ms)
+(node:34762) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ typed client uses real REST for full commands, projections, conflicts, edit preparation, and binary export (1120.467083ms)
+✔ typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry (699.323375ms)
+✔ typed client accepts a ten-revision page with maximum JSON escaping (1115.794333ms)
+✔ CLI subprocesses retain exact operations and recover lost create, update, and publish responses (4725.753125ms)
+✔ CLI complete command files, edits, conflicts, request path safety, and owner binding preserve exact inputs (1704.487125ms)
+✔ CLI retains the same request ID independently for two resources and creates each operation exclusively (1204.62425ms)
+✔ CLI help works without configuration and invalid options fail before authoring (607.837959ms)
+✔ CLI pins one verified credential across preparation, owner binding, and submission during concurrent login (856.106167ms)
+✔ public origins reject unsupported paths and non-loopback HTTP while MCP retains its resource path (0.599416ms)
+✔ migrations are repeatable and central-session deletion cascades to panel sessions (42.714042ms)
+✔ copy preserves existing passwords, owner identity, OAuth secrets, keys, tokens, and sessions and replays without new rows (920.814166ms)
+✔ a conflicting target owner rolls back rows inserted before the conflict (107.353459ms)
+✔ an unrelated target row prevents replay without deleting or changing it (25.233334ms)
+✔ an incompatible target schema rolls back the copy instead of dropping source columns (57.908ms)
+✔ copy preserves blobs, full-width integers, real numbers, nulls, duplicate rows, and quoted identifiers (72.875875ms)
+✔ foreign key cycles copy through one deferred destination transaction (57.935084ms)
+✔ verification rejects a target trigger that changes copied identity and rolls everything back (53.338916ms)
+✔ foreign key verification rejects an orphan in the source without committing partial data (22.304541ms)
+✔ CLI reads explicit environment files, ignores inherited database settings, and never rewrites files or prints secrets (581.480875ms)
+✔ library search and publication filters query all owner artifacts before stable cursor pagination (826.654958ms)
+✔ dashboard query validation leaves the public MCP list contract unchanged (1.009041ms)
+✔ PKCE token and authenticated introspection identify the owner on every MCP request (882.939791ms)
+✔ MCP challenges missing credentials, rejects invalid claims and scope, and fails closed on introspection outage (3821.565625ms)
+✔ MCP rejects inactive and inconsistent introspection results without trusting a prior request (237.24825ms)
+✔ refresh rotation replays the same response during grace and rejects reuse after its persisted deadline (232.140292ms)
+✔ a surviving refresh after central deletion mints no usable MCP identity (237.326417ms)
+✔ concurrent refresh and family invalidation cannot bypass a deleted central session (205.774166ms)
+✔ authorization codes are single-use, signup is closed, and global revocation rejects cross-origin mutations (180.55675ms)
+✔ OIDC validates signed identity and durable one-use state, then panel logout preserves central access (644.257833ms)
+✔ OIDC state tampering and expired or deleted central sessions cannot establish or retain panel access (312.732416ms)
+✔ a callback released after central revocation cannot create a panel session (759.883375ms)
+✔ a valid issuer signature cannot link a different subject to the owner central session (271.135917ms)
+✔ encrypted publication handoff binds state and artifact, clears the callback, and serves revision-bound downloads (58.042458ms)
+✔ anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes (7.069709ms)
+✔ backend outages, redirects and malformed content fail closed after valid admission (18.949334ms)
+✔ service admission precedes browser Origin exemption and OIDC return paths stay local (1.14475ms)
+✔ runtime secret projection follows the service declarations and keeps the viewer free of database and authoring credentials (1.32675ms)
+✔ missing and malformed deployment inputs fail before temporary secret files or Worker commands (67.414125ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+✔ every bundle and every dry run must pass before the first deployment, and secret files have mode 0600 with failure cleanup (76.842167ms)
+✔ a generated config with a changed binding fails preflight without commands (18.964708ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Skipped superseded release. The revision is no longer current main.
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+✔ dry-run mode needs no Cloudflare token and superseded releases skip after four dry runs (60.013083ms)
+✔ Cloudflare account verification requires a successful matching account and redacts provider errors before any commands (62.649083ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Deployed auth
+Deployed mcp
+Deployed panel
+Deployed view
+Production read-only smoke passed
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Deployed auth
+✔ a current release finishes its serial quartet before smoke and a partial release stops without rollback (81.127709ms)
+✔ production smoke performs only read operations and requires database-backed absent-session denial (319.739334ms)
+✔ REST-only HTTP creates, reads, edits, publishes, paginates and exports exact retained bytes (585.755666ms)
+✔ REST validates HTTP boundaries and complete route-bound commands before store mutation (473.803167ms)
+✔ REST and MCP share retained state, exact replay, and competing publication expectations (425.06075ms)
+✔ two independent HTTP writers produce one head winner and one conflict without an extra revision (216.607625ms)
+✔ REST ownership, scopes, and central revocation apply before command receipt replay (441.579417ms)
+✔ canonical root audiences remain compatible and ArtifactError keeps one runtime identity (175.341833ms)
+✔ lost committed HTTP create, update, and publish responses replay their exact receipts (223.265125ms)
+✔ config requires a full consistent saved read and declarative content-only checks (13.295166ms)
+✔ archive comparison proves exact manifest, text, inventory and binary attachment bytes (8.08075ms)
+✔ Worker metadata gate and transport share the exact vendor resource policy (16.673ms)
+✔ Worker metadata refuses redirects, cancels their bodies, and permits conditional 304 (1.949291ms)
+✔ compact summaries retain identity and decoded attachment digests without payloads (15.555875ms)
+✔ revision comparison reports metadata, content and changed attachment inventories (9.186834ms)
+✔ prepared edits preserve omitted values, isolate callers and freeze every nested value (4.394416ms)
+✔ preparation rejects a returned non-head, another artifact and invalid snapshots (1.305417ms)
+✔ persisted prepared edits replay an uncertain committed write and reject a stale head (222.735792ms)
+✔ optional response schemas preserve absent fields and accept only their operation modes (0.446417ms)
+✔ literal legacy create and update receipt hashes replay after response mode extension (151.741958ms)
+✔ MCP compact modes project full receipts, preserve exact retries and bound summary history (452.770708ms)
+ℹ tests 89
+ℹ suites 0
+ℹ pass 89
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27511.258458

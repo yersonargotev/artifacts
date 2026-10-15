@@ -1,0 +1,17 @@
+{
+  "name": "@artifacts/rest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./identity": "./src/identity.ts"
+  },
+  "dependencies": {
+    "@artifacts/contracts": "workspace:*",
+    "@artifacts/artifacts": "workspace:*",
+    "jose": "6.2.12",
+    "zod": "4.6.5",
+    "@artifacts/config": "workspace:*"
+  }
+}

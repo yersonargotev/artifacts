@@ -240,6 +240,21 @@ importers:
         specifier: 1.7.7
         version: 1.7.7(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@libsql/client@0.18.0)(kysely@0.29.6))(jose@6.2.12)(kysely@0.29.6)(magicast@0.5.5)(nanostores@1.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@10.2.2)
 
+  apps/cli:
+    dependencies:
+      '@artifacts/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@artifacts/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      openid-client:
+        specifier: 6.8.8
+        version: 6.8.8
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+
   apps/dashboard:
     dependencies:
       '@artifacts/artifacts':
@@ -318,9 +333,15 @@ importers:
       '@artifacts/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@artifacts/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@artifacts/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@artifacts/rest':
+        specifier: workspace:*
+        version: link:../../packages/rest
       '@hono/node-server':
         specifier: 2.1.4
         version: 2.1.4(hono@4.13.13)
@@ -349,8 +370,29 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  apps/rest:
+    dependencies:
+      '@artifacts/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@artifacts/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@artifacts/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@artifacts/rest':
+        specifier: workspace:*
+        version: link:../../packages/rest
+      '@hono/node-server':
+        specifier: 2.1.4
+        version: 2.1.4(hono@4.13.13)
+
   packages/artifacts:
     dependencies:
+      '@artifacts/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@artifacts/db':
         specifier: workspace:*
         version: link:../db
@@ -364,7 +406,22 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  packages/client:
+    dependencies:
+      '@artifacts/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+
   packages/config: {}
+
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   packages/db:
     dependencies:
@@ -378,6 +435,24 @@ importers:
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
+
+  packages/rest:
+    dependencies:
+      '@artifacts/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
+      '@artifacts/config':
+        specifier: workspace:*
+        version: link:../config
+      '@artifacts/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
 packages:
 

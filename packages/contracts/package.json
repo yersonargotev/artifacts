@@ -1,0 +1,15 @@
+{
+  "name": "@artifacts/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./workflow": "./src/workflow.ts",
+    "./serialization": "./src/serialization.ts",
+    "./http": "./src/http.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

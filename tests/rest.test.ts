@@ -1,0 +1,236 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createHash } from 'node:crypto';
+import { unzipSync } from 'fflate';
+import { fixture, grant } from './helpers.ts';
+import { canonicalResource, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
+import { createArtifactStore, ArtifactError as StoreError } from '../packages/artifacts/src/index.ts';
+import { ArtifactError, type ArtifactRead, type Snapshot } from '../packages/contracts/src/index.ts';
+import { createArtifactRestApp } from '../packages/rest/src/index.ts';
+
+const snapshot: Snapshot = { metadata: { title: 'HTTP retained artifact', description: 'A complete REST snapshot', custom: { preserved: ['one', 2] } }, content: { kind: 'html', text: '<h1>REST first revision</h1>' }, files: [{ path: 'data/raw.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAEC/w==' }] };
+const fullScope = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
+function api(app: Awaited<ReturnType<typeof fixture>>, token: string) {
+  return (path: string, method = 'GET', body?: unknown) => fetch(`${restBase(app.config.resource)}${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' });
+}
+async function error(response: Response, status: number, code: string) {
+  assert.equal(response.status, status);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const value = await response.json() as { error: { code: string; message: string; details: Record<string, unknown> } };
+  assert.equal(value.error.code, code);
+  assert.equal(typeof value.error.message, 'string');
+  return value.error;
+}
+async function mcp(app: Awaited<ReturnType<typeof fixture>>, token: string, name: string, args: unknown) {
+  const response = await fetch(app.config.resource, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  const value = JSON.parse(text.startsWith('event:') ? text.split('\n').find((line) => line.startsWith('data: '))!.slice(6) : text) as { result: { structuredContent: unknown; isError?: boolean } };
+  return value.result;
+}
+
+test('REST-only HTTP creates, reads, edits, publishes, paginates and exports exact retained bytes', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    assert.equal((await fetch(app.config.resource, { method: 'POST' })).status, 404);
+    const identity = await (await call('/identity')).json();
+    assert.equal(identity.userId, app.ownerId);
+    assert.equal(identity.clientId, tokens.clientId);
+    const metadata = await (await fetch(protectedResourceMetadataUrl(app.config.resource))).json();
+    assert.equal(metadata.resource, app.config.resource);
+    const command = { requestId: 'rest-create-complete', snapshot };
+    const createdResponse = await call('/artifacts', 'POST', command);
+    assert.equal(createdResponse.status, 201);
+    const created = await createdResponse.json() as ArtifactRead;
+    assert.deepEqual(created.revision.snapshot, snapshot);
+    assert.equal(created.ownerId, app.ownerId);
+    assert.deepEqual(await (await call('/artifacts', 'POST', command)).json(), created);
+    const listing = await (await call('/artifacts?limit=1')).json();
+    assert.deepEqual(listing.items.map((item: { title: string }) => item.title), ['HTTP retained artifact']);
+    assert.equal(listing.nextCursor, null);
+    const changed = structuredClone(snapshot);
+    changed.content.text = '<h1>REST second revision</h1>';
+    const update = { requestId: 'rest-update-complete', artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot: changed };
+    const updated = await (await call(`/artifacts/${created.artifactId}`, 'PUT', update)).json() as ArtifactRead;
+    assert.equal(updated.revision.sequence, 2);
+    assert.deepEqual(updated.revision.snapshot.files, snapshot.files);
+    assert.equal((await (await call(`/artifacts/${created.artifactId}?revisionId=${created.revision.id}`)).json()).revision.snapshot.content.text, '<h1>REST first revision</h1>');
+    const compact = await (await call(`/artifacts/${created.artifactId}?response=compact`)).json();
+    assert.equal(compact.revision.content.utf8Bytes, 29);
+    assert.equal(Object.hasOwn(compact.revision, 'snapshot'), false);
+    const history = await (await call(`/artifacts/${created.artifactId}/history?limit=1&response=summary`)).json();
+    assert.equal(history.items[0].sequence, 2);
+    assert.equal(history.nextBeforeSequence, 2);
+    const previous = await (await call(`/artifacts/${created.artifactId}/history?beforeSequence=2`)).json();
+    assert.deepEqual(previous.items.map((item: { sequence: number }) => item.sequence), [1]);
+    const publish = { requestId: 'rest-publication-one', artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 };
+    const publication = await (await call(`/artifacts/${created.artifactId}/publication`, 'PUT', publish)).json();
+    assert.equal(publication.version, 1);
+    assert.equal(publication.revisionId, created.revision.id);
+    assert.equal(publication.url, `https://published.example.test/a/${created.artifactId}`);
+    const exported = await call(`/artifacts/${created.artifactId}/revisions/${created.revision.id}/export`);
+    assert.equal(exported.headers.get('content-type'), 'application/zip');
+    const bytes = Buffer.from(await exported.arrayBuffer());
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), exported.headers.get('x-artifact-sha256'));
+    const files = unzipSync(bytes);
+    assert.equal(Buffer.from(files['content.html']).toString(), '<h1>REST first revision</h1>');
+    assert.deepEqual([...files['files/data/raw.bin']], [0, 1, 2, 255]);
+    assert.equal(JSON.parse(Buffer.from(files['artifact.json']).toString()).revision.id, created.revision.id);
+  } finally { await app.close(); }
+});
+
+test('REST validates HTTP boundaries and complete route-bound commands before store mutation', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const unauthorized = await fetch(`${restBase(app.config.resource)}/artifacts`);
+    await error(unauthorized, 401, 'unauthenticated');
+    assert.equal(unauthorized.headers.get('www-authenticate')?.includes('resource_metadata'), false);
+    for (const query of ['limit=1&limit=2', 'limit=1.0', 'limit=+1', 'limit=1e1', 'limit=9007199254740992', 'ownerId=other']) await error(await call(`/artifacts?${query}`), 400, 'invalid_input');
+    await error(await call('/artifacts', 'POST', { requestId: 'invalid-extra-actor', snapshot, actor: { userId: 'spoofed' } }), 400, 'invalid_input');
+    await error(await call('/artifacts', 'POST', { requestId: 'invalid-not-complete' }), 400, 'invalid_input');
+    await error(await call('/artifacts/wrong', 'PUT', { requestId: 'invalid-route-identity', artifactId: 'different', expectedRevisionId: 'revision', snapshot }), 400, 'invalid_input');
+    await error(await call('/artifacts/wrong/publication', 'PUT', { requestId: 'invalid-publish-route', artifactId: 'different', revisionId: 'revision', expectedPublicationVersion: 0 }), 400, 'invalid_input');
+    const unsupported = await call('/artifacts', 'DELETE');
+    await error(unsupported, 405, 'method_not_allowed');
+    assert.equal(unsupported.headers.get('allow'), 'GET, POST');
+    await error(await fetch(`${restBase(app.config.resource)}/artifacts`, { method: 'POST', headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'text/plain' }, body: '{}' }), 415, 'unsupported_media_type');
+    await error(await fetch(`${restBase(app.config.resource)}/artifacts`, { method: 'POST', headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' }, body: '{' }), 400, 'invalid_input');
+    await error(await fetch(`${restBase(app.config.resource)}/artifacts`, { method: 'POST', headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' }, body: ' '.repeat(8_388_609) }), 413, 'request_too_large');
+    let chunked = false;
+    app.setResourceHandler((request) => {
+      chunked = request.method === 'POST' && !request.headers.has('content-length');
+      return app.resourceHandler(request);
+    });
+    const streamed = new ReadableStream<Uint8Array>({ start(controller) { for (let index = 0; index < 129; index++) controller.enqueue(new Uint8Array(65_536).fill(32)); controller.close(); } });
+    const streamedInit = { method: 'POST', headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' }, body: streamed, duplex: 'half' };
+    await error(await fetch(`${restBase(app.config.resource)}/artifacts`, streamedInit), 413, 'request_too_large');
+    assert.equal(chunked, true);
+    await error(await fetch(`${restBase(app.config.resource)}/artifacts`, { headers: { authorization: `Bearer ${tokens.access_token}`, origin: 'https://attacker.example' } }), 403, 'forbidden');
+    const handler = createArtifactRestApp(app.mcpOptions, createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' }));
+    await error(await handler(new Request('http://attacker.example/mcp/v1/artifacts')), 400, 'invalid_host');
+    assert.deepEqual(await (await call('/artifacts')).json(), { items: [], nextCursor: null });
+  } finally { await app.close(); }
+});
+
+test('REST and MCP share retained state, exact replay, and competing publication expectations', async () => {
+  const app = await fixture({ transport: 'combined' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const command = { requestId: 'interoperable-create', snapshot };
+    const created = await (await call('/artifacts', 'POST', command)).json() as ArtifactRead;
+    const fromMcp = await mcp(app, tokens.access_token, 'artifacts_read', { artifactId: created.artifactId });
+    assert.deepEqual(fromMcp.structuredContent, created);
+    const nextSnapshot = { ...snapshot, content: { kind: 'html', text: '<h1>MCP revision</h1>' } };
+    const fromMcpUpdate = await mcp(app, tokens.access_token, 'artifacts_update', { requestId: 'mcp-after-rest-update', artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot: nextSnapshot });
+    const updated = fromMcpUpdate.structuredContent as ArtifactRead;
+    assert.equal(updated.revision.sequence, 2);
+    assert.equal((await (await call(`/artifacts/${created.artifactId}`)).json()).revision.snapshot.content.text, '<h1>MCP revision</h1>');
+    const basePublish = { artifactId: created.artifactId, revisionId: updated.revision.id, expectedPublicationVersion: 0 };
+    const [restPublication, mcpPublication] = await Promise.all([
+      call(`/artifacts/${created.artifactId}/publication`, 'PUT', { ...basePublish, requestId: 'publication-rest-race' }),
+      mcp(app, tokens.access_token, 'artifacts_publish', { ...basePublish, requestId: 'publication-mcp-race' }),
+    ]);
+    assert.equal(Number(restPublication.status === 200) + Number(!mcpPublication.isError), 1);
+    if (restPublication.status !== 200) await error(restPublication, 409, 'conflict');
+    else assert.equal((mcpPublication.structuredContent as { error: string }).error, 'conflict');
+    const current = await (await call(`/artifacts/${created.artifactId}`)).json();
+    assert.equal(current.publication.version, 1);
+    assert.equal(current.publication.url, `https://published.example.test/a/${created.artifactId}`);
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_create', command)).structuredContent, created);
+    await error(await call('/artifacts', 'POST', { ...command, response: 'full' }), 409, 'request_conflict');
+  } finally { await app.close(); }
+});
+
+test('two independent HTTP writers produce one head winner and one conflict without an extra revision', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const created = await (await call('/artifacts', 'POST', { requestId: 'http-writer-base', snapshot })).json() as ArtifactRead;
+    const responses = await Promise.all(['Writer one', 'Writer two'].map((title, index) => call(`/artifacts/${created.artifactId}`, 'PUT', { requestId: `http-writer-${index}`, artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot: { ...snapshot, metadata: { ...snapshot.metadata, title } } })));
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+    await error(responses.find((response) => response.status === 409)!, 409, 'conflict');
+    const history = await (await call(`/artifacts/${created.artifactId}/history`)).json();
+    assert.deepEqual(history.items.map((item: { sequence: number }) => item.sequence), [2, 1]);
+  } finally { await app.close(); }
+});
+
+test('REST ownership, scopes, and central revocation apply before command receipt replay', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const command = { requestId: 'authority-create-replay', snapshot };
+    const created = await (await call('/artifacts', 'POST', command)).json() as ArtifactRead;
+    const writeOnly = await grant(app, 'openid profile offline_access artifacts:write');
+    const writeResponse = await api(app, writeOnly.access_token)('/artifacts', 'POST', { requestId: 'write-without-read-scope', snapshot });
+    assert.equal(writeResponse.status, 201);
+    assert.equal((await writeResponse.json()).ownerId, app.ownerId);
+    await error(await api(app, writeOnly.access_token)(`/artifacts/${created.artifactId}`), 403, 'forbidden');
+    const limited = await grant(app);
+    await error(await api(app, limited.access_token)('/artifacts', 'POST', command), 403, 'forbidden');
+    const publication = { requestId: 'authority-publish-replay', artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 };
+    assert.equal((await call(`/artifacts/${created.artifactId}/publication`, 'PUT', publication)).status, 200);
+    await error(await api(app, limited.access_token)(`/artifacts/${created.artifactId}/publication`, 'PUT', publication), 403, 'forbidden');
+    await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'rest-other@example.test', password: app.password } });
+    const signIn = await app.auth.api.signInEmail({ body: { email: 'rest-other@example.test', password: app.password }, returnHeaders: true });
+    const outsiderCookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
+    const outsider = await grant({ ...app, cookie: outsiderCookie }, fullScope);
+    const other = api(app, outsider.access_token);
+    for (const path of [`/artifacts/${created.artifactId}`, `/artifacts/${created.artifactId}/history`, `/artifacts/${created.artifactId}/revisions/${created.revision.id}/export`]) await error(await other(path), 404, 'not_found');
+    await error(await other(`/artifacts/${created.artifactId}/publication`, 'PUT', publication), 404, 'not_found');
+    const revoked = await fetch(`${app.config.origin}/revoke-all`, { method: 'POST', headers: { cookie: app.cookie, origin: app.config.origin }, redirect: 'manual' });
+    assert.equal(revoked.status, 303);
+    await error(await call('/artifacts', 'POST', command), 401, 'unauthenticated');
+    await error(await call(`/artifacts/${created.artifactId}/publication`, 'PUT', publication), 401, 'unauthenticated');
+    await error(await call(`/artifacts/${created.artifactId}`), 401, 'unauthenticated');
+  } finally { await app.close(); }
+});
+
+test('canonical root audiences remain compatible and ArtifactError keeps one runtime identity', async () => {
+  assert.equal(canonicalResource('https://artifacts.example'), 'https://artifacts.example');
+  assert.equal(StoreError, ArtifactError);
+  const app = await fixture({ transport: 'combined', resourcePath: '' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const identity = await (await api(app, tokens.access_token)('/identity')).json();
+    assert.equal(identity.userId, app.ownerId);
+    assert.equal((await mcp(app, tokens.access_token, 'whoami', {})).isError, undefined);
+    assert.equal((await (await fetch(protectedResourceMetadataUrl(app.config.resource))).json()).resource, app.config.resource);
+  } finally { await app.close(); }
+});
+
+
+test('lost committed HTTP create, update, and publish responses replay their exact receipts', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const create = { requestId: 'lost-response-create', snapshot };
+    app.dropNextResourceResponse('POST');
+    await assert.rejects(call('/artifacts', 'POST', create), /fetch failed/);
+    const created = await (await call('/artifacts', 'POST', create)).json() as ArtifactRead;
+    assert.equal(created.revision.sequence, 1);
+    assert.equal((await (await call('/artifacts')).json()).items.length, 1);
+    const update = { requestId: 'lost-response-update', artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot: { ...snapshot, content: { kind: 'text', text: 'Committed despite lost HTTP response' } } };
+    app.dropNextResourceResponse('PUT');
+    await assert.rejects(call(`/artifacts/${created.artifactId}`, 'PUT', update), /fetch failed/);
+    const updated = await (await call(`/artifacts/${created.artifactId}`, 'PUT', update)).json() as ArtifactRead;
+    assert.equal(updated.revision.sequence, 2);
+    assert.equal(updated.revision.snapshot.content.text, 'Committed despite lost HTTP response');
+    const publish = { requestId: 'lost-response-publish', artifactId: created.artifactId, revisionId: updated.revision.id, expectedPublicationVersion: 0 };
+    app.dropNextResourceResponse('PUT');
+    await assert.rejects(call(`/artifacts/${created.artifactId}/publication`, 'PUT', publish), /fetch failed/);
+    const publication = await (await call(`/artifacts/${created.artifactId}/publication`, 'PUT', publish)).json();
+    assert.equal(publication.version, 1);
+    assert.equal(publication.revisionId, updated.revision.id);
+    assert.deepEqual((await (await call(`/artifacts/${created.artifactId}/history`)).json()).items.map((item: { sequence: number }) => item.sequence), [2, 1]);
+    await error(await call(`/artifacts/${created.artifactId}`, 'PUT', { ...update, response: 'full' }), 409, 'request_conflict');
+    await error(await call(`/artifacts/${created.artifactId}/publication`, 'PUT', { ...publish, expectedPublicationVersion: 1 }), 409, 'request_conflict');
+  } finally { await app.close(); }
+});
