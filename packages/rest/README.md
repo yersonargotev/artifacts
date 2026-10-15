@@ -1,6 +1,6 @@
 # Artifacts REST
 
-`createArtifactRestApp(config, store)` returns a Fetch handler. It does not import or construct MCP. The caller supplies the canonical artifact store and the existing bearer resource configuration. Build compiled JavaScript, declarations, and tarballs with `pnpm build:packages`. Install the generated contracts, config, db, artifacts, and rest tarballs together in an external server project. The [repository instructions](../../README.md#use-the-standalone-cli-or-rest-client) describe local installation.
+`createArtifactRestApp(config, store)` returns a Fetch handler. It does not import or construct MCP. The caller supplies the canonical artifact store and the existing bearer resource configuration. Build compiled JavaScript, declarations, and tarballs with `pnpm build:packages`. Install the generated contracts, config, db, artifacts, and rest tarballs together in an external server project. The [repository instructions](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/README.md#use-the-standalone-cli-or-rest-client) describe local installation.
 
 ```ts
 import { createArtifactRestApp } from '@artifacts/rest';

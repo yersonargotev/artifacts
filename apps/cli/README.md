@@ -2,7 +2,7 @@
 
 The `artifacts` Node CLI reads and writes retained artifacts through REST. It prints JSON results to stdout and diagnostics to stderr. Node 24 or later is required. Its private credential database uses Node's experimental built-in SQLite API.
 
-The installed package exposes the `artifacts` binary as compiled ESM JavaScript. Repository development uses `pnpm artifacts`. The command syntax is identical. Run `pnpm build:packages` in the repository, then install the generated contracts, client, and CLI tarballs together. The [repository install instructions](../../README.md#use-the-standalone-cli-or-rest-client) show the exact command. The standalone [artifacts-cli skill](../../skills/artifacts-cli/SKILL.md) supplies authoring and retry guidance.
+The installed package exposes the `artifacts` binary as compiled ESM JavaScript. Repository development uses `pnpm artifacts`. The command syntax is identical. Run `pnpm build:packages` in the repository, then install the generated contracts, client, and CLI tarballs together. The [repository install instructions](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/README.md#use-the-standalone-cli-or-rest-client) show the exact command. The standalone [artifacts-cli skill](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/skills/artifacts-cli/SKILL.md) supplies authoring and retry guidance.
 
 ## Server and local state
 
