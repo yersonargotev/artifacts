@@ -358,6 +358,43 @@ async function drive(feature: Feature) {
           if (libraryDemo) {
             assert.equal(await page.locator('.artifact-list li').count(), 4);
             assert.equal(await page.locator('.artifact-list .pending').count(), 1);
+            for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+              await page.setViewportSize(viewport);
+              await page.goto(instance.panel);
+              await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('entrega');
+              await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+              await page.waitForURL((url) => url.searchParams.get('q') === 'entrega');
+              assert.equal(await page.locator('.artifact-list li').count(), 2);
+              await record('Search library by title', { viewport: name, query: 'entrega', results: 2 });
+              const filters = page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true });
+              await filters.getByRole('link', { name: /^Publicados \(/ }).click();
+              await page.waitForURL((url) => url.searchParams.get('status') === 'published');
+              assert.equal(new URL(page.url()).searchParams.get('q'), 'entrega');
+              assert.equal(await page.locator('.artifact-list li').count(), 1);
+              await page.getByRole('link', { name: 'Guía de revisión de entregas', exact: true }).waitFor();
+              await filters.getByRole('link', { name: /^Cambios pendientes \(/ }).click();
+              await page.waitForURL((url) => url.searchParams.get('status') === 'pending');
+              assert.equal(await page.locator('.artifact-list .pending').count(), 1);
+              await filters.getByRole('link', { name: /^Sin publicar \(/ }).click();
+              await page.waitForURL((url) => url.searchParams.get('status') === 'unpublished');
+              assert.equal(await page.locator('.artifact-list li').count(), 1);
+              await page.getByRole('link', { name: 'Notas para publicar una entrega', exact: true }).waitFor();
+              await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('no-match-library-proof');
+              await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+              await page.getByRole('heading', { name: 'No hay resultados', exact: true }).waitFor();
+              assert.equal(await page.locator('.artifact-list li').count(), 0);
+              assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+              await capture(page, `library-no-results-${name}`);
+              await page.goBack();
+              await page.getByRole('link', { name: 'Notas para publicar una entrega', exact: true }).waitFor();
+              assert.equal(new URL(page.url()).searchParams.get('q'), 'entrega');
+              await page.getByRole('link', { name: 'Limpiar filtros', exact: true }).click();
+              await page.waitForURL(`${instance.panel}/`);
+              assert.equal(await page.locator('.artifact-list li').count(), 4);
+              await record('Filter, recover empty results and restore library', { viewport: name, statuses: ['published', 'pending', 'unpublished'], restoredResults: 4 });
+            }
+            await page.setViewportSize({ width: 1280, height: 900 });
+            checks.push('Library search combines with publication filters at desktop and mobile', 'No-match state, browser Back and clear filters recover the library');
             const rowTrigger = page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true });
             await rowTrigger.focus();
             await rowTrigger.press('Space');
@@ -444,8 +481,17 @@ async function drive(feature: Feature) {
                 await page.goto(libraryDemo.publication.url);
                 await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
                 await capture(page, `demo-publication-${name}`);
+                const home = page.getByRole('link', { name: 'Volver a la biblioteca', exact: true });
+                assert.equal(await home.getAttribute('href'), `${instance.panel}/`);
+                const homeBounds = await home.boundingBox();
+                assert(homeBounds && homeBounds.width >= 44 && homeBounds.height >= 44);
+                await record('Return from publication to library', { viewport: name, destination: instance.panel });
+                await home.click();
+                await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+                assert.equal(new URL(page.url()).origin, instance.panel);
+                assert.equal(await page.locator('.artifact-list li').count(), 4);
               }
-              checks.push('Real MCP library drafts, publication and pending state', 'Row menu keyboard, exact-head download and stable publication links', 'Library desktop and 390px rows and menu without overflow');
+              checks.push('Real MCP library drafts, publication and pending state', 'Row menu keyboard, exact-head download and stable publication links', 'Library desktop and 390px rows and menu without overflow', 'Publication home returns to authenticated library at both viewports');
             }
             checks.push('Real MCP creates two retained revisions', 'Panel list and history select each revision', 'Interaction inside actual sandbox iframe', 'Desktop and 390px mobile without page overflow');
           }

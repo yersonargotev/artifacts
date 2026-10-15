@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-10-15T01:53:00Z	frame	Use three isolated implementation slices	Dashboard, publication, and authoring skill have distinct owners	.test-artifacts/redesign/plan.md	open
+2026-10-15T01:53:00Z	design	Use Mocha blue tokens and the reference native font stack	Matches the requested reference without remote font dependencies	docs/decisions/catppuccin-blue.md	open
+2026-10-15T01:53:00Z	baseline	Capture existing application in real Chrome before implementation	Preserve revision and menu behavior while changing visual design	.test-artifacts/verify-artifacts/catppuccin-baseline/preview/result.json	passed
+2026-10-15T01:57:23Z	skill	Integrate purpose-based authoring guidance with Blue palette	Preserve tool contracts and beginner explanation guidance while improving design decisions	f2b599f	structural-validation-passed
+2026-10-15T01:57:23Z	verification	Extend actual UI proof for search filters and publication home	A rendered control alone does not prove its action	.agents/skills/verify-artifacts/scripts/control.ts	open
+2026-10-15T02:01:15Z	navigation	Separate trusted publication header from authenticated revision content response	Chrome blocks the requested home navigation under the wrapper empty allowlist	docs/decisions/catppuccin-blue.md	verification-pending
+2026-10-15T02:01:15Z	review	Keep artifact networking denied and isolate cross-origin openers	Independent Chrome review reproduced opener postMessage escape outside connection allowlist scope	tests/publication-network.proof.ts	regression-pending
+2026-10-15T02:01:15Z	review	Accept independent skill instruction review	Four scenarios preserve user style and tool contracts	.test-artifacts/redesign/skill-scenarios.md	passed
