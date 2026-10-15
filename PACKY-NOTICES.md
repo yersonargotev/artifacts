@@ -1,7 +1,7 @@
 <!-- packy:project:pstack:codex:notices:start -->
 ## Packy project notices
 
-Pack: pstack 4.2.0
+Pack: pstack 4.3.0
 
 Surface: codex
 

@@ -15,17 +15,13 @@ Use accessible current-workspace history and authorized tools. Missing history, 
 
 Mine the current conversation for durable learnings, then route them into skill edits.
 
-## When to invoke
-
 Invoke when the user says "reflect" or "/reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.
 
-## Process
-
-### 1. Locate the active transcript
+## 1. Locate the active transcript
 
 Use the host-exposed record for the current workspace and session. Verify its session identity before reading it. If the host exposes no record, write a concise digest from this conversation and label it as a digest. Pass that digest to the reviewers; do not invent transcript paths or assume another host's JSONL layout.
 
-### 2. Spawn three reviewers in parallel
+## 2. Spawn three reviewers in parallel
 
 One message, three native subagent calls, the available general-purpose agent type, with `model` set as below, read-only review intent with the required authorized lookup tools. Reviewers need MCP access for context lookups (tickets, chat threads, observability traces referenced in the transcript). Inspect the delegated tool set before relying on any MCP lookup.
 
@@ -39,30 +35,30 @@ Each reviewer and the synthesizer name a role line in the `~/.pstack/codex-model
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the native subagent response body.
 
-### 3. Synthesize
+## 3. Synthesize
 
 One native subagent call, the available general-purpose agent type, with `model` from the `reflect judgment, divergent, synthesizer` line (default `inherit-parent`), read-only review intent with the required authorized lookup tools. The synthesizer's quality check includes spot-verifying citations, which can require MCP access. Inspect the delegated tool set before relying on any MCP lookup. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
-### 4. Structural enforcement check
+## 4. Structural enforcement check
 
-Sanity-check the synthesizer's Accepted list. For any item that would be enforced more reliably by a lint rule, script, metadata flag, or runtime check, move it from Accepted to Backlog. See the **encode-lessons-in-structure** principle skill.
+Move any Accepted item that a lint rule, script, metadata flag, or runtime check would enforce more reliably to Backlog. See the **encode-lessons-in-structure** principle skill.
 
-### 5. Apply
+## 5. Apply
 
-Before applying any Accepted edit, present the synthesizer's full Accepted/Rejected/Backlog output to the user and wait for explicit approval. The user picks which subset to apply and may redirect routings. Skill changes affect every future agent in the org. Do not auto-apply.
+Present the synthesizer's full Accepted / Rejected / Backlog output and wait for explicit approval before applying any Accepted edit. The user picks the subset and may redirect routings. Skill changes affect every future agent in the org. Do not auto-apply.
 
 Keep Backlog items in the local report. File them externally only when the user has authorized publication and the correct tracker/project is available; otherwise label them unfiled.
 
-For each approved Accepted item, follow the Routing field exactly:
+Follow each approved row's Routing exactly:
 
 - Trivial existing-skill edit (a one-line bullet, a tightened sentence, a stale fact corrected): parent does directly.
 - Substantive existing-skill edit (a new section, a new pattern table, more than ~10 lines): use an available host skill creator and run its draft / test / iterate loop. If none exists, edit and verify the skill directly.
 - `tune description: <skill path>` (the skill exists but didn't trigger when it should have): use an available skill-authoring guide and test realistic triggering requests; otherwise refine and verify the description directly.
 - `new skill via create-skill: <kebab-name>`: use an available skill-authoring guide; otherwise write a minimal skill and verify its frontmatter, references, and realistic behavior.
 
-If your environment ships a SKILL.md validator, run it on every touched skill before declaring done. Skip this step if it doesn't.
+If your environment ships a SKILL.md validator, run it on every touched skill before declaring done.
 
-### 6. Summarize for the user
+## 6. Summarize for the user
 
 Short list, no preamble:
 

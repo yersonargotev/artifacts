@@ -42,6 +42,9 @@ Recommend `$poteto-mode` for a broad workflow. Name a leaf skill when the user w
 | The user wants to | Skill |
 |---|---|
 | Do any non-trivial task with rigor | [`$poteto-mode`](../poteto-mode/SKILL.md) |
+| Check that the agent understood the goal and problem | [`$in-your-own-words`](../in-your-own-words/SKILL.md) |
+| Sharpen the approach and task specification before starting | [`$sharpen`](../sharpen/SKILL.md) |
+| Catch up on this chat and any decisions waiting on the user | [`$ketchup`](../ketchup/SKILL.md) |
 | Know how code works now, or where new code should live | [`$how`](../how/SKILL.md) |
 | Know why code is shaped this way, or where a number came from | [`$why`](../why/SKILL.md) |
 | Understand a change or subsystem, explained plainly | [`$teach`](../teach/SKILL.md) |
@@ -78,7 +81,7 @@ Close calls:
 - `$arena` gives independent workers the same brief and synthesizes candidates; `$swarm` splits work into slices or a race.
 - `$architect` proceeds to implementation after design. Add "with checkpoint" when the user wants to approve the design first.
 - `$interrogate` reviews a diff; `$blast-radius` checks consequences outside it.
-- `$recall` uses accessible, authorized history and reports gaps. Picking up one branch uses the Session pickup playbook.
+- `$recall` uses accessible, authorized history and reports gaps. `$ketchup` covers this chat since the user's last message. Picking up one branch uses the Session pickup playbook.
 - `$figure-it-out` designs one rigorous run; Orchestrate coordinates a program across PRs; Autonomous run drives a task toward a completion check.
 
 External integrations such as bot webhooks, browser control, and schedulers require available tools and the user's task authority. pstack has no standalone `$orchestrate` skill; Orchestrate is a playbook. A separately installed skill with that name has its own contract.

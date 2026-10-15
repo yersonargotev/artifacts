@@ -6,7 +6,7 @@
       "surface_intents": [
         {
           "surface": "codex",
-          "version": "4.2.0",
+          "version": "4.3.0",
           "selection": {
             "mode": "all",
             "roots": []
