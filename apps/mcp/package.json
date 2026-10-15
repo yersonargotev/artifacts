@@ -9,6 +9,8 @@
     "zod": "4.6.5",
     "@artifacts/config": "workspace:*",
     "@artifacts/artifacts": "workspace:*",
-    "@artifacts/db": "workspace:*"
+    "@artifacts/db": "workspace:*",
+    "@artifacts/rest": "workspace:*",
+    "@artifacts/contracts": "workspace:*"
   }
 }

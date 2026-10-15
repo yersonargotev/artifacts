@@ -1,0 +1,15 @@
+$ tsc --noEmit && pnpm --filter @artifacts/dashboard check
+$ astro check
+22:37:57 [@astrojs/node] Enabling sessions with filesystem storage
+22:37:57 [vite] Re-optimizing dependencies because lockfile has changed
+22:37:57 [types] Generated 108ms
+22:37:57 [check] Getting diagnostics for Astro files in /Users/argote/Documents/dev/artifacts/apps/dashboard...
+[96msrc/identity.ts[0m:[93m25[0m:[93m63[0m - [93mwarning[0m[90m ts(6385): [0m'allowInsecureRequests' is deprecated.
+
+[7m25[0m       execute: [...(config.issuer.startsWith('http:') ? [oidc.allowInsecureRequests] : []), oidc.enableNonRepudiationChecks], timeout: 5,
+[7m  [0m [93m                                                              ~~~~~~~~~~~~~~~~~~~~~[0m
+
+Result (35 files):
+- 0 errors
+- 0 warnings
+- 1 hint

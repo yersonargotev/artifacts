@@ -1,0 +1,13 @@
+{
+  "name": "@artifacts/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@artifacts/contracts": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

@@ -1,6 +1,6 @@
 # Artifact store
 
-`createArtifactStore(db, { publishOrigin })` owns retained snapshots, draft heads, publication pointers, retry receipts, and publication grants. MCP and panel callers use this API. `@artifacts/artifacts/contracts` exposes the input and response schemas without importing the database or ZIP library.
+`createArtifactStore(db, { publishOrigin })` owns retained snapshots, draft heads, publication pointers, retry receipts, and publication grants. MCP, REST, and panel callers use this API. `@artifacts/contracts` owns the database-free schemas and workflow helpers. The existing `@artifacts/artifacts/contracts` and `/workflow` exports remain compatible re-exports of the same runtime. HTTP consumers use [the client package](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/packages/client/README.md).
 
 A snapshot contains `metadata`, `content`, and `files`. Metadata retains the title, description, and optional JSON custom value. Content contains its kind and text. Files retain normalized relative paths, media types, the original UTF-8 or base64 encoding, and their data. Each revision stores the entire snapshot, parent, sequence, author, creation time, and SHA-256 of canonical snapshot JSON. Unknown fields are rejected.
 

@@ -1,0 +1,84 @@
+$ pnpm build:packages && tsx tests/packages.proof.ts
+$ tsx scripts/build-packages.ts
+package: @artifacts/config@0.1.0
+Tarball Contents
+package.json
+src/index.d.ts
+src/index.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-config-0.1.0.tgz
+package: @artifacts/db@0.1.0
+Tarball Contents
+package.json
+src/auth-schema.d.ts
+src/auth-schema.js
+src/index.d.ts
+src/index.js
+src/schema.d.ts
+src/schema.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-db-0.1.0.tgz
+package: @artifacts/contracts@0.1.0
+Tarball Contents
+package.json
+README.md
+src/http.d.ts
+src/http.js
+src/index.d.ts
+src/index.js
+src/serialization.d.ts
+src/serialization.js
+src/workflow.d.ts
+src/workflow.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-contracts-0.1.0.tgz
+package: @artifacts/artifacts@0.1.0
+Tarball Contents
+package.json
+README.md
+src/contracts.d.ts
+src/contracts.js
+src/index.d.ts
+src/index.js
+src/serialization.d.ts
+src/serialization.js
+src/workflow.d.ts
+src/workflow.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-artifacts-0.1.0.tgz
+package: @artifacts/rest@0.1.0
+Tarball Contents
+package.json
+README.md
+src/identity.d.ts
+src/identity.js
+src/index.d.ts
+src/index.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-rest-0.1.0.tgz
+package: @artifacts/client@0.1.0
+Tarball Contents
+package.json
+README.md
+src/index.d.ts
+src/index.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-client-0.1.0.tgz
+package: @artifacts/cli@0.1.0
+Tarball Contents
+package.json
+README.md
+src/auth.d.ts
+src/auth.js
+src/credentials.d.ts
+src/credentials.js
+src/index.d.ts
+src/index.js
+src/operations.d.ts
+src/operations.js
+Tarball Details
+/Users/argote/Documents/dev/artifacts/dist/packages/tarballs/artifacts-cli-0.1.0.tgz
+Compiled packages and tarballs are in /Users/argote/Documents/dev/artifacts/dist/packages
+Packed client runtime and real HTTP conflict passed
+Packed store and REST share ArtifactError and map a real conflict to 409
+Installed artifacts bin runs with ordinary Node, compiled ESM and declarations; client dependency graph is database-free

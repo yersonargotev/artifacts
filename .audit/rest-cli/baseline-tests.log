@@ -1,0 +1,98 @@
+$ node --import tsx --test tests/*.test.ts
+✔ immutable revisions retain metadata and bytes, while publication advances independently (297.573208ms)
+✔ mutations replay receipts, reject changed arguments, and enforce authority before replay (220.840125ms)
+✔ competing updates and publishers produce one winner and report current versions (176.111291ms)
+✔ owner filters and revision membership prevent reads or publication through another artifact (278.718875ms)
+✔ publication grants are bound, one-use, and recheck live sessions and selected revisions (171.453084ms)
+✔ snapshot validation rejects malformed bytes, unsafe paths, extra fields, and oversized payloads (1.393541ms)
+✔ MCP artifact tools use verified OAuth identity and individual operation scopes (283.283ms)
+✔ database constraints reject historical rewrites and cross-artifact pointers (127.559042ms)
+✔ grant consumption races admit once and expired sessions and grants fail closed (112.870583ms)
+✔ bootstrap registers independent mixed-origin clients and preserves owner IDs, secrets, and resource links (3227.5325ms)
+✔ bootstrap appends public callback clients to the selected private environment file (687.830167ms)
+✔ public origins reject unsupported paths and non-loopback HTTP while MCP retains its resource path (6.2ms)
+✔ migrations are repeatable and central-session deletion cascades to panel sessions (45.260666ms)
+✔ copy preserves existing passwords, owner identity, OAuth secrets, keys, tokens, and sessions and replays without new rows (530.992792ms)
+✔ a conflicting target owner rolls back rows inserted before the conflict (23.992791ms)
+✔ an unrelated target row prevents replay without deleting or changing it (33.36775ms)
+✔ an incompatible target schema rolls back the copy instead of dropping source columns (20.883958ms)
+✔ copy preserves blobs, full-width integers, real numbers, nulls, duplicate rows, and quoted identifiers (20.606583ms)
+✔ foreign key cycles copy through one deferred destination transaction (18.008791ms)
+✔ verification rejects a target trigger that changes copied identity and rolls everything back (16.745667ms)
+✔ foreign key verification rejects an orphan in the source without committing partial data (13.608583ms)
+✔ CLI reads explicit environment files, ignores inherited database settings, and never rewrites files or prints secrets (281.706334ms)
+✔ library search and publication filters query all owner artifacts before stable cursor pagination (598.89075ms)
+✔ dashboard query validation leaves the public MCP list contract unchanged (1.077041ms)
+✔ PKCE token and authenticated introspection identify the owner on every MCP request (420.263792ms)
+✔ MCP challenges missing credentials, rejects invalid claims and scope, and fails closed on introspection outage (3282.326125ms)
+✔ MCP rejects inactive and inconsistent introspection results without trusting a prior request (173.299291ms)
+✔ refresh rotation replays the same response during grace and rejects reuse after its persisted deadline (128.182333ms)
+✔ a surviving refresh after central deletion mints no usable MCP identity (135.919042ms)
+✔ concurrent refresh and family invalidation cannot bypass a deleted central session (134.156625ms)
+✔ authorization codes are single-use, signup is closed, and global revocation rejects cross-origin mutations (125.268291ms)
+✔ OIDC validates signed identity and durable one-use state, then panel logout preserves central access (385.889625ms)
+✔ OIDC state tampering and expired or deleted central sessions cannot establish or retain panel access (180.770166ms)
+✔ a callback released after central revocation cannot create a panel session (177.059333ms)
+✔ a valid issuer signature cannot link a different subject to the owner central session (213.127208ms)
+✔ encrypted publication handoff binds state and artifact, clears the callback, and serves revision-bound downloads (45.857916ms)
+✔ anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes (2.546417ms)
+✔ backend outages, redirects and malformed content fail closed after valid admission (22.931959ms)
+✔ service admission precedes browser Origin exemption and OIDC return paths stay local (1.306042ms)
+✔ runtime secret projection follows the service declarations and keeps the viewer free of database and authoring credentials (2.573125ms)
+✔ missing and malformed deployment inputs fail before temporary secret files or Worker commands (55.077459ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+✔ every bundle and every dry run must pass before the first deployment, and secret files have mode 0600 with failure cleanup (22.974167ms)
+✔ a generated config with a changed binding fails preflight without commands (17.082959ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Skipped superseded release. The revision is no longer current main.
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+✔ dry-run mode needs no Cloudflare token and superseded releases skip after four dry runs (34.743625ms)
+✔ Cloudflare account verification requires a successful matching account and redacts provider errors before any commands (33.811125ms)
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Deployed auth
+Deployed mcp
+Deployed panel
+Deployed view
+Production read-only smoke passed
+Dry run passed for auth
+Dry run passed for mcp
+Dry run passed for panel
+Dry run passed for view
+Deployed auth
+✔ a current release finishes its serial quartet before smoke and a partial release stops without rollback (39.090167ms)
+✔ production smoke performs only read operations and requires database-backed absent-session denial (213.022166ms)
+✔ config requires a full consistent saved read and declarative content-only checks (64.915167ms)
+✔ archive comparison proves exact manifest, text, inventory and binary attachment bytes (5.9735ms)
+✔ Worker metadata gate and transport share the exact vendor resource policy (12.20175ms)
+✔ Worker metadata refuses redirects, cancels their bodies, and permits conditional 304 (2.111834ms)
+✔ compact summaries retain identity and decoded attachment digests without payloads (5.96675ms)
+✔ revision comparison reports metadata, content and changed attachment inventories (1.459375ms)
+✔ prepared edits preserve omitted values, isolate callers and freeze every nested value (4.657917ms)
+✔ preparation rejects a returned non-head, another artifact and invalid snapshots (2.339042ms)
+✔ persisted prepared edits replay an uncertain committed write and reject a stale head (189.055709ms)
+✔ optional response schemas preserve absent fields and accept only their operation modes (0.371417ms)
+✔ literal legacy create and update receipt hashes replay after response mode extension (109.4625ms)
+✔ MCP compact modes project full receipts, preserve exact retries and bound summary history (285.525666ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 59
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6906.389875

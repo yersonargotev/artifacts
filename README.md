@@ -1,6 +1,6 @@
 # Artifacts
 
-Create an artifact from Claude Code or Codex, retain every revision in Turso, and open its published revision at a stable authenticated URL. The Astro panel lists artifacts, displays revision history, previews selected revisions, and exports their original bytes.
+Create an artifact from Claude Code, Codex, the standalone CLI, or direct HTTP, retain every revision in Turso, and open its published revision at a stable authenticated URL. The Astro panel lists artifacts, displays revision history, previews selected revisions, and exports their original bytes.
 
 `main` is the canonical branch and GitHub default. It contains the complete deployed implementation. Create short-lived feature branches from `main`, integrate completed work there, and remove those branches after integration. Worker deployments use the explicit commands in [deployment instructions](docs/deployment.md).
 
@@ -28,6 +28,31 @@ claude mcp login artifacts-cloud
 ```
 
 The Artifacts account authenticates the MCP connection. Each CLI also needs its own working model-provider login.
+
+## Use the standalone CLI or REST client
+
+The CLI uses an independent REST API under `${MCP_URL}/v1`. The existing complete `MCP_URL` remains its OAuth resource. MCP and REST share the artifact store and bearer policy. The panel continues to use its own session policy and the store directly. This source change has not been deployed, so the hosted URLs above are not a default for CLI setup.
+
+Build the local distribution and install the CLI without `tsx`:
+
+```sh
+pnpm build:packages
+npm install --prefix "$HOME/.local/share/artifacts-cli" \
+  "$PWD/dist/packages/tarballs/artifacts-contracts-0.1.0.tgz" \
+  "$PWD/dist/packages/tarballs/artifacts-client-0.1.0.tgz" \
+  "$PWD/dist/packages/tarballs/artifacts-cli-0.1.0.tgz"
+export PATH="$HOME/.local/share/artifacts-cli/node_modules/.bin:$PATH"
+export ARTIFACTS_SERVER='http://127.0.0.1:4101/mcp'
+artifacts login
+artifacts whoami
+artifacts create --snapshot snapshot.json --request-id first-cli-artifact
+```
+
+Choose an actual REST-enabled server before login. Local default services include REST after this change. `pnpm dev:rest` is an alternative REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
+
+The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. The independent [artifacts-cli skill](skills/artifacts-cli/SKILL.md) can be copied as a complete directory into `~/.agents/skills`. It has no hosted default and does not require an MCP connection.
+
+Library consumers install the compiled `@artifacts/contracts` and `@artifacts/client` tarballs. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. Server consumers can install the additional `config`, `db`, `artifacts`, and `rest` tarballs from the same output directory. The [contracts reference](packages/contracts/README.md) describes source-compatible exports. Package staging preserves workspace source imports and emits JavaScript and declarations separately under `dist/packages`.
 
 ## Install the Artifacts skill
 
@@ -121,10 +146,12 @@ ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap
 pnpm check
 pnpm test
 pnpm test:browser
+pnpm test:rest-cli:browser
+pnpm test:packages
 pnpm build:workers
 ```
 
-The tests use disposable identities and databases. `test:browser` builds the Node panel and runs actual Chrome proofs for identity, artifact publication, revision history, historical ZIP bytes, anonymous and revoked access, native forms, sandbox isolation, HTTP and UDP containment, and mobile layout. It never revokes the normal account.
+The tests use disposable identities and databases. `test:rest-cli` exercises real REST and CLI subprocesses. `test:rest-cli:browser` proves native login, retained revisions, panel publication conflicts, historical ZIP equality, and revocation in Chrome. `test:packages` compiles and installs tarballs into temporary external consumers. Run Node panel and Worker builds sequentially. `dev:rest-cli:fixture` starts a disposable combined service, authorization server, publication viewer, and a copy of the built Node panel. It prints the path to a private connection manifest for independent CLI checks and removes that temporary state on shutdown. Run `pnpm build` before starting the fixture. `test:browser` builds the Node panel and runs actual Chrome proofs for identity, artifact publication, revision history, historical ZIP bytes, anonymous and revoked access, native forms, sandbox isolation, HTTP and UDP containment, and mobile layout. It never revokes the normal account.
 
 The live acceptance runners retain private ignored evidence and require authenticated CLI registrations. The browser runner also requires the selected deployment origins and owner credentials. They create a real artifact and retain its revisions.
 

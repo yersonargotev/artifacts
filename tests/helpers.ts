@@ -11,23 +11,30 @@ import { createAuth } from '../apps/auth/src/auth.ts';
 import { createAuthApp } from '../apps/auth/src/http.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
+import { createArtifactRestApp } from '../packages/rest/src/index.ts';
+import { createResourceApp } from '../apps/mcp/src/app.ts';
 
-export async function fixture(options: { dashboard?: string; publishOrigin?: string } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
   const connection = await openDatabase({ url });
   let authHandler: (request: Request) => Promise<Response> = async () => new Response(null, { status: 503 });
   let mcpHandler = authHandler;
+  let dropMethod: string | undefined;
   const authServer = serve({ fetch: (request) => authHandler(request), hostname: '127.0.0.1', port: 0 });
-  const mcpServer = serve({ fetch: (request) => mcpHandler(request), hostname: '127.0.0.1', port: 0 });
+  const mcpServer = serve({ fetch: async (request, bindings) => {
+    const response = await mcpHandler(request);
+    if (request.method === dropMethod && response.ok) { dropMethod = undefined; bindings.outgoing.destroy(); }
+    return response;
+  }, hostname: '127.0.0.1', port: 0 });
   await Promise.all([once(authServer, 'listening'), once(mcpServer, 'listening')]);
   const authAddress = authServer.address();
   const mcpAddress = mcpServer.address();
   assert(authAddress && typeof authAddress === 'object');
   assert(mcpAddress && typeof mcpAddress === 'object');
   const origin = `http://127.0.0.1:${authAddress.port}`;
-  const config = { origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}/mcp`, dashboard: options.dashboard ?? 'http://localhost:4321' };
+  const config = { origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
   const auth = createAuth(connection.db, config, true);
   const password = randomBytes(24).toString('base64url');
   const owner = await auth.api.signUpEmail({ body: { name: 'Test owner', email: 'owner@example.test', password } });
@@ -38,10 +45,14 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   assert(resourceClient.client_secret);
   const mcpOptions = { issuer: config.issuer, resource: config.resource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
   authHandler = createAuthApp(connection.db, config);
-  mcpHandler = createMcpApp(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test' }));
+  const createResource = options.transport === 'rest' ? createArtifactRestApp : options.transport === 'combined' ? createResourceApp : createMcpApp;
+  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test' }));
   return {
     ...connection, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
+    setResourceHandler(handler: typeof mcpHandler) { mcpHandler = handler; },
+    resourceHandler: mcpHandler,
+    dropNextResourceResponse(method: string) { dropMethod = method; },
     async close() {
       if ('closeAllConnections' in authServer) authServer.closeAllConnections();
       if ('closeAllConnections' in mcpServer) mcpServer.closeAllConnections();

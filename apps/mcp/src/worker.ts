@@ -1,14 +1,14 @@
 import { mcpConfig, required, serviceUrl, type McpWorkerEnvironment } from '@artifacts/config';
 import { openDatabase } from '@artifacts/db';
 import { createArtifactStore } from '@artifacts/artifacts';
-import { createMcpApp } from './http.ts';
+import { createResourceApp } from './app.ts';
 
-const runtimes = new WeakMap<McpWorkerEnvironment, Promise<ReturnType<typeof createMcpApp>>>();
+const runtimes = new WeakMap<McpWorkerEnvironment, Promise<ReturnType<typeof createResourceApp>>>();
 
 async function createRuntime(env: McpWorkerEnvironment) {
   const config = mcpConfig(env);
   const { db } = await openDatabase({ url: required('DATABASE_URL', env), authToken: env.DATABASE_AUTH_TOKEN });
-  return createMcpApp(config, createArtifactStore(db, { publishOrigin: serviceUrl('PUBLISH_URL', env) }));
+  return createResourceApp(config, createArtifactStore(db, { publishOrigin: serviceUrl('PUBLISH_URL', env) }));
 }
 
 export default {
