@@ -40,7 +40,7 @@ async function environment(name: string) {
   await Promise.all([config, globalConfig].map((path) => writeFile(path, '')));
   const path = (process.env.PATH ?? '').split(':').filter((entry) => entry && !entry.includes('node_modules') && !entry.startsWith(root));
   const env: NodeJS.ProcessEnv = {
-    PATH: [join(prefix, 'bin'), pnpmHome, dirname(process.execPath), ...path].join(':'), HOME: home,
+    PATH: [join(prefix, 'bin'), join(pnpmHome, 'bin'), pnpmHome, dirname(process.execPath), ...path].join(':'), HOME: home,
     TMPDIR: directory, LANG: 'en_US.UTF-8', CI: 'true',
     XDG_CONFIG_HOME: join(home, '.config'), XDG_CACHE_HOME: join(home, '.cache'), XDG_DATA_HOME: join(home, '.local/share'),
     PNPM_HOME: pnpmHome, npm_config_registry: 'https://registry.npmjs.org/', npm_config_userconfig: config,
@@ -77,7 +77,8 @@ try {
   const pnpmGlobal = await environment('pnpm-global');
   evidence.pnpm = (await run('pnpm', ['--version'], pnpmGlobal.directory, pnpmGlobal.env)).trim();
   await run('pnpm', ['add', '--global', '--ignore-scripts', '--store-dir', join(pnpmGlobal.directory, 'pnpm-store'), spec], pnpmGlobal.directory, pnpmGlobal.env);
-  await probe('pnpm global', join(pnpmGlobal.pnpmHome, 'artifacts'), [], pnpmGlobal);
+  const pnpmBin = (await run('pnpm', ['bin', '--global'], pnpmGlobal.directory, pnpmGlobal.env)).trim();
+  await probe('pnpm global', join(pnpmBin, 'artifacts'), [], pnpmGlobal);
   const npx = await environment('npx');
   await probe('npx', 'npx', ['--yes', spec], npx);
   const dlx = await environment('pnpm-dlx');

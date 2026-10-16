@@ -81,6 +81,8 @@ The repository remains private, so npm provenance is disabled. [npm trusted publ
 
 This check uses separate empty homes, npm caches, pnpm stores, global prefixes, and working directories outside the checkout. It verifies npm global installation, pnpm global installation, `npx`, and `pnpm dlx`, with the exact version and help output. It verifies registry dependency resolution and integrity. `--keep` retains the isolated installation and reports a binary path for authenticated first use. Remove that reported temporary directory after verification.
 
+The isolated PATH includes both `PNPM_HOME` and `PNPM_HOME/bin`. The verifier asks `pnpm bin --global` for the executable directory. Current pnpm uses the `bin` subdirectory, as documented in [pnpm global packages](https://pnpm.io/global-packages).
+
 Run `verify-cli-first-use.ts` again against the registry-installed binary. Builds and local tarballs do not replace this gate. Save the safe JSON results with exact versions, package-manager versions, platform, and tarball hashes. The workflow prepares macOS and Linux installation checks. Only a completed run establishes coverage. Windows is unverified.
 
 [pnpm's documented security policies](https://pnpm.io/cli/pnx#security-and-trust-policies) can delay a fresh release. Record any rejection and follow the account or organization's policy. Do not claim that default installation passed after silently disabling that policy.

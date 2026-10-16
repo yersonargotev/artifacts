@@ -5,9 +5,9 @@
 - [x] Read the Principles section of the poteto-mode skill.
 - [x] Phase A: Frame.
 - [x] Phase B: Design the workflow.
-- [ ] Phase C: Run the loop.
-- [ ] Phase D: Keep the audit trail.
-- [ ] Phase E: Verify and hand back.
+- [x] Phase C: Run the loop.
+- [x] Phase D: Keep the audit trail.
+- [x] Phase E: Verify and hand back.
 
 ## Definition of done
 
@@ -37,11 +37,11 @@ The private monorepo produces exactly three intentionally public MIT packages un
 - [x] Implement packaging, beta release automation, installation docs, and clean-registry verifier.
 - [x] Verify workspace consumers, exact tarballs, installed CLI native OAuth, and authenticated artifact operations against disposable and deployed services.
 - [x] Resolve independent review findings and obtain a passing follow-up verdict.
-- [ ] Authenticate to npm, establish scope authority, and publish the inspected versions under beta.
-- [ ] Verify four clean registry modes, dependency integrity, and authenticated registry first use.
+- [x] Authenticate to npm, establish scope authority, and publish the inspected versions under beta.
+- [x] Verify four clean registry modes, dependency integrity, and authenticated registry first use.
 
 ## Rigor and boundaries
 
-Registry publication is irreversible, so exact tarball inspection, runtime checks, and an independent review are required gates. The user explicitly authorized publication once these gates pass. Homebrew and repository visibility changes are outside scope. npm authentication is currently absent. Name availability does not establish scope ownership.
+Registry publication is irreversible, so exact tarball inspection, runtime checks, and an independent review are required gates. The user explicitly authorized publication once these gates pass. All three exact tarballs are now published and verified. Native npm login and successful publication established `yargote` scope authority. Homebrew and repository visibility changes are outside scope.
 
 The local host has no configured pstack model preferences, control-cli skill, or deslop skill. Implementation and initial design/release reviews inherit the host model. The final trail and fix review uses the available `gpt-5.6-sol` model. Different model-family coverage is unavailable and is not claimed. Direct installed-command execution supplies CLI evidence.

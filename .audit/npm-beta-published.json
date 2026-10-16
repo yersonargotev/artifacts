@@ -1,0 +1,128 @@
+{
+  "verifiedAt": "2026-10-16T01:58:47.227Z",
+  "repository": {
+    "name": "yersonargotev/artifacts",
+    "private": true
+  },
+  "version": "0.1.0-beta.1",
+  "platform": "darwin",
+  "node": "v24.19.0",
+  "npm": "11.17.0",
+  "pnpm": "12.11.2",
+  "status": "passed",
+  "cases": [
+    {
+      "mode": "npm global",
+      "version": "0.1.0-beta.1",
+      "help": true
+    },
+    {
+      "mode": "pnpm global",
+      "version": "0.1.0-beta.1",
+      "help": true
+    },
+    {
+      "mode": "npx",
+      "version": "0.1.0-beta.1",
+      "help": true
+    },
+    {
+      "mode": "pnpm dlx",
+      "version": "0.1.0-beta.1",
+      "help": true
+    }
+  ],
+  "packages": [
+    {
+      "name": "@yargote/artifacts-contracts",
+      "version": "0.1.0-beta.1",
+      "beta": "0.1.0-beta.1",
+      "latest": "0.0.0-stage",
+      "integrity": "sha512-Jtrbq7QwmXE97ydjDMdq1tYUZ8ZGoHec36lZLjTIyz/Q/fTk1Tz5iN3BeUgXRRun7H3NO3EvxSqk8uDOEqDnig==",
+      "url": "https://www.npmjs.com/package/@yargote/artifacts-contracts/v/0.1.0-beta.1"
+    },
+    {
+      "name": "@yargote/artifacts-client",
+      "version": "0.1.0-beta.1",
+      "beta": "0.1.0-beta.1",
+      "latest": "0.0.0-stage",
+      "integrity": "sha512-U+xICm2z2uSY/3XYXE2X3rTMhKbTUeyWeDvorrMk64Fm1nlPLBqC9U63aTVFARldeiCFbZUYLvC9jUUHNQS2Kg==",
+      "url": "https://www.npmjs.com/package/@yargote/artifacts-client/v/0.1.0-beta.1"
+    },
+    {
+      "name": "@yargote/artifacts-cli",
+      "version": "0.1.0-beta.1",
+      "beta": "0.1.0-beta.1",
+      "latest": "0.0.0-stage",
+      "integrity": "sha512-EyndDsxBIA3e7DfJg9pAD4hmBmvW24s1J5Z7yKRMD8tTR8/voKUZHQQEPK9KRz8HK4S+UVFM2zytTdAmY1bM4g==",
+      "url": "https://www.npmjs.com/package/@yargote/artifacts-cli/v/0.1.0-beta.1"
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "@yargote/artifacts-contracts",
+      "version": "0.1.0-beta.1",
+      "resolved": "https://registry.npmjs.org/@yargote/artifacts-contracts/-/artifacts-contracts-0.1.0-beta.1.tgz",
+      "integrity": "sha512-Jtrbq7QwmXE97ydjDMdq1tYUZ8ZGoHec36lZLjTIyz/Q/fTk1Tz5iN3BeUgXRRun7H3NO3EvxSqk8uDOEqDnig=="
+    },
+    {
+      "name": "@yargote/artifacts-client",
+      "version": "0.1.0-beta.1",
+      "resolved": "https://registry.npmjs.org/@yargote/artifacts-client/-/artifacts-client-0.1.0-beta.1.tgz",
+      "integrity": "sha512-U+xICm2z2uSY/3XYXE2X3rTMhKbTUeyWeDvorrMk64Fm1nlPLBqC9U63aTVFARldeiCFbZUYLvC9jUUHNQS2Kg=="
+    },
+    {
+      "name": "@yargote/artifacts-cli",
+      "version": "0.1.0-beta.1",
+      "resolved": "https://registry.npmjs.org/@yargote/artifacts-cli/-/artifacts-cli-0.1.0-beta.1.tgz",
+      "integrity": "sha512-EyndDsxBIA3e7DfJg9pAD4hmBmvW24s1J5Z7yKRMD8tTR8/voKUZHQQEPK9KRz8HK4S+UVFM2zytTdAmY1bM4g=="
+    }
+  ],
+  "firstUse": {
+    "startedAt": "2026-10-16T01:57:58.083Z",
+    "server": "https://artifacts-mcp.yersonargotev.workers.dev/mcp",
+    "expectedVersion": "0.1.0-beta.1",
+    "checks": [
+      "installed-version",
+      "rest-resource-discovery-and-anonymous-denial",
+      "browser-launch",
+      "native-browser-consent-and-persisted-whoami",
+      "create-list-read",
+      "update-edit-and-three-revision-history",
+      "historical-publication-and-exact-retained-replays",
+      "identical-historical-zip-and-sha256",
+      "protected-publication-renders-original-revision",
+      "own-credential-logout-and-denied-whoami"
+    ],
+    "status": "passed",
+    "version": "0.1.0-beta.1",
+    "browserVersion": "155.0.8059.84",
+    "artifactId": "5e33f7cd-b046-47eb-84f0-90c2158479ae",
+    "artifactTitle": "CLI npm beta verification 2026-10-16-e819433b",
+    "revisions": [
+      "501e95f3-415b-4735-8079-6d1a02cd95ca",
+      "a278ee68-2ebb-496d-8801-a7e90fca658c",
+      "ff7b4da5-0e21-4e40-82b3-d96a82e8049b"
+    ],
+    "publicationUrl": "https://artifacts-view.yersonargotev.workers.dev/a/5e33f7cd-b046-47eb-84f0-90c2158479ae",
+    "archiveSha256": "e5cd7dbec563591f5410bddc799c6eb417036068fa9960935d7163b835592490",
+    "finishedAt": "2026-10-16T01:58:24.906Z"
+  },
+  "scope": {
+    "mit": [
+      "@yargote/artifacts-contracts",
+      "@yargote/artifacts-client",
+      "@yargote/artifacts-cli"
+    ],
+    "linuxWorkflowExecuted": false,
+    "windowsVerified": false,
+    "trustedPublishingActivated": false,
+    "consumerInstallationsRemovedAfterVerification": true
+  },
+  "tagging": {
+    "initialAutomaticLatest": true,
+    "finalLatest": "0.0.0-stage",
+    "reservationCreatedBy": "npm registry",
+    "stableExecutablePublished": false
+  }
+}

@@ -43,7 +43,7 @@ artifacts login
 artifacts whoami
 ```
 
-The first beta remains a release target until the release report records registry publication. The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. This task does not promote `latest`.
+Version `0.1.0-beta.1` is published under `beta` for all three packages. Clean registry installations and authenticated deployed operations passed in the [release report](.audit/npm-beta-verification.md). The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
 
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
