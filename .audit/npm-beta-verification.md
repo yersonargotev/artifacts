@@ -4,7 +4,7 @@ Release target is `0.1.0-beta.1` for `@yargote/artifacts-contracts`, `@yargote/a
 
 ## Current verdict
 
-PREPARATION VERIFIED, PUBLICATION PENDING. The final independent review passed. Registry publication has not occurred. This report is updated as the remaining gates run.
+PREPARATION VERIFIED, PUBLICATION PARTIALLY COMPLETE. npm accepted contracts `0.1.0-beta.1`. Client and CLI publication remain pending. The registry processing and first-package tagging behavior required corrections described below.
 
 ## Baseline and endpoint
 
@@ -12,8 +12,8 @@ PREPARATION VERIFIED, PUBLICATION PENDING. The final independent review passed. 
 - Node `24.19.0`, npm `11.17.0`, and pnpm `12.8.1` are installed on this macOS host.
 - All 30 existing REST and CLI tests passed before changes. Local evidence is `.test-artifacts/npm-beta/baseline.log`.
 - Live deployed protected-resource metadata and issuer discovery returned 200. REST identity and list returned the expected unauthenticated 401. Local evidence is `.test-artifacts/npm-beta/endpoint.json`.
-- All three candidate package names returned 404 from npm. Ownership remains unverified until authenticated registry access is available.
-- `npm whoami --registry=https://registry.npmjs.org` returned `ENEEDAUTH`. No registry publication is claimed.
+- All three candidate package names initially returned 404 from npm.
+- After user login, `npm whoami --registry=https://registry.npmjs.org` returned `yargote`, matching the package scope. Publication of contracts established write authority for that package.
 
 ## Gates
 
@@ -25,7 +25,7 @@ PREPARATION VERIFIED, PUBLICATION PENDING. The final independent review passed. 
 | Exact public tarball contents and hashes | PASS, 11 contracts files, 5 client files, 11 CLI files |
 | Authenticated first use of installed tarball CLI | PASS against deployed service with Chrome 155.0.8059.84 |
 | Independent release review | PASS. Workflow retry collision and missing explicit latest-versus-beta rejection fixed and independently rechecked. |
-| Registry ownership and publication | Blocked by npm authentication |
+| Registry ownership and publication | Contracts accepted and available. Client and CLI pending. |
 | npm global install from registry | Pending publication |
 | pnpm global install from registry | Pending publication |
 | npx execution from registry | Pending publication |
@@ -58,3 +58,13 @@ The two design agents and design judge inherited the parent model. Their reviews
 The three-package runtime graph, compiled ESM packaging, `artifacts` bin, Node 24 baseline, and external state paths match current source and installed runtime checks. The historical claim that REST was undeployed is contradicted by live HTTP and authenticated first use. The old public-package default is not relied upon. The publisher supplies `--access public` and `--tag beta` explicitly under the current [npm publish reference](https://docs.npmjs.com/cli/v11/commands/npm-publish/). [npm exec](https://docs.npmjs.com/cli/v11/commands/npm-exec/) and [pnpm dlx](https://pnpm.io/cli/pnx) remain registry execution modes, with separate clean-install checks prepared. No registry success is inferred from their documentation.
 
 The packages expose the verified public maintainer profile as homepage and support entry. The repository URL remains the actual private source repository. No public issue tracker or public GitHub release asset is promised.
+
+## Registry behavior observed during first publication
+
+The contracts publish command explicitly supplied `--tag beta` and returned success with npm's processing notice. Immediate metadata readback returned 404, so the publisher stopped before sending either dependent. npm's [publish-time scanning announcement](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/) confirms that successful submission can precede installability. The publisher now records accepted submissions and waits up to 20 minutes for exact metadata and downloadable bytes. Independent review passed the availability correction and its deterministic regressions.
+
+While metadata was unavailable, npm's dist-tags endpoint already returned both `beta` and `latest` pointing to `0.1.0-beta.1`. Removing `latest` failed with HTTP 400 twice after successful interactive authentication. A diagnostic invocation captured the same generic rejection body. The [npm CLI issue](https://github.com/npm/cli/issues/8490) records matching first-publish behavior.
+
+The registry had created an empty `0.0.0-stage` reservation containing only package.json and README. Its manifest has `stub: true`. That reservation is described by [npm staged publishing](https://docs.npmjs.com/staged-publishing/). After inspection and user-completed authentication, `npm dist-tag add @yargote/artifacts-contracts@0.0.0-stage latest` succeeded. Current tags are `beta: 0.1.0-beta.1` and `latest: 0.0.0-stage`. No stable executable version was created. The beta briefly received npm's automatic initial latest tag before correction; this is reported explicitly rather than presented as unchanged tags.
+
+Evidence is `.test-artifacts/npm-beta/registry-processing.json`, `.test-artifacts/npm-beta/contracts-bootstrap.json`, and `.test-artifacts/npm-beta/contracts-verified.json`. Independent review passed the automated bootstrap correction, typecheck, and release regression proof before dependent publication. The source package tarballs remain unchanged.

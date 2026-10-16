@@ -62,7 +62,7 @@ jobs:
   publish:
     needs: prepare
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     environment: npm-beta
     permissions:
       contents: read
@@ -84,6 +84,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - run: pnpm release:npm:check
+      - run: npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
       - run: pnpm release:npm:publish
         env:
           NPM_CONFIG_PROVENANCE: 'false'

@@ -11,6 +11,27 @@ const betaVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-beta\.(0|[1-9]\d*
 export function assertBetaNotLatest(version: string, latest: string | null): void {
   assert.notEqual(latest, version, 'The beta release must not be tagged latest');
 }
+const bootstrapVersion = '0.0.0-stage';
+export function bootstrapLatestAction(input: { name: string; version: string; initialLatest: string | null; latest: string | null; recorded: boolean; placeholder: unknown }): 'unchanged' | 'restore' | 'record' {
+  const { name, version, initialLatest, latest, recorded, placeholder } = input;
+  if (!recorded && latest === initialLatest) {
+    assertBetaNotLatest(version, latest);
+    return 'unchanged';
+  }
+  assert.equal(initialLatest, null, 'latest changed since release snapshot');
+  assert.ok(placeholder && typeof placeholder === 'object', 'Registry bootstrap placeholder is missing');
+  const stub = placeholder as Record<string, unknown>;
+  assert.equal(stub.name, name, 'Registry bootstrap placeholder name differs');
+  assert.equal(stub.version, bootstrapVersion, 'Registry bootstrap placeholder version differs');
+  assert.equal(stub.stub, true, 'Registry bootstrap placeholder must be marked stub');
+  if (recorded) {
+    assert.equal(latest, bootstrapVersion, 'latest changed after bootstrap normalization');
+    return 'unchanged';
+  }
+  if (latest === bootstrapVersion) return 'record';
+  assert.equal(latest, version, 'latest changed since release snapshot');
+  return 'restore';
+}
 function targets(value: unknown): string[] {
   if (typeof value === 'string') return [value];
   if (value === null) return [];
@@ -83,29 +104,50 @@ export async function verifyRelease(inventory: PackageInventory, output = packag
     }
   }
 }
-async function metadata(name: string): Promise<{ 'dist-tags'?: Record<string, string>; versions?: Record<string, { dist: { integrity: string; tarball: string } }> } | undefined> {
-  const response = await fetch(`${registry}/${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(30_000) });
+async function metadata(name: string, timeoutMs = 30_000): Promise<{ 'dist-tags'?: Record<string, string>; versions?: Record<string, { name?: string; version?: string; stub?: boolean; dist: { integrity: string; tarball: string } }> } | undefined> {
+  const response = await fetch(`${registry}/${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(timeoutMs) });
   if (response.status === 404) return undefined;
   if (!response.ok) throw new Error(`Registry metadata failed with HTTP ${response.status}`);
   return response.json();
 }
-async function publishedBytes(name: string, version: string, integrity: string): Promise<void> {
-  const value = await metadata(name);
-  const dist = value?.versions?.[version]?.dist;
-  assert.ok(dist, `Registry version ${name}@${version} is missing`);
-  assert.equal(dist.integrity, integrity, `Existing ${name}@${version} differs from inspected tarball`);
-  assert.equal(new URL(dist.tarball).origin, registry, 'Tarball must come from the npm registry');
-  const response = await fetch(dist.tarball, { signal: AbortSignal.timeout(30_000) });
-  assert.ok(response.ok, `Cannot download ${name}@${version}`);
-  const { createHash } = await import('node:crypto');
-  const downloaded = `sha512-${createHash('sha512').update(Buffer.from(await response.arrayBuffer())).digest('base64')}`;
-  assert.equal(downloaded, integrity, `Downloaded ${name}@${version} differs from inspected tarball`);
+export async function publishedBytes(name: string, version: string, integrity: string, options: { timeoutMs?: number; intervalMs?: number } = {}): Promise<void> {
+  const started = Date.now();
+  const deadline = started + (options.timeoutMs ?? 20 * 60_000);
+  const requestTimeout = () => Math.max(1, Math.min(10_000, deadline - Date.now()));
+  do {
+    const value = await metadata(name, requestTimeout());
+    const dist = value?.versions?.[version]?.dist;
+    if (dist) {
+      assert.equal(dist.integrity, integrity, `Existing ${name}@${version} differs from inspected tarball`);
+      assert.equal(new URL(dist.tarball).origin, registry, 'Tarball must come from the npm registry');
+      const response = await fetch(dist.tarball, { signal: AbortSignal.timeout(requestTimeout()) });
+      if (response.status !== 404) {
+        assert.ok(response.ok, `Cannot download ${name}@${version}, HTTP ${response.status}`);
+        const { createHash } = await import('node:crypto');
+        const downloaded = `sha512-${createHash('sha512').update(Buffer.from(await response.arrayBuffer())).digest('base64')}`;
+        assert.equal(downloaded, integrity, `Downloaded ${name}@${version} differs from inspected tarball`);
+        return;
+      }
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    console.log(`Waiting for npm availability of ${name}@${version} (${Math.floor((Date.now() - started) / 1_000)}s elapsed)`);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(options.intervalMs ?? 10_000, remaining)));
+  } while (Date.now() < deadline);
+  throw new Error(`Timed out waiting for npm availability of ${name}@${version}`);
+}
+async function runNpm(args: string[]): Promise<void> {
+  await new Promise<void>((resolvePromise, reject) => {
+    const child = spawn('npm', args, { stdio: 'inherit', timeout: 180_000 });
+    child.once('error', reject);
+    child.once('exit', (code) => code === 0 ? resolvePromise() : reject(new Error(`npm ${args[0]} failed (${code})`)));
+  });
 }
 export async function publishRelease(inventory: PackageInventory, output = packageOutput): Promise<void> {
   await verifyRelease(inventory, output);
   const statePath = resolve(output, 'publication-state.json');
   const entries = publicNames.map((name) => inventory.packages.find((item) => item.name === name)!);
-  let state: { versions: Record<string, string>; latest: Record<string, string | null> };
+  let state: { versions: Record<string, string>; latest: Record<string, string | null>; submitted?: string[]; bootstrapLatest?: string[] };
   try { state = JSON.parse(await readFile(statePath, 'utf8')) as typeof state; }
   catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
@@ -117,28 +159,48 @@ export async function publishRelease(inventory: PackageInventory, output = packa
     await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
   }
   assert.deepEqual(state.versions, Object.fromEntries(entries.map((item) => [item.name, item.version])), 'Publication state belongs to a different release');
+  const submitted = state.submitted ??= [];
+  const bootstrapLatest = state.bootstrapLatest ??= [];
+  for (const name of submitted) assert.ok(entries.some((item) => item.name === name), 'Submitted package is outside the release');
+  for (const name of bootstrapLatest) {
+    assert.ok(entries.some((item) => item.name === name), 'Bootstrap package is outside the release');
+    assert.equal(state.latest[name], null, 'Bootstrap normalization requires an initially absent latest');
+  }
   for (const item of entries) assertBetaNotLatest(item.version, state.latest[item.name]);
   for (const item of entries) {
     const before = await metadata(item.name);
-    assertBetaNotLatest(item.version, before?.['dist-tags']?.latest ?? null);
-    assert.equal(before?.['dist-tags']?.latest ?? null, state.latest[item.name], 'latest changed since release snapshot');
     const existing = before?.versions?.[item.version];
-    if (!existing) await new Promise<void>((resolvePromise, reject) => {
-      const child = spawn('npm', ['publish', resolve(output, item.tarball), '--registry', registry, '--access', 'public', '--tag', 'beta', '--provenance=false', '--ignore-scripts'], { stdio: 'inherit', timeout: 180_000 });
-      child.once('error', reject);
-      child.once('exit', (code) => code === 0 ? resolvePromise() : reject(new Error(`npm publish failed (${code}) for ${item.name}`)));
-    });
+    if (!existing && !submitted.includes(item.name)) {
+      assertBetaNotLatest(item.version, before?.['dist-tags']?.latest ?? null);
+      assert.equal(before?.['dist-tags']?.latest ?? null, state.latest[item.name], 'latest changed since release snapshot');
+      await runNpm(['publish', resolve(output, item.tarball), '--registry', registry, '--access', 'public', '--tag', 'beta', '--provenance=false', '--ignore-scripts']);
+      submitted.push(item.name);
+      await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    }
     await publishedBytes(item.name, item.version, item.integrity);
-    const tags = (await metadata(item.name))?.['dist-tags'];
+    let published = await metadata(item.name);
+    let tags = published?.['dist-tags'];
+    assert.equal(tags?.beta, item.version, `beta does not identify ${item.name}@${item.version}`);
+    const action = bootstrapLatestAction({ name: item.name, version: item.version, initialLatest: state.latest[item.name], latest: tags?.latest ?? null, recorded: bootstrapLatest.includes(item.name), placeholder: published?.versions?.[bootstrapVersion] });
+    if (action === 'restore') {
+      await runNpm(['dist-tag', 'add', `${item.name}@${bootstrapVersion}`, 'latest', '--registry', registry]);
+      published = await metadata(item.name);
+      tags = published?.['dist-tags'];
+    }
+    const expectedLatest = bootstrapLatest.includes(item.name) || action !== 'unchanged' ? bootstrapVersion : state.latest[item.name];
     assert.equal(tags?.beta, item.version, `beta does not identify ${item.name}@${item.version}`);
     assertBetaNotLatest(item.version, tags?.latest ?? null);
-    assert.equal(tags?.latest ?? null, state.latest[item.name], 'Publication changed latest');
+    assert.equal(tags?.latest ?? null, expectedLatest, 'Publication changed latest');
+    if (action !== 'unchanged') {
+      bootstrapLatest.push(item.name);
+      await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    }
     console.log(JSON.stringify({ name: item.name, version: item.version, integrity: item.integrity, beta: tags?.beta, latest: tags?.latest ?? null, downloaded: true }));
   }
   for (const item of entries) {
     const latest = (await metadata(item.name))?.['dist-tags']?.latest ?? null;
     assertBetaNotLatest(item.version, latest);
-    assert.equal(latest, state.latest[item.name], 'Publication changed latest');
+    assert.equal(latest, bootstrapLatest.includes(item.name) ? bootstrapVersion : state.latest[item.name], 'Publication changed latest');
   }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

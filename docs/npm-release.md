@@ -54,7 +54,11 @@ Complete browser login and any npm 2FA challenge yourself. Never paste passwords
 
 The publisher uses contracts, client, then CLI order. It supplies public access, the `beta` tag, and disabled provenance. It verifies downloaded registry bytes before proceeding to the next dependency. A repeated invocation accepts an existing version only when its integrity matches the inspected tarball. A mismatch stops publication. Do not rebuild between inspection and publication.
 
-The publisher checks `latest` before and after. Do not run `npm dist-tag add ... latest`. There is no stable promotion in this workflow.
+npm scans new packages before making them installable. A successful `npm publish` can therefore precede public registry availability. The publisher records accepted submissions in `dist/packages/publication-state.json` and waits up to 20 minutes for each package's metadata and tarball. It does not resubmit an accepted package while waiting. If this deadline expires, retain the exact build directory and inspect npm's processing state before retrying. [npm's publication scanning announcement](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/) explains this availability delay.
+
+The publisher checks `latest` before and after. Never tag the beta release as `latest`. There is no stable promotion in this workflow. The only first-publication correction allowed below targets npm's existing empty reservation.
+
+The first public publish can receive both `beta` and `latest` from npm despite `--tag beta`. On this registry, removing `latest` returned HTTP 400. When npm has already created its empty `0.0.0-stage` reservation, the publisher can restore `latest` to that existing reservation after verifying the beta's bytes and the reservation's `stub` metadata. It never creates a reservation or points `latest` at the beta. Later releases preserve that pointer. Install the exact beta version or use `@beta`; bare installation does not select a supported stable release. The [npm CLI issue](https://github.com/npm/cli/issues/8490) records this first-publish tagging behavior, and [staged publishing documentation](https://docs.npmjs.com/staged-publishing/) describes the registry reservation.
 
 If publication stops after one package, retain the exact build directory and rerun the same command after resolving the specific authentication or registry error. Do not change versions independently. A published version cannot be overwritten, even after unpublishing. If bytes are defective, publish a new coordinated beta and consider deprecating the defective version with a clear migration message.
 
@@ -62,7 +66,7 @@ If publication stops after one package, retain the exact build directory and rer
 
 1. Commit and review the release automation in the private repository.
 2. Configure the `npm-beta` GitHub environment with required reviewers and branch restrictions. The environment name in the workflow alone does not configure protection.
-3. For each of the three npm packages, configure a GitHub trusted publisher for owner `yersonargotev`, repository `artifacts`, workflow `npm-beta.yml`, and environment `npm-beta`. Explicitly permit direct `npm publish` under npm's current allowed-actions controls. Use npm CLI 11.5.1 or later on Node 24.
+3. For each of the three npm packages, configure a GitHub trusted publisher for owner `yersonargotev`, repository `artifacts`, workflow `npm-beta.yml`, and environment `npm-beta`. Explicitly permit direct `npm publish` and `npm dist-tag` under npm's current allowed-actions controls. The publication job uses npm CLI 11.21.0 on Node 24 because OIDC dist-tag operations require that version or later.
 4. Dispatch **Public npm beta** with the exact version already committed in all three manifests. Review the uploaded tarballs before approving the protected publication job.
 
 The workflow builds once, uploads that output, and publishes the downloaded artifacts without rebuilding. It does not deploy application services. The first publication can occur locally before trusted publishers are configured. npm's current trusted-publisher setup requires package settings and validates new configurations on first use. Complete that first use before the configuration expires.
