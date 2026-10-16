@@ -46,6 +46,8 @@ Errors have the shape `{ "error": { "code": "conflict", "message": "Artifact hea
 
 Every bearer request verifies signature, claims, and fresh introspection. Reads require `artifacts:read`, create and update require `artifacts:write`, and publication requires `artifacts:publish`. The store independently verifies scopes and live sessions before receipt lookup.
 
-Retry a mutation with its exact complete command. Preserve omitted response fields, request ID, snapshot, and expected versions. A successful receipt can describe an older head or publication. Read fresh state separately. A conflict requires a deliberate new command, not a changed retry.
+Retry a mutation with its exact complete command. Preserve omitted response fields, request ID, snapshot, and expected versions. While the artifact exists, an exact retry returns the original receipt, which can describe an older head or publication. Read fresh state separately. A conflict requires a deliberate new command, not a changed retry.
 
 Export returns the store's deterministic ZIP bytes with `Content-Disposition`, `X-Artifact-SHA256`, and `X-Content-Type-Options: nosniff`. The HTTP adapter does not rebuild archives.
+
+Permanent deletion from the panel invalidates historical content-bearing receipts. An exact create, update or publish retry for a deleted artifact returns `not_found`; request identity remains reserved, so a changed command still returns `request_conflict` and an old create cannot recreate it. Live-session and scope checks still precede replay. This package exposes no deletion operation.

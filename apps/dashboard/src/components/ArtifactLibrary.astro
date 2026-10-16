@@ -32,7 +32,7 @@ const date = (value: string) => new Date(value).toLocaleDateString('es', { dateS
       <div class="artifact-row-content"><h2><a href={detailUrl}>{artifact.title}</a></h2>{pending ? <p class="pending"><span></span>Cambios pendientes de publicación</p> : <p class="row-kind">Artefacto</p>}</div>
       <div class="row-publication"><Badge className={artifact.publication ? 'publication-badge is-published' : 'publication-badge'}>{artifact.publication ? <><Icon name="world" size={13} />Publicado</> : 'Sin publicar'}</Badge>{artifact.publication && <span class="publication-version">Versión {artifact.publication.version}</span>}</div>
       <time class="row-created" datetime={artifact.createdAt}>{date(artifact.createdAt)}</time>
-      <ArtifactRowMenu title={artifact.title} actions={[
+      <ArtifactRowMenu title={artifact.title} deleteUrl={`${detailUrl}/delete`} actions={[
         { label: 'Ver artefacto', href: detailUrl },
         { label: 'Descargar revisión más reciente', href: `${detailUrl}/export?${new URLSearchParams({ revisionId: artifact.headRevisionId })}` },
         ...(artifact.publication ? [{ label: 'Abrir publicación', href: artifact.publication.url }] : []),

@@ -56,10 +56,12 @@ All commands and JSON responses pass the strict domain schemas. An omitted mutat
 
 Invalid local commands throw a Zod validation error before any HTTP request. Invalid configuration throws `TypeError`.
 
-A caller that needs recovery retains the complete create, update, or publish command before its first request. Retrying that exact command returns the original receipt. Changing `response`, the snapshot, or any expected version changes the command. A conflict requires a new deliberate command with a new request ID. A replayed receipt describes the original operation and can differ from a fresh read.
+A caller that needs recovery retains the complete create, update, or publish command before its first request. While the artifact exists, retrying that exact command returns the original receipt. Changing `response`, the snapshot, or any expected version changes the command. A conflict requires a new deliberate command with a new request ID. A replayed receipt describes the original operation and can differ from a fresh read.
 
 ## Compiled installation
 
 The registry package contains compiled ESM JavaScript and declarations. Consumers need no TypeScript loader or database package. For repository development, `pnpm build:packages` produces local tarballs and a `dist/packages/manifest.json` inventory. `pnpm test:packages` verifies an ordinary Node consumer and its types.
 
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.
+
+Permanent deletion from the panel invalidates historical content-bearing receipts. An exact create, update or publish retry for a deleted artifact returns `not_found`; request identity remains reserved, so a changed command still returns `request_conflict` and an old create cannot recreate it. Live-session and scope checks still precede replay. This package exposes no deletion operation.

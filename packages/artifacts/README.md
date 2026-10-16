@@ -32,9 +32,9 @@ The `artifacts_create`, `artifacts_update`, and `artifacts_read` MCP tools accep
 
 Compact reads retain artifact identity, the current head, publication state, and revision provenance. Each revision summary contains the title, description, content kind, content UTF-8 byte count, and attachment summaries. An attachment summary contains `path`, `mediaType`, `encoding`, `decodedBytes`, and `sha256` of the decoded bytes. Summaries omit custom metadata, content text, and attachment data.
 
-The store always returns complete snapshots and saves complete command receipts. MCP projects the saved result after the operation completes. Compact responses reduce wire payloads. They do not reduce stored snapshots or database reads. A full `artifacts_read` or export remains necessary to verify saved bytes.
+Create and update return complete snapshots and save complete command receipts. MCP projects the saved result after the operation completes. Compact responses reduce wire payloads. They do not reduce stored snapshots or database reads. A full `artifacts_read` or export remains necessary to verify saved bytes.
 
-Response modes are part of the exact create and update arguments. Omission, `"full"`, and `"compact"` have distinct request identities. A retry must preserve the original mode. Reusing a request ID with a different mode fails with `request_conflict`. An identical retry returns the original receipt's head and publication state, even after later edits or publication changes. Preexisting requests with no response mode keep their original hashes.
+Response modes are part of the exact create and update arguments. Omission, `"full"`, and `"compact"` have distinct request identities. A retry must preserve the original mode. Reusing a request ID with a different mode fails with `request_conflict`. While the artifact exists, an identical retry returns the original receipt's head and publication state, even after later edits or publication changes. Preexisting requests with no response mode keep their original hashes.
 
 `@artifacts/artifacts/workflow` exports `summarizeRevision(revision)`, `compactArtifactRead(document)`, and `compareRevisions(before, after)`. These asynchronous helpers share the summaries used by MCP and the panel. Comparisons include changed metadata rows, before and after content with `kindChanged` and `textChanged`, and added, removed, or changed attachments sorted by path. A file changes when its decoded bytes, media type, or encoding change. Custom JSON comparison ignores object key order.
 
@@ -73,7 +73,7 @@ const retry = updateSchema.parse(JSON.parse(await readFile('pending-edit.json', 
 const saved = await store.update(actor, retry);
 ```
 
-The same committed request returns its original receipt without creating another revision. A stale head fails with `conflict` and leaves the current artifact unchanged. Preparing again reads a new head and creates a new operation, so that decision requires a new request ID.
+While the artifact exists, the same committed request returns its original receipt without creating another revision. A stale head fails with `conflict` and leaves the current artifact unchanged. Preparing again reads a new head and creates a new operation, so that decision requires a new request ID.
 
 ## Publication admission
 
@@ -88,3 +88,13 @@ The same committed request returns its original receipt without creating another
 The archive contains `artifact.json`, a content document with the matching extension, and `files/<path>` entries sorted by path. The manifest retains artifact metadata, revision provenance, content kind, and each file's media type, encoding, size, and SHA-256. Credentials are excluded. Fixed ZIP timestamps and attributes make repeated exports of one revision byte-identical. The implementation uses `fflate` 0.8.3 with stored ZIP entries.
 
 Run `pnpm exec tsx --test tests/artifacts.test.ts tests/workflow.test.ts` to exercise real migrated SQLite databases, competing writers, stale publication requests, retry receipts, session revocation, one-use grants, schema rejection, MCP tools, decompressed export bytes, compact responses, revision comparisons, and persisted prepared edits.
+
+## Permanent deletion
+
+The panel calls `store.delete(actor, { requestId, artifactId, expectedRevisionId, expectedPublicationVersion })`. It requires a live owner session and `artifacts:write`. Confirmation observes both the current head and publication version (zero when unpublished). A changed value fails with `conflict` and requires a fresh confirmation. The operation returns only `{ artifactId }`. No public MCP, REST, client or CLI deletion operation is registered.
+
+Deletion atomically removes the owned root, all revisions and embedded files, publication and pending grants. It replaces this owner's associated command results with private tombstones, retaining request IDs, hashes and timestamps. Matching historical create, update and publish retries then fail with `not_found`, so erased snapshots cannot be replayed and old creates cannot recreate the artifact. Changed arguments still fail with `request_conflict`. Exact delete retries return their original minimal result, including from another live session of the same owner. Scope and session checks always precede replay. Other artifacts' receipts remain unchanged.
+
+This removes retained application records. It does not promise secure erasure of SQLite free pages, WAL files or backups. Already admitted publication viewers are denied on their next read. Content already rendered in a browser cannot be recalled.
+
+Run `node --import tsx --test tests/artifact-deletion.test.ts tests/deletion-form.test.ts` for deletion contracts and `pnpm build && node --import tsx tests/artifact-deletion.browser.proof.ts` for the actual panel path.
