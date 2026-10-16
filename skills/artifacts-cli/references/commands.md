@@ -47,10 +47,14 @@ Save this JSON as `snapshot.json`, replacing its content with the requested arti
 ```sh
 artifacts create --snapshot snapshot.json
 artifacts list --limit 25
-artifacts read ARTIFACT_ID --out saved.json
+artifacts read ARTIFACT_ID --out saved.json --quiet
 ```
 
 Keep the request ID printed for the mutation. Successful JSON goes to stdout; diagnostics and recovery instructions go to stderr. Exit zero indicates command success. A nonzero exit must be inspected before claiming completion.
+
+For `read`, `--out FILE --quiet` saves the returned response without printing successful JSON. It requires a nonempty output path. It preserves the selected response mode, so use the default full response for snapshot verification. Errors still go to stderr and exit nonzero. Without `--quiet`, `read --out FILE` also prints the response to stdout.
+
+Check installed help for `--quiet` support before running these examples. Older versions, including `0.1.0-beta.1`, can suppress stdout with `artifacts read ARTIFACT_ID --out saved.json > /dev/null`. This redirection preserves stderr and the command's exit status. Use the same fallback for the revision reads below.
 
 ## Edit without losing retained data
 
@@ -62,7 +66,7 @@ For a title change, save `changes.json` with only the requested field.
 
 ```sh
 artifacts edit ARTIFACT_ID --changes changes.json
-artifacts read ARTIFACT_ID --out current.json
+artifacts read ARTIFACT_ID --out current.json --quiet
 ```
 
 For a complete replacement, read the current head, preserve untouched data in `next-snapshot.json`, and use that observed revision.
@@ -111,7 +115,7 @@ Create uses the same `requestId` and complete `snapshot` fields without artifact
 
 ```sh
 artifacts history ARTIFACT_ID --summary
-artifacts read ARTIFACT_ID --revision REVISION_ID --out historical.json
+artifacts read ARTIFACT_ID --revision REVISION_ID --out historical.json --quiet
 artifacts publish ARTIFACT_ID --revision REVISION_ID --expected-version 0
 ```
 

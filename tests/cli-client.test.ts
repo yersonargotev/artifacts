@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -243,6 +243,75 @@ test('CLI complete command files, edits, conflicts, request path safety, and own
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test('CLI read quiet saves exact response bytes and preserves default stdout and failures', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-output-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const created = await client.create({ requestId: 'cli-output-create', snapshot });
+    const expected = await client.read({ artifactId: created.artifactId, revisionId: created.revision.id });
+    assert.deepEqual(expected.revision.snapshot, snapshot);
+    const args = ['read', created.artifactId, '--revision', created.revision.id];
+    const defaultResult = await cli(args, environment);
+    assert.equal(defaultResult.code, 0, defaultResult.stderr);
+    assert.equal(defaultResult.stdout, `${JSON.stringify(expected)}\n`);
+    const defaultOut = join(directory, 'default.json');
+    const savedDefault = await cli([...args, '--out', defaultOut], environment);
+    assert.equal(savedDefault.code, 0, savedDefault.stderr);
+    assert.equal(savedDefault.stdout, defaultResult.stdout);
+    const expectedBytes = Buffer.from(`${JSON.stringify(expected, null, 2)}\n`);
+    assert.deepEqual(await readFile(defaultOut), expectedBytes);
+    const quietOut = join(directory, 'quiet.json');
+    const savedQuiet = await cli([...args, '--out', quietOut, '--quiet'], environment);
+    assert.equal(savedQuiet.code, 0, savedQuiet.stderr);
+    assert.equal(savedQuiet.stdout, '');
+    assert.deepEqual(await readFile(quietOut), expectedBytes);
+    assert.equal((await stat(quietOut)).mode & 0o777, 0o600);
+    const compact = await client.read({ artifactId: created.artifactId, revisionId: created.revision.id, response: 'compact' });
+    assert.equal(compact.revision.content.utf8Bytes, 23);
+    assert.equal(Object.hasOwn(compact.revision, 'snapshot'), false);
+    const compactOut = join(directory, 'compact.json');
+    const savedCompact = await cli([...args, '--response', 'compact', '--out', compactOut, '--quiet'], environment);
+    assert.equal(savedCompact.code, 0, savedCompact.stderr);
+    assert.equal(savedCompact.stdout, '');
+    assert.deepEqual(await readFile(compactOut), Buffer.from(`${JSON.stringify(compact, null, 2)}\n`));
+    failure(await cli([...args, '--out', quietOut, '--quiet'], environment), 'local_error');
+    assert.deepEqual(await readFile(quietOut), expectedBytes);
+    const link = join(directory, 'linked.json');
+    await symlink(quietOut, link);
+    failure(await cli([...args, '--out', link, '--quiet'], environment), 'local_error');
+    assert.deepEqual(await readFile(quietOut), expectedBytes);
+    failure(await cli([...args, '--out', join(directory, 'missing', 'read.json'), '--quiet'], environment), 'local_error');
+    const missingOut = join(directory, 'not-found.json');
+    const missing = failure(await cli(['read', 'missing-artifact', '--out', missingOut, '--quiet'], environment), 'not_found');
+    assert.equal(missing.status, 404);
+    await assert.rejects(stat(missingOut), { code: 'ENOENT' });
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI rejects invalid quiet options before authentication or requests', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-output-validation-'));
+  try {
+    const stateDir = join(directory, 'state');
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: stateDir };
+    let requests = 0;
+    app.setResourceHandler(async (request) => { requests += 1; return app.resourceHandler(request); });
+    assert.equal(failure(await cli(['read', 'artifact', '--quiet'], environment), 'invalid_arguments').message, 'Specify --out');
+    assert.equal(failure(await cli(['read', 'artifact', '--quiet', '--out', ''], environment), 'invalid_arguments').message, 'Specify --out');
+    for (const command of ['whoami', 'create', 'update', 'edit', 'publish', 'retry', 'export']) {
+      assert.equal(failure(await cli([command, '--quiet', '--out', join(directory, 'unused.json')], environment), 'invalid_arguments').message, `Option --quiet is not supported by ${command}`);
+    }
+    assert.equal(requests, 0);
+    await assert.rejects(stat(stateDir), { code: 'ENOENT' });
+    const unauthenticated = failure(await cli(['read', 'artifact', '--quiet', '--out', join(directory, 'unauthenticated.json')], environment), 'local_error');
+    assert.match(unauthenticated.message, /^You are not signed in\. Run artifacts login --server /);
+    assert.equal(requests, 0);
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test('CLI retains the same request ID independently for two resources and creates each operation exclusively', async () => {
   const first = await fixture({ transport: 'rest' });
   const second = await fixture({ transport: 'rest' });
@@ -278,6 +347,7 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.equal(help.code, 0);
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
   assert.match(help.stdout, /retry REQUEST_ID/);
+  assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);
   assert.equal(failure(await cli(['whoami']), 'invalid_arguments').message, 'Specify --server RESOURCE or ARTIFACTS_SERVER. No production server is selected by default.');
   failure(await cli(['create', '--snapshot', 'missing', '--server', 'https://example.test/mcp', '--server', 'https://other.test/mcp']), 'invalid_arguments');
   failure(await cli(['read', 'artifact', '--summary', '--server', 'https://example.test/mcp']), 'invalid_arguments');
