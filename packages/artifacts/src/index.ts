@@ -3,12 +3,14 @@ import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, exportSchema, historySchema, issueGrantSchema, libraryQuerySchema, listSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactLibraryPage, type ArtifactRead, type ArtifactSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, libraryQuerySchema, listSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactLibraryPage, type ArtifactRead, type ArtifactSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 
 export * from './contracts.ts';
 
 type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
+const deletedReceiptSchema = z.strictObject({ kind: z.literal('artifact_deleted'), artifactId: z.string().min(1).max(128) });
+
 type RevisionRow = typeof artifactRevision.$inferSelect;
 
 function revision(row: RevisionRow): Revision {
@@ -61,14 +63,16 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     }
   }
 
-  async function command<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
+  async function command<T extends { artifactId: string }>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
     return transaction(async (connection) => {
       await authorize(connection, actor, scope);
       const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, actor.userId), eq(artifactCommand.requestId, input.requestId))).limit(1);
       if (receipt) {
         if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
-        return output.parse(JSON.parse(receipt.result));
+        const result: unknown = JSON.parse(receipt.result);
+        if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
+        return output.parse(result);
       }
       const result = await work(connection);
       await connection.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson(result), createdAt: new Date() });
@@ -128,6 +132,21 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           if (changed.length !== 1) throw new ArtifactError('conflict', 'Publication changed');
         }
         return { ...values, url: urlFor(input.artifactId) };
+      });
+    },
+
+    async delete(actor: Actor, value: z.input<typeof deleteSchema>) {
+      const input = deleteSchema.parse(value);
+      return command(actor, 'artifacts:write', 'delete', input, deleteResultSchema, async (connection) => {
+        const current = await readOwned(connection, actor.userId, input.artifactId);
+        if (current.headRevisionId !== input.expectedRevisionId || (current.publication?.version ?? 0) !== input.expectedPublicationVersion) {
+          throw new ArtifactError('conflict', 'Artifact changed since confirmation', { currentRevisionId: current.headRevisionId, currentPublicationVersion: current.publication?.version ?? 0 });
+        }
+        const matching = and(eq(artifactCommand.ownerId, actor.userId), sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`);
+        await connection.update(artifactCommand).set({ result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
+        const removed = await connection.delete(artifact).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId))).returning({ artifactId: artifact.id });
+        if (removed.length !== 1) throw new ArtifactError('not_found', 'Artifact not found');
+        return { artifactId: input.artifactId };
       });
     },
 
