@@ -1,7 +1,13 @@
 import { spawn } from 'node:child_process';
 import { chmod, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { basename, join, relative } from 'node:path';
-import { inspectTarball, packageDefinitions, packageOutput, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
+import { basename, isAbsolute, join, relative } from 'node:path';
+import { parseArgs } from 'node:util';
+import { inspectTarball, packageDefinitions, packageOutput as defaultOutput, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
+
+const { values } = parseArgs({ options: { out: { type: 'string' } } });
+if (values.out !== undefined && !isAbsolute(values.out)) throw new Error('--out requires an absolute new directory');
+const packageOutput = values.out ?? defaultOutput;
+if (values.out !== undefined) await mkdir(packageOutput, { mode: 0o700 });
 
 const compiled = join(packageOutput, 'compiled');
 const tarballs = join(packageOutput, 'tarballs');
@@ -16,12 +22,12 @@ async function run(command: string, args: string[], cwd = root): Promise<string>
 }
 const sources = await Promise.all(packageDefinitions.map(async (definition) => ({ ...definition, manifest: JSON.parse(await readFile(join(root, definition.directory, 'package.json'), 'utf8')) as PackageManifest })));
 const byName = new Map(sources.map((source) => [source.manifest.name, source]));
-await rm(packageOutput, { recursive: true, force: true });
+if (values.out === undefined) await rm(packageOutput, { recursive: true, force: true });
 await mkdir(tarballs, { recursive: true });
 const config = join(packageOutput, 'tsconfig.json');
 await writeFile(config, JSON.stringify({
   extends: join(root, 'tsconfig.json'),
-  compilerOptions: { noEmit: false, declaration: true, rewriteRelativeImportExtensions: true, rootDir: root, outDir: compiled },
+  compilerOptions: { noEmit: false, declaration: true, rewriteRelativeImportExtensions: true, rootDir: root, outDir: compiled, typeRoots: [join(root, 'node_modules/@types')] },
   include: packageDefinitions.map((definition) => join(root, definition.directory, 'src/**/*.ts')),
   exclude: [],
 }, null, 2));
