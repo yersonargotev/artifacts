@@ -41,5 +41,6 @@ This directory is the maintained source for Artifacts verification. The primary 
 - [Authoring and publication selection](./authoring.md): `authoring` covers real MCP creation, retained updates, retries/conflicts, reads, and publication selection.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
+- [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.
 - [Historical export](./export.md): `export` covers selecting an old revision and comparing its browser ZIP download with the same MCP export.
 - [Exact retained artifact](./retained.md): `verify-retained.ts` and its callable library verify an existing selected revision, real policy, declarative content checks, mobile layout and complete attachment bytes without authoring or account mutation.

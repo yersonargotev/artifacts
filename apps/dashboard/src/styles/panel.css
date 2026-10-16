@@ -366,3 +366,12 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+.destructive-menu-item, .destructive-menu-item:focus { color: var(--red); }
+.deletion-card { max-width: 660px; margin: 32px auto; padding: clamp(20px, 4vw, 36px); border: 1px solid var(--divider); border-radius: 12px; background: var(--mantle); }
+.deletion-title, .deletion-id { overflow-wrap: anywhere; }
+.deletion-id { font-size: 13px; }
+.deletion-id code { display: block; margin-top: 4px; }
+.deletion-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.deletion-actions form { margin: 0; }
+.destructive-button { background: var(--red); color: var(--crust); }

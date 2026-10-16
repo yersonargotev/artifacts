@@ -1,0 +1,58 @@
+---
+import { ArtifactError, type DeleteInput } from '@artifacts/artifacts/contracts';
+import Panel from '../../../layouts/Panel.astro';
+import { getRuntime } from '../../../runtime.ts';
+import { artifactErrorResponse, panelActor } from '../../../publication.ts';
+import { parseDeletionForm } from '../../../delete.ts';
+if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
+if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
+const actor = panelActor(Astro.locals.identity);
+let command: DeleteInput;
+let title: string | undefined;
+let outcome: 'confirm' | 'conflict' | 'uncertain' = 'confirm';
+if (Astro.request.method === 'POST') {
+  const parsed = await parseDeletionForm(Astro.request, Astro.params.artifactId).catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
+  if (parsed instanceof Response) return parsed;
+  command = parsed;
+  try {
+    await (await getRuntime()).artifacts.delete(actor, command);
+    return Astro.redirect('/', 303);
+  } catch (error) {
+    if (error instanceof ArtifactError) {
+      if (error.code !== 'conflict' && error.code !== 'request_conflict') return artifactErrorResponse(error);
+      outcome = 'conflict';
+      Astro.response.status = 409;
+    } else {
+      outcome = 'uncertain';
+      Astro.response.status = 503;
+    }
+  }
+} else {
+  const current = await getRuntime().then(({ artifacts }) => artifacts.read(actor, { artifactId: Astro.params.artifactId! })).catch((error: unknown) => artifactErrorResponse(error));
+  if (current instanceof Response) return current;
+  title = current.revision.snapshot.metadata.title;
+  command = { requestId: crypto.randomUUID(), artifactId: current.artifactId, expectedRevisionId: current.headRevisionId, expectedPublicationVersion: current.publication?.version ?? 0 };
+}
+const confirmationUrl = `/artifacts/${encodeURIComponent(command.artifactId)}/delete`;
+const heading = { confirm: 'Eliminar artefacto', conflict: 'El artefacto cambió', uncertain: 'No pudimos confirmar la eliminación' }[outcome];
+---
+<Panel title={heading} section="Biblioteca">
+  <section class="deletion-card" data-deletion-result={outcome}>
+    <h1>{heading}</h1>
+    {title && <h2 class="deletion-title">{title}</h2>}
+    {outcome === 'confirm' && <p>Se eliminarán permanentemente este artefacto, todas sus revisiones, sus archivos y su publicación. No podrás recuperarlos. Los enlaces existentes dejarán de funcionar.</p>}
+    {outcome === 'conflict' && <p role="alert">La revisión, la publicación o la solicitud cambió. Abre una nueva confirmación para revisar el estado actual antes de eliminar.</p>}
+    {outcome === 'uncertain' && <p role="alert">La solicitud pudo haberse completado. Reintenta la misma solicitud para confirmar el resultado.</p>}
+    <p class="muted deletion-id">Identificador del artefacto <code>{command.artifactId}</code></p>
+    <div class="deletion-actions">
+      <a class="button secondary" href="/">Cancelar</a>
+      {outcome === 'conflict' ? <a class="button secondary" href={confirmationUrl}>Revisar nueva confirmación</a> : <form method="post" action={confirmationUrl}>
+        <input type="hidden" name="artifactId" value={command.artifactId} />
+        <input type="hidden" name="expectedRevisionId" value={command.expectedRevisionId} />
+        <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
+        <input type="hidden" name="requestId" value={command.requestId} />
+        <button class="destructive-button" type="submit">{outcome === 'uncertain' ? 'Reintentar eliminación' : 'Eliminar artefacto'}</button>
+      </form>}
+    </div>
+  </section>
+</Panel>
