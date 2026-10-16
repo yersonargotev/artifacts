@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, publishResultSchema, publishSchema, readSchema, updateSchema, type ArtifactRead, type UpdateInput } from '@artifacts/contracts';
-import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@artifacts/contracts/http';
-import type { CompactArtifactRead } from '@artifacts/contracts/workflow';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, publishResultSchema, publishSchema, readSchema, updateSchema, type ArtifactRead, type UpdateInput } from '@yargote/artifacts-contracts';
+import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
+import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
-export type { ArtifactRead, Snapshot, UpdateInput } from '@artifacts/contracts';
-export type { Identity } from '@artifacts/contracts/http';
-export type { CompactArtifactRead, RevisionSummary } from '@artifacts/contracts/workflow';
-export { prepareArtifactEdit } from '@artifacts/contracts/workflow';
+export type { ArtifactRead, Snapshot, UpdateInput } from '@yargote/artifacts-contracts';
+export type { Identity } from '@yargote/artifacts-contracts/http';
+export type { CompactArtifactRead, RevisionSummary } from '@yargote/artifacts-contracts/workflow';
+export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 
 export type CreateInput = z.input<typeof createSchema>;
 export type ReadInput = z.input<typeof readSchema>;

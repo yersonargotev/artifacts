@@ -1,1 +1,1 @@
-export * from '@artifacts/contracts/serialization';
+export * from '@yargote/artifacts-contracts/serialization';

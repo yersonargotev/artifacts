@@ -1,9 +1,13 @@
 # Artifacts HTTP client reference
 
-`@artifacts/client` is a typed Fetch client for the Artifacts REST API. It depends on the database-free contracts package and Zod. It does not install the artifact store or a database driver.
+`@yargote/artifacts-client` is a typed Fetch client for the Artifacts REST API. It depends on `@yargote/artifacts-contracts` and Zod. It does not install the artifact store or a database driver. Node 24 or later is required.
+
+```sh
+npm install @yargote/artifacts-client@0.1.0-beta.1
+```
 
 ```ts
-import { createArtifactHttpClient, HttpError } from '@artifacts/client';
+import { createArtifactHttpClient, HttpError } from '@yargote/artifacts-client';
 
 const client = createArtifactHttpClient({
 	resource: process.env.ARTIFACTS_SERVER!,
@@ -56,4 +60,6 @@ A caller that needs recovery retains the complete create, update, or publish com
 
 ## Compiled installation
 
-Run `pnpm build:packages` in the repository. Install the generated `artifacts-contracts-0.1.0.tgz` and `artifacts-client-0.1.0.tgz` tarballs together in the consuming project. Their entry points contain compiled ESM JavaScript and declarations, so consumers need no TypeScript loader or database package. `pnpm test:packages` verifies an ordinary Node consumer and its types.
+The registry package contains compiled ESM JavaScript and declarations. Consumers need no TypeScript loader or database package. For repository development, `pnpm build:packages` produces local tarballs and a `dist/packages/manifest.json` inventory. `pnpm test:packages` verifies an ordinary Node consumer and its types.
+
+This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.

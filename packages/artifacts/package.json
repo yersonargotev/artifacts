@@ -12,6 +12,6 @@
     "drizzle-orm": "0.45.4",
     "fflate": "0.8.3",
     "zod": "4.6.5",
-    "@artifacts/contracts": "workspace:*"
+    "@yargote/artifacts-contracts": "workspace:*"
   }
 }

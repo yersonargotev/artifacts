@@ -1,13 +1,27 @@
 {
-  "name": "@artifacts/client",
-  "version": "0.1.0",
+  "name": "@yargote/artifacts-client",
+  "version": "0.1.0-beta.1",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@artifacts/contracts": "workspace:*",
+    "@yargote/artifacts-contracts": "workspace:*",
     "zod": "4.6.5"
+  },
+  "license": "MIT",
+  "description": "Typed HTTP client for the Artifacts REST API.",
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yersonargotev/artifacts.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://github.com/yersonargotev",
+  "bugs": {
+    "url": "https://github.com/yersonargotev"
   }
 }

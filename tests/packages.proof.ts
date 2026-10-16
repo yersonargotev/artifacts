@@ -4,6 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fixture, grant } from './helpers.ts';
+import { readInventory, packageOutput } from '../scripts/package-catalog.ts';
+const inventory = await readInventory();
 
 const root = process.cwd();
 const directory = await mkdtemp(join(tmpdir(), 'artifacts-packed-consumer-'));
@@ -20,7 +22,11 @@ async function run(command: string, args: string[], cwd: string, env: NodeJS.Pro
   });
 }
 async function install(path: string, names: string[]) {
-  await writeFile(join(path, 'package.json'), JSON.stringify({ name: 'ordinary-node-consumer', private: true, type: 'module', dependencies: Object.fromEntries(names.map((name) => [`@artifacts/${name}`, `file:${resolve(root, `dist/packages/tarballs/artifacts-${name}-0.1.0.tgz`)}`])) }));
+  await writeFile(join(path, 'package.json'), JSON.stringify({ name: 'ordinary-node-consumer', private: true, type: 'module', dependencies: Object.fromEntries(names.map((name) => {
+    const packed = inventory.packages.find((item) => item.directory.endsWith(`/${name}`));
+    assert.ok(packed, `Package ${name} exists in inventory`);
+    return [packed.name, `file:${resolve(packageOutput, packed.tarball)}`];
+  })) }));
   await run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], path);
 }
 function dependencies(value: unknown): string[] {
@@ -32,9 +38,9 @@ try {
   const clientDirectory = await mkdtemp(join(directory, 'client-'));
   await install(clientDirectory, ['contracts', 'client']);
   const graph = dependencies(JSON.parse(await run('npm', ['ls', '--json', '--all'], clientDirectory)));
-  assert.equal(graph.some((name) => /libsql|drizzle|artifacts\/(db|artifacts|rest|cli)$|^tsx$/.test(name)), false, 'Client-only installation contains no database, server, CLI, or tsx dependency');
+  assert.equal(graph.some((name) => /libsql|drizzle|@artifacts\/(db|artifacts|rest)$|@yargote\/artifacts-cli$|^tsx$/.test(name)), false, 'Client-only installation contains no database, server, CLI, or tsx dependency');
   await writeFile(join(clientDirectory, 'consumer.mjs'), `import assert from 'node:assert/strict';
-import { createArtifactHttpClient, HttpError } from '@artifacts/client';
+import { createArtifactHttpClient, HttpError } from '@yargote/artifacts-client';
 const client = createArtifactHttpClient({resource:process.env.ARTIFACTS_SERVER, accessToken:process.env.ARTIFACTS_ACCESS_TOKEN});
 assert.equal((await client.identity()).userId, process.env.EXPECTED_OWNER);
 const snapshot = { metadata: { title: 'Packed client artifact', description: 'Ordinary Node runtime' }, content: { kind: 'text', text: 'Packed client content' }, files: [] };
@@ -47,7 +53,7 @@ console.log('Packed client runtime and real HTTP conflict passed');
 `);
   const env = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_ACCESS_TOKEN: token.access_token, EXPECTED_OWNER: app.ownerId };
   console.log((await run(process.execPath, ['consumer.mjs'], clientDirectory, env)).trim());
-  await writeFile(join(clientDirectory, 'consumer.ts'), `import { createArtifactHttpClient, type ArtifactRead, type CompactArtifactRead } from '@artifacts/client';
+  await writeFile(join(clientDirectory, 'consumer.ts'), `import { createArtifactHttpClient, type ArtifactRead, type CompactArtifactRead } from '@yargote/artifacts-client';
 const client = createArtifactHttpClient({ resource: 'https://example.test/mcp', accessToken: 'token' });
 const full: ArtifactRead = await client.read({artifactId:'id'});
 const compact: CompactArtifactRead = await client.read({artifactId:'id',response:'compact'});
@@ -64,7 +70,7 @@ console.log(full.revision.snapshot.content.text, compact.revision.content.utf8By
 import { readFile } from 'node:fs/promises';
 import { openDatabase } from '@artifacts/db';
 import { createArtifactStore, ArtifactError as StoreError } from '@artifacts/artifacts';
-import { ArtifactError } from '@artifacts/contracts';
+import { ArtifactError } from '@yargote/artifacts-contracts';
 import { createArtifactRestApp } from '@artifacts/rest';
 assert.equal(StoreError, ArtifactError);
 const config = JSON.parse(await readFile('fixture.json','utf8'));
@@ -96,6 +102,8 @@ console.log(app, prepareArtifactEdit);
 `);
   await run(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2024', 'server.ts'], serverDirectory);
   const binary = join(serverDirectory, 'node_modules/.bin/artifacts');
+  assert.equal((await run(binary, ['--version'], serverDirectory)).trim(), inventory.packages.find((item) => item.name === '@yargote/artifacts-cli')!.version);
+  assert.ok((await run(binary, ['--help'], serverDirectory)).startsWith('Usage: artifacts COMMAND [OPTIONS]'));
   const whoami = JSON.parse(await run(binary, ['whoami'], serverDirectory, { ...env, ARTIFACTS_STATE_DIR: join(directory, 'state') }));
   assert.equal(whoami.userId, app.ownerId);
   const snapshotFile = join(serverDirectory, 'snapshot.json');

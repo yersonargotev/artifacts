@@ -11,6 +11,6 @@
     "@artifacts/artifacts": "workspace:*",
     "@artifacts/db": "workspace:*",
     "@artifacts/rest": "workspace:*",
-    "@artifacts/contracts": "workspace:*"
+    "@yargote/artifacts-contracts": "workspace:*"
   }
 }
