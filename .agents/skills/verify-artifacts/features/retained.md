@@ -1,6 +1,27 @@
 # Exact retained artifact
 
-Use this recipe when the artifact already exists and the task is to prove its saved revision through the actual panel and protected publication. Retain a full independent `artifacts_read` result before browser verification. Compact reads do not contain the snapshot bytes needed for this proof.
+Use this recipe when the artifact already exists and the task is to prove its saved revision through the actual panel and protected publication. Retain a full independent read from `artifacts_read` or the installed CLI before browser verification. Compact reads do not contain the snapshot bytes needed for this proof.
+
+## Partial browser-control verification
+
+Use this route when the available authenticated tab exposes browser controls but no supplied Playwright `BrowserContext` or private storage state. Inspect only the authorized retained artifact. Keep authentication inside the browser and use its normal sign-in path if needed.
+
+1. Open the exact selected panel URL with one `revisionId`. Compare the selected artifact, revision, digest, and publication version with the independent saved read. Current panels expose `data-artifact-id`, `data-revision-id`, `data-revision-sha256`, and `data-publication-version`. Record any changed publication state separately from immutable revision identity.
+2. Establish the actual browser version and available capabilities. Record whether frame locators, console logs, response inspection, downloads, viewport controls, or native browser UI are available. A product name or empty console does not establish compatibility or successful loading.
+3. Inspect the actual iframe source, pinned revision, dimensions, sandbox, and referrer policy. Wait for a distinctive content element within a stated deadline. Exercise an authorized content control and record its resulting visible state. Use the available viewport controls for requested sizes and keyboard controls for affected interactions. Mark each inaccessible check unavailable.
+4. Inspect the real iframe request when the browser exposes network evidence. Native DevTools is an alternative when the connector lacks response APIs. Record pending or completed state, final status, content type, CSP, connection allowlist, cache policy, and DNS policy. Check whether the response is interactive content, an inert fallback, or an error. A direct top-level preview navigation receives deliberate 403 iframe-only admission and cannot replace this check.
+5. If the frame stays blank, distinguish admission, pending transport, response policy, browser compatibility, content execution, and browser-control failures using the available evidence. A pending request has no final response status or body. A load event or empty error log alone proves none of these boundaries. Keep checks with missing evidence unavailable rather than passed.
+6. If the debugger attached by browser control stalls the frame, compare with native controls. Disconnect that debugging session through the browser's normal control, reload the same pinned panel, and repeat the content interaction. Record both observed states. Use native controls or an independently supplied-context verifier if reconnecting automation reproduces the stall. Preserve authentication and containment settings. Attribute the failure to the control boundary only when this comparison demonstrates it.
+7. Retain a sanitized report and private screenshots where supported. Include identities, version, requested viewports, actions, resulting state, observed response evidence, unavailable checks, and the outcome table below. Retain header values from an explicit policy allowlist. Exclude cookies, tokens, viewer grants, callback queries, reporting URLs, raw authentication requests, and raw private content from diagnostic logs.
+
+| Outcome | Required evidence |
+| --- | --- |
+| Persistence | Independent full explicit-revision read and complete snapshot comparison. Exact export additionally requires ZIP and manifest verification. |
+| Local rendering | Observed standalone document interactions. This does not establish the hosted sandbox. |
+| Hosted rendering | Selected real panel, pinned frame, visible content, and observed interaction. State missing response, policy, byte, viewport, or console checks beside this partial result. |
+| Protected publication | Separate authorized protected-viewer admission, selected published revision, visible frame, and attachment checks. Omit publication when unauthorized or not requested. |
+
+Use the supplied-context verifier below for the complete exact-byte, policy, attachment, ZIP, and viewport proof. An authenticated tab cannot be converted to that input by extracting browser credentials. Without an authorized supplied context or state, those complete checks remain unverified. The existing markers, frame attributes, and native network inspection form the diagnostic mechanism. Add no endpoint or telemetry merely to fill an unavailable capability.
 
 ## Configuration
 

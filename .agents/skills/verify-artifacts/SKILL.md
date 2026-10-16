@@ -5,9 +5,13 @@ description: "Verify Artifacts through its real Astro panel, protected publicati
 
 # Verify Artifacts
 
-Read the [feature map](features/README.md), then the requested feature recipe. The disposable recipes use the existing production handlers and built panel with a local identity. The [retained artifact recipe](features/retained.md) verifies an existing saved revision through a supplied authenticated browser context or private storage state. It supports deployed and local URLs without authoring or account mutations. Live Claude/Codex acceptance is a separate path described in the map.
+Read the [feature map](features/README.md), then the requested feature recipe. The disposable recipes use the existing production handlers and built panel with a local identity. The [retained artifact recipe](features/retained.md) provides partial inspection through an authenticated browser-control tab and complete verification through a supplied authenticated browser context or private storage state. It supports deployed and local URLs without authoring or account mutations. Live Claude/Codex acceptance is a separate path described in the map.
 
 ## Verify a retained revision
+
+When only an authenticated browser-control tab is available, follow [Partial browser-control verification](features/retained.md#partial-browser-control-verification). Record the exact selected revision, available frame and response evidence, observed interactions, and unavailable checks. A connected tab does not supply a Playwright `BrowserContext` or storage-state file. Keep its authentication inside the browser.
+
+Report persistence, local rendering, hosted rendering, and protected publication separately. A partial browser inspection cannot return the complete verifier's pass verdict. Use the supplied-context path below when exact response bytes, complete policy checks, downloads, attachment bytes, or automated viewport coverage are required.
 
 Use an independent saved full `ArtifactRead`, an exact selected panel URL with `revisionId`, and the [typed declarative configuration](features/retained.md). Publication coverage requires that the selected saved revision is currently published. Omit `publicationUrl` for an unpublished selection. The report explicitly records that publication was not requested.
 

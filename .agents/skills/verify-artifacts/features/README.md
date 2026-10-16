@@ -11,7 +11,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account; other drives create an artifact with the same fixed title.
 - The feature files show explicit run paths for reproducibility. `launch --run` requires the path to be absent. Use a new path for subsequent runs; keep completed evidence.
 - The local authorization, panel, and publication hosts are deliberately distinct. Preserve the URLs from the run rather than replacing them with the normal development ports.
-- These disposable preconditions apply to the fixed `control.ts` drives. Existing retained artifacts use the separate [retained recipe](./retained.md) with an independent saved read and supplied authenticated context. That verifier has no disposable setup or mutation phase.
+- These disposable preconditions apply to the fixed `control.ts` drives. Existing retained artifacts use the separate [retained recipe](./retained.md) with an independent saved read. It supports partial browser-control inspection or complete verification with a supplied authenticated context. That verifier has no disposable setup or mutation phase.
 - Finish within the run's 15-minute lifetime. The helper reads the existing built panel; do not rebuild that shared output while verification instances are active.
 
 ## Driving conventions
