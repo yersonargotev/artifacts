@@ -47,7 +47,7 @@ A `request_conflict` means the ID was used with different arguments. Do not desc
 
 ## Verify and deliver
 
-After create or update, read the explicit returned revision. Compare its complete metadata, content, and decoded attachment bytes with the intended snapshot. For an update, check that its parent is the head used for preparation. Compact responses cannot verify omitted content.
+After create or update, read the explicit returned revision. Use `read ARTIFACT_ID --revision REVISION_ID --out FILE --quiet` to retain the full response without printing its snapshot. Check that the installed `--help` supports `--quiet` first. For older versions, use the command workflow's stdout redirection fallback. Compare the saved complete metadata, content, and decoded attachment bytes with the intended snapshot. For an update, check that its parent is the head used for preparation. Compact responses cannot verify omitted content.
 
 After publication, read current publication and compare revision, version, and URL with the committed result. A replayed receipt describes the original commit; another writer may have changed the current publication afterward. Report that difference.
 

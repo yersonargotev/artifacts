@@ -109,7 +109,7 @@ artifacts whoami
 artifacts create --snapshot FILE [--request-id ID] [--response full|compact]
 artifacts create --command FILE
 artifacts list [--limit N] [--cursor CURSOR]
-artifacts read ID [--revision REV] [--response full|compact] [--out FILE]
+artifacts read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
 artifacts update ID --snapshot FILE --expected-revision REV [--request-id ID]
                  [--response full|compact]
 artifacts update [ID] --command FILE
@@ -133,7 +133,11 @@ Create and update snapshot files contain the complete domain snapshot.
 }
 ```
 
-`read --out FILE` saves the returned artifact JSON and also prints it to stdout. A default full read contains the complete snapshot under `revision.snapshot`. `export --out FILE` saves the exact ZIP and prints its filename, local path, media type, SHA-256, and byte count. Output files use exclusive creation and never overwrite an existing path.
+`read --out FILE` saves the returned artifact JSON and also prints it to stdout. Add `--quiet` to suppress successful stdout while saving the same bytes for the selected response mode. `--quiet` is available only for `read` and requires a nonempty `--out FILE`. Errors still go to stderr and exit with code `1`.
+
+Check installed help for `--quiet` support. Version `0.1.0-beta.1` predates this option. With that version, `artifacts read ARTIFACT_ID --out saved.json > /dev/null` suppresses stdout while preserving stderr and the exit status.
+
+A default full read contains the complete snapshot under `revision.snapshot`. `export --out FILE` saves the exact ZIP and prints its filename, local path, media type, SHA-256, and byte count. Output files use exclusive creation and never overwrite an existing path.
 
 History defaults to complete revisions. `--summary` returns revision metadata and attachment summaries. `--before-sequence` continues a page. `list --cursor` continues an artifact list.
 

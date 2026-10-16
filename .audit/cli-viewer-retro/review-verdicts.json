@@ -1,0 +1,65 @@
+{
+  "provenance": "Root-transcribed records of final verdicts actually received through the native subagent API in this session. These are judgment records, not an exported session transcript. English summaries preserve the received conclusions and limits.",
+  "reviews": [
+    {
+      "agent": "/root/cli_design_judge",
+      "scope": "Bounded read output design",
+      "verdict": "ACCEPT",
+      "conclusion": "Use a read-local --quiet boolean requiring nonempty --out before authentication or network. Preserve the existing writer and all retry paths.",
+      "findingsResolved": [
+        "Explicitly reject empty --out before side effects."
+      ],
+      "runtimeChecks": []
+    },
+    {
+      "agent": "/root/review_cli_guidance",
+      "scope": "CLI implementation and partial verification guidance",
+      "verdict": "PASS",
+      "findings": [],
+      "runtimeChecks": [
+        "10 CLI client tests passed independently",
+        "git diff --check passed"
+      ],
+      "commentReview": "No MUST KILL, RESHAPE or KEEP findings.",
+      "limits": [
+        "Did not repeat the original hosted browser observations."
+      ]
+    },
+    {
+      "agent": "/root/independent_lifecycle_review",
+      "scope": "Lifecycle evaluator, packaging guard, fixture, documentation and independent candidate run",
+      "verdict": "PASS",
+      "findings": [],
+      "runtimeChecks": [
+        "Fresh external installed-candidate run passed all 22 declared checks including revocation and cleanup.",
+        "Evaluator, fixture, build and CLI hashes match the final author reports.",
+        "Registry provenance and output guards reviewed."
+      ],
+      "rerunReport": ".test-artifacts/cli-viewer-retro/candidate-independent.json",
+      "rerunReportSha256": "ea4694856d47c52123e8d4f4c6f58521f0f5ddf15c27a942908358efcd5de486",
+      "commentReview": "No MUST KILL, RESHAPE or KEEP findings.",
+      "limits": [
+        "Does not establish production hosting or causal skill quality.",
+        "Did not repeat the original production preview diagnosis."
+      ]
+    },
+    {
+      "agent": "/root/cross_model_trail_review",
+      "model": "gpt-5.6-sol",
+      "scope": "Decision trail and evidence claims",
+      "verdict": "No retained evidence contradicts the final claims or the supplied execution digest.",
+      "attention": [
+        "Original production browser observations cannot be independently replayed from workspace files because raw browser evidence and a transcript export are unavailable.",
+        "The independent JSON hash proves the rerun, not a reviewer narrative. Name it the independent rerun report SHA-256."
+      ],
+      "verified": [
+        "Final copied reports match originals and each has 22 passing checks.",
+        "Source, skill, binary and tarball integrity hashes match.",
+        "Screenshots, ZIPs, 91-test log and zero-error check log resolve."
+      ],
+      "limits": [
+        "Review used a labeled root execution digest, not an exported active-session transcript."
+      ]
+    }
+  ]
+}

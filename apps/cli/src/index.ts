@@ -28,7 +28,7 @@ Commands:
   create --snapshot FILE [--request-id ID] [--response full|compact]
   create --command FILE
   list [--limit N] [--cursor CURSOR]
-  read ID [--revision REV] [--response full|compact] [--out FILE]
+  read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
   update ID --snapshot FILE --expected-revision REV [--request-id ID]
          [--response full|compact]
   update [ID] --command FILE
@@ -42,7 +42,8 @@ Commands:
 Mutation command files contain the complete create, update, or publish JSON.
 Mutation request IDs default to a random UUID. Commands are retained before
 submission. Retry sends the exact retained command for the same server and owner.
-Read --out saves the complete artifact JSON. Export --out saves the ZIP.
+Read --out saves the returned artifact JSON. Export --out saves the ZIP.
+Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
 JSON results go to stdout. Diagnostics and recovery guidance go to stderr.
 ARTIFACTS_ACCESS_TOKEN supplies a token for automation without local login.
@@ -53,7 +54,7 @@ class UsageError extends Error {}
 const commandOptions: Record<string, readonly string[]> = {
   login: ['no-browser'], logout: [], whoami: [],
   create: ['snapshot', 'request-id', 'response', 'command'],
-  list: ['limit', 'cursor'], read: ['revision', 'response', 'out'],
+  list: ['limit', 'cursor'], read: ['revision', 'response', 'out', 'quiet'],
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
@@ -90,7 +91,7 @@ async function main(): Promise<unknown> {
       changes: { type: 'string' }, 'request-id': { type: 'string' }, response: { type: 'string' },
       revision: { type: 'string' }, 'expected-revision': { type: 'string' }, 'expected-version': { type: 'string' },
       limit: { type: 'string' }, cursor: { type: 'string' }, 'before-sequence': { type: 'string' },
-      summary: { type: 'boolean' }, out: { type: 'string' },
+      summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -135,6 +136,8 @@ async function main(): Promise<unknown> {
   }
   const response = values.response;
   if (response !== undefined && response !== 'full' && response !== 'compact') throw new UsageError('--response requires full or compact');
+  const quiet = values.quiet ?? false;
+  if (quiet) required('out');
   let commandToken: Promise<string> | undefined;
   const client = createArtifactHttpClient({ resource, accessToken: () => commandToken ??= accessToken({ resource, stateDir }) });
   async function mutate(mutation: Mutation): Promise<unknown> {
@@ -171,7 +174,7 @@ async function main(): Promise<unknown> {
     case 'read': {
       const result = await client.read({ artifactId: argument()!, ...(values.revision === undefined ? {} : { revisionId: values.revision }), ...(response === undefined ? {} : { response }) });
       if (values.out) await writeOutput(values.out, `${JSON.stringify(result, null, 2)}\n`);
-      return result;
+      return quiet ? undefined : result;
     }
     case 'update': {
       if (values.command) return mutate(await commandFile('update'));
