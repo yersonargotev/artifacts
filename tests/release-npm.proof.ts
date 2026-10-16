@@ -5,7 +5,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspectTarball, packageOutput, readInventory, type PackageInventory } from '../scripts/package-catalog.ts';
-import { assertBetaNotLatest, bootstrapLatestAction, publishedBytes, verifyRelease } from '../scripts/release-npm.ts';
+import { assertBetaNotLatest, bootstrapLatestAction, publishedBytes, verifyRelease, waitForBootstrapTags } from '../scripts/release-npm.ts';
 
 const bootstrap = { name: '@yargote/artifacts-contracts', version: '0.1.0-beta.1', initialLatest: null, latest: '0.1.0-beta.1', recorded: false, placeholder: { name: '@yargote/artifacts-contracts', version: '0.0.0-stage', stub: true } };
 assert.equal(bootstrapLatestAction(bootstrap), 'restore');
@@ -37,6 +37,27 @@ function registryResponses(responses: Response[]): void {
   };
 }
 try {
+  const normalizedTags = { beta: '0.1.0-beta.1', latest: '0.0.0-stage' };
+  registryResponses([
+    new Response(null, { status: 404 }),
+    Response.json({}),
+    Response.json({ 'dist-tags': { beta: '0.1.0-beta.1', latest: '0.1.0-beta.1' } }),
+    Response.json({ 'dist-tags': normalizedTags }),
+  ]);
+  assert.deepEqual(await waitForBootstrapTags(bootstrap.name, bootstrap.version, { timeoutMs: 1_000, intervalMs: 0 }), normalizedTags);
+  assert.equal(requests, 4, 'Bootstrap tag visibility must settle without another mutation');
+  registryResponses([Response.json({ 'dist-tags': { beta: bootstrap.version, latest: bootstrap.version } })]);
+  await assert.rejects(waitForBootstrapTags(bootstrap.name, bootstrap.version, { timeoutMs: 0, intervalMs: 0 }), /Timed out waiting for npm bootstrap tags/);
+  assert.equal(requests, 1, 'Stale bootstrap tags must stop at the deadline');
+  registryResponses([Response.json({ 'dist-tags': { ...normalizedTags, latest: '0.2.0' } })]);
+  await assert.rejects(waitForBootstrapTags(bootstrap.name, bootstrap.version), /latest changed during bootstrap normalization/);
+  assert.equal(requests, 1, 'Unexpected latest must fail without retry');
+  registryResponses([Response.json({ 'dist-tags': { ...normalizedTags, beta: '0.2.0-beta.1' } })]);
+  await assert.rejects(waitForBootstrapTags(bootstrap.name, bootstrap.version), /beta does not identify/);
+  assert.equal(requests, 1, 'Unexpected beta must fail without retry');
+  registryResponses([new Response(null, { status: 503 })]);
+  await assert.rejects(waitForBootstrapTags(bootstrap.name, bootstrap.version), /Registry metadata failed with HTTP 503/);
+  assert.equal(requests, 1, 'Bootstrap polling must preserve non-404 registry errors');
   registryResponses([
     new Response(null, { status: 404 }),
     Response.json({ versions: {} }),

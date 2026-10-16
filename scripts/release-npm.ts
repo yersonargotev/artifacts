@@ -110,6 +110,19 @@ async function metadata(name: string, timeoutMs = 30_000): Promise<{ 'dist-tags'
   if (!response.ok) throw new Error(`Registry metadata failed with HTTP ${response.status}`);
   return response.json();
 }
+export async function waitForBootstrapTags(name: string, version: string, options: { timeoutMs?: number; intervalMs?: number } = {}): Promise<Record<string, string>> {
+  const deadline = Date.now() + (options.timeoutMs ?? 60_000);
+  do {
+    const tags = (await metadata(name, Math.max(1, Math.min(10_000, deadline - Date.now()))))?.['dist-tags'];
+    if (tags?.beta !== undefined) assert.equal(tags.beta, version, `beta does not identify ${name}@${version}`);
+    if (tags?.latest !== undefined) assert.ok(tags.latest === version || tags.latest === bootstrapVersion, 'latest changed during bootstrap normalization');
+    if (tags?.beta === version && tags.latest === bootstrapVersion) return tags;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, Math.min(options.intervalMs ?? 1_000, remaining)));
+  } while (Date.now() < deadline);
+  throw new Error(`Timed out waiting for npm bootstrap tags of ${name}@${version}`);
+}
 export async function publishedBytes(name: string, version: string, integrity: string, options: { timeoutMs?: number; intervalMs?: number } = {}): Promise<void> {
   const started = Date.now();
   const deadline = started + (options.timeoutMs ?? 20 * 60_000);
@@ -178,14 +191,13 @@ export async function publishRelease(inventory: PackageInventory, output = packa
       await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
     }
     await publishedBytes(item.name, item.version, item.integrity);
-    let published = await metadata(item.name);
+    const published = await metadata(item.name);
     let tags = published?.['dist-tags'];
     assert.equal(tags?.beta, item.version, `beta does not identify ${item.name}@${item.version}`);
     const action = bootstrapLatestAction({ name: item.name, version: item.version, initialLatest: state.latest[item.name], latest: tags?.latest ?? null, recorded: bootstrapLatest.includes(item.name), placeholder: published?.versions?.[bootstrapVersion] });
     if (action === 'restore') {
       await runNpm(['dist-tag', 'add', `${item.name}@${bootstrapVersion}`, 'latest', '--registry', registry]);
-      published = await metadata(item.name);
-      tags = published?.['dist-tags'];
+      tags = await waitForBootstrapTags(item.name, item.version);
     }
     const expectedLatest = bootstrapLatest.includes(item.name) || action !== 'unchanged' ? bootstrapVersion : state.latest[item.name];
     assert.equal(tags?.beta, item.version, `beta does not identify ${item.name}@${item.version}`);
