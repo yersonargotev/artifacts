@@ -31,28 +31,25 @@ The Artifacts account authenticates the MCP connection. Each CLI also needs its 
 
 ## Use the standalone CLI or REST client
 
-The CLI uses an independent REST API under `${MCP_URL}/v1`. The existing complete `MCP_URL` remains its OAuth resource. MCP and REST share the artifact store and bearer policy. The panel continues to use its own session policy and the store directly. This source change has not been deployed, so the hosted URLs above are not a default for CLI setup.
+The CLI uses REST under `${MCP_URL}/v1`. The complete `MCP_URL` remains its OAuth resource. MCP and REST share the artifact store and bearer policy. The deployed protected-resource metadata and REST routes were probed during beta preparation. Authenticated first-use evidence is recorded separately in the [release report](.audit/npm-beta-verification.md).
 
-Build the local distribution and install the CLI without `tsx`:
+Use Node 24 or later. The public beta uses three MIT packages under `@yargote`; the application repository remains private. Install the CLI and its dependencies from npm:
 
 ```sh
-pnpm build:packages
-npm install --prefix "$HOME/.local/share/artifacts-cli" \
-  "$PWD/dist/packages/tarballs/artifacts-contracts-0.1.0.tgz" \
-  "$PWD/dist/packages/tarballs/artifacts-client-0.1.0.tgz" \
-  "$PWD/dist/packages/tarballs/artifacts-cli-0.1.0.tgz"
-export PATH="$HOME/.local/share/artifacts-cli/node_modules/.bin:$PATH"
-export ARTIFACTS_SERVER='http://127.0.0.1:4101/mcp'
+npm install --global @yargote/artifacts-cli@0.1.0-beta.1
+artifacts --version
+export ARTIFACTS_SERVER='https://artifacts-mcp.yersonargotev.workers.dev/mcp'
 artifacts login
 artifacts whoami
-artifacts create --snapshot snapshot.json --request-id first-cli-artifact
 ```
 
-Choose an actual REST-enabled server before login. Local default services include REST after this change. `pnpm dev:rest` is an alternative REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
+Version `0.1.0-beta.1` is published under `beta` for all three packages. Clean registry installations and authenticated deployed operations passed in the [release report](.audit/npm-beta-verification.md). The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
+
+The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
 The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. The independent [artifacts-cli skill](skills/artifacts-cli/SKILL.md) can be copied as a complete directory into `~/.agents/skills`. It has no hosted default and does not require an MCP connection.
 
-Library consumers install the compiled `@artifacts/contracts` and `@artifacts/client` tarballs. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. Server consumers can install the additional `config`, `db`, `artifacts`, and `rest` tarballs from the same output directory. The [contracts reference](packages/contracts/README.md) describes source-compatible exports. Package staging preserves workspace source imports and emits JavaScript and declarations separately under `dist/packages`.
+Library consumers install `@yargote/artifacts-client@0.1.0-beta.1` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.1`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
 ## Install the Artifacts skill
 

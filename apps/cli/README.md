@@ -2,7 +2,81 @@
 
 The `artifacts` Node CLI reads and writes retained artifacts through REST. It prints JSON results to stdout and diagnostics to stderr. Node 24 or later is required. Its private credential database uses Node's experimental built-in SQLite API.
 
-The installed package exposes the `artifacts` binary as compiled ESM JavaScript. Repository development uses `pnpm artifacts`. The command syntax is identical. Run `pnpm build:packages` in the repository, then install the generated contracts, client, and CLI tarballs together. The [repository install instructions](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/README.md#use-the-standalone-cli-or-rest-client) show the exact command. The standalone [artifacts-cli skill](https://github.com/yersonargotev/artifacts/blob/5ccb12e7cb9711c7919171602b3af7006e8bc6cc/skills/artifacts-cli/SKILL.md) supplies authoring and retry guidance.
+The `@yargote/artifacts-cli` package exposes the `artifacts` binary as compiled ESM JavaScript. Its client and contracts dependencies install automatically. Repository development uses `pnpm artifacts` with the same command syntax.
+
+## Install the beta
+
+Use Node 24 or later. The beta targets macOS and Linux. Windows has not been verified.
+
+Choose one persistent installation:
+
+```sh
+npm install --global @yargote/artifacts-cli@0.1.0-beta.1
+# Or, with pnpm and an existing global bin directory on PATH:
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.1
+artifacts --version
+```
+
+If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen your shell before installation.
+
+For one-off execution, pin the same version:
+
+```sh
+npx --yes @yargote/artifacts-cli@0.1.0-beta.1 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.1 --help
+```
+
+`@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
+
+## Complete first use
+
+An existing Artifacts account is required. Select the complete OAuth resource, including `/mcp`:
+
+```sh
+export ARTIFACTS_SERVER='https://artifacts-mcp.yersonargotev.workers.dev/mcp'
+artifacts login
+artifacts whoami
+```
+
+Login opens browser authorization. After you approve access, `whoami` prints JSON with your user ID and scopes. Use `artifacts login --no-browser` to open the printed authorization URL yourself on the same machine.
+
+Create `snapshot.json`:
+
+```json
+{
+	"metadata": { "title": "My first CLI artifact", "description": "Created through REST" },
+	"content": { "kind": "text", "text": "Hello from the Artifacts CLI." },
+	"files": []
+}
+```
+
+```sh
+artifacts create --snapshot snapshot.json
+artifacts list --limit 5
+```
+
+The create result contains `artifactId` and `headRevisionId`. Use those values to read, publish, and export the exact revision:
+
+```sh
+artifacts read ARTIFACT_ID
+artifacts publish ARTIFACT_ID --revision REVISION_ID --expected-version 0
+artifacts export ARTIFACT_ID --revision REVISION_ID --out artifact.zip
+artifacts logout
+```
+
+Publication URLs require authenticated owner access. A retained request ID appears on stderr before each mutation. If the response is lost, run `artifacts retry REQUEST_ID` with the same server and state directory. Keep that state directory when upgrading, reinstalling, or switching between global and one-off execution.
+
+## Upgrade or uninstall
+
+Install another exact version with the same package manager to change the executable version. Credentials and retained operation files live outside the package installation and remain available.
+
+```sh
+npm uninstall --global @yargote/artifacts-cli
+# Or:
+pnpm remove --global @yargote/artifacts-cli
+```
+
+Run `artifacts logout` before uninstalling if you want to clear credentials. Uninstalling does not delete retained operations.
 
 ## Server and local state
 
@@ -26,7 +100,7 @@ The private `credentials.sqlite` file stores credentials. The separate `credenti
 
 ## Command syntax
 
-`artifacts --help` prints this command reference.
+`artifacts --help` prints this command reference. `artifacts --version` prints the installed package version without requiring a server or login.
 
 ```text
 artifacts login [--no-browser]
@@ -99,3 +173,7 @@ Each invocation resolves one access token for its reads, owner check, and submis
 If a response is lost after commit, retry recovers the original receipt. If a conflict occurs, the retained operation remains available for inspection. A new read and a deliberate new command with a new request ID are required to incorporate another writer's changes.
 
 Commands exit with code `1` on failure and print a JSON error to stderr. Server errors preserve their HTTP status, code, and conflict details. Successful JSON stdout contains no progress messages or credentials.
+
+## License and support
+
+This package is MIT licensed. The client and contracts packages have their own MIT licenses. This does not license the private Artifacts application repository. Contact your Artifacts service administrator with `artifacts --version`, Node and package-manager versions, and a redacted error. Never include credentials or the contents of `credentials.sqlite`.

@@ -1,0 +1,168 @@
+[
+  {
+    "name": "@yargote/artifacts-contracts",
+    "version": "0.1.0-beta.1",
+    "integrity": "sha512-Jtrbq7QwmXE97ydjDMdq1tYUZ8ZGoHec36lZLjTIyz/Q/fTk1Tz5iN3BeUgXRRun7H3NO3EvxSqk8uDOEqDnig==",
+    "files": [
+      "LICENSE",
+      "src/http.js",
+      "src/index.js",
+      "src/serialization.js",
+      "src/workflow.js",
+      "package.json",
+      "README.md",
+      "src/http.d.ts",
+      "src/index.d.ts",
+      "src/serialization.d.ts",
+      "src/workflow.d.ts"
+    ],
+    "manifest": {
+      "name": "@yargote/artifacts-contracts",
+      "version": "0.1.0-beta.1",
+      "private": false,
+      "type": "module",
+      "description": "Shared schemas and contracts for Artifacts clients.",
+      "license": "MIT",
+      "repository": {
+        "type": "git",
+        "url": "git+https://github.com/yersonargotev/artifacts.git",
+        "directory": "packages/contracts"
+      },
+      "homepage": "https://github.com/yersonargotev",
+      "bugs": {
+        "url": "https://github.com/yersonargotev"
+      },
+      "engines": {
+        "node": ">=24"
+      },
+      "exports": {
+        ".": "./src/index.js",
+        "./workflow": "./src/workflow.js",
+        "./serialization": "./src/serialization.js",
+        "./http": "./src/http.js"
+      },
+      "files": [
+        "src",
+        "README.md",
+        "LICENSE"
+      ],
+      "dependencies": {
+        "zod": "4.6.5"
+      },
+      "publishConfig": {
+        "access": "public",
+        "tag": "beta",
+        "provenance": false
+      }
+    },
+    "unwantedContent": []
+  },
+  {
+    "name": "@yargote/artifacts-client",
+    "version": "0.1.0-beta.1",
+    "integrity": "sha512-U+xICm2z2uSY/3XYXE2X3rTMhKbTUeyWeDvorrMk64Fm1nlPLBqC9U63aTVFARldeiCFbZUYLvC9jUUHNQS2Kg==",
+    "files": [
+      "LICENSE",
+      "src/index.js",
+      "package.json",
+      "README.md",
+      "src/index.d.ts"
+    ],
+    "manifest": {
+      "name": "@yargote/artifacts-client",
+      "version": "0.1.0-beta.1",
+      "private": false,
+      "type": "module",
+      "description": "Typed HTTP client for the Artifacts REST API.",
+      "license": "MIT",
+      "repository": {
+        "type": "git",
+        "url": "git+https://github.com/yersonargotev/artifacts.git",
+        "directory": "packages/client"
+      },
+      "homepage": "https://github.com/yersonargotev",
+      "bugs": {
+        "url": "https://github.com/yersonargotev"
+      },
+      "engines": {
+        "node": ">=24"
+      },
+      "exports": {
+        ".": "./src/index.js"
+      },
+      "files": [
+        "src",
+        "README.md",
+        "LICENSE"
+      ],
+      "dependencies": {
+        "@yargote/artifacts-contracts": "0.1.0-beta.1",
+        "zod": "4.6.5"
+      },
+      "publishConfig": {
+        "access": "public",
+        "tag": "beta",
+        "provenance": false
+      }
+    },
+    "unwantedContent": []
+  },
+  {
+    "name": "@yargote/artifacts-cli",
+    "version": "0.1.0-beta.1",
+    "integrity": "sha512-EyndDsxBIA3e7DfJg9pAD4hmBmvW24s1J5Z7yKRMD8tTR8/voKUZHQQEPK9KRz8HK4S+UVFM2zytTdAmY1bM4g==",
+    "files": [
+      "LICENSE",
+      "src/auth.js",
+      "src/credentials.js",
+      "src/index.js",
+      "src/operations.js",
+      "package.json",
+      "README.md",
+      "src/auth.d.ts",
+      "src/credentials.d.ts",
+      "src/index.d.ts",
+      "src/operations.d.ts"
+    ],
+    "manifest": {
+      "name": "@yargote/artifacts-cli",
+      "version": "0.1.0-beta.1",
+      "private": false,
+      "type": "module",
+      "description": "Command-line client for the Artifacts REST API.",
+      "license": "MIT",
+      "repository": {
+        "type": "git",
+        "url": "git+https://github.com/yersonargotev/artifacts.git",
+        "directory": "apps/cli"
+      },
+      "homepage": "https://github.com/yersonargotev",
+      "bugs": {
+        "url": "https://github.com/yersonargotev"
+      },
+      "engines": {
+        "node": ">=24"
+      },
+      "bin": {
+        "artifacts": "./src/index.js"
+      },
+      "files": [
+        "src",
+        "README.md",
+        "LICENSE"
+      ],
+      "dependencies": {
+        "@yargote/artifacts-contracts": "0.1.0-beta.1",
+        "@yargote/artifacts-client": "0.1.0-beta.1",
+        "openid-client": "6.8.8",
+        "zod": "4.6.5"
+      },
+      "publishConfig": {
+        "access": "public",
+        "tag": "beta",
+        "provenance": false
+      }
+    },
+    "unwantedContent": []
+  }
+]

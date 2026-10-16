@@ -242,10 +242,10 @@ importers:
 
   apps/cli:
     dependencies:
-      '@artifacts/client':
+      '@yargote/artifacts-client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@artifacts/contracts':
+      '@yargote/artifacts-contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       openid-client:
@@ -333,9 +333,6 @@ importers:
       '@artifacts/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@artifacts/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       '@artifacts/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -348,6 +345,9 @@ importers:
       '@modelcontextprotocol/server':
         specifier: 2.3.1
         version: 2.3.1
+      '@yargote/artifacts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -390,12 +390,12 @@ importers:
 
   packages/artifacts:
     dependencies:
-      '@artifacts/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@artifacts/db':
         specifier: workspace:*
         version: link:../db
+      '@yargote/artifacts-contracts':
+        specifier: workspace:*
+        version: link:../contracts
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@libsql/client@0.18.0)(kysely@0.29.6)
@@ -408,7 +408,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@artifacts/contracts':
+      '@yargote/artifacts-contracts':
         specifier: workspace:*
         version: link:../contracts
       zod:
@@ -444,7 +444,7 @@ importers:
       '@artifacts/config':
         specifier: workspace:*
         version: link:../config
-      '@artifacts/contracts':
+      '@yargote/artifacts-contracts':
         specifier: workspace:*
         version: link:../contracts
       jose:

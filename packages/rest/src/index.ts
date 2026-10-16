@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, publishSchema, readSchema, updateSchema } from '@artifacts/contracts';
-import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@artifacts/contracts/http';
-import { compactArtifactRead, summarizeRevision } from '@artifacts/contracts/workflow';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, publishSchema, readSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
+import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
 import { createBearerAuthorizer, type BearerConfig } from './identity.ts';
 

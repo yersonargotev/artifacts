@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { open } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { createSchema, publishSchema, updateSchema } from '@artifacts/contracts';
-import { canonicalResource } from '@artifacts/contracts/http';
-import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@artifacts/client';
+import { createSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { canonicalResource } from '@yargote/artifacts-contracts/http';
+import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
 import { loadOperation, retainOperation, submitOperation, type Mutation } from './operations.ts';
 
@@ -19,6 +19,7 @@ Global options:
   --state-dir DIR         Private local state, or ARTIFACTS_STATE_DIR
                          Default: ~/.local/state/artifacts
   --help                 Print this reference
+  --version              Print the installed package version
 
 Commands:
   login [--no-browser]
@@ -84,7 +85,7 @@ async function main(): Promise<unknown> {
   const { values, positionals, tokens } = parseArgs({
     allowPositionals: true, tokens: true,
     options: {
-      server: { type: 'string' }, 'state-dir': { type: 'string' }, help: { type: 'boolean' },
+      server: { type: 'string' }, 'state-dir': { type: 'string' }, help: { type: 'boolean' }, version: { type: 'boolean' },
       'no-browser': { type: 'boolean' }, command: { type: 'string' }, snapshot: { type: 'string' },
       changes: { type: 'string' }, 'request-id': { type: 'string' }, response: { type: 'string' },
       revision: { type: 'string' }, 'expected-revision': { type: 'string' }, 'expected-version': { type: 'string' },
@@ -97,6 +98,11 @@ async function main(): Promise<unknown> {
     if (token.kind !== 'option') continue;
     if (seen.has(token.name)) throw new UsageError(`Option --${token.name} cannot be repeated`);
     seen.add(token.name);
+  }
+  if (values.version) {
+    const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
+    process.stdout.write(`${manifest.version}\n`);
+    return;
   }
   if (values.help) {
     process.stdout.write(help);

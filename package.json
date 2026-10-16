@@ -32,10 +32,14 @@
     "artifacts": "tsx apps/cli/src/index.ts",
     "dev:rest": "tsx apps/rest/src/server.ts",
     "build:packages": "tsx scripts/build-packages.ts",
-    "test:packages": "pnpm build:packages && tsx tests/packages.proof.ts",
+    "test:packages": "pnpm build:packages && tsx tests/release-npm.proof.ts && tsx tests/packages.proof.ts",
     "test:rest-cli": "node --import tsx --test tests/rest.test.ts tests/cli-auth*.test.ts tests/cli-client*.test.ts",
     "test:rest-cli:browser": "pnpm build && tsx tests/rest-cli.browser.proof.ts",
-    "dev:rest-cli:fixture": "tsx tests/rest-cli.serve.ts"
+    "test:cli-first-use": "pnpm build && tsx tests/cli-first-use.proof.ts",
+    "dev:rest-cli:fixture": "tsx tests/rest-cli.serve.ts",
+    "release:npm:check": "tsx scripts/release-npm.ts check",
+    "release:npm:publish": "tsx scripts/release-npm.ts publish",
+    "verify:npm": "tsx scripts/verify-npm.ts"
   },
   "devDependencies": {
     "@hono/node-server": "2.1.4",

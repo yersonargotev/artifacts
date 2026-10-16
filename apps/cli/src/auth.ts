@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import * as oidc from 'openid-client';
-import { canonicalResource, identitySchema, protectedResourceMetadataUrl, restBase, type Identity } from '@artifacts/contracts/http';
+import { canonicalResource, identitySchema, protectedResourceMetadataUrl, restBase, type Identity } from '@yargote/artifacts-contracts/http';
 import { z } from 'zod';
 import { CredentialStore, type Registration, type Tokens } from './credentials.ts';
 

@@ -1,15 +1,29 @@
 {
-  "name": "@artifacts/cli",
-  "version": "0.1.0",
+  "name": "@yargote/artifacts-cli",
+  "version": "0.1.0-beta.1",
   "private": true,
   "type": "module",
   "bin": {
     "artifacts": "./src/index.ts"
   },
   "dependencies": {
-    "@artifacts/contracts": "workspace:*",
-    "@artifacts/client": "workspace:*",
+    "@yargote/artifacts-contracts": "workspace:*",
+    "@yargote/artifacts-client": "workspace:*",
     "openid-client": "6.8.8",
     "zod": "4.6.5"
+  },
+  "license": "MIT",
+  "description": "Command-line client for the Artifacts REST API.",
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yersonargotev/artifacts.git",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/yersonargotev",
+  "bugs": {
+    "url": "https://github.com/yersonargotev"
   }
 }

@@ -3,9 +3,9 @@ import { lstat, mkdir, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { createSchema, publishSchema, updateSchema } from '@artifacts/contracts';
-import { canonicalResource } from '@artifacts/contracts/http';
-import type { ArtifactHttpClient } from '@artifacts/client';
+import { createSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { canonicalResource } from '@yargote/artifacts-contracts/http';
+import type { ArtifactHttpClient } from '@yargote/artifacts-client';
 
 const binding = {
   version: z.literal(1),
