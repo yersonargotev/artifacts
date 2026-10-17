@@ -514,3 +514,5 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .preview { width: calc(100% - 20px); margin: 10px auto; }
   .detail-card { padding: 18px; }
 }
+
+.move-missing { overflow-wrap: anywhere; }

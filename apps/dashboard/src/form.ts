@@ -1,4 +1,4 @@
-export async function readForm(request: Request, names: readonly string[]): Promise<URLSearchParams | undefined> {
+export async function readForm(request: Request, spec: Readonly<Record<string, readonly [number, number]>>, maxBytes: number): Promise<URLSearchParams | undefined> {
   if (!/^application\/x-www-form-urlencoded(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get('content-type') ?? '')) return undefined;
   const reader = request.body?.getReader();
   if (!reader) return undefined;
@@ -8,7 +8,7 @@ export async function readForm(request: Request, names: readonly string[]): Prom
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 4096) { await reader.cancel(); return undefined; }
+    if (size > maxBytes) { await reader.cancel(); return undefined; }
     chunks.push(value);
   }
   let body: string;
@@ -17,6 +17,9 @@ export async function readForm(request: Request, names: readonly string[]): Prom
     for (const part of body.split('&')) for (const value of part.split('=')) decodeURIComponent(value.replace(/\+/g, ' '));
   } catch { return undefined; }
   const fields = new URLSearchParams(body);
-  if ([...fields.keys()].some((name) => !names.includes(name)) || names.some((name) => fields.getAll(name).length !== 1)) return undefined;
+  if ([...fields.keys()].some((name) => !Object.hasOwn(spec, name)) || Object.entries(spec).some(([name, [min, max]]) => {
+    const count = fields.getAll(name).length;
+    return count < min || count > max;
+  })) return undefined;
   return fields;
 }

@@ -342,7 +342,7 @@ async function drive(feature: Feature) {
           { name: 'projects', path: '/projects', heading: 'Proyectos' },
           { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
           { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: detail.revision.snapshot.metadata.title },
-          { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
+          { name: 'move', path: `/move?artifactId=${detail.artifactId}`, heading: 'Mover a proyecto' },
           { name: 'delete', path: `/artifacts/${detail.artifactId}/delete`, heading: 'Eliminar artefacto' },
         ];
         for (const screen of screens) for (const viewport of screenViewports) {

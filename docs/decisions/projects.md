@@ -2,7 +2,7 @@
 
 ## Problem and decision
 
-Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel sidebar group the owner's artifacts by that column. MCP, REST, the CLI, and the panel's `Mover a proyecto` page all move an artifact through the same store command. There is no project table, no command that creates or deletes a project, and no empty project.
+Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel sidebar group the owner's artifacts by that column. MCP, REST, and the CLI move one artifact through the public store command. The panel uses a private batch command over the same project column. There is no project table, no command that creates or deletes a project, and no empty project.
 
 ## Derived label instead of a project table
 
@@ -22,7 +22,13 @@ The comparison runs in the store rather than in SQL because SQLite `lower()` fol
 
 A project is mutable artifact-level organization. A snapshot is the immutable content of a revision. A project inside the snapshot would make every move create a revision and change its digest. It would also appear in revision comparisons, exports, and publications. Instead, `artifacts_move`, `PUT /v1/artifacts/:id/project`, and the panel's move form update only the artifact row. A move never creates a revision and never changes the publication. Exports and published pages do not contain the project.
 
-Move is a command with an owner-scoped receipt like the other mutations. An exact retry returns the original result, and a changed command under the same request ID fails with `request_conflict`. The panel move form carries its request ID like the deletion form, so a resubmitted form replays the receipt instead of moving the artifact again. Moving to the current project succeeds without change. Deleting the artifact invalidates its move receipts along with its other receipts.
+Move is a command with an owner-scoped receipt like the other mutations. An exact retry returns the original result, and a changed command under the same request ID fails with `request_conflict`. The panel move form carries its request ID like the deletion form, so a resubmitted form replays the receipt instead of moving the artifact again. Moving to the current project succeeds without change. Deleting the artifact invalidates its public single-artifact move receipts along with its other content-bearing receipts.
+
+The private `panel_move` command accepts up to 25 unique IDs. It validates every ID, deduplicates and sorts the selection, and normalizes the submitted project name before hashing. Stored canonical spelling is resolved once inside the transaction after receipt lookup. This keeps the request hash independent of later membership changes. One owner-authorized transaction reads the selection, updates the changing owned rows once, and persists one receipt. Missing or foreign IDs appear only as submitted IDs in `missing`; no foreign title or project is returned.
+
+A panel receipt records `{ project, moved, unchanged, missing }` as a historical result. Later deletion or reassignment does not rewrite it or make a replay move the survivors again. The deletion scrub targets a top-level `artifactId`, which this batch result deliberately lacks. A partial result means some submitted IDs were unavailable, not that a transaction partly committed. A changed selection, destination, or command kind under the same request ID conflicts. Forms opened before the route migration can therefore receive 409 when an existing public `move` receipt meets `panel_move`.
+
+The native `/move` page preserves submitted fields and the request ID for invalid or uncertain outcomes. Uncertain retries preserve the original move or remove intent. Once a non-redirect POST outcome exists, a non-domain failure while reading optional titles or workspace data cannot replace that outcome. Authorization errors still terminate the request. A successful move redirects to the receipt's project; removal redirects to `/?unfiled=1`. Legacy single-artifact move URLs redirect with 308 for both GET and POST.
 
 ## Compatibility and rollout
 

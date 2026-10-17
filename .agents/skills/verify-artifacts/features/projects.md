@@ -75,3 +75,13 @@ Header evidence adds `project-view-1440`, `project-390`, `unfiled-1440`, `vanish
 - Pressing Enter in `Proyecto` submits the first button, `Mover al proyecto`. Keep `Quitar del proyecto` after it, or Enter would remove the project.
 - At 390px the panel collapses `Navegación`, and Playwright role queries skip links inside a closed disclosure. Open `Navegación` before reading the `Tus proyectos` links.
 - The drive uses the source CLI with a bearer token, like the `cli` drive. Packaged CLI behavior and interactive login remain covered by the package and first-use proofs.
+
+## Atomic panel movement
+
+The native GET and POST route is `/move`. GET accepts repeated `artifactId` query parameters. POST accepts one to 25 repeated hidden `artifactId` fields, one request ID, an optional project field for removal, and one intent. The parser limits the encoded body to 4096 bytes and rejects malformed UTF-8, percent escapes, unknown fields, and duplicate singleton fields. Mover remains the first submit intent.
+
+A complete result redirects with 303 to the canonical project or `/?unfiled=1`. A partial result returns 200, lists unavailable submitted IDs, and links to the historical destination. Invalid names return 400 with the same fields and request ID. Conflicts return 409 and a fresh-form link. Unconfirmed commands return 503 with a dedicated same-action retry form. Non-domain failures in optional title or workspace reads preserve every non-redirect POST outcome. GET and authorization failures still require their normal error response.
+
+The legacy `/artifacts/<id>/move` route returns 308 for GET and POST. The projects drive uses the canonical route and checks removal in Sin proyecto. Dedicated batch browser coverage must keep the legacy method-preserving POST and command-kind conflict checks.
+
+The accepted live database fault is a disposable SQLite trigger on receipt insertion, scoped to the run's owner and request ID. It proves rollback after the project update, an absent receipt, retained retry fields, and convergence after trigger removal. It does not prove transport loss, an ambiguous commit, or an actual connection close. Rejected optional reads remain separate orchestration tests.

@@ -1,7 +1,7 @@
 ---
 import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
-import { exportHref, scopeHref } from '../../urls.ts';
+import { moveHref, exportHref, scopeHref } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 interface Props { card: Card; now: Date }
 const { card, now } = Astro.props;
@@ -16,7 +16,7 @@ const status = publicationStates[card.publication.state];
       { label: 'Ver artefacto', href: detailUrl },
       { label: 'Descargar revisión más reciente', href: exportHref(card.artifactId, card.head.revisionId) },
       ...(publication ? [{ label: 'Abrir publicación', href: publication.url }] : []),
-      { label: 'Mover a proyecto', href: `${detailUrl}/move` },
+      { label: 'Mover a proyecto', href: moveHref([card.artifactId]) },
     ]} deleteUrl={`${detailUrl}/delete`} client:load />
   </div>
   <p class="artifact-description">{card.description}</p>

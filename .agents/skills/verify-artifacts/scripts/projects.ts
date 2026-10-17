@@ -106,7 +106,7 @@ export async function driveProjects({ page, browser, context, instance, director
   assert.deepEqual(await cards(), [['Beta handoff', 'Beta']]);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow at 390px');
   await capture(page, 'projects-beta-mobile');
-  const moveUrl = `${instance.panel}/artifacts/${loose.artifactId}/move`;
+  const moveUrl = `${instance.panel}/move?artifactId=${loose.artifactId}`;
   const field = page.getByLabel('Proyecto', { exact: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(instance.panel);
@@ -124,7 +124,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await capture(page, 'projects-move-desktop');
   await record('Submit Mover al proyecto with a blank name', { project: '   ' });
   await field.fill('   ');
-  const invalidResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url() === moveUrl);
+  const invalidResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url() === `${instance.panel}/move`);
   await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).click();
   assert.equal((await invalidResponse).status(), 400, 'A blank project name returns 400');
   await page.getByText('Escribe un nombre de proyecto de 1 a 80 caracteres, sin caracteres de control.', { exact: true }).waitFor();
@@ -155,12 +155,12 @@ export async function driveProjects({ page, browser, context, instance, director
   await capture(page, 'projects-move-mobile');
   await record('Choose Quitar del proyecto at 390px', {});
   await page.getByRole('button', { name: 'Quitar del proyecto', exact: true }).click();
-  await page.waitForURL((url) => url.pathname === '/' && url.search === '');
-  await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
+  await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('unfiled') === '1');
+  await page.getByRole('heading', { level: 1, name: 'Sin proyecto', exact: true }).waitFor();
   await page.locator('.library-navigation > summary').click();
   await projects.getByRole('link', { name: 'Alpha (1)', exact: true }).waitFor();
   assert.deepEqual((await projectLinks()).map(({ name }) => name), ['Alpha (1)', 'Beta (1)'], 'Gamma disappears with its last artifact');
-  assert.deepEqual(await cards(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Sin proyecto']]);
+  assert.deepEqual(await cards(), [['Unfiled notes', 'Sin proyecto']]);
   await capture(page, 'projects-removed-mobile');
   const unfiled = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
   assert.equal(unfiled.project, null, 'Independent MCP read shows the removal');
