@@ -11,6 +11,7 @@ import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
 import { loadOperation, retainOperation, submitOperation, type Mutation } from './operations.ts';
+import { runSkillsCommand } from './skills.ts';
 
 const help = `Usage: artifacts COMMAND [OPTIONS]
 
@@ -22,6 +23,11 @@ Global options:
   --version              Print the installed package version
 
 Commands:
+  skills [list]
+  skills get NAME [--full]
+  skills get --all [--full]
+  skills path [NAME]
+  skills install [NAME] [--agent claude] [--global] [--force]
   login [--no-browser]
   logout
   whoami
@@ -47,6 +53,12 @@ Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
 JSON results go to stdout. Diagnostics and recovery guidance go to stderr.
 ARTIFACTS_ACCESS_TOKEN supplies a token for automation without local login.
+Skills commands work offline without a server, login, or private state.
+They print plain text. Global server and state options are accepted and ignored.
+Skills install defaults to artifacts-cli under .agents/skills in the current
+directory. --agent claude uses .claude/skills. --global uses your home directory.
+The installed discovery file loads instructions through artifacts skills get.
+Identical files stay unchanged. Differing files require --force.
 `;
 
 class UsageError extends Error {}
@@ -59,6 +71,7 @@ const commandOptions: Record<string, readonly string[]> = {
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
   export: ['revision', 'out'], retry: [],
+  skills: ['full', 'all', 'agent', 'global', 'force'],
 };
 
 async function jsonFile(path: string): Promise<unknown> {
@@ -92,6 +105,8 @@ async function main(): Promise<unknown> {
       revision: { type: 'string' }, 'expected-revision': { type: 'string' }, 'expected-version': { type: 'string' },
       limit: { type: 'string' }, cursor: { type: 'string' }, 'before-sequence': { type: 'string' },
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
+      full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
+      global: { type: 'boolean' }, force: { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -112,6 +127,7 @@ async function main(): Promise<unknown> {
   const [command, ...arguments_] = positionals;
   if (!command || !Object.hasOwn(commandOptions, command)) throw new UsageError('Specify a command. Use artifacts --help for the reference.');
   for (const option of seen) if (!['server', 'state-dir', 'help', ...commandOptions[command]].includes(option)) throw new UsageError(`Option --${option} is not supported by ${command}`);
+  if (command === 'skills') return runSkillsCommand(arguments_, values, seen);
   const resourceValue = values.server ?? process.env.ARTIFACTS_SERVER;
   if (!resourceValue) throw new UsageError('Specify --server RESOURCE or ARTIFACTS_SERVER. No production server is selected by default.');
   const resource = canonicalResource(resourceValue);

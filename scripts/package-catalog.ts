@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'fflate';
@@ -29,6 +29,8 @@ export interface PackageManifest {
   exports?: unknown;
   bin?: Record<string, string>;
   dependencies?: Record<string, string>;
+  artifactsSkills?: string[];
+  files?: string[];
   publishConfig?: { access: string; tag: string; provenance: boolean };
 }
 export interface PackedPackage {
@@ -44,6 +46,24 @@ export interface PackedPackage {
 }
 export interface PackageInventory { packages: PackedPackage[] }
 export interface TarMember { path: string; mode: number; bytes: Buffer }
+export async function bundledSkillFiles(manifest: PackageManifest): Promise<Map<string, Buffer>> {
+  const names = manifest.artifactsSkills ?? [];
+  if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) || new Set(names).size !== names.length) throw new Error('Invalid bundled skills declaration');
+  const files = new Map<string, Buffer>();
+  async function visit(directory: string, prefix: string): Promise<void> {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) await visit(resolve(directory, entry.name), path);
+      else if (entry.isFile()) files.set(path, await readFile(resolve(directory, entry.name)));
+      else throw new Error(`Bundled skill contains a non-regular file at ${path}`);
+    }
+  }
+  for (const name of names) {
+    await visit(resolve(root, 'skills', name), `skills/${name}`);
+    if (!files.has(`skills/${name}/SKILL.md`)) throw new Error(`Bundled skill ${name} has no SKILL.md`);
+  }
+  return files;
+}
 export async function inspectTarball(path: string) {
   const bytes = await readFile(path);
   const tar = Buffer.from(gunzipSync(bytes));

@@ -3,6 +3,9 @@
   "version": "0.1.0-beta.1",
   "private": true,
   "type": "module",
+  "artifactsSkills": [
+    "artifacts-cli"
+  ],
   "bin": {
     "artifacts": "./src/index.ts"
   },

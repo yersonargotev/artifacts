@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inspectTarball, packageDefinitions, packageOutput, readInventory, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
+import { bundledSkillFiles, inspectTarball, packageDefinitions, packageOutput, readInventory, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
 
 export const publicNames = ['@yargote/artifacts-contracts', '@yargote/artifacts-client', '@yargote/artifacts-cli'] as const;
 const registry = 'https://registry.npmjs.org';
@@ -72,6 +72,8 @@ export async function verifyRelease(inventory: PackageInventory, output = packag
     const rewrite = (value: unknown): unknown => typeof value === 'string' ? value.replace(/\.ts$/, '.js') : value === null || value === undefined ? value : Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, child]) => [key, rewrite(child)]));
     assert.deepEqual(actual.manifest.exports, rewrite(source.exports), 'Published exports must preserve source exports');
     assert.deepEqual(actual.manifest.bin, rewrite(source.bin), 'Published bin must preserve the source command');
+    assert.deepEqual(actual.manifest.artifactsSkills, source.artifactsSkills, 'Published skills selection must preserve the source declaration');
+    assert.deepEqual(actual.manifest.files, ['src', 'README.md', 'LICENSE', ...(source.artifactsSkills ? ['skills'] : [])], 'Published files must preserve the approved package contents');
     for (const key of ['description', 'license', 'repository', 'homepage', 'bugs'] as const) assert.deepEqual(actual.manifest[key], source[key], `Published ${key} differs from source`);
     const expectedDependencies = Object.fromEntries(Object.entries(source.dependencies ?? {}).map(([name, version]) => [name, version.startsWith('workspace:') ? byName.get(name)?.version : version]));
     assert.deepEqual(packed.dependencies, expectedDependencies, 'Published dependencies must preserve source dependency edges');
@@ -81,7 +83,14 @@ export async function verifyRelease(inventory: PackageInventory, output = packag
     const license = actual.files.find((file) => file.path === 'LICENSE')!.bytes;
     assert.deepEqual(license, await readFile(resolve(root, packed.directory, 'LICENSE')), 'Published LICENSE differs from the approved package license');
     assert.match(license.toString('utf8'), /MIT License/);
+    const skillFiles = await bundledSkillFiles(source);
+    for (const [path, bytes] of skillFiles) {
+      const file = actual.files.find((entry) => entry.path === path);
+      assert.ok(file, `Missing bundled skill file ${path}`);
+      assert.deepEqual(file.bytes, bytes, `Bundled skill file differs from source at ${path}`);
+    }
     for (const file of actual.files) {
+      if (skillFiles.has(file.path)) continue;
       assert.match(file.path, /^(?:package\.json|README\.md|LICENSE|src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+(?:\.js|\.d\.ts))$/, `Unexpected published file ${file.path}`);
       if (/\.(?:js|ts)$/.test(file.path)) assert.doesNotMatch(file.bytes.toString('utf8'), /@artifacts\/(?:cli|client|contracts)(?:['"/]|$)/, 'Compiled imports still contain private package identities');
     }

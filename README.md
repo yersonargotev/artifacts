@@ -47,7 +47,7 @@ Version `0.1.0-beta.1` is published under `beta` for all three packages. Clean r
 
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
-The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. The independent [artifacts-cli skill](skills/artifacts-cli/SKILL.md) can be copied as a complete directory into `~/.agents/skills`. It has no hosted default and does not require an MCP connection.
+The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. Packages built from the current source include the complete [artifacts-cli skill](skills/artifacts-cli/SKILL.md). `artifacts skills` lists bundled skills. `artifacts skills get artifacts-cli --full` prints its instructions and references offline. `artifacts skills install --global` installs a discovery skill under `~/.agents/skills` that loads those instructions through the installed CLI. Add `--agent claude` to use `~/.claude/skills`. The published `0.1.0-beta.1` package predates these commands. Check installed help before using them. The skill has no hosted default and does not require an MCP connection.
 
 Library consumers install `@yargote/artifacts-client@0.1.0-beta.1` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.1`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
@@ -145,6 +145,7 @@ pnpm test
 pnpm test:browser
 pnpm test:rest-cli:browser
 pnpm test:packages
+pnpm test:cli-skills
 pnpm build:workers
 ```
 

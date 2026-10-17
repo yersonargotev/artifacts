@@ -2,6 +2,25 @@
 
 Check the installed `artifacts --help` before use. These examples use the canonical resource selected for the task. `ARTIFACT_ID` and `REVISION_ID` stand for IDs observed in actual command output.
 
+## Inspect and install bundled skills
+
+When installed help lists `skills`, use these commands without a server or login.
+
+```sh
+artifacts skills
+artifacts skills get artifacts-cli --full
+artifacts skills get --all --full
+artifacts skills path artifacts-cli
+artifacts skills install
+artifacts skills install --agent claude --global
+```
+
+`skills` and `skills list` list names and descriptions. Plain `skills get artifacts-cli` returns the complete `SKILL.md`. `--full` includes references and templates with relative file paths. `skills path` without a name returns the catalog directory.
+
+Installation defaults to `artifacts-cli` in `.agents/skills` under the current directory. `--agent claude` selects `.claude/skills`. `--global` selects the user's home directory. Existing agent directories do not affect the default. The discovery file instructs the agent to load the installed CLI's complete instructions with `artifacts skills get artifacts-cli --full`. Installation reports the absolute path, leaves identical files unchanged, and requires `--force` to replace differing files.
+
+The published `0.1.0-beta.1` package predates skills commands. Do not assume support without checking help.
+
 ## Authenticate
 
 ```sh
@@ -10,7 +29,7 @@ artifacts login
 artifacts whoami
 ```
 
-Replace the example with the selected resource before executing it. Every command reads `ARTIFACTS_SERVER` or an explicit `--server RESOURCE`. Login does not save a default resource. `--state-dir DIR` or `ARTIFACTS_STATE_DIR` selects an isolated private state directory. For automation, `ARTIFACTS_ACCESS_TOKEN` supplies an already authorized bearer token. Do not echo it or put it in an argument.
+Replace the example with the selected resource before executing it. Service commands read `ARTIFACTS_SERVER` or an explicit `--server RESOURCE`. Login does not save a default resource. `--state-dir DIR` or `ARTIFACTS_STATE_DIR` selects an isolated private state directory. For automation, `ARTIFACTS_ACCESS_TOKEN` supplies an already authorized bearer token. Do not echo it or put it in an argument.
 
 Use `--no-browser` when the environment cannot open a browser automatically. Open the printed authorization URL and keep the CLI running for its loopback callback. A remote machine's loopback callback must be reachable by the browser used for login. Do not replace the callback with an arbitrary public listener.
 
