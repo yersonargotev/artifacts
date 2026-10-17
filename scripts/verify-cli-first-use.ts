@@ -9,7 +9,7 @@ import { parseArgs, parseEnv } from 'node:util';
 import { unzipSync } from 'fflate';
 import { chromium, type Browser } from 'playwright';
 import { artifactReadSchema, publishResultSchema, type Snapshot } from '../packages/contracts/src/index.ts';
-import { canonicalResource, historyResultSchema, identitySchema, listResultSchema, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
+import { canonicalResource, historyResultSchema, identitySchema, listResultSchema, projectsResultSchema, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
 
 type CommandResult = { code: number | null; stdout: string; stderr: string; failure?: 'spawn' | 'timeout' | 'output-limit' };
 type FailureType = 'interrupted' | 'browser-launch' | 'timeout' | 'assertion' | 'invalid-response' | 'network' | 'unexpected';
@@ -25,6 +25,7 @@ type Evidence = {
   browserChannel?: 'chrome';
   artifactId?: string;
   artifactTitle?: string;
+  projects?: string[];
   publicationUrl?: string;
   revisions?: string[];
   archiveSha256?: string;
@@ -38,13 +39,14 @@ type Evidence = {
 const { values } = parseArgs({ options: {
   binary: { type: 'string' }, server: { type: 'string' }, report: { type: 'string' },
   'env-file': { type: 'string' }, 'expected-version': { type: 'string' },
-  'browser-executable': { type: 'string' },
+  'browser-executable': { type: 'string' }, panel: { type: 'string' },
 } });
 assert(values.binary && isAbsolute(values.binary), 'Specify --binary with an absolute installed executable path');
 assert(values.server, 'Specify --server with the exact canonical REST resource');
 assert(values.report, 'Specify --report with a new evidence JSON path');
 assert(!values['browser-executable'] || isAbsolute(values['browser-executable']), 'Specify --browser-executable with an absolute executable path');
 const binary = values.binary;
+const panel = values.panel ? new URL(values.panel).origin : undefined;
 const server = canonicalResource(values.server);
 const report = resolve(values.report);
 const supplied = values['env-file'] ? parseEnv(await readFile(resolve(values['env-file']), 'utf8')) : {};
@@ -197,8 +199,11 @@ try {
   };
   const snapshotFile = join(directory, 'snapshot.json');
   await writeFile(snapshotFile, JSON.stringify(snapshot), { mode: 0o600 });
-  const created = artifactReadSchema.parse(await cli(['create', '--snapshot', snapshotFile, '--request-id', requests.create]));
+  const projects = [`CLI verification ${suffix}`, `CLI verification moved ${suffix}`] as const;
+  evidence.projects = [...projects];
+  const created = artifactReadSchema.parse(await cli(['create', '--snapshot', snapshotFile, '--project', projects[0], '--request-id', requests.create]));
   assert.equal(created.ownerId, identity.userId);
+  assert.equal(created.project, projects[0]);
   assert.equal(created.revision.sequence, 1);
   assert.deepEqual(created.revision.snapshot, snapshot);
   evidence.artifactId = created.artifactId;
@@ -263,6 +268,37 @@ try {
   assert.equal(await page.locator('main').getAttribute('data-revision-id'), created.revision.id);
   checked('protected-publication-renders-original-revision');
 
+  stage = 'projects';
+  const filtered = listResultSchema.parse(await cli(['list', '--project', projects[0].toUpperCase()]));
+  assert.deepEqual(filtered.items.map((item) => [item.artifactId, item.project]), [[created.artifactId, projects[0]]]);
+  const projectCount = async (name: string) => projectsResultSchema.parse(await cli(['projects'])).items.find((project) => project.name === name)?.artifactCount;
+  assert.equal(await projectCount(projects[0]), 1);
+  assert.deepEqual(await cli(['move', created.artifactId, '--project', projects[1]]), { artifactId: created.artifactId, project: projects[1] });
+  const moved = artifactReadSchema.parse(await cli(['read', created.artifactId]));
+  assert.equal(moved.project, projects[1]);
+  assert.equal(moved.headRevisionId, edited.revision.id);
+  assert.equal(await projectCount(projects[0]), undefined);
+  assert.equal(await projectCount(projects[1]), 1);
+  checked('create-with-project-filter-list-and-move');
+
+  if (panel) {
+    stage = 'panel-projects';
+    await page.goto(`${panel}/?${new URLSearchParams({ project: projects[1] })}`);
+    const panelSignIn = page.getByRole('link', { name: 'Iniciar sesión', exact: true });
+    if (await panelSignIn.count()) await panelSignIn.click();
+    const consent = page.getByRole('button', { name: 'Permitir acceso', exact: true });
+    const sidebarLink = page.getByRole('navigation', { name: 'Proyectos', exact: true }).getByRole('link', { name: `${projects[1]} (1)`, exact: true });
+    await Promise.race([sidebarLink.waitFor(), consent.waitFor().then(() => consent.click())]);
+    await sidebarLink.waitFor();
+    assert.equal(await sidebarLink.getAttribute('aria-current'), 'page');
+    assert.deepEqual(await page.locator('.artifact-list h2').allTextContents(), [title]);
+    checked('panel-sidebar-groups-moved-artifact');
+  }
+
+  assert.deepEqual(await cli(['move', created.artifactId, '--no-project']), { artifactId: created.artifactId, project: null });
+  assert.equal(await projectCount(projects[1]), undefined);
+  checked('remove-from-project-leaves-no-verification-project');
+
   stage = 'logout';
   const signedOut = await cli(['logout']) as { signedOut: boolean; remoteRevocation: string };
   assert.equal(signedOut.signedOut, true);
@@ -294,6 +330,8 @@ try {
     'publish-and-retry': 'Check historical publication and retained request replay operations.',
     export: 'Check historical ZIP export, archive contents, and SHA-256 consistency.',
     'publication-browser': 'Check protected publication access and original revision rendering.',
+    projects: 'Check create with a project, project filtering, the projects list, and move.',
+    'panel-projects': 'Check panel sign-in and the Proyectos sidebar for the moved artifact.',
     logout: 'Check credential revocation and authentication denial after logout.',
   };
   evidence.failureMessage = interrupted ? 'Verification was interrupted or exceeded its overall deadline.'

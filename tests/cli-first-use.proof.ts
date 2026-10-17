@@ -44,7 +44,7 @@ try {
   const output = await run(process.execPath, [
     '--import', 'tsx', resolve(root, 'scripts/verify-cli-first-use.ts'),
     '--binary', binary, '--server', app.config.resource,
-    '--expected-version', cli.version, '--report', report,
+    '--expected-version', cli.version, '--report', report, '--panel', app.dashboard,
     ...(browser ? ['--browser-executable', browser] : []),
   ], root, { ...environment, OWNER_EMAIL: 'owner@example.test', OWNER_PASSWORD: app.password });
   const evidence = JSON.parse(await readFile(report, 'utf8')) as { status: string; version: string; checks: string[] };
@@ -57,6 +57,9 @@ try {
     'historical-publication-and-exact-retained-replays',
     'identical-historical-zip-and-sha256',
     'protected-publication-renders-original-revision',
+    'create-with-project-filter-list-and-move',
+    'panel-sidebar-groups-moved-artifact',
+    'remove-from-project-leaves-no-verification-project',
     'own-credential-logout-and-denied-whoami',
   ]) assert(evidence.checks.includes(check), `First-use harness proves ${check}`);
   process.stdout.write(output);
