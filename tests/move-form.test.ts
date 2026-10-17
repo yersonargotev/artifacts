@@ -116,3 +116,15 @@ test('successful POST redirects without enrichment while GET and explicit author
   await assert.rejects(prepareMovePage({ move, moveSubject: async () => { throw new ArtifactError('forbidden', 'Revoked'); } }, actor, request(encode({ ...sample, project: '' }))), { code: 'forbidden' });
   await assert.rejects(prepareMovePage({ move: async () => { throw new ArtifactError('forbidden', 'Revoked'); }, moveSubject: unavailable }, actor, request(encode(sample))), { code: 'forbidden' });
 });
+
+test('publication and deletion keep strict singleton fields after the parser migration', async () => {
+  const { parsePublicationForm } = await import('../apps/dashboard/src/publish.ts');
+  const { parseDeletionForm } = await import('../apps/dashboard/src/delete.ts');
+  for (const [parse, revision] of [[parsePublicationForm, 'revisionId'], [parseDeletionForm, 'expectedRevisionId']] as const) {
+    const body = new URLSearchParams({ artifactId: 'artifact-one', [revision]: 'revision-one', expectedPublicationVersion: '0', requestId: 'singleton-request' }).toString();
+    assert.equal((await parse(request(body), 'artifact-one')).artifactId, 'artifact-one');
+    for (const invalid of [`${body}&artifactId=artifact-one`, `${body}&requestId=other-request`, `${body}&project=Gamma`, body.replace('requestId=singleton-request', ''), body.replace('revision-one', '%FF'), `${body}&padding=${'x'.repeat(4096)}`]) {
+      await assert.rejects(parse(request(invalid), 'artifact-one'), (error: unknown) => error instanceof Response && error.status === 400);
+    }
+  }
+});
