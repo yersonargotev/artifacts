@@ -34,7 +34,7 @@ The drive captures these pages at both widths:
 | Projects index | `/projects` | `screens-projects` |
 | Project library | `/?project=Alpha` | `screens-project` |
 | Artifact detail | `/artifacts/<Alpha overview ID>` | `screens-detail` |
-| Move page | `/artifacts/<Alpha overview ID>/move` | `screens-move` |
+| Move page | `/move?artifactId=<Alpha overview ID>` | `screens-move` |
 | Delete confirmation | `/artifacts/<Alpha overview ID>/delete` | `screens-delete` |
 
 Login uses `Correo electrónico`, `Contraseña`, and `Iniciar sesión`. The detail waits for `Verification revision 2` inside the real `.preview` iframe. Move and delete confirmations are inspected without submitting them. Publication results require a POST and are outside this capture drive. The `publication` recipe covers the protected viewer separately.
