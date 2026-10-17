@@ -73,7 +73,8 @@ try {
     await document.fonts.ready;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-  assert.equal(await mobile.locator('header').count(), 1);
+  assert.equal(await mobile.locator('header.workspace-toolbar').count(), 1);
+  assert.equal(await mobile.locator('main > header.library-header').count(), 1);
   assert.equal(await mobile.locator('h1').count(), 1);
   assert.equal(await mobile.locator('.identity').count(), 1);
   assert.equal(await mobile.locator('footer').count(), 1);
