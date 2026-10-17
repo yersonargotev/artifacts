@@ -3,6 +3,7 @@ import type { LibraryPage } from '@artifacts/artifacts/panel/model';
 import { searchFor } from '../../presentation.ts';
 import { libraryHref } from '../../urls.ts';
 import ArtifactCard from './ArtifactCard.astro';
+import CreateHereCard from './CreateHereCard.astro';
 import Icon from '../Icon.astro';
 interface Props { page: LibraryPage; workspaceCount: number; now: Date }
 const { page, workspaceCount, now } = Astro.props;
@@ -25,7 +26,7 @@ const empty = page.continued
     <p role="status">{total} {total === 1 ? 'artefacto' : 'artefactos'}{page.q ? <> para <strong>"{page.q}"</strong></> : ''}{page.continued && total > 0 ? <span class="results-continuation">, continuación de resultados</span> : ''}</p>
     <div>{filtered && page.cards.length > 0 && <a class="clear-filters" href={clearHref}>Limpiar filtros</a>}<span class="library-order">Más recientes primero</span></div>
   </div>
-  {page.cards.length ? <ul class="artifact-grid">{page.cards.map((card) => <ArtifactCard card={card} now={now} />)}</ul> : <div class="library-empty" data-slot="card">
+  {page.cards.length ? <ul class="artifact-grid">{page.cards.map((card) => <ArtifactCard card={card} now={now} />)}{page.scope.kind === 'project' && <CreateHereCard project={page.scope.project.name} />}</ul> : <div class="library-empty" data-slot="card">
     <span class="empty-icon" aria-hidden="true"><Icon name={empty.icon} size={30} /></span><h2>{empty.title}</h2><p>{empty.text}</p>
     {page.continued ? <a class="button secondary" href={libraryHref(query)}>Volver al inicio</a>
       : filtered ? <a class="button secondary" href={clearHref}>Limpiar filtros</a>
