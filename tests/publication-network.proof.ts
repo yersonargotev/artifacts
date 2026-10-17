@@ -77,8 +77,10 @@ try {
     if (path === '/publication') {
       await page.locator('.title-menu > summary').click();
       await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
+      const attachment = page.getByRole('link', { name: 'proof.txt', exact: true });
+      await attachment.waitFor({ state: 'visible' });
       const event = page.waitForEvent('download');
-      await page.getByRole('link', { name: 'proof.txt', exact: true }).click();
+      await attachment.press('Enter');
       const download = await event;
       assert.equal(await download.failure(), null);
       const stream = await download.createReadStream();
