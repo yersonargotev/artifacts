@@ -16,7 +16,7 @@ import { artifactReadSchema, publishResultSchema } from '../../../../packages/ar
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'preview', 'publication', 'export'] as const;
+const features = ['identity', 'authoring', 'cli', 'preview', 'publication', 'export'] as const;
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
 type Credentials = { controlToken: string; accessToken: string; password: string };
@@ -95,7 +95,7 @@ async function supervisor() {
     const view = serve({ fetch: (request) => viewHandler(request), hostname: '::1', port: 0 });
     servers.push(view);
     const viewOrigin = `http://[::1]:${await listen(view)}`;
-    app = await fixture({ dashboard: panelOrigin, publishOrigin: viewOrigin });
+    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin });
     const serviceSecret = randomBytes(32).toString('hex');
     const cookieSecret = randomBytes(32).toString('hex');
     viewHandler = createPublicationApp({ DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
@@ -238,6 +238,45 @@ async function drive(feature: Feature) {
       assert.deepEqual(read.revision.snapshot, secondSnapshot);
       assert.equal(read.publication?.revisionId, published.revisionId);
       checks.push('Real HTTP-MCP create/replay/read/update/history/list/publish', 'Immutable historical snapshot', 'Stale update rejected', 'Publication independently read back');
+    } else if (feature === 'cli') {
+      const state = join(runtime, 'cli-state');
+      await mkdir(state, { mode: 0o700 });
+      const env = { PATH: process.env.PATH, HOME: state, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: state, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken };
+      async function cli(...cliArgs: string[]) {
+        const child = spawn(process.execPath, ['--import', 'tsx', join(root, 'apps/cli/src/index.ts'), ...cliArgs], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '';
+        let stderr = '';
+        child.stdout!.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+        child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+        const [code] = await once(child, 'close') as [number | null];
+        await record(`CLI artifacts ${cliArgs.join(' ')}`, { code, stdout, stderr });
+        return { code, stdout, stderr };
+      }
+      async function ok(...cliArgs: string[]) { const result = await cli(...cliArgs); assert.equal(result.code, 0, `artifacts ${cliArgs[0]} exits 0`); return JSON.parse(result.stdout); }
+      const identity = await ok('whoami');
+      assert.equal(identity.userId, instance.ownerId, 'CLI identity matches disposable owner');
+      await json(join(directory, 'snapshot-1.json'), firstSnapshot);
+      const created = artifactReadSchema.parse(await ok('create', '--snapshot', join(directory, 'snapshot-1.json')));
+      await json(join(directory, 'changes.json'), { content: { text: secondSnapshot.content.text } });
+      const edited = artifactReadSchema.parse(await ok('edit', created.artifactId, '--changes', join(directory, 'changes.json')));
+      assert.equal(edited.revision.parentRevisionId, created.revision.id);
+      assert.deepEqual(edited.revision.snapshot, secondSnapshot, 'Edit preserves metadata and attachment');
+      const stale = await cli('update', created.artifactId, '--snapshot', join(directory, 'snapshot-1.json'), '--expected-revision', created.revision.id);
+      assert.equal(stale.code, 1, 'Stale CLI update exits 1');
+      assert.match(stale.stderr, /"code":"conflict".*"status":409/, 'Stale CLI update reports the REST conflict');
+      const history = await ok('history', created.artifactId, '--summary');
+      assert.deepEqual(history.items.map((item: { id: string }) => item.id), [edited.revision.id, created.revision.id]);
+      const published = publishResultSchema.parse(await ok('publish', created.artifactId, '--revision', edited.revision.id, '--expected-version', '0'));
+      const exported = await ok('export', created.artifactId, '--revision', created.revision.id, '--out', join(directory, 'cli-revision-1.zip'));
+      const bytes = await readFile(join(directory, 'cli-revision-1.zip'));
+      assert.equal(hash(bytes), exported.sha256, 'CLI export reports its file digest');
+      const archive = await call('artifacts_export', { artifactId: created.artifactId, revisionId: created.revision.id });
+      assert.deepEqual(bytes, Buffer.from(archive.base64, 'base64'), 'CLI ZIP equals MCP export');
+      assert.equal(strFromU8(unzipSync(bytes)['content.html']!), firstSnapshot.content.text);
+      const read = artifactReadSchema.parse(await call('artifacts_read', { artifactId: created.artifactId }));
+      assert.equal(read.headRevisionId, edited.revision.id);
+      assert.equal(read.publication?.revisionId, published.revisionId);
+      checks.push('Source CLI whoami/create/edit/history/publish/export over local REST', 'Stale CLI update rejected with exit 1', 'Edit preserves omitted metadata and attachment', 'CLI ZIP equals MCP export bytes', 'Head and publication independently read through MCP');
     } else {
       browser = await chromium.launch({ channel: 'chrome' });
       context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
