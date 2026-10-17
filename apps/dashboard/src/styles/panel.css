@@ -148,7 +148,9 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .project-header h1 { margin: 0; font-size: clamp(26px, 3vw, 34px); font-weight: 800; letter-spacing: -.03em; overflow-wrap: anywhere; }
 .project-header-counts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; color: var(--muted); font-size: 13px; }
 .project-header-counts > .tally-bar { width: 96px; }
-.project-header-action { min-width: 0; max-width: 100%; }
+.project-header-action { display: grid; gap: 12px; min-width: 0; max-width: 100%; flex: 0 1 340px; }
+.project-header-action code { display: block; min-width: 0; padding: 9px 10px; border: 1px solid var(--divider); border-radius: 8px; background: var(--base); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-copy-command][hidden] { display: none; }
 .project-header-action > .button { max-width: 100%; white-space: normal; text-align: left; }
 .library-heading .unfiled-count { color: var(--foreground); font-weight: 600; }
 .create-here-card { display: flex; flex-direction: column; justify-content: center; gap: 12px; min-width: 0; min-height: 300px; padding: 24px; border: 1px dashed var(--border-control); border-radius: 16px; }
