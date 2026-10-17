@@ -31,6 +31,12 @@ Resolve an existing artifact by its supplied ID, an observed publication URL, or
 
 Use `edit` for partial changes that preserve omitted fields. Use `update` for a complete next snapshot with the observed `headRevisionId` as its expected revision. Changing the attachment list replaces that inventory; an empty list removes all attachments. An update creates a retained revision and does not change the published revision.
 
+## Organize projects
+
+When the user names a project for new content, add `--project NAME` to `create`. Run `artifacts projects` first when an existing project may already fit. A name matching an existing project regardless of letter case joins it and keeps the stored spelling. Do not invent a project the user did not ask for. Use `list --project NAME` to find artifacts in a project.
+
+Use `move ID --project NAME` to file an existing artifact under a project and `move ID --no-project` to remove it from one. A move changes only the project. It creates no revision and leaves the publication unchanged. It is a retained mutation, so recover an uncertain move with `retry`. Verify it with `read` or `list --project NAME`. A project disappears when its last artifact leaves it.
+
 ## Publish deliberately
 
 Publish when the user requests publication, a shareable artifact URL, or a change to the live artifact. Use the exact saved revision selected by the user or returned by the edit. Read the current publication version before preparing publication. Use zero only when the artifact is unpublished.

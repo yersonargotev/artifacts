@@ -146,6 +146,55 @@ test('REST and MCP share retained state, exact replay, and competing publication
   } finally { await app.close(); }
 });
 
+test('REST and MCP share project creation, filtering, listing, and route-bound moves', async () => {
+  const app = await fixture({ transport: 'combined' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const ids = (items: { artifactId: string }[]) => items.map((item) => item.artifactId).sort();
+    const alphaResponse = await call('/artifacts', 'POST', { requestId: 'rest-project-alpha', snapshot, project: 'Alpha' });
+    assert.equal(alphaResponse.status, 201);
+    const alpha = await alphaResponse.json() as ArtifactRead;
+    assert.equal(alpha.project, 'Alpha');
+    const second = (await mcp(app, tokens.access_token, 'artifacts_create', { requestId: 'mcp-project-alpha', snapshot, project: ' ALPHA ' })).structuredContent as ArtifactRead;
+    assert.equal(second.project, 'Alpha');
+    assert.equal((await (await call('/artifacts', 'POST', { requestId: 'rest-project-none', snapshot })).json()).project, null);
+    assert.deepEqual(await (await call('/projects')).json(), { items: [{ name: 'Alpha', artifactCount: 2 }] });
+    assert.deepEqual(ids((await (await call('/artifacts?project=alpha')).json()).items), [alpha.artifactId, second.artifactId].sort());
+
+    const move = { requestId: 'rest-project-move', artifactId: second.artifactId, project: 'Beta' };
+    const moved = await call(`/artifacts/${second.artifactId}/project`, 'PUT', move);
+    assert.equal(moved.status, 200);
+    assert.deepEqual(await moved.json(), { artifactId: second.artifactId, project: 'Beta' });
+    assert.deepEqual(await (await call(`/artifacts/${second.artifactId}/project`, 'PUT', move)).json(), { artifactId: second.artifactId, project: 'Beta' });
+    await error(await call(`/artifacts/${second.artifactId}/project`, 'PUT', { ...move, project: null }), 409, 'request_conflict');
+    const read = await (await call(`/artifacts/${second.artifactId}`)).json() as ArtifactRead;
+    assert.equal(read.project, 'Beta');
+    assert.equal(read.headRevisionId, second.headRevisionId);
+    assert.deepEqual((await mcp(app, tokens.access_token, 'projects_list', {})).structuredContent, { items: [{ name: 'Alpha', artifactCount: 1 }, { name: 'Beta', artifactCount: 1 }] });
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_move', { requestId: 'mcp-project-clear', artifactId: alpha.artifactId, project: null })).structuredContent, { artifactId: alpha.artifactId, project: null });
+    assert.deepEqual(ids(((await mcp(app, tokens.access_token, 'artifacts_list', { project: 'beta' })).structuredContent as { items: { artifactId: string }[] }).items), [second.artifactId]);
+    assert.deepEqual(await (await call('/projects')).json(), { items: [{ name: 'Beta', artifactCount: 1 }] });
+
+    await error(await call(`/artifacts/${alpha.artifactId}/project`, 'PUT', { requestId: 'rest-project-mismatch', artifactId: second.artifactId, project: 'Gamma' }), 400, 'invalid_input');
+    await error(await call(`/artifacts/${alpha.artifactId}/project`, 'PUT', { requestId: 'rest-project-absent', artifactId: alpha.artifactId }), 400, 'invalid_input');
+    await error(await call(`/artifacts/${alpha.artifactId}/project`, 'PUT', { requestId: 'rest-project-control', artifactId: alpha.artifactId, project: 'bell\u0007' }), 400, 'invalid_input');
+    const wrongMethod = await call(`/artifacts/${alpha.artifactId}/project`);
+    await error(wrongMethod, 405, 'method_not_allowed');
+    assert.equal(wrongMethod.headers.get('allow'), 'PUT');
+    const wrongProjectsMethod = await call('/projects', 'POST', {});
+    await error(wrongProjectsMethod, 405, 'method_not_allowed');
+    assert.equal(wrongProjectsMethod.headers.get('allow'), 'GET');
+    await error(await call('/projects?limit=1'), 400, 'invalid_input');
+    await error(await call(`/artifacts?project=${'x'.repeat(81)}`), 400, 'invalid_input');
+    await error(await call('/projects/Beta'), 404, 'not_found');
+    const reader = api(app, (await grant(app)).access_token);
+    await error(await reader(`/artifacts/${alpha.artifactId}/project`, 'PUT', { requestId: 'rest-project-reader', artifactId: alpha.artifactId, project: 'Gamma' }), 403, 'forbidden');
+    assert.deepEqual(await (await reader('/projects')).json(), { items: [{ name: 'Beta', artifactCount: 1 }] });
+    await error(await api(app, (await grant(app, 'openid profile offline_access artifacts:write')).access_token)('/projects'), 403, 'forbidden');
+  } finally { await app.close(); }
+});
+
 test('two independent HTTP writers produce one head winner and one conflict without an extra revision', async () => {
   const app = await fixture({ transport: 'rest' });
   try {

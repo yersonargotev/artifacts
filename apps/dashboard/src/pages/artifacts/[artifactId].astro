@@ -9,9 +9,10 @@ import LibrarySidebar from '../../components/LibrarySidebar.astro';
 import Icon from '../../components/Icon.astro';
 if (!Astro.locals.identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
 const { config, artifacts } = await getRuntime();
-const result = await loadArtifactReview(artifacts, panelActor(Astro.locals.identity), Astro.params.artifactId, Astro.url.searchParams).catch((error: unknown) => artifactErrorResponse(error));
+const actor = panelActor(Astro.locals.identity);
+const result = await Promise.all([loadArtifactReview(artifacts, actor, Astro.params.artifactId, Astro.url.searchParams), artifacts.projects(actor)]).catch((error: unknown) => artifactErrorResponse(error));
 if (result instanceof Response) return result;
-const { artifact, history, head, published, compared, summary, comparison, revisions, before } = result;
+const [{ artifact, history, head, published, compared, summary, comparison, revisions, before }, projects] = result;
 const { revision, publication } = artifact;
 const revisionUrl = (revisionId: string, action = '', compareTo = compared?.id) => `/artifacts/${encodeURIComponent(artifact.artifactId)}${action}?${new URLSearchParams({ revisionId, ...(!action && compareTo && compareTo !== revisionId ? { compareTo } : {}) })}`;
 const command = { artifactId: artifact.artifactId, revisionId: revision.id, expectedPublicationVersion: publication?.version ?? 0, requestId: crypto.randomUUID() };
@@ -25,7 +26,7 @@ const fileLabels = { added: 'Agregado', removed: 'Eliminado', changed: 'Modifica
 const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 ---
 <Panel title={revision.snapshot.metadata.title} section="Tu artefacto" library detail>
-<LibrarySidebar slot="sidebar" identity={Astro.locals.identity} authUrl={config.auth} active={false} />
+<LibrarySidebar slot="sidebar" identity={Astro.locals.identity} authUrl={config.auth} projects={projects.items} project={artifact.project ?? undefined} active={false} />
 <header slot="header" class="artifact-toolbar">
   <a class="home-link" href="/" aria-label="Volver a tus artefactos"><Icon name="arrow-left" size={20} /></a>
   <h1><ArtifactTitleMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={[
@@ -36,6 +37,7 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
     { label: 'Historial', href: '#history', icon: 'history', group: 'sections' },
     { label: 'Tus artefactos', href: '/', icon: 'library', group: 'destinations' },
     ...(publication ? [{ label: 'Abrir publicación', href: publication.url, icon: 'publication' as const, group: 'destinations' as const }] : []),
+    { label: 'Mover a proyecto', href: `/artifacts/${encodeURIComponent(artifact.artifactId)}/move`, icon: 'move', group: 'artifact' },
   ]} client:load /></h1>
   <span class="toolbar-revision">Revisión {revision.sequence}</span>
   {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
@@ -59,7 +61,7 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
       <summary>Información</summary>
       <h2>Revisión {revision.sequence}</h2>
       {revision.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{selectedPublication && <span class="badge">Publicada</span>}
-      <dl><dt>Título</dt><dd>{revision.snapshot.metadata.title}</dd><dt>Descripción</dt><dd>{revision.snapshot.metadata.description}</dd>{revision.snapshot.metadata.custom !== undefined && <><dt>Metadatos personalizados</dt><dd><pre>{JSON.stringify(revision.snapshot.metadata.custom, null, 2)}</pre></dd></>}<dt>Artefacto</dt><dd>{artifact.artifactId}</dd><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{revision.authorClientId}</dd><dt>Creada</dt><dd>{date(revision.createdAt)} UTC</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl>
+      <dl><dt>Título</dt><dd>{revision.snapshot.metadata.title}</dd><dt>Descripción</dt><dd>{revision.snapshot.metadata.description}</dd>{revision.snapshot.metadata.custom !== undefined && <><dt>Metadatos personalizados</dt><dd><pre>{JSON.stringify(revision.snapshot.metadata.custom, null, 2)}</pre></dd></>}<dt>Artefacto</dt><dd>{artifact.artifactId}</dd><dt>Proyecto</dt><dd>{artifact.project ?? 'Sin proyecto'}</dd><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{revision.authorClientId}</dd><dt>Creada</dt><dd>{date(revision.createdAt)} UTC</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl>
       {publication && <><p>Versión {publication.version}. El enlace conserva la dirección cuando publicas otra revisión.</p><code>{publication.url}</code></>}
       <p>Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.</p>
     </details>

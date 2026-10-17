@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, publishSchema, readSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, moveSchema, publishSchema, readSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
 import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
@@ -48,7 +48,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
         const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
         const mutation = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
         server.registerTool('artifacts_create', {
-          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, or text and downloadable attachments. Limit 1 MiB decoded total and 32 files. Published HTML must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments. Optional response=compact omits content, custom metadata, and file data from the result.',
+          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, or text and downloadable attachments. Limit 1 MiB decoded total and 32 files. Published HTML must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments. Optional project files the artifact under a project name of up to 80 characters: an existing project with the same name in any letter case is reused with its stored spelling, otherwise the project is created. Optional response=compact omits content, custom metadata, and file data from the result.',
           inputSchema: createSchema, annotations: mutation,
         }, async (input) => execute(async () => {
           const result = await artifacts.create(principal, input);
@@ -77,9 +77,17 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           inputSchema: exportSchema, annotations: readOnly,
         }, async (input) => execute(() => artifacts.export(principal, input)));
         server.registerTool('artifacts_list', {
-          title: 'List artifacts', description: 'List owned artifacts in stable ID order with bounded cursor pagination.',
+          title: 'List artifacts', description: 'List owned artifacts in stable ID order with bounded cursor pagination. Each item includes its project name or null. Optional project returns only artifacts in that project, matched case-insensitively.',
           inputSchema: listSchema, annotations: readOnly,
         }, async (input) => execute(() => artifacts.list(principal, input)));
+        server.registerTool('artifacts_move', {
+          title: 'Move artifact to project', description: 'Set or clear the project of an owned artifact. A project name is reused case-insensitively with its stored spelling, or created; null removes the artifact from its project. A project disappears when its last artifact leaves. Moving never creates a revision and never changes the publication. Moving to the current project succeeds without change. Requires artifacts:write. Retry with the same requestId and arguments.',
+          inputSchema: moveSchema, annotations: mutation,
+        }, async (input) => execute(() => artifacts.move(principal, input)));
+        server.registerTool('projects_list', {
+          title: 'List projects', description: 'List the owner\'s projects with their artifact counts, ordered by name without regard to letter case. Projects exist only while they contain artifacts. Use artifacts_list with project to list a project\'s artifacts.',
+          inputSchema: z.object({}), annotations: readOnly,
+        }, async () => execute(() => artifacts.projects(principal)));
         server.registerTool('artifacts_history', {
           title: 'Read artifact history', description: 'Read retained revisions newest first with bounded beforeSequence pagination. Optional response=summary omits content, custom metadata, and file data from each revision.',
           inputSchema: historySchema, annotations: readOnly,

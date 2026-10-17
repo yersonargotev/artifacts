@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { createSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { createSchema, moveSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
@@ -31,9 +31,11 @@ Commands:
   login [--no-browser]
   logout
   whoami
-  create --snapshot FILE [--request-id ID] [--response full|compact]
+  create --snapshot FILE [--project NAME] [--request-id ID]
+         [--response full|compact]
   create --command FILE
-  list [--limit N] [--cursor CURSOR]
+  list [--limit N] [--cursor CURSOR] [--project NAME]
+  projects
   read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
   update ID --snapshot FILE --expected-revision REV [--request-id ID]
          [--response full|compact]
@@ -43,11 +45,16 @@ Commands:
   publish ID --revision REV --expected-version N [--request-id ID]
   publish [ID] --command FILE
   export ID --revision REV --out FILE
+  move ID --project NAME [--request-id ID]
+  move ID --no-project [--request-id ID]
   retry REQUEST_ID
 
 Mutation command files contain the complete create, update, or publish JSON.
 Mutation request IDs default to a random UUID. Commands are retained before
 submission. Retry sends the exact retained command for the same server and owner.
+Projects group artifacts by name without regard to letter case. A project
+exists while it contains an artifact. Move changes the project of an artifact
+without creating a revision; --no-project removes it from its project.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
@@ -65,12 +72,12 @@ class UsageError extends Error {}
 
 const commandOptions: Record<string, readonly string[]> = {
   login: ['no-browser'], logout: [], whoami: [],
-  create: ['snapshot', 'request-id', 'response', 'command'],
-  list: ['limit', 'cursor'], read: ['revision', 'response', 'out', 'quiet'],
+  create: ['snapshot', 'project', 'request-id', 'response', 'command'],
+  list: ['limit', 'cursor', 'project'], projects: [], read: ['revision', 'response', 'out', 'quiet'],
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
-  export: ['revision', 'out'], retry: [],
+  export: ['revision', 'out'], move: ['project', 'no-project', 'request-id'], retry: [],
   skills: ['full', 'all', 'agent', 'global', 'force'],
 };
 
@@ -107,6 +114,7 @@ async function main(): Promise<unknown> {
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
       full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
       global: { type: 'boolean' }, force: { type: 'boolean' },
+      project: { type: 'string' }, 'no-project': { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -162,7 +170,7 @@ async function main(): Promise<unknown> {
     process.stderr.write(`Retained operation ${operation.command.requestId}. Recover with artifacts retry ${operation.command.requestId} using the same server and state directory.\n`);
     return submitOperation(client, operation);
   }
-  async function commandFile(kind: Mutation['kind']): Promise<Mutation> {
+  async function commandFile(kind: 'create' | 'update' | 'publish'): Promise<Mutation> {
     const extra = [...seen].filter((option) => !['server', 'state-dir', 'command'].includes(option));
     if (extra.length) throw new UsageError('--command cannot be combined with mutation options');
     const value = await jsonFile(required('command'));
@@ -184,9 +192,10 @@ async function main(): Promise<unknown> {
     case 'create': {
       if (values.command) return mutate(await commandFile('create'));
       none();
-      return mutate({ kind: 'create', command: createSchema.parse({ requestId: values['request-id'] ?? randomUUID(), snapshot: await jsonFile(required('snapshot')), ...(response === undefined ? {} : { response }) }) });
+      return mutate({ kind: 'create', command: createSchema.parse({ requestId: values['request-id'] ?? randomUUID(), snapshot: await jsonFile(required('snapshot')), ...(values.project === undefined ? {} : { project: values.project }), ...(response === undefined ? {} : { response }) }) });
     }
-    case 'list': none(); return client.list({ ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values.cursor === undefined ? {} : { cursor: values.cursor }) });
+    case 'list': none(); return client.list({ ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values.cursor === undefined ? {} : { cursor: values.cursor }), ...(values.project === undefined ? {} : { project: values.project }) });
+    case 'projects': none(); return client.projects();
     case 'read': {
       const result = await client.read({ artifactId: argument()!, ...(values.revision === undefined ? {} : { revisionId: values.revision }), ...(response === undefined ? {} : { response }) });
       if (values.out) await writeOutput(values.out, `${JSON.stringify(result, null, 2)}\n`);
@@ -213,6 +222,11 @@ async function main(): Promise<unknown> {
       const archive = await client.export({ artifactId: argument()!, revisionId: required('revision') });
       await writeOutput(output, archive.bytes);
       return { filename: archive.filename, path: resolve(output), mediaType: archive.mediaType, sha256: archive.sha256, bytes: archive.bytes.byteLength };
+    }
+    case 'move': {
+      const artifactId = argument()!;
+      if ((values.project !== undefined) === (values['no-project'] ?? false)) throw new UsageError('Specify exactly one of --project NAME or --no-project');
+      return mutate({ kind: 'move', command: moveSchema.parse({ artifactId, requestId: values['request-id'] ?? randomUUID(), project: values.project ?? null }) });
     }
     case 'retry': {
       const requestId = argument()!;

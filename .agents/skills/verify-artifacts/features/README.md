@@ -8,7 +8,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - Run `pnpm build` before the first launch so the helper can start the built Astro panel. Complete builds while no verification instance is active.
 - Start a disposable instance with `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch`. Read the JSON output for its run path and service URLs. A new run owns its database, credentials, processes, and ephemeral ports.
 - Pass that same run path to `doctor`, `drive`, and `cleanup`. Require `doctor` to pass before driving. Never substitute the normal `.env`, an existing account, or a deployed service.
-- Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account; other drives create an artifact with the same fixed title.
+- Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account. Most other drives create an artifact with the same fixed title; `projects` creates three titled artifacts.
 - The feature files show explicit run paths for reproducibility. `launch --run` requires the path to be absent. Use a new path for subsequent runs; keep completed evidence.
 - The local authorization, panel, and publication hosts are deliberately distinct. Preserve the URLs from the run rather than replacing them with the normal development ports.
 - These disposable preconditions apply to the fixed `control.ts` drives. Existing retained artifacts use the separate [retained recipe](./retained.md) with an independent saved read. It supports partial browser-control inspection or complete verification with a supplied authenticated context. That verifier has no disposable setup or mutation phase.
@@ -40,6 +40,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - [Identity and sessions](./identity.md): `identity` covers panel login, canonical identity, panel logout, central SSO, and global revocation.
 - [Authoring and publication selection](./authoring.md): `authoring` covers real MCP creation, retained updates, retries/conflicts, reads, and publication selection.
 - [Standalone CLI over REST](./cli.md): `cli` drives the source `artifacts` CLI through whoami, create, edit, stale update, history, publish and export against the local REST resource.
+- [Projects](./projects.md): `projects` creates artifacts in projects through MCP, moves one with the source CLI, moves another into and out of a project from the panel, and browses the panel's `Proyectos` sidebar at desktop and 390px.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.

@@ -22,7 +22,7 @@ const revision: Revision = {
   id: 'revision-one', parentRevisionId: null, sequence: 1, authorUserId: 'owner', authorClientId: 'client',
   createdAt: '2026-10-10T00:00:00.000Z', sha256: 'a'.repeat(64), snapshot,
 };
-const document: ArtifactRead = { artifactId: 'artifact-one', ownerId: 'owner', headRevisionId: revision.id, publication: null, revision };
+const document: ArtifactRead = { artifactId: 'artifact-one', ownerId: 'owner', headRevisionId: revision.id, project: null, publication: null, revision };
 const binarySummary = { path: 'bytes.bin', mediaType: 'application/octet-stream', encoding: 'base64' as const, decodedBytes: 4, sha256: 'c5dbae22661af6db18a1f676db82a7ef7de46d27c3a263a872f00478b0d99fc4' };
 const textSummary = { path: 'notes/hello.txt', mediaType: 'text/plain', encoding: 'utf8' as const, decodedBytes: 5, sha256: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824' };
 
@@ -43,7 +43,7 @@ test('compact summaries retain identity and decoded attachment digests without p
     content: { kind: 'html', utf8Bytes: 37 }, files: [binarySummary, textSummary],
   });
   const compact = await compactArtifactRead(document);
-  assert.deepEqual(compact, { artifactId: 'artifact-one', ownerId: 'owner', headRevisionId: 'revision-one', publication: null, revision: summary });
+  assert.deepEqual(compact, { artifactId: 'artifact-one', ownerId: 'owner', headRevisionId: 'revision-one', project: null, publication: null, revision: summary });
   assert.doesNotMatch(JSON.stringify(compact), /private-content-payload|private-custom-payload|AAH\+\/w==|"data"|"snapshot"/);
 });
 
@@ -183,19 +183,19 @@ test('literal legacy create and update receipt hashes replay after response mode
   const app = await workflowFixture();
   try {
     const legacySnapshot: Snapshot = { metadata: { title: 'Legacy', description: '' }, content: { kind: 'text', text: 'Legacy payload' }, files: [] };
-    const legacyResult: ArtifactRead = {
+    const legacyResult: Omit<ArtifactRead, 'project'> = {
       artifactId: 'legacy-artifact', ownerId: app.ownerId, headRevisionId: 'legacy-revision-one', publication: null,
       revision: { id: 'legacy-revision-one', parentRevisionId: null, sequence: 1, authorUserId: app.ownerId, authorClientId: 'legacy-client', createdAt: '2026-01-01T00:00:00.000Z', sha256: '1'.repeat(64), snapshot: legacySnapshot },
     };
-    const updatedResult: ArtifactRead = { ...legacyResult, headRevisionId: 'legacy-revision-two', revision: { ...legacyResult.revision, id: 'legacy-revision-two', parentRevisionId: 'legacy-revision-one', sequence: 2 } };
+    const updatedResult: Omit<ArtifactRead, 'project'> = { ...legacyResult, headRevisionId: 'legacy-revision-two', revision: { ...legacyResult.revision, id: 'legacy-revision-two', parentRevisionId: 'legacy-revision-one', sequence: 2 } };
     await app.db.insert(artifactCommand).values([
       { ownerId: app.ownerId, requestId: 'legacy-create-request', payloadHash: 'cf00e97db6e580c4143fb3df098d97f68dfb7ba83657833203b9a2a74c53cf5b', result: JSON.stringify(legacyResult), createdAt: new Date('2026-01-01T00:00:00.000Z') },
       { ownerId: app.ownerId, requestId: 'legacy-update-request', payloadHash: '744a6c846f7753b74a479baf0ad651898c598447c6d29369baad007c70f83e2d', result: JSON.stringify(updatedResult), createdAt: new Date('2026-01-01T00:00:00.000Z') },
     ]);
     const create = { requestId: 'legacy-create-request', snapshot: legacySnapshot };
     const update = { requestId: 'legacy-update-request', artifactId: 'legacy-artifact', expectedRevisionId: 'legacy-revision-one', snapshot: legacySnapshot };
-    assert.deepEqual(await app.store.create(app.actor, create), legacyResult);
-    assert.deepEqual(await app.store.update(app.actor, update), updatedResult);
+    assert.deepEqual(await app.store.create(app.actor, create), { ...legacyResult, project: null });
+    assert.deepEqual(await app.store.update(app.actor, update), { ...updatedResult, project: null });
     for (const response of ['full', 'compact'] as const) {
       await assert.rejects(app.store.create(app.actor, { ...create, response }), { code: 'request_conflict' });
       await assert.rejects(app.store.update(app.actor, { ...update, response }), { code: 'request_conflict' });

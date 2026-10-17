@@ -3,7 +3,7 @@ import { lstat, mkdir, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { createSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { createSchema, moveSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import type { ArtifactHttpClient } from '@yargote/artifacts-client';
 
@@ -17,12 +17,14 @@ export const operationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...binding, kind: z.literal('create'), command: createSchema }),
   z.strictObject({ ...binding, kind: z.literal('update'), command: updateSchema }),
   z.strictObject({ ...binding, kind: z.literal('publish'), command: publishSchema }),
+  z.strictObject({ ...binding, kind: z.literal('move'), command: moveSchema }),
 ]);
 export type PreparedOperation = z.infer<typeof operationSchema>;
 export type Mutation =
   | { kind: 'create'; command: z.input<typeof createSchema> }
   | { kind: 'update'; command: z.input<typeof updateSchema> }
-  | { kind: 'publish'; command: z.input<typeof publishSchema> };
+  | { kind: 'publish'; command: z.input<typeof publishSchema> }
+  | { kind: 'move'; command: z.input<typeof moveSchema> };
 
 export function operationPath(stateDir: string, resource: string, requestId: string): string {
   createSchema.shape.requestId.parse(requestId);
@@ -85,5 +87,6 @@ export function submitOperation(client: ArtifactHttpClient, operation: PreparedO
     case 'create': return client.create(operation.command);
     case 'update': return client.update(operation.command);
     case 'publish': return client.publish(operation.command);
+    case 'move': return client.move(operation.command);
   }
 }

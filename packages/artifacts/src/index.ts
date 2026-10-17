@@ -3,13 +3,15 @@ import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, libraryQuerySchema, listSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactLibraryPage, type ArtifactRead, type ArtifactSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, libraryQuerySchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactLibraryPage, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 
 export * from './contracts.ts';
 
 type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 const deletedReceiptSchema = z.strictObject({ kind: z.literal('artifact_deleted'), artifactId: z.string().min(1).max(128) });
+// Receipts committed before projects existed omit the field; those artifacts had no project.
+const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null) });
 
 type RevisionRow = typeof artifactRevision.$inferSelect;
 
@@ -27,6 +29,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
   const callback = `${origin}/callback`;
   const urlFor = (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}`;
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
+  const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
 
   async function liveSession(connection: Connection, userId: string, sessionId: string) {
     const [found] = await connection.select().from(session).where(and(eq(session.id, sessionId), eq(session.userId, userId), gt(session.expiresAt, new Date()))).limit(1);
@@ -50,7 +53,18 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     const [row] = await connection.select().from(artifactRevision).where(and(eq(artifactRevision.artifactId, artifactId), eq(artifactRevision.id, revisionId ?? found.headRevisionId))).limit(1);
     if (!row) throw new ArtifactError('not_found', 'Revision not found');
     const [selected] = await connection.select().from(artifactPublication).where(eq(artifactPublication.artifactId, artifactId)).limit(1);
-    return { artifactId, ownerId, headRevisionId: found.headRevisionId, publication: publication(artifactId, selected), revision: revision(row) };
+    return { artifactId, ownerId, headRevisionId: found.headRevisionId, project: found.project, publication: publication(artifactId, selected), revision: revision(row) };
+  }
+
+  async function ownedProjects(connection: Connection, ownerId: string): Promise<ProjectSummary[]> {
+    const rows = await connection.select({ name: sql<string>`${artifact.project}`, artifactCount: count() }).from(artifact).where(and(eq(artifact.ownerId, ownerId), isNotNull(artifact.project))).groupBy(artifact.project);
+    return rows.sort((left, right) => left.name.localeCompare(right.name, 'en') || (left.name < right.name ? -1 : 1));
+  }
+
+  // SQLite lower() folds only ASCII, so case-insensitive matching happens here against the owner's few distinct names.
+  async function projectSpelling(connection: Connection, ownerId: string, name: string): Promise<string> {
+    const key = name.toLowerCase();
+    return (await ownedProjects(connection, ownerId)).find((project) => project.name.toLowerCase() === key)?.name ?? name;
   }
 
   async function transaction<T>(work: (connection: Connection) => Promise<T>): Promise<T> {
@@ -85,11 +99,12 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const input = createSchema.parse(value);
       const snapshot = canonicalJson(input.snapshot);
       const digest = await sha256(snapshot);
-      return command(actor, 'artifacts:write', 'create', input, artifactReadSchema, async (connection) => {
+      return command(actor, 'artifacts:write', 'create', input, artifactReceiptSchema, async (connection) => {
         const artifactId = crypto.randomUUID();
         const revisionId = crypto.randomUUID();
         const createdAt = new Date();
-        await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt });
+        const project = input.project === undefined ? null : await projectSpelling(connection, actor.userId, input.project);
+        await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt, project });
         await connection.insert(artifactRevision).values({ id: revisionId, artifactId, parentRevisionId: null, sequence: 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt, sha256: digest, snapshot });
         return readOwned(connection, actor.userId, artifactId);
       });
@@ -107,7 +122,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const input = updateSchema.parse(value);
       const snapshot = canonicalJson(input.snapshot);
       const digest = await sha256(snapshot);
-      return command(actor, 'artifacts:write', 'update', input, artifactReadSchema, async (connection) => {
+      return command(actor, 'artifacts:write', 'update', input, artifactReceiptSchema, async (connection) => {
         const current = await readOwned(connection, actor.userId, input.artifactId);
         if (current.headRevisionId !== input.expectedRevisionId) throw new ArtifactError('conflict', 'Artifact head changed', { currentRevisionId: current.headRevisionId });
         const revisionId = crypto.randomUUID();
@@ -150,15 +165,33 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       });
     },
 
+    async move(actor: Actor, value: z.input<typeof moveSchema>): Promise<MoveResult> {
+      const input = moveSchema.parse(value);
+      return command(actor, 'artifacts:write', 'move', input, moveResultSchema, async (connection) => {
+        await owned(connection, actor.userId, input.artifactId);
+        const project = input.project === null ? null : await projectSpelling(connection, actor.userId, input.project);
+        await connection.update(artifact).set({ project }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId)));
+        return { artifactId: input.artifactId, project };
+      });
+    },
+
+    async projects(actor: Actor): Promise<{ items: ProjectSummary[] }> {
+      return transaction(async (connection) => {
+        await authorize(connection, actor, 'artifacts:read');
+        return { items: await ownedProjects(connection, actor.userId) };
+      });
+    },
+
     async list(actor: Actor, value: z.input<typeof listSchema> = {}): Promise<{ items: ArtifactSummary[]; nextCursor: string | null }> {
       const input = listSchema.parse(value);
       return transaction(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
+        const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
         const rows = await connection.select({ artifact, title: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String), publication: artifactPublication }).from(artifact)
           .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
           .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
-          .where(and(eq(artifact.ownerId, actor.userId), input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(input.limit + 1);
-        const items = rows.slice(0, input.limit).map((row) => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), publication: publication(row.artifact.id, row.publication ?? undefined) }));
+          .where(and(eq(artifact.ownerId, actor.userId), project, input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(input.limit + 1);
+        const items = rows.slice(0, input.limit).map(summary);
         return { items, nextCursor: rows.length > input.limit ? items.at(-1)?.artifactId ?? null : null };
       });
     },
@@ -173,9 +206,10 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         unpublished: isNull(artifactPublication.artifactId),
         pending: and(isNotNull(artifactPublication.artifactId), ne(artifactPublication.revisionId, artifact.headRevisionId)),
       };
-      const matching = and(eq(artifact.ownerId, actor.userId), input.q ? or(sql`instr(lower(${title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
       return transaction(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
+        const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
+        const matching = and(eq(artifact.ownerId, actor.userId), project, input.q ? or(sql`instr(lower(${title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
         const rows = await connection.select({ artifact, title, publication: artifactPublication }).from(artifact)
           .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
           .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
@@ -188,7 +222,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         }).from(artifact)
           .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
           .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id)).where(matching);
-        const items = rows.slice(0, limit).map((row) => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), publication: publication(row.artifact.id, row.publication ?? undefined) }));
+        const items = rows.slice(0, limit).map(summary);
         return { items, nextCursor: rows.length > limit ? items.at(-1)?.artifactId ?? null : null, counts };
       });
     },

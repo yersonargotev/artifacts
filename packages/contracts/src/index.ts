@@ -22,8 +22,9 @@ export const snapshotSchema = z.strictObject({
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
 });
 
+export const projectNameSchema = z.string().normalize('NFC').trim().min(1).max(80).refine((name) => name.isWellFormed() && !/\p{Cc}/u.test(name), 'Use a project name without control characters');
 const response = z.enum(['full', 'compact']).optional();
-export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, response });
+export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, project: projectNameSchema.optional(), response });
 export const readSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
 export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema, response });
 export const publishSchema = z.strictObject({ requestId, artifactId: identifier, revisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
@@ -31,11 +32,15 @@ export const deleteSchema = z.strictObject({ requestId, artifactId: identifier, 
 export const deleteResultSchema = z.strictObject({ artifactId: identifier });
 export type DeleteInput = z.infer<typeof deleteSchema>;
 export type DeleteResult = z.infer<typeof deleteResultSchema>;
+export const moveSchema = z.strictObject({ requestId, artifactId: identifier, project: projectNameSchema.nullable() });
+export const moveResultSchema = z.strictObject({ artifactId: identifier, project: z.string().nullable() });
+export type MoveResult = z.infer<typeof moveResultSchema>;
 export const exportSchema = z.strictObject({ artifactId: identifier, revisionId: identifier });
-export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional() });
+export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional(), project: projectNameSchema.optional() });
 export const libraryQuerySchema = z.strictObject({
   q: z.string().trim().max(256).default(''),
   status: z.enum(['all', 'published', 'unpublished', 'pending']).default('all'),
+  project: projectNameSchema.optional(),
   cursor: identifier.optional(),
 });
 export const historySchema = z.strictObject({ artifactId: identifier, limit: z.number().int().min(1).max(10).default(5), beforeSequence: z.number().int().positive().optional(), response: z.enum(['full', 'summary']).optional() });
@@ -61,7 +66,8 @@ export type Viewer = z.infer<typeof viewerSchema>;
 export type Publication = z.infer<typeof publicationSchema>;
 export type Revision = z.infer<typeof revisionSchema>;
 export type ArtifactRead = z.infer<typeof artifactReadSchema>;
-export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; publication: Publication | null };
+export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; project: string | null; publication: Publication | null };
+export type ProjectSummary = { name: string; artifactCount: number };
 export type ArtifactLibraryQuery = z.infer<typeof libraryQuerySchema>;
 export type ArtifactLibraryPage = {
   items: ArtifactSummary[];
@@ -86,5 +92,5 @@ export function decodeFile(file: { encoding: 'utf8' | 'base64'; data: string }):
 
 export const publicationSchema = z.strictObject({ revisionId: identifier, version: z.number().int().positive(), url: z.url() });
 export const revisionSchema = z.strictObject({ id: identifier, parentRevisionId: identifier.nullable(), sequence: z.number().int().positive(), authorUserId: identifier, authorClientId: identifier, createdAt: z.iso.datetime(), sha256: z.string().regex(/^[a-f0-9]{64}$/), snapshot: snapshotSchema });
-export const artifactReadSchema = z.strictObject({ artifactId: identifier, ownerId: identifier, headRevisionId: identifier, publication: publicationSchema.nullable(), revision: revisionSchema });
+export const artifactReadSchema = z.strictObject({ artifactId: identifier, ownerId: identifier, headRevisionId: identifier, project: z.string().nullable(), publication: publicationSchema.nullable(), revision: revisionSchema });
 export const publishResultSchema = publicationSchema.extend({ artifactId: identifier });

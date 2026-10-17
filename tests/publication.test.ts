@@ -9,7 +9,7 @@ import { publicationServiceAuthorized } from '../apps/dashboard/src/publication.
 const publish = 'https://publication.example.test';
 const dashboard = 'https://panel.example.test';
 const artifact: ArtifactRead = {
-  artifactId: 'artifact-a', ownerId: 'owner-a', headRevisionId: 'revision-1', publication: { revisionId: 'revision-1', version: 1, url: `${publish}/a/artifact-a` },
+  artifactId: 'artifact-a', ownerId: 'owner-a', headRevisionId: 'revision-1', project: null, publication: { revisionId: 'revision-1', version: 1, url: `${publish}/a/artifact-a` },
   revision: { id: 'revision-1', parentRevisionId: null, sequence: 1, authorUserId: 'owner-a', authorClientId: 'client-a', createdAt: '2026-01-01T00:00:00Z', sha256: 'a'.repeat(64), snapshot: { metadata: { title: 'Protected document', description: 'A retained document' }, content: { kind: 'html', text: '<h1>Protected bytes</h1><script>window.secret = 1</script>' }, files: [{ path: 'nested/file.html', mediaType: 'text/html', encoding: 'base64', data: 'AAH/PGgxPkF0dGFjaG1lbnQ8L2gxPg==' }] } },
 };
 

@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.3
+npm install --global @yargote/artifacts-cli@0.1.0-beta.4
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.3
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.4
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.3 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.3 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.4 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.4 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
@@ -108,9 +108,11 @@ The private `credentials.sqlite` file stores credentials. The separate `credenti
 artifacts login [--no-browser]
 artifacts logout
 artifacts whoami
-artifacts create --snapshot FILE [--request-id ID] [--response full|compact]
+artifacts create --snapshot FILE [--project NAME] [--request-id ID]
+                 [--response full|compact]
 artifacts create --command FILE
-artifacts list [--limit N] [--cursor CURSOR]
+artifacts list [--limit N] [--cursor CURSOR] [--project NAME]
+artifacts projects
 artifacts read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
 artifacts update ID --snapshot FILE --expected-revision REV [--request-id ID]
                  [--response full|compact]
@@ -120,6 +122,8 @@ artifacts history ID [--limit N] [--before-sequence N] [--summary]
 artifacts publish ID --revision REV --expected-version N [--request-id ID]
 artifacts publish [ID] --command FILE
 artifacts export ID --revision REV --out FILE
+artifacts move ID --project NAME [--request-id ID]
+artifacts move ID --no-project [--request-id ID]
 artifacts retry REQUEST_ID
 artifacts skills [list]
 artifacts skills get NAME [--full]
@@ -174,6 +178,24 @@ Check installed help for `--quiet` support. Version `0.1.0-beta.1` predates this
 A default full read contains the complete snapshot under `revision.snapshot`. `export --out FILE` saves the exact ZIP and prints its filename, local path, media type, SHA-256, and byte count. Output files use exclusive creation and never overwrite an existing path.
 
 History defaults to complete revisions. `--summary` returns revision metadata and attachment summaries. `--before-sequence` continues a page. `list --cursor` continues an artifact list.
+
+## Projects
+
+A project groups artifacts by name. `create --snapshot FILE --project NAME` files the new artifact under that project. A name that matches an existing project regardless of letter case reuses its stored spelling, so `--project alpha` joins `Alpha`. Names are trimmed and NFC-normalized, contain 1 to 80 characters, and cannot contain control characters. A complete create command file can include the same optional `project` field.
+
+```sh
+artifacts create --snapshot snapshot.json --project Alpha
+artifacts list --project alpha
+artifacts projects
+artifacts move ARTIFACT_ID --project Beta
+artifacts move ARTIFACT_ID --no-project
+```
+
+Every artifact read and list item includes `project`, a name or null. `projects` prints `{ "items": [{ "name": "Alpha", "artifactCount": 1 }] }`, ordered by name without regard to letter case. A project exists only while it contains an artifact.
+
+`move ID` requires exactly one of `--project NAME` or `--no-project`. It prints `{ "artifactId": "...", "project": "Beta" }` with the stored spelling, or `null` after `--no-project`. Move never creates a revision or changes the publication. Moving to the current project succeeds without change. Move is a retained mutation like the others, so `retry` recovers a lost response.
+
+Version `0.1.0-beta.4` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
 
 ## Complete commands and edits
 

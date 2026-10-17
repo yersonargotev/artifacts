@@ -14,7 +14,7 @@ collector.bind(0, '127.0.0.1');
 await once(collector, 'listening');
 const port = collector.address().port;
 const artifact: ArtifactRead = {
-  artifactId: 'network-proof', ownerId: 'disposable-owner', headRevisionId: 'revision-one',
+  artifactId: 'network-proof', ownerId: 'disposable-owner', headRevisionId: 'revision-one', project: null,
   publication: { revisionId: 'revision-one', version: 1, url: 'https://publication.example.test/a/network-proof' },
   revision: { id: 'revision-one', parentRevisionId: null, sequence: 1, authorUserId: 'disposable-owner', authorClientId: 'disposable-client', createdAt: '2026-01-01T00:00:00Z', sha256: 'a'.repeat(64), snapshot: {
     metadata: { title: 'Network containment proof', description: 'Disposable browser fixture' }, files: [],

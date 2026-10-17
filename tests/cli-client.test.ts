@@ -97,6 +97,26 @@ test('typed client uses real REST for full commands, projections, conflicts, edi
   } finally { await app.close(); }
 });
 
+test('typed client files, filters, lists, and moves projects over real REST', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const alpha = await client.create({ requestId: 'client-project-alpha', snapshot, project: 'Alpha' });
+    const second = await client.create({ requestId: 'client-project-second', snapshot, project: 'alpha' });
+    assert.deepEqual([alpha.project, second.project], ['Alpha', 'Alpha']);
+    assert.deepEqual(await client.projects(), { items: [{ name: 'Alpha', artifactCount: 2 }] });
+    const move = { requestId: 'client-project-move', artifactId: second.artifactId, project: 'Beta' };
+    assert.deepEqual(await client.move(move), { artifactId: second.artifactId, project: 'Beta' });
+    assert.deepEqual(await client.move(move), { artifactId: second.artifactId, project: 'Beta' });
+    await assert.rejects(client.move({ ...move, project: null }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'request_conflict');
+    assert.deepEqual((await client.list({ project: 'BETA' })).items.map((item) => [item.artifactId, item.project]), [[second.artifactId, 'Beta']]);
+    assert.equal((await client.read({ artifactId: second.artifactId })).headRevisionId, second.headRevisionId);
+    assert.deepEqual(await client.move({ requestId: 'client-project-clear', artifactId: alpha.artifactId, project: null }), { artifactId: alpha.artifactId, project: null });
+    assert.deepEqual(await client.projects(), { items: [{ name: 'Beta', artifactCount: 1 }] });
+  } finally { await app.close(); }
+});
+
 test('typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry', async () => {
   const app = await fixture({ transport: 'rest' });
   try {
@@ -188,6 +208,45 @@ test('CLI subprocesses retain exact operations and recover lost create, update, 
     const operations = await readdir(join(environment.ARTIFACTS_STATE_DIR, 'operations'));
     assert.equal(operations.length, 3);
     assert.equal((await stat(join(environment.ARTIFACTS_STATE_DIR, 'operations', operations[0]))).mode & 0o777, 0o600);
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI files, lists, and moves projects, and retries a lost move from its retained operation', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-projects-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const snapshotFile = join(directory, 'snapshot.json');
+    await writeFile(snapshotFile, JSON.stringify(snapshot));
+    const alpha = success(await cli(['create', '--snapshot', snapshotFile, '--project', 'Alpha'], environment)) as ArtifactRead;
+    const second = success(await cli(['create', '--snapshot', snapshotFile, '--project', ' alpha '], environment)) as ArtifactRead;
+    assert.deepEqual([alpha.project, second.project], ['Alpha', 'Alpha']);
+    assert.deepEqual(success(await cli(['projects'], environment)), { items: [{ name: 'Alpha', artifactCount: 2 }] });
+
+    app.dropNextResourceResponse('PUT');
+    failure(await cli(['move', second.artifactId, '--project', 'Beta', '--request-id', 'cli-lost-move'], environment), 'network_error');
+    const retained = JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-lost-move'), 'utf8'));
+    assert.deepEqual(retained, { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'move', command: { requestId: 'cli-lost-move', artifactId: second.artifactId, project: 'Beta' } });
+    const replay = await cli(['retry', 'cli-lost-move'], environment);
+    assert.deepEqual(success(replay), { artifactId: second.artifactId, project: 'Beta' });
+    assert.match(replay.stderr, /Replaying retained move operation cli-lost-move/);
+    assert.deepEqual(success(await cli(['list', '--project', 'BETA'], environment)).items.map((item: { artifactId: string; project: string }) => [item.artifactId, item.project]), [[second.artifactId, 'Beta']]);
+    assert.deepEqual(success(await cli(['projects'], environment)), { items: [{ name: 'Alpha', artifactCount: 1 }, { name: 'Beta', artifactCount: 1 }] });
+    const moved = success(await cli(['read', second.artifactId], environment)) as ArtifactRead;
+    assert.equal(moved.project, 'Beta');
+    assert.equal(moved.headRevisionId, second.headRevisionId);
+    assert.deepEqual(success(await cli(['move', alpha.artifactId, '--no-project'], environment)), { artifactId: alpha.artifactId, project: null });
+    assert.deepEqual(success(await cli(['projects'], environment)), { items: [{ name: 'Beta', artifactCount: 1 }] });
+
+    for (const args of [['move', alpha.artifactId], ['move', alpha.artifactId, '--project', 'Gamma', '--no-project']]) {
+      assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'Specify exactly one of --project NAME or --no-project');
+    }
+    assert.equal(failure(await cli(['move', '--project', 'Gamma'], environment), 'invalid_arguments').message, 'move requires one positional argument');
+    assert.equal(failure(await cli(['projects', 'Beta'], environment), 'invalid_arguments').message, 'projects does not accept positional arguments');
+    assert.equal(failure(await cli(['list', '--no-project'], environment), 'invalid_arguments').message, 'Option --no-project is not supported by list');
+    failure(await cli(['move', alpha.artifactId, '--project', 'bell\u0007'], environment), 'invalid_input');
+    assert.deepEqual(success(await cli(['projects'], environment)), { items: [{ name: 'Beta', artifactCount: 1 }] });
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -347,6 +406,8 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.equal(help.code, 0);
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
   assert.match(help.stdout, /retry REQUEST_ID/);
+  assert.match(help.stdout, /\n  projects\n/);
+  assert.match(help.stdout, /move ID --project NAME \[--request-id ID\]\n  move ID --no-project \[--request-id ID\]/);
   assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);
   assert.equal(failure(await cli(['whoami']), 'invalid_arguments').message, 'Specify --server RESOURCE or ARTIFACTS_SERVER. No production server is selected by default.');
   failure(await cli(['create', '--snapshot', 'missing', '--server', 'https://example.test/mcp', '--server', 'https://other.test/mcp']), 'invalid_arguments');

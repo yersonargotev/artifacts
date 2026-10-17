@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, publishResultSchema, publishSchema, readSchema, updateSchema, type ArtifactRead, type UpdateInput } from '@yargote/artifacts-contracts';
-import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, updateSchema, type ArtifactRead, type UpdateInput } from '@yargote/artifacts-contracts';
+import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
 export type { ArtifactRead, Snapshot, UpdateInput } from '@yargote/artifacts-contracts';
@@ -12,6 +12,9 @@ export type CreateInput = z.input<typeof createSchema>;
 export type ReadInput = z.input<typeof readSchema>;
 export type PublishInput = z.input<typeof publishSchema>;
 export type ListInput = z.input<typeof listSchema>;
+export type MoveInput = z.input<typeof moveSchema>;
+export type MoveResult = z.infer<typeof moveResultSchema>;
+export type ProjectsResult = z.infer<typeof projectsResultSchema>;
 export type HistoryInput = z.input<typeof historySchema>;
 export type ExportInput = z.input<typeof exportSchema>;
 export type ArtifactArchive = { filename: string; mediaType: 'application/zip'; bytes: Uint8Array; sha256: string };
@@ -38,6 +41,7 @@ export interface ArtifactHttpClient {
   create(input: CreateInput & { response?: 'full' }): Promise<ArtifactRead>;
   create(input: CreateInput): Promise<ArtifactRead | CompactArtifactRead>;
   list(input?: ListInput): Promise<z.infer<typeof listResultSchema>>;
+  projects(): Promise<ProjectsResult>;
   read(input: ReadInput & { response: 'compact' }): Promise<CompactArtifactRead>;
   read(input: ReadInput & { response?: 'full' }): Promise<ArtifactRead>;
   read(input: ReadInput): Promise<ArtifactRead | CompactArtifactRead>;
@@ -48,6 +52,7 @@ export interface ArtifactHttpClient {
   history(input: HistoryInput & { response?: 'full' }): Promise<HistoryResult>;
   history(input: HistoryInput): Promise<HistoryResult | SummaryHistoryResult>;
   publish(input: PublishInput): Promise<z.infer<typeof publishResultSchema>>;
+  move(input: MoveInput): Promise<MoveResult>;
   export(input: ExportInput): Promise<ArtifactArchive>;
 }
 
@@ -167,6 +172,7 @@ export function createArtifactHttpClient(options: {
     list(value: ListInput = {}) {
       return json(`/artifacts${query(listSchema.parse(value))}`, 'GET', listResultSchema);
     },
+    projects: () => json('/projects', 'GET', projectsResultSchema),
     read(value: ReadInput) {
       const { artifactId, ...parameters } = readSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(artifactId)}${query(parameters)}`, 'GET', parameters.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema);
@@ -182,6 +188,10 @@ export function createArtifactHttpClient(options: {
     publish(value: PublishInput) {
       const input = publishSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(input.artifactId)}/publication`, 'PUT', publishResultSchema, input);
+    },
+    move(value: MoveInput) {
+      const input = moveSchema.parse(value);
+      return json(`/artifacts/${encodeURIComponent(input.artifactId)}/project`, 'PUT', moveResultSchema, input);
     },
     export(value: ExportInput) {
       const input = exportSchema.parse(value);
