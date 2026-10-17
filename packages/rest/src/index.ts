@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, publishSchema, readSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, moveSchema, publishSchema, readSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
@@ -79,14 +79,16 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       catch { return failure(400, 'invalid_input', 'Malformed route identifier'); }
       const [collection, artifactId, section, revisionId, action] = segments;
       const route = collection === 'identity' && segments.length === 1 ? 'identity'
+        : collection === 'projects' && segments.length === 1 ? 'projects'
         : collection !== 'artifacts' ? null
         : segments.length === 1 ? 'collection'
         : segments.length === 2 && artifactId ? 'artifact'
         : segments.length === 3 && artifactId && section === 'history' ? 'history'
         : segments.length === 3 && artifactId && section === 'publication' ? 'publication'
+        : segments.length === 3 && artifactId && section === 'project' ? 'project'
         : segments.length === 5 && artifactId && section === 'revisions' && revisionId && action === 'export' ? 'export' : null;
       if (!route) return failure(404, 'not_found', 'Route not found');
-      const allowed = route === 'collection' ? ['GET', 'POST'] : route === 'artifact' ? ['GET', 'PUT'] : route === 'publication' ? ['PUT'] : ['GET'];
+      const allowed = route === 'collection' ? ['GET', 'POST'] : route === 'artifact' ? ['GET', 'PUT'] : route === 'publication' || route === 'project' ? ['PUT'] : ['GET'];
       if (!allowed.includes(request.method)) return failure(405, 'method_not_allowed', 'Unsupported method', {}, { allow: allowed.join(', ') });
       const scope = route === 'publication' ? 'artifacts:publish' : request.method === 'PUT' || request.method === 'POST' ? 'artifacts:write' : 'artifacts:read';
       const decision = await authorize(request, [scope]);
@@ -100,7 +102,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       const actor = decision.principal;
       const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
       if (route === 'identity') { query(url, []); return json({ userId: actor.userId, sessionId: actor.sessionId, clientId: actor.clientId, scopes: actor.scopes }); }
-      if (route === 'collection' && request.method === 'GET') return json(await artifacts.list(actor, listSchema.parse(query(url, ['limit', 'cursor'], ['limit']))));
+      if (route === 'collection' && request.method === 'GET') return json(await artifacts.list(actor, listSchema.parse(query(url, ['limit', 'cursor', 'project'], ['limit']))));
       if (route === 'artifact' && request.method === 'GET') {
         const input = readSchema.parse({ artifactId, ...query(url, ['revisionId', 'response']) });
         const result = await artifacts.read(actor, input);
@@ -112,6 +114,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         return json(input.response === 'summary' ? { ...result, items: await Promise.all(result.items.map(summarizeRevision)) } : result);
       }
       query(url, []);
+      if (route === 'projects') return json(await artifacts.projects(actor));
       if (route === 'export') {
         const result = await artifacts.export(actor, exportSchema.parse({ artifactId, revisionId }));
         return new Response(Buffer.from(result.base64, 'base64'), { headers: { 'cache-control': 'no-store', 'content-type': result.mediaType, 'content-disposition': `attachment; filename="${result.filename}"`, 'x-artifact-sha256': result.sha256, 'x-content-type-options': 'nosniff' } });
@@ -126,6 +129,11 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');
         const result = await artifacts.update(actor, input);
         return json(input.response === 'compact' ? await compactArtifactRead(result) : result);
+      }
+      if (route === 'project') {
+        const input = moveSchema.parse(await body(request));
+        if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');
+        return json(await artifacts.move(actor, input));
       }
       const input = publishSchema.parse(await body(request));
       if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');

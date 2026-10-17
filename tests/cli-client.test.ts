@@ -97,6 +97,26 @@ test('typed client uses real REST for full commands, projections, conflicts, edi
   } finally { await app.close(); }
 });
 
+test('typed client files, filters, lists, and moves projects over real REST', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const alpha = await client.create({ requestId: 'client-project-alpha', snapshot, project: 'Alpha' });
+    const second = await client.create({ requestId: 'client-project-second', snapshot, project: 'alpha' });
+    assert.deepEqual([alpha.project, second.project], ['Alpha', 'Alpha']);
+    assert.deepEqual(await client.projects(), { items: [{ name: 'Alpha', artifactCount: 2 }] });
+    const move = { requestId: 'client-project-move', artifactId: second.artifactId, project: 'Beta' };
+    assert.deepEqual(await client.move(move), { artifactId: second.artifactId, project: 'Beta' });
+    assert.deepEqual(await client.move(move), { artifactId: second.artifactId, project: 'Beta' });
+    await assert.rejects(client.move({ ...move, project: null }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'request_conflict');
+    assert.deepEqual((await client.list({ project: 'BETA' })).items.map((item) => [item.artifactId, item.project]), [[second.artifactId, 'Beta']]);
+    assert.equal((await client.read({ artifactId: second.artifactId })).headRevisionId, second.headRevisionId);
+    assert.deepEqual(await client.move({ requestId: 'client-project-clear', artifactId: alpha.artifactId, project: null }), { artifactId: alpha.artifactId, project: null });
+    assert.deepEqual(await client.projects(), { items: [{ name: 'Beta', artifactCount: 1 }] });
+  } finally { await app.close(); }
+});
+
 test('typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry', async () => {
   const app = await fixture({ transport: 'rest' });
   try {

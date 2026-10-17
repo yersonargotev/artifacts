@@ -237,7 +237,10 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     const discoveryResponse = await fetch(app.config.resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${tokens.access_token}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) });
     const discoveryText = await discoveryResponse.text();
     const discovery = JSON.parse(discoveryText.startsWith('event:') ? discoveryText.split('\n').find((line) => line.startsWith('data:'))!.slice(5) : discoveryText);
-    assert.deepEqual(discovery.result.tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_publish', 'artifacts_read', 'artifacts_update', 'whoami']);
+    assert.deepEqual(discovery.result.tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_move', 'artifacts_publish', 'artifacts_read', 'artifacts_update', 'projects_list', 'whoami']);
+    const annotations = (name: string) => discovery.result.tools.find((tool: { name: string }) => tool.name === name).annotations;
+    assert.deepEqual(annotations('artifacts_move'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+    assert.deepEqual(annotations('projects_list'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);
