@@ -3,7 +3,7 @@
 `@yargote/artifacts-client` is a typed Fetch client for the Artifacts REST API. It depends on `@yargote/artifacts-contracts` and Zod. It does not install the artifact store or a database driver. Node 24 or later is required.
 
 ```sh
-npm install @yargote/artifacts-client@0.1.0-beta.3
+npm install @yargote/artifacts-client@0.1.0-beta.4
 ```
 
 ```ts
@@ -50,7 +50,7 @@ Create, read, and update accept `response: 'compact'`. The returned revision con
 
 All commands and JSON responses pass the strict domain schemas. An omitted mutation `response` remains omitted in the transmitted command. JSON responses are bounded at 64 MiB, which accommodates ten maximum-size revisions with JSON escaping. Archives are bounded at 8 MiB. Export verifies the binary bytes against `X-Artifact-SHA256` and returns the bytes without rebuilding the ZIP.
 
-Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.3` and earlier reject responses from such a server with `invalid_response`.
+Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.4` and earlier reject responses from such a server with `invalid_response`.
 
 `prepareArtifactEdit(client, { artifactId, requestId, changes })` reads the current full snapshot and prepares an immutable update command. Metadata and content changes merge into that snapshot. An explicit `files` array replaces the attachments. The helper does not submit the update. Retain its exact output before sending it.
 

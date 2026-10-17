@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.3
+npm install --global @yargote/artifacts-cli@0.1.0-beta.4
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.3
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.4
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.3 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.3 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.4 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.4 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
@@ -195,7 +195,7 @@ Every artifact read and list item includes `project`, a name or null. `projects`
 
 `move ID` requires exactly one of `--project NAME` or `--no-project`. It prints `{ "artifactId": "...", "project": "Beta" }` with the stored spelling, or `null` after `--no-project`. Move never creates a revision or changes the publication. Moving to the current project succeeds without change. Move is a retained mutation like the others, so `retry` recovers a lost response.
 
-Version `0.1.0-beta.3` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
+Version `0.1.0-beta.4` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
 
 ## Complete commands and edits
 

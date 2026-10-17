@@ -36,20 +36,20 @@ The CLI uses REST under `${MCP_URL}/v1`. The complete `MCP_URL` remains its OAut
 Use Node 24 or later. The public beta uses three MIT packages under `@yargote`; the application repository remains private. Install the CLI and its dependencies from npm:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.3
+npm install --global @yargote/artifacts-cli@0.1.0-beta.4
 artifacts --version
 export ARTIFACTS_SERVER='https://artifacts-mcp.yersonargotev.workers.dev/mcp'
 artifacts login
 artifacts whoami
 ```
 
-The three packages share version `0.1.0-beta.3`. The [first beta release report](.audit/npm-beta-verification.md) records registry installation and authenticated operations for `0.1.0-beta.1`. The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
+The three packages share version `0.1.0-beta.4`. The [first beta release report](.audit/npm-beta-verification.md) records registry installation and authenticated operations for `0.1.0-beta.1`. The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
 
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
 The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. Packages built from the current source include the complete [artifacts-cli skill](skills/artifacts-cli/SKILL.md). `artifacts skills` lists bundled skills. `artifacts skills get artifacts-cli --full` prints its instructions and references offline. The CLI also bundles `artifacts-design`; full output lists its font files by size instead of printing their bytes. `artifacts skills install --global` installs a discovery skill under `~/.agents/skills` that loads those instructions through the installed CLI. Add `--agent claude` to use `~/.claude/skills`. The published `0.1.0-beta.1` package predates these commands. Check installed help before using them. The skill has no hosted default and does not require an MCP connection.
 
-Library consumers install `@yargote/artifacts-client@0.1.0-beta.3` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.3`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
+Library consumers install `@yargote/artifacts-client@0.1.0-beta.4` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.4`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
 ## Install the Artifacts skill
 
