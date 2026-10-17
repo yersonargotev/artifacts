@@ -98,6 +98,8 @@ Ask a client to call `artifacts_create` with a complete snapshot and a unique `r
 
 Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve artifacts. `artifacts_update` saves a complete snapshot with `expectedRevisionId`. `artifacts_publish` selects a retained `revisionId` with `expectedPublicationVersion`, using zero for the first publication. Its returned URL stays unchanged when you publish another revision. `artifacts_export` returns a deterministic ZIP for an explicit retained revision. `whoami` still returns the canonical account and session.
 
+Pass an optional `project` name to `artifacts_create` to group artifacts. A name that matches an existing project regardless of letter case joins it. `artifacts_list` accepts the same `project` filter, `projects_list` returns each project with its artifact count, and `artifacts_move` changes or clears the project without creating a revision. The panel sidebar lists the projects. [The projects decision](docs/decisions/projects.md) records the model.
+
 Matching mutation retries use the same `requestId` and arguments. Changed arguments under that ID fail. Concurrent updates and publication changes reject stale expected versions. [The store contract](packages/artifacts/README.md) describes the schemas, limits, pagination, permissions, and archive format.
 
 Snapshots support self-contained HTML, Markdown, and text, plus downloadable attachments. The initial limit is 1 MiB decoded total and 32 files per revision. Relative executable assets and multi-file websites are outside this increment. Markdown and text display as inert text.

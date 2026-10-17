@@ -75,6 +75,22 @@ For `read`, `--out FILE --quiet` saves the returned response without printing su
 
 Check installed help for `--quiet` support before running these examples. Older versions, including `0.1.0-beta.1`, can suppress stdout with `artifacts read ARTIFACT_ID --out saved.json > /dev/null`. This redirection preserves stderr and the command's exit status. Use the same fallback for the revision reads below.
 
+## Organize projects
+
+Check that installed help lists `projects` and `move` before using them.
+
+```sh
+artifacts create --snapshot snapshot.json --project "Client onboarding"
+artifacts projects
+artifacts list --project "client onboarding"
+artifacts move ARTIFACT_ID --project Archive
+artifacts move ARTIFACT_ID --no-project
+```
+
+A project name contains 1 to 80 characters after trimming and NFC normalization, without control characters. A name that matches an existing project regardless of letter case joins it and keeps its stored spelling. Every read and list item includes `project`, a name or null. `projects` prints `{ "items": [{ "name": "Client onboarding", "artifactCount": 1 }] }`, ordered by name without regard to letter case. A project exists only while it contains an artifact.
+
+`move` takes exactly one of `--project NAME` or `--no-project` and prints `{ "artifactId": "...", "project": "Archive" }`, or `null` for the project after `--no-project`. It creates no revision and leaves the publication unchanged. Moving to the current project succeeds without change. A lost move response is recovered with `retry REQUEST_ID` like any other retained mutation.
+
 ## Edit without losing retained data
 
 For a title change, save `changes.json` with only the requested field.
@@ -104,7 +120,7 @@ Command files contain the command itself, without the CLI's retained-operation w
 | `update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` |
 | `publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` |
 
-`requestId` is a caller-chosen string of 8 to 128 characters. Create and update also accept optional `response` with value `full` or `compact`. This complete update example replaces a snapshot. Substitute the observed IDs and preserve all required content and attachments in its `snapshot`.
+`requestId` is a caller-chosen string of 8 to 128 characters. Create and update also accept optional `response` with value `full` or `compact`. Create also accepts an optional `project` name. This complete update example replaces a snapshot. Substitute the observed IDs and preserve all required content and attachments in its `snapshot`.
 
 ```json
 {

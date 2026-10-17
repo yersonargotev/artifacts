@@ -12,17 +12,21 @@ Every method checks a live central session. An actor contains `userId`, `session
 
 | Method | Arguments after actor | Required scope | Result |
 | --- | --- | --- | --- |
-| `create` | `requestId`, `snapshot` | `artifacts:write` | Complete artifact and revision |
+| `create` | `requestId`, `snapshot`, optional `project` | `artifacts:write` | Complete artifact and revision |
 | `read` | `artifactId`, optional `revisionId` | `artifacts:read` | Complete artifact and selected revision |
 | `update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` | `artifacts:write` | Complete artifact and new revision |
 | `publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | `artifacts:publish` | Artifact ID, revision ID, version, and URL |
-| `list` | Optional `limit` and `cursor` | `artifacts:read` | Summaries and `nextCursor` |
+| `list` | Optional `limit`, `cursor`, and `project` | `artifacts:read` | Summaries and `nextCursor` |
+| `move` | `requestId`, `artifactId`, `project` name or null | `artifacts:write` | Artifact ID and stored project |
+| `projects` | None | `artifacts:read` | Project names and artifact counts |
 | `history` | `artifactId`, optional `limit` and `beforeSequence` | `artifacts:read` | Revisions and `nextBeforeSequence` |
 | `export` | `artifactId`, `revisionId` | `artifacts:read` | ZIP base64, filename, media type, and SHA-256 |
 
+Every artifact read and summary includes `project`, a name or null. A project is a label on the artifact, outside the immutable snapshot. It exists while at least one owned artifact carries it. Names are NFC-normalized, trimmed, 1 to 80 characters, and free of control characters. Create and move reuse an existing project name of the same owner regardless of letter case and keep its stored spelling. Otherwise they store the given name. The `project` filter of `list` and the panel library matches the same way. `projects` returns `{ items: [{ name, artifactCount }] }` ordered by name without regard to letter case. Moving never creates a revision or changes the publication, and moving to the current project succeeds without change.
+
 Lists default to 25 summaries and allow at most 100 per page. History defaults to 5 complete revisions and allows at most 10 per page. Callers use the returned cursor to request the next page.
 
-Creation, update, and publication store their result under an owner-scoped request ID in the same transaction as the change. Matching retries return the committed result after checking current authority. Changed arguments under that ID fail with `request_conflict`. Updates compare the expected head. Publication compares the expected version before considering a same-revision no-op. Version zero means unpublished. Busy retries retain the caller's expected versions.
+Creation, update, publication, and move store their result under an owner-scoped request ID in the same transaction as the change. Matching retries return the committed result after checking current authority. Changed arguments under that ID fail with `request_conflict`. Updates compare the expected head. Publication compares the expected version before considering a same-revision no-op. Version zero means unpublished. Busy retries retain the caller's expected versions.
 
 The publication URL is `${publishOrigin}/a/${artifactId}`. It remains stable when the selected revision changes. Publishing does not move the draft head. Composite foreign keys enforce revision membership for parents, heads, and publication pointers. The head membership constraint is deferred to commit so a new artifact and its first revision enter together. A database trigger rejects revision updates.
 

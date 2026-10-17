@@ -42,19 +42,23 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 | Tool | Input | Successful result |
 | --- | --- | --- |
 | `whoami` | `{}` | Verified account, central session, OAuth client, and scopes |
-| `artifacts_create` | `requestId`, `snapshot` | Artifact with `artifactId`, `headRevisionId`, `publication`, and `revision` |
+| `artifacts_create` | `requestId`, `snapshot`, optional `project` | Artifact with `artifactId`, `headRevisionId`, `project`, `publication`, and `revision` |
 | `artifacts_read` | `artifactId`, optional `revisionId` | Artifact and selected complete revision |
 | `artifacts_update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` | Artifact and new complete revision |
 | `artifacts_publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | `artifactId`, `revisionId`, `version`, and `url` |
-| `artifacts_list` | Optional `limit`, optional `cursor` | `items` and `nextCursor` |
+| `artifacts_list` | Optional `limit`, optional `cursor`, optional `project` | `items` and `nextCursor` |
+| `artifacts_move` | `requestId`, `artifactId`, `project` name or null | `artifactId` and stored `project` |
+| `projects_list` | `{}` | `items` with `name` and `artifactCount` |
 | `artifacts_history` | `artifactId`, optional `limit`, optional `beforeSequence` | `items` and `nextBeforeSequence` |
 | `artifacts_export` | `artifactId`, `revisionId` | `filename`, `mediaType`, `base64`, and `sha256` |
+
+`project` is the artifact's project name or null. Every list item also includes it. A project name contains 1 to 80 characters after trimming and NFC normalization, without control characters. Create and move reuse an existing project whose name matches regardless of letter case and return its stored spelling. Otherwise they create the project. The `artifacts_list` filter matches the same way. A move with `project: null` removes the artifact from its project. A move never creates a revision or changes the publication, and moving to the current project succeeds without change. `projects_list` returns only projects that contain artifacts, ordered by name without regard to letter case, without pagination.
 
 `revision.id` identifies the saved revision. Other revision fields include `parentRevisionId`, `sequence`, `sha256`, and `snapshot`. `headRevisionId` identifies the draft head. `publication` is null or contains `revisionId`, `version`, and `url`.
 
 Lists default to 25 items and allow at most 100 per page. History defaults to 5 revisions and allows at most 10 per page.
 
-Create and update require `artifacts:write`. Publication requires `artifacts:publish`. Reads, lists, history, and export require `artifacts:read`. Ownership and live session checks apply to every operation.
+Create, update, and move require `artifacts:write`. Publication requires `artifacts:publish`. Reads, lists, projects, history, and export require `artifacts:read`. Ownership and live session checks apply to every operation.
 
 Mutations return their original result for a retry with the same owner-scoped `requestId` and exact arguments. Reuse with different arguments fails. Stale expected revision or publication versions fail with `conflict`.
 

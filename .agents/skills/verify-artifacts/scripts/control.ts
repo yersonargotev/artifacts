@@ -16,7 +16,7 @@ import { artifactReadSchema, publishResultSchema } from '../../../../packages/ar
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'cli', 'preview', 'publication', 'export'] as const;
+const features = ['identity', 'authoring', 'cli', 'projects', 'preview', 'publication', 'export'] as const;
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
 type Credentials = { controlToken: string; accessToken: string; password: string };
@@ -192,6 +192,20 @@ async function drive(feature: Feature) {
     if (!allowError) assert(!response.result.isError, `${name} tool succeeded`);
     return response.result.structuredContent;
   }
+  const cliState = join(runtime, 'cli-state');
+  async function cli(...cliArgs: string[]) {
+    await mkdir(cliState, { recursive: true, mode: 0o700 });
+    const env = { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken };
+    const child = spawn(process.execPath, ['--import', 'tsx', join(root, 'apps/cli/src/index.ts'), ...cliArgs], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout!.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    const [code] = await once(child, 'close') as [number | null];
+    await record(`CLI artifacts ${cliArgs.join(' ')}`, { code, stdout, stderr });
+    return { code, stdout, stderr };
+  }
+  async function ok(...cliArgs: string[]) { const result = await cli(...cliArgs); assert.equal(result.code, 0, `artifacts ${cliArgs[0]} exits 0`); return JSON.parse(result.stdout); }
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   async function capture(page: Page, label: string) {
@@ -239,20 +253,6 @@ async function drive(feature: Feature) {
       assert.equal(read.publication?.revisionId, published.revisionId);
       checks.push('Real HTTP-MCP create/replay/read/update/history/list/publish', 'Immutable historical snapshot', 'Stale update rejected', 'Publication independently read back');
     } else if (feature === 'cli') {
-      const state = join(runtime, 'cli-state');
-      await mkdir(state, { mode: 0o700 });
-      const env = { PATH: process.env.PATH, HOME: state, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: state, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken };
-      async function cli(...cliArgs: string[]) {
-        const child = spawn(process.execPath, ['--import', 'tsx', join(root, 'apps/cli/src/index.ts'), ...cliArgs], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
-        let stdout = '';
-        let stderr = '';
-        child.stdout!.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-        child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-        const [code] = await once(child, 'close') as [number | null];
-        await record(`CLI artifacts ${cliArgs.join(' ')}`, { code, stdout, stderr });
-        return { code, stdout, stderr };
-      }
-      async function ok(...cliArgs: string[]) { const result = await cli(...cliArgs); assert.equal(result.code, 0, `artifacts ${cliArgs[0]} exits 0`); return JSON.parse(result.stdout); }
       const identity = await ok('whoami');
       assert.equal(identity.userId, instance.ownerId, 'CLI identity matches disposable owner');
       await json(join(directory, 'snapshot-1.json'), firstSnapshot);
@@ -328,6 +328,58 @@ async function drive(feature: Feature) {
         assert(!cookies.some((cookie) => ['artifacts-panel', 'artifacts-auth.session_token'].includes(cookie.name)));
         await capture(page, 'globally-revoked');
         checks.push('Browser login owner matches MCP owner', 'Mobile native navigation and account disclosure without overflow', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
+      } else if (feature === 'projects') {
+        const titled = (title: string) => ({ ...firstSnapshot, metadata: { ...firstSnapshot.metadata, title } });
+        const ids = (items: { artifactId: string }[]) => items.map((item) => item.artifactId).sort();
+        const alpha = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Alpha plan'), project: 'Alpha' }));
+        const beta = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Beta handoff'), project: 'alpha' }));
+        const loose = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Unfiled notes') }));
+        assert.deepEqual([alpha.project, beta.project, loose.project], ['Alpha', 'Alpha', null], 'Lowercase alpha reuses the stored Alpha spelling');
+        assert.deepEqual(ids((await call('artifacts_list', { project: 'Alpha' })).items), [alpha.artifactId, beta.artifactId].sort(), 'MCP list by project returns exactly A and B');
+        assert.deepEqual(await call('projects_list'), { items: [{ name: 'Alpha', artifactCount: 2 }] });
+        assert.deepEqual(await ok('move', beta.artifactId, '--project', 'Beta'), { artifactId: beta.artifactId, project: 'Beta' });
+        assert.deepEqual(ids((await ok('list', '--project', 'Beta')).items), [beta.artifactId], 'CLI list by project returns only B');
+        assert.deepEqual(await ok('projects'), { items: [{ name: 'Alpha', artifactCount: 1 }, { name: 'Beta', artifactCount: 1 }] });
+        const moved = artifactReadSchema.parse(await call('artifacts_read', { artifactId: beta.artifactId }));
+        assert.equal(moved.project, 'Beta', 'Independent MCP read shows the moved project');
+        assert.equal(moved.headRevisionId, beta.headRevisionId, 'Move keeps the head revision');
+        await login(page);
+        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+        const projects = page.getByRole('navigation', { name: 'Proyectos', exact: true });
+        const projectLinks = async () => projects.getByRole('link').evaluateAll((links) => links.map((link) => ({ name: link.getAttribute('aria-label'), text: link.textContent, href: link.getAttribute('href'), current: link.getAttribute('aria-current') })));
+        assert.deepEqual(await projectLinks(), [{ name: 'Alpha (1)', text: 'Alpha1', href: '/?project=Alpha', current: null }, { name: 'Beta (1)', text: 'Beta1', href: '/?project=Beta', current: null }]);
+        for (const name of ['Alpha (1)', 'Beta (1)']) assert.equal(await projects.getByRole('link', { name, exact: true }).count(), 1, `Accessible name ${name}`);
+        const rows = async () => page.locator('.artifact-list li').evaluateAll((items) => items.map((item) => [item.querySelector('h2')?.textContent, item.querySelector('.row-kind')?.textContent]).sort());
+        assert.deepEqual(await rows(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Artefacto']]);
+        await capture(page, 'projects-library-desktop');
+        await record('Choose Beta (1) in Proyectos', {});
+        await projects.getByRole('link', { name: 'Beta (1)', exact: true }).click();
+        await page.waitForURL((url) => url.searchParams.get('project') === 'Beta');
+        await page.getByRole('heading', { level: 1, name: 'Beta', exact: true }).waitFor();
+        assert.deepEqual(await rows(), [['Beta handoff', 'Beta']], 'Beta library lists only B');
+        assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', 'page']]);
+        await capture(page, 'projects-beta-desktop');
+        await record('Open Beta handoff from the Beta project', {});
+        await page.getByRole('link', { name: 'Beta handoff', exact: true }).click();
+        await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
+        assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', 'true']]);
+        await record('Open Información', {});
+        await page.locator('#information > summary').scrollIntoViewIfNeeded();
+        await page.locator('#information > summary').click();
+        const projectValue = page.locator('#information[open] dt', { hasText: /^Proyecto$/ }).locator('xpath=following-sibling::dd[1]');
+        await projectValue.waitFor();
+        assert.equal(await projectValue.textContent(), 'Beta', 'Información shows the artifact project');
+        await capture(page, 'projects-detail-desktop');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(`${instance.panel}/?project=Beta`);
+        await page.getByRole('heading', { level: 1, name: 'Beta', exact: true }).waitFor();
+        await record('Open Navegación at 390px', {});
+        await page.locator('.library-navigation > summary').click();
+        await projects.getByRole('link', { name: 'Beta (1)', exact: true }).waitFor();
+        assert.deepEqual(await rows(), [['Beta handoff', 'Beta']]);
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow at 390px');
+        await capture(page, 'projects-beta-mobile');
+        checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, row project labels and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow');
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
         let libraryDemo: { artifact: ReturnType<typeof artifactReadSchema.parse>; publication: ReturnType<typeof publishResultSchema.parse> } | undefined;

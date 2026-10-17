@@ -37,11 +37,17 @@ Before writing or restyling HTML, load the `artifacts-design` skill and follow i
 
 For a new artifact, call `artifacts_create` with a unique `requestId` and the complete snapshot. Use its returned `artifactId` and `revision.id` for subsequent calls.
 
-For an existing artifact, resolve the exact artifact before a write. Use the supplied ID or an observed publication URL. Otherwise, use `artifacts_list` and its cursors to find the intended artifact. If several artifacts match, ask which one the user means.
+For an existing artifact, resolve the exact artifact before a write. Use the supplied ID or an observed publication URL. Otherwise, use `artifacts_list` and its cursors to find the intended artifact. When the user names a project, pass it as the `project` filter. If several artifacts match, ask which one the user means.
 
 Call `artifacts_read` without `revisionId` to obtain the current head. Apply the requested change to that complete snapshot. Preserve the metadata, content, and attachments the user did not ask to change. Call `artifacts_update` with the observed `headRevisionId` as `expectedRevisionId` and a new `requestId`.
 
 An update creates a revision. It does not change the published revision. If the user asks to change the live artifact, publish the returned revision as part of that request.
+
+## Organize projects
+
+When the user names a project for new content, pass it as `project` to `artifacts_create`. Call `projects_list` first when an existing project may already fit. A name matching an existing project regardless of letter case joins it, so reuse the existing spelling in your reply. Do not invent a project the user did not ask for.
+
+To file an existing artifact under a project, or to take it out of one, call `artifacts_move` with a new `requestId`, the `artifactId`, and the project name or `null`. A move changes only the artifact's project. It creates no revision and leaves the publication unchanged, so do not follow it with an update or publication. Verify the move with `artifacts_read` or `artifacts_list` and its `project` filter. A project disappears when its last artifact leaves it.
 
 ## Publish the selected revision
 
