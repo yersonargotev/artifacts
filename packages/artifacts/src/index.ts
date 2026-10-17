@@ -1,9 +1,9 @@
-import { and, asc, count, desc, eq, gt, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, libraryQuerySchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactLibraryPage, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 
@@ -135,37 +135,6 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           .where(and(eq(artifact.ownerId, actor.userId), project, input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(input.limit + 1);
         const items = rows.slice(0, input.limit).map(summary);
         return { items, nextCursor: rows.length > input.limit ? items.at(-1)?.artifactId ?? null : null };
-      });
-    },
-
-    async queryLibrary(actor: Actor, value: z.input<typeof libraryQuerySchema> = {}): Promise<ArtifactLibraryPage> {
-      const input = libraryQuerySchema.parse(value);
-      const limit = 25;
-      const title = sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String);
-      const statuses = {
-        all: undefined,
-        published: isNotNull(artifactPublication.artifactId),
-        unpublished: isNull(artifactPublication.artifactId),
-        pending: and(isNotNull(artifactPublication.artifactId), ne(artifactPublication.revisionId, artifact.headRevisionId)),
-      };
-      return transaction(async (connection) => {
-        await authorize(connection, actor, 'artifacts:read');
-        const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
-        const matching = and(eq(artifact.ownerId, actor.userId), project, input.q ? or(sql`instr(lower(${title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
-        const rows = await connection.select({ artifact, title, publication: artifactPublication }).from(artifact)
-          .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
-          .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
-          .where(and(matching, statuses[input.status], input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(limit + 1);
-        const [counts] = await connection.select({
-          all: count(),
-          published: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is not null then 1 else 0 end), 0)`.mapWith(Number),
-          unpublished: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is null then 1 else 0 end), 0)`.mapWith(Number),
-          pending: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is not null and ${artifactPublication.revisionId} != ${artifact.headRevisionId} then 1 else 0 end), 0)`.mapWith(Number),
-        }).from(artifact)
-          .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
-          .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id)).where(matching);
-        const items = rows.slice(0, limit).map(summary);
-        return { items, nextCursor: rows.length > limit ? items.at(-1)?.artifactId ?? null : null, counts };
       });
     },
 

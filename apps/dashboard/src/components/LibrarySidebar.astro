@@ -1,18 +1,20 @@
 ---
 import type { ProjectSummary } from '@artifacts/artifacts/contracts';
+import { scopeHref } from '../urls.ts';
 import type { PanelIdentity } from '../identity.ts';
 import Icon from './Icon.astro';
-interface Props { identity: PanelIdentity; authUrl: string; projects: ProjectSummary[]; project?: string; active?: boolean }
-const { identity, authUrl, projects, project, active = true } = Astro.props;
+interface Props { identity: PanelIdentity; authUrl: string; projects: ProjectSummary[]; project?: string; active?: boolean; unfiled?: boolean; unfiledCount?: number }
+const { identity, authUrl, projects, project, active = true, unfiled = false, unfiledCount } = Astro.props;
 ---
 <div class="sidebar-brand"><a class="wordmark" href="/"><span class="brand-symbol" aria-hidden="true"><Icon name="layers-intersect" size={23} /></span>Artifacts</a><span class="workspace-label">Tu espacio de trabajo</span></div>
 <details class="library-navigation" open>
   <summary><span><Icon name="menu-2" size={18} />Navegación</span><Icon name="chevron-down" size={16} /></summary>
   <div class="sidebar-content">
-    <nav aria-label="Navegación principal"><a class="sidebar-link" href="/" aria-current={active && project === undefined ? 'page' : undefined}><Icon name="layout-dashboard" />Tus artefactos<Icon name="chevron-right" size={16} /></a></nav>
+    <nav aria-label="Navegación principal"><a class="sidebar-link" href="/" aria-current={active && project === undefined && !unfiled ? 'page' : undefined}><Icon name="layout-dashboard" />Tus artefactos<Icon name="chevron-right" size={16} /></a></nav>
     <nav class="sidebar-projects" aria-label="Proyectos">
       <h2>Proyectos</h2>
-      {projects.length ? <ul>{projects.map(({ name, artifactCount }) => <li><a class="sidebar-link" href={`/?${new URLSearchParams({ project: name })}`} title={name} aria-label={`${name} (${artifactCount})`} aria-current={name === project ? active ? 'page' : 'true' : undefined}><Icon name="folder" size={18} /><span>{name}</span><span class="project-count">{artifactCount}</span></a></li>)}</ul> : <p>Aún no tienes proyectos. Asigna uno al crear o mover un artefacto.</p>}
+      {projects.length ? <ul>{projects.map(({ name, artifactCount }) => <li><a class="sidebar-link" href={scopeHref({ kind: 'project', name })} title={name} aria-label={`${name} (${artifactCount})`} aria-current={name === project ? active ? 'page' : 'true' : undefined}><Icon name="folder" size={18} /><span>{name}</span><span class="project-count">{artifactCount}</span></a></li>)}</ul> : <p>Aún no tienes proyectos. Asigna uno al crear o mover un artefacto.</p>}
+      {unfiledCount !== undefined && <a class="sidebar-link" href={scopeHref({ kind: 'unfiled' })} aria-label={`Sin proyecto (${unfiledCount})`} aria-current={active && unfiled ? 'page' : undefined}><Icon name="file-text" size={18} /><span>Sin proyecto</span><span class="project-count">{unfiledCount}</span></a>}
     </nav>
     <details class="tools" id="connect-tools"><summary><Icon name="plug-connected" size={19} />Conecta tus herramientas<Icon name="chevron-down" size={15} /></summary><div class="sidebar-disclosure"><p>Agrega este servidor MCP en Claude Code o Codex e inicia sesión con tu cuenta.</p><code>{process.env.MCP_URL}</code><p>Usa <strong>artifacts_create</strong> para crear tu primer artefacto. Cada revisión conserva su contenido y sus archivos.</p></div></details>
     <div class="sidebar-note"><Icon name="code" size={22} /><p>Crea con tus herramientas.<br />Encuéntralo todo aquí.</p></div>

@@ -21,13 +21,13 @@ const heading = { published: 'Revisión publicada', superseded: 'La publicación
   <a class="back" href={selectedUrl}>Volver a la revisión seleccionada</a>
   <section class="publication" data-publication-result={result.kind}>
     <h1>{heading}</h1>
-    {result.kind === 'published' && <p role="status">La lectura posterior confirmó la revisión {observed!.revision.sequence} en la versión {result.committed.version}.</p>}
-    {result.kind === 'superseded' && <p role="status">Tu solicitud publicó la versión {result.committed.version}. La lectura posterior encontró otra publicación. Revisa su estado antes de volver a publicar.</p>}
-    {result.kind === 'conflict' && <p role="alert">La versión enviada o el identificador de solicitud ya no coincide. Revisa el estado actual y vuelve a elegir qué revisión publicar.</p>}
-    {result.kind === 'uncertain' && <><p role="alert">La solicitud pudo haberse completado. Reintenta con la misma revisión, versión e identificador de solicitud para confirmar su resultado.</p><PublicationForm command={command} label="Reintentar publicación" /></>}
-    {current && <><h2>Publicación observada</h2><p>Versión {current.version}.</p><div class="actions"><a href={`/artifacts/${encodeURIComponent(command.artifactId)}?${new URLSearchParams({ revisionId: current.revisionId })}`}>Ver revisión publicada</a><a class="button secondary" href={current.url}>Abrir publicación</a></div><code>{current.url}</code></>}
+    {result.kind === 'published' && <p role="status">Revisión {observed!.revision.sequence} publicada. La lectura posterior confirmó el resultado.</p>}
+    {result.kind === 'superseded' && <p role="status">Tu solicitud se completó. La lectura posterior encontró otra revisión publicada. Revisa su estado antes de volver a publicar.</p>}
+    {result.kind === 'conflict' && <p role="alert">La publicación esperada o el identificador de solicitud ya no coincide. Revisa el estado actual y vuelve a elegir qué revisión publicar.</p>}
+    {result.kind === 'uncertain' && <><p role="alert">La solicitud pudo haberse completado. Reintenta con la misma revisión, estado esperado e identificador de solicitud para confirmar su resultado.</p><PublicationForm command={command} label="Reintentar publicación" /></>}
+    {current && <><h2>Publicación observada</h2><p>Esta es la publicación actual del artefacto.</p><div class="actions"><a href={`/artifacts/${encodeURIComponent(command.artifactId)}?${new URLSearchParams({ revisionId: current.revisionId })}`}>Ver revisión publicada</a><a class="button secondary" href={current.url}>Abrir publicación</a></div><code>{current.url}</code></>}
     {observed && !current && <p>Este artefacto está sin publicar.</p>}
     {result.kind === 'conflict' && !observed && <p>No pudimos leer el estado actual. Abre la revisión seleccionada para comprobarlo.</p>}
-    <dl><dt>Revisión enviada</dt><dd>{command.revisionId}</dd><dt>Versión esperada</dt><dd>{command.expectedPublicationVersion}</dd><dt>Solicitud</dt><dd>{command.requestId}</dd></dl>
+    <dl><dt>Revisión enviada</dt><dd>{command.revisionId}</dd><dt>Solicitud</dt><dd>{command.requestId}</dd></dl>
   </section>
 </Panel>

@@ -62,7 +62,7 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
       <h2>Revisión {revision.sequence}</h2>
       {revision.id === artifact.headRevisionId && <span class="badge">Más reciente</span>}{selectedPublication && <span class="badge">Publicada</span>}
       <dl><dt>Título</dt><dd>{revision.snapshot.metadata.title}</dd><dt>Descripción</dt><dd>{revision.snapshot.metadata.description}</dd>{revision.snapshot.metadata.custom !== undefined && <><dt>Metadatos personalizados</dt><dd><pre>{JSON.stringify(revision.snapshot.metadata.custom, null, 2)}</pre></dd></>}<dt>Artefacto</dt><dd>{artifact.artifactId}</dd><dt>Proyecto</dt><dd>{artifact.project ?? 'Sin proyecto'}</dd><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{revision.authorClientId}</dd><dt>Creada</dt><dd>{date(revision.createdAt)} UTC</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl>
-      {publication && <><p>Versión {publication.version}. El enlace conserva la dirección cuando publicas otra revisión.</p><code>{publication.url}</code></>}
+      {publication && <><p>Revisión {published!.sequence} publicada. El enlace conserva la dirección cuando publicas otra revisión.</p><code>{publication.url}</code></>}
       <p>Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.</p>
     </details>
   </section>

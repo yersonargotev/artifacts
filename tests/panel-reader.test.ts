@@ -27,13 +27,16 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
     await store.publish(actor, { requestId: randomUUID(), artifactId: pending.artifactId, revisionId: pending.revision.id, expectedPublicationVersion: 0 });
     const updated = await store.update(actor, { requestId: randomUUID(), artifactId: pending.artifactId, expectedRevisionId: pending.revision.id, snapshot: snapshot('Alpha revised') });
     const published = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Beta published'), project: 'Beta' });
-    await store.publish(actor, { requestId: randomUUID(), artifactId: published.artifactId, revisionId: published.revision.id, expectedPublicationVersion: 0 });
+    const publishedHead = await store.update(actor, { requestId: randomUUID(), artifactId: published.artifactId, expectedRevisionId: published.revision.id, snapshot: snapshot('Beta published') });
+    await store.publish(actor, { requestId: randomUUID(), artifactId: published.artifactId, revisionId: publishedHead.revision.id, expectedPublicationVersion: 0 });
     const loose = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Loose draft') });
     const all = await panel.library(actor);
     assert.deepEqual(all.page.counts, { all: 4, published: 1, unpublished: 2, pending: 1 });
     assert.deepEqual(all.workspace.total, { count: 4, published: 2, pending: 1 });
     assert.deepEqual(all.workspace.unfiled, { count: 1, published: 0, pending: 0 });
     assert.deepEqual(all.workspace.projects.map(({ name, count, published, pending }) => ({ name, count, published, pending })), [{ name: 'Álpha', count: 2, published: 1, pending: 1 }, { name: 'Beta', count: 1, published: 1, pending: 0 }]);
+    const publishedCard = all.page.cards.find(({ artifactId }) => artifactId === published.artifactId)!;
+    assert.deepEqual(publishedCard.publication, { state: 'published', url: `https://published.example.test/a/${published.artifactId}`, version: 1, revision: { revisionId: publishedHead.revision.id, sequence: 2, createdAt: new Date(publishedHead.revision.createdAt) } });
     const card = all.page.cards.find(({ artifactId }) => artifactId === pending.artifactId)!;
     assert.deepEqual(card, { artifactId: pending.artifactId, title: 'Alpha revised', description: 'Description for Alpha revised', kind: 'text', project: 'Álpha', head: { revisionId: updated.revision.id, sequence: 2, createdAt: new Date(updated.revision.createdAt) }, publication: { state: 'pending', url: `https://published.example.test/a/${pending.artifactId}`, version: 1, revision: { revisionId: pending.revision.id, sequence: 1, createdAt: new Date(pending.revision.createdAt) } } });
     const alpha = await panel.library(actor, { scope: { kind: 'project', name: 'ÁLPHA' } });

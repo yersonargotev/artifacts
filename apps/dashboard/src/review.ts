@@ -2,7 +2,7 @@ import type { createArtifactStore } from '@artifacts/artifacts';
 import { historySchema, readSchema, type Actor, type Revision } from '@artifacts/artifacts/contracts';
 import { compareRevisions, summarizeRevision } from '@artifacts/artifacts/workflow';
 
-export async function loadArtifactReview(store: ReturnType<typeof createArtifactStore>, actor: Actor, artifactId: string | undefined, search: URLSearchParams) {
+export async function loadArtifactReview(store: Pick<ReturnType<typeof createArtifactStore>, 'read' | 'history'>, actor: Actor, artifactId: string | undefined, search: URLSearchParams) {
   const input = readSchema.parse({ artifactId, revisionId: search.get('revisionId') ?? undefined });
   const historyInput = historySchema.parse({ artifactId: input.artifactId, beforeSequence: search.has('before') ? Number(search.get('before')) : undefined });
   const requestedComparison = search.has('compareTo') ? readSchema.parse({ artifactId: input.artifactId, revisionId: search.get('compareTo') }).revisionId : undefined;

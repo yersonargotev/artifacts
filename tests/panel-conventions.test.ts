@@ -159,3 +159,29 @@ test('markup policy rejects effect utilities and inline shadows', () => {
   ]) assert(markupViolations('fixture.tsx', source).length > 0, source);
   assert.deepEqual(markupViolations('fixture.astro', '<button data-variant="primary">Publicar</button>'), []);
 });
+
+function readerViolations(filename: string, source: string) {
+  const issues: string[] = [];
+  if (filename.startsWith('apps/dashboard/src/')) {
+    for (const match of source.matchAll(/versión/gi)) issues.push(`${filename}:${source.slice(0, match.index).split('\n').length} publication copy must name a revision`);
+  }
+  if (!filename.startsWith('apps/dashboard/') && !filename.startsWith('tests/')) {
+    for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["']@artifacts\/artifacts\/panel(?:\/model)?["']/g)) issues.push(`${filename}: panel imports belong to the dashboard or tests`);
+  }
+  if (filename === 'packages/artifacts/src/panel/model.ts' && /(?:^|\n)\s*import\s+(?!type\b)/.test(source)) issues.push(`${filename}: panel model imports must be type-only`);
+  return issues;
+}
+
+test('panel revision copy and reader imports preserve the package boundary', async () => {
+  const files = (await Promise.all(['apps', 'packages', 'scripts', 'tests'].map((directory) => sourceFiles(resolve(directory))))).flat();
+  const issues = (await Promise.all(files.filter((filename) => /\.(?:astro|[cm]?[jt]sx?)$/.test(filename) && !filename.includes('/node_modules/')).map(async (filename) => readerViolations(relative(resolve('.'), filename), await readFile(filename, 'utf8'))))).flat();
+  assert.deepEqual(issues, []);
+});
+
+test('reader policy rejects version labels, external imports, and runtime model imports', () => {
+  assert.deepEqual(readerViolations('apps/dashboard/src/fixture.astro', '<p>Versión 2</p>\n<p>versión anterior</p>'), ['apps/dashboard/src/fixture.astro:1 publication copy must name a revision', 'apps/dashboard/src/fixture.astro:2 publication copy must name a revision']);
+  for (const source of ["import { createPanel } from '@artifacts/artifacts/panel';", "import('@artifacts/artifacts/panel');", "import '@artifacts/artifacts/panel/model';"]) assert.deepEqual(readerViolations('apps/mcp/src/fixture.ts', source), ['apps/mcp/src/fixture.ts: panel imports belong to the dashboard or tests']);
+  assert.deepEqual(readerViolations('apps/dashboard/src/fixture.ts', "import { createPanel } from '@artifacts/artifacts/panel';"), []);
+  assert.deepEqual(readerViolations('packages/artifacts/src/panel/model.ts', "import { z } from 'zod';"), ['packages/artifacts/src/panel/model.ts: panel model imports must be type-only']);
+  assert.deepEqual(readerViolations('packages/artifacts/src/panel/model.ts', "import type { Actor } from '../contracts.ts';"), []);
+});
