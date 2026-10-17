@@ -21,7 +21,7 @@ Use self-contained HTML for interactive content. Inline styles and scripts and e
 
 Keep the whole revision within 1 MiB of decoded content, metadata, attachment paths, media types, and attachment bytes. At most 32 attachments are accepted. Base64 changes wire size, not the decoded limit. If required content exceeds a limit, explain the constraint without silently removing it.
 
-Finish requested visual and interaction checks before saving when browser tools are available. A successful CLI write proves persistence, not visual quality or browser compatibility. Interactive HTML follows the server's Chrome policy; do not promise it in every browser.
+Before writing or restyling HTML, run `artifacts skills get artifacts-design --full` and follow it. It owns typography, embedded fonts, color, layout, and the rendered checks. Finish those checks before saving when browser tools are available. A successful CLI write proves persistence, not visual quality or browser compatibility. Interactive HTML follows the server's Chrome policy; do not promise it in every browser.
 
 ## Create or revise
 

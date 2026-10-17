@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "artifactsSkills": [
-    "artifacts-cli"
+    "artifacts-cli",
+    "artifacts-design"
   ],
   "bin": {
     "artifacts": "./src/index.ts"

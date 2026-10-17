@@ -47,15 +47,18 @@ The three packages share version `0.1.0-beta.2`. The [first beta release report]
 
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
-The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. Packages built from the current source include the complete [artifacts-cli skill](skills/artifacts-cli/SKILL.md). `artifacts skills` lists bundled skills. `artifacts skills get artifacts-cli --full` prints its instructions and references offline. `artifacts skills install --global` installs a discovery skill under `~/.agents/skills` that loads those instructions through the installed CLI. Add `--agent claude` to use `~/.claude/skills`. The published `0.1.0-beta.1` package predates these commands. Check installed help before using them. The skill has no hosted default and does not require an MCP connection.
+The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. Packages built from the current source include the complete [artifacts-cli skill](skills/artifacts-cli/SKILL.md). `artifacts skills` lists bundled skills. `artifacts skills get artifacts-cli --full` prints its instructions and references offline. The CLI also bundles `artifacts-design`; full output lists its font files by size instead of printing their bytes. `artifacts skills install --global` installs a discovery skill under `~/.agents/skills` that loads those instructions through the installed CLI. Add `--agent claude` to use `~/.claude/skills`. The published `0.1.0-beta.1` package predates these commands. Check installed help before using them. The skill has no hosted default and does not require an MCP connection.
 
 Library consumers install `@yargote/artifacts-client@0.1.0-beta.2` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.2`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
 ## Install the Artifacts skill
 
 The canonical skill is [skills/artifacts](skills/artifacts/SKILL.md). It includes
-the MCP contract, HTML authoring guidance, and Codex connection metadata. Update
-these files with the service contract. The skills under `.agents/skills` support
+the MCP contract and Codex connection metadata. HTML design lives in
+[skills/artifacts-design](skills/artifacts-design/SKILL.md), which both the MCP
+and CLI skills load. It bundles OFL fonts and a script that embeds them, because
+the artifact sandbox accepts only `data:` fonts. Update these files with the
+service contract. The skills under `.agents/skills` support
 development of this repository.
 
 Review any existing local edits before replacing an installed copy. For a
@@ -63,7 +66,7 @@ personal Codex installation, copy the complete directory from this checkout:
 
 ```sh
 mkdir -p ~/.agents/skills
-cp -R skills/artifacts ~/.agents/skills/
+cp -R skills/artifacts skills/artifacts-design ~/.agents/skills/
 ```
 
 Installed copies are not the source for future changes.

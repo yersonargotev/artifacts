@@ -1,4 +1,4 @@
-# Interface guidelines for HTML artifacts
+# Interface checks for HTML artifacts
 
 Use these checks for visual authoring and review. Apply only the checks relevant to the artifact. Keep the requested content and behavior central.
 
@@ -29,7 +29,7 @@ Under `prefers-reduced-motion: reduce`, remove decorative movement and retain im
 
 Keep input-driven calculations in document memory. Use labeled controls without a form submission workflow. Do not imply that an in-document control saves a retained revision or publishes an artifact.
 
-Keep filters and tabs local to the document. Do not depend on host URL synchronization, router packages, persistent storage, network requests, or external fonts. Inline required assets within the snapshot budget.
+Keep filters and tabs local to the document. Do not depend on host URL synchronization, router packages, persistent storage, network requests, or remote fonts. Embed fonts and other required assets as `data:` URIs within the snapshot budget.
 
 ## Check the result
 
