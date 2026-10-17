@@ -132,7 +132,7 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .library-shell .panel-main { width: 100%; max-width: 1240px; padding: 32px 32px 56px; }
 
 .library-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
-.library-heading h1 { margin: 0; font-size: 32px; letter-spacing: -.95px; }
+.library-heading h1 { margin: 0; font-size: 32px; letter-spacing: -.95px; overflow-wrap: anywhere; }
 .library-heading p { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
 .connect-button { margin-top: 3px; flex: none; }
 .library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 20px; border-bottom: 1px solid var(--divider); }
