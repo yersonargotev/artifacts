@@ -1,0 +1,28 @@
+---
+import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
+import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
+import { exportHref, scopeHref } from '../../urls.ts';
+import ArtifactMenu from '../ArtifactMenu.tsx';
+interface Props { card: Card; now: Date }
+const { card, now } = Astro.props;
+const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
+const publication = card.publication.state === 'unpublished' ? undefined : card.publication;
+const status = publicationStates[card.publication.state];
+---
+<li class="artifact-card">
+  <div class="artifact-card-heading">
+    <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>
+    <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={[
+      { label: 'Ver artefacto', href: detailUrl },
+      { label: 'Descargar revisión más reciente', href: exportHref(card.artifactId, card.head.revisionId) },
+      ...(publication ? [{ label: 'Abrir publicación', href: publication.url }] : []),
+      { label: 'Mover a proyecto', href: `${detailUrl}/move` },
+    ]} deleteUrl={`${detailUrl}/delete`} client:load />
+  </div>
+  <p class="artifact-description">{card.description}</p>
+  <div class="artifact-card-labels">
+    <a class="project-chip" data-tone={card.project ? projectTone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a>
+    <span class="artifact-status" data-state={card.publication.state}>{status.label}</span>
+  </div>
+  <div class="artifact-card-footer"><span class="artifact-kind">{contentLabels[card.kind]}</span><p>Revisión {card.head.sequence} · Actualizado <time datetime={card.head.createdAt.toISOString()} title={absoluteTime(card.head.createdAt)}>{relativeTime(card.head.createdAt, now)}</time></p></div>
+</li>

@@ -404,8 +404,8 @@ try {
   let reviewHead = reviewTwo;
   for (let sequence = 3; sequence <= 7; sequence++) reviewHead = await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, expectedRevisionId: reviewHead.revision.id, snapshot: reviewTwo.revision.snapshot });
   await panel.goto(dashboard);
-  const reviewCard = panel.locator('.artifact-list li').filter({ has: panel.getByRole('link', { name: 'Browser workflow review', exact: true }) });
-  assert.equal(await reviewCard.locator('.pending').innerText(), 'Cambios pendientes de publicación');
+  const reviewCard = panel.locator('.artifact-card').filter({ has: panel.getByRole('link', { name: 'Browser workflow review', exact: true }) });
+  assert.equal(await reviewCard.locator('.artifact-status').innerText(), 'Cambios pendientes');
   await panel.goto(`${reviewUrl}?revisionId=${reviewTwo.revision.id}&compareTo=${reviewOne.revision.id}`);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-artifact-id'), reviewOne.artifactId);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);

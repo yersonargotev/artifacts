@@ -39,6 +39,25 @@ export function searchFor(page: LibraryPage): LibraryQuery {
 export const clientLabel = (client: ClientRef) => client.name ?? client.clientId;
 export const absoluteTime = (at: Date) => `${at.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
 export const contentLabels = { html: 'HTML', markdown: 'Markdown', text: 'Texto' } as const;
+export const publicationStates = {
+  unpublished: { label: 'Sin publicar' },
+  published: { label: 'Publicado' },
+  pending: { label: 'Cambios pendientes' },
+} as const;
+export const statusTabs = [
+  { value: 'all', label: 'Todos' },
+  { value: 'published', label: 'Publicados' },
+  { value: 'unpublished', label: 'Sin publicar' },
+  { value: 'pending', label: 'Cambios pendientes' },
+] as const;
+
+export function relativeTime(at: Date, now: Date): string {
+  const minutes = Math.round((at.getTime() - now.getTime()) / 60_000);
+  const formatter = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+  if (Math.abs(minutes) < 60) return formatter.format(minutes, 'minute');
+  if (Math.abs(minutes) < 1_440) return formatter.format(Math.round(minutes / 60), 'hour');
+  return formatter.format(Math.round(minutes / 1_440), 'day');
+}
 
 export function revisionLabel(ref: RevisionRef, detail: ArtifactDetail): string {
   return `Revisión ${ref.sequence}${ref.revisionId === detail.publication?.revision.revisionId ? ' · publicada' : ''}${ref.revisionId === detail.head.revisionId ? ' · más reciente' : ''}`;
