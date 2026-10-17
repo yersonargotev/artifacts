@@ -81,24 +81,39 @@ require('node:module').syncBuiltinESMExports();
   const source = join(root, 'skills/artifacts-cli');
   const skill = await readFile(join(source, 'SKILL.md'), 'utf8');
   const description = 'Create, revise, inspect, publish, and export retained Artifacts through the artifacts CLI and REST API. Use when the user chooses the CLI or a terminal workflow for Artifacts. Exclude generic build artifacts and unrelated local files.';
+  const designSource = join(root, 'skills/artifacts-design');
+  const designDescription = /^description: (.+)$/m.exec(await readFile(join(designSource, 'SKILL.md'), 'utf8'))![1];
   const listed = await cli(['skills']);
-  assert.equal(listed, `artifacts-cli\t${description}\n`);
+  assert.equal(listed, `artifacts-cli\t${description}\nartifacts-design\t${designDescription}\n`);
   assert.equal(await cli(['skills', 'list']), listed);
   assert.equal(await cli(['skills', 'get', 'artifacts-cli']), skill);
 
   const packed = inventory.packages.find((item) => item.name === '@yargote/artifacts-cli')!;
   const archive = await inspectTarball(resolve(packageOutput, packed.tarball));
   const sourceFiles = await files(source);
-  assert.deepEqual(archive.files.filter((item) => item.path.startsWith('skills/')).map((item) => item.path).sort(), sourceFiles.map((path) => `skills/artifacts-cli/${path}`));
-  for (const path of sourceFiles) {
-    assert.deepEqual(archive.files.find((item) => item.path === `skills/artifacts-cli/${path}`)!.bytes, await readFile(join(source, path)));
+  const designFiles = await files(designSource);
+  assert.deepEqual(archive.files.filter((item) => item.path.startsWith('skills/')).map((item) => item.path).sort(), [...sourceFiles.map((path) => `skills/artifacts-cli/${path}`), ...designFiles.map((path) => `skills/artifacts-design/${path}`)].sort());
+  for (const [name, directoryPath, paths] of [['artifacts-cli', source, sourceFiles], ['artifacts-design', designSource, designFiles]] as const) {
+    for (const path of paths) {
+      assert.deepEqual(archive.files.find((item) => item.path === `skills/${name}/${path}`)!.bytes, await readFile(join(directoryPath, path)));
+    }
   }
 
   const all = await cli(['skills', 'get', '--all']);
   assert.match(all, /artifacts-cli\/SKILL\.md/);
   assert.ok(all.includes(skill));
   const full = await cli(['skills', 'get', 'artifacts-cli', '--full']);
-  assert.equal(await cli(['skills', 'get', '--all', '--full']), full);
+  const designFull = await cli(['skills', 'get', 'artifacts-design', '--full']);
+  assert.equal(await cli(['skills', 'get', '--all', '--full']), full + designFull);
+  for (const path of designFiles) {
+    const bytes = await readFile(join(designSource, path));
+    if (path.endsWith('.woff2')) {
+      assert.ok(designFull.includes(`=== artifacts-design/${path} (binary, ${bytes.length} bytes) ===\n`), `Full output labels binary ${path}`);
+      assert.equal(designFull.includes(bytes.subarray(0, 64).toString('latin1')), false, `Full output omits the bytes of ${path}`);
+    } else {
+      assert.ok(designFull.includes(`=== artifacts-design/${path} ===\n${bytes.toString('utf8')}`), `Full output preserves ${path}`);
+    }
+  }
   for (const path of sourceFiles) {
     assert.ok(full.includes(`=== artifacts-cli/${path} ===\n`), `Full output labels ${path}`);
     assert.ok(full.includes(await readFile(join(source, path), 'utf8')), `Full output preserves ${path}`);
@@ -116,7 +131,7 @@ require('node:module').syncBuiltinESMExports();
   await writeFile(join(templates, 'snapshot.json'), template);
   const expanded = `${full}=== artifacts-cli/templates/nested/snapshot.json ===\n${template}\n`;
   assert.equal(await cli(['skills', 'get', 'artifacts-cli', '--full']), expanded);
-  assert.equal(await cli(['skills', 'get', '--all', '--full']), expanded);
+  assert.equal(await cli(['skills', 'get', '--all', '--full']), expanded + designFull);
   assert.equal(await cli(['skills', 'get', 'artifacts-cli']), skill);
   await rm(join(bundled, 'templates'), { recursive: true });
   assert.equal(await cli(['skills', 'get', 'artifacts-cli'], home), skill);

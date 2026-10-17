@@ -10,4 +10,4 @@ Use inline SVG or CSS for diagrams. Use embedded raster images when the subject 
 
 Make the main visual dominant and its labels legible on narrow and wide screens. Give meaningful images text alternatives. Add interaction only when it helps the reader understand a relationship or change. Keep the core explanation accessible without operating a control.
 
-Before saving, check that the sequence explains the topic with its pictures and short captions, without a separate essay. Apply the [interface guidelines](web-design-guidelines.md) visual checks and report any checks you could not run.
+Before saving, check that the sequence explains the topic with its pictures and short captions, without a separate essay. Apply the [interface guidelines](interface-checks.md) visual checks and report any checks you could not run.

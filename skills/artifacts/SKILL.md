@@ -31,13 +31,7 @@ Interactive HTML follows the server's current Chrome compatibility policy. Other
 
 ## Author HTML
 
-For new layouts, restyling, or interaction changes, read [visual design](references/visual-design.md) and [interface guidelines](references/web-design-guidelines.md). For beginner explanations or requests for big pictures and few words, also read [visual explanations](references/visual-explanations.md).
-
-Follow the user's visual direction and an existing artifact's established style. Choose the composition for the document's purpose. When a dark digital canvas suits an unspecified design, use [Catppuccin Mocha with Blue](references/catppuccin-mocha.md). These references style the artifact document; the surrounding application is separate.
-
-Use the bundled guidance directly. Remote source links provide attribution, not a required fetch step. Apply the snapshot and sandbox constraints above when a general web guideline assumes unavailable capabilities.
-
-Finish the relevant visual and interaction checks before saving. Fix observed failures and repeat the affected checks. When browser verification is unavailable, inspect the source and disclose that visual behavior remains unverified.
+Before writing or restyling HTML, load the `artifacts-design` skill and follow it. It owns typography, embedded fonts, color, layout, and the rendered checks. Finish its checks before saving. When browser verification is unavailable, inspect the source and disclose that visual behavior remains unverified.
 
 ## Create or revise
 

@@ -81,12 +81,22 @@ async function fullFiles(directory: string, prefix = ''): Promise<string[]> {
   return files;
 }
 
+function isText(content: Buffer): boolean {
+  if (content.includes(0)) return false;
+  try { new TextDecoder('utf-8', { fatal: true }).decode(content); return true; }
+  catch { return false; }
+}
+
 async function labeledContent(skills: BundledSkill[], full: boolean): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for (const skill of skills) {
     const files = full ? ['SKILL.md', ...(await fullFiles(skill.directory)).filter((path) => path !== 'SKILL.md')] : ['SKILL.md'];
     for (const path of files) {
       const content = path === 'SKILL.md' ? skill.skillText : await readFile(join(skill.directory, path));
+      if (!isText(content)) {
+        chunks.push(Buffer.from(`=== ${skill.name}/${path} (binary, ${content.length} bytes) ===\n`));
+        continue;
+      }
       chunks.push(Buffer.from(`=== ${skill.name}/${path} ===\n`), content);
       if (content.at(-1) !== 10) chunks.push(Buffer.from('\n'));
     }

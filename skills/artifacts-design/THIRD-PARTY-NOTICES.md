@@ -1,11 +1,11 @@
 # Third-party notices
 
-These notices apply to the named adapted references. They do not set a license
+These notices apply to the named adapted references and bundled fonts. They do not set a license
 for the Artifacts application or the original Artifacts skill instructions.
 
 ## Emil Kowalski skills
 
-Adapted in [references/web-design-guidelines.md](references/web-design-guidelines.md). [Upstream license](https://raw.githubusercontent.com/emilkowalski/skills/refs/heads/main/LICENSE).
+Adapted in [references/interface-checks.md](references/interface-checks.md). [Upstream license](https://raw.githubusercontent.com/emilkowalski/skills/refs/heads/main/LICENSE).
 
 ```text
 MIT License
@@ -33,7 +33,7 @@ SOFTWARE.
 
 ## Vercel Web Interface Guidelines
 
-Adapted in [references/web-design-guidelines.md](references/web-design-guidelines.md). [Upstream license](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/refs/heads/main/LICENSE).
+Adapted in [references/interface-checks.md](references/interface-checks.md). [Upstream license](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/refs/heads/main/LICENSE).
 
 ```text
 MIT License
@@ -61,7 +61,7 @@ SOFTWARE.
 
 ## Catppuccin palette
 
-Adapted in [references/catppuccin-mocha.md](references/catppuccin-mocha.md). [Upstream license](https://raw.githubusercontent.com/catppuccin/palette/refs/heads/main/LICENSE).
+Adapted in [references/catppuccin.md](references/catppuccin.md). [Upstream license](https://raw.githubusercontent.com/catppuccin/palette/refs/heads/main/LICENSE).
 
 ```text
 MIT License
@@ -89,7 +89,7 @@ SOFTWARE.
 
 ## Vercel Agent Skills
 
-Adapted in [interface guidelines](references/web-design-guidelines.md).
+Adapted in [interface guidelines](references/interface-checks.md).
 [Upstream repository](https://github.com/vercel-labs/agent-skills).
 This notice is retained from the reviewed Packy Web Pack.
 
@@ -118,3 +118,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Bundled fonts
+
+The files in [fonts](fonts) are the Latin subsets of Bricolage Grotesque, Public Sans, JetBrains Mono, and Newsreader, as served by Google Fonts on 2026-10-17. Each is licensed under the SIL Open Font License, Version 1.1. The copyright lines and the complete license text are in [fonts/OFL.txt](fonts/OFL.txt).
