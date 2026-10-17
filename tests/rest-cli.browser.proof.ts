@@ -67,10 +67,9 @@ try {
   await page.frameLocator('.preview').getByRole('heading', { name: 'CLI second revision', exact: true }).waitFor();
   assert.equal(await page.locator('.artifact-detail').getAttribute('data-revision-id'), updated.revision.id);
   assert.equal(await page.locator('.artifact-detail').getAttribute('data-publication-version'), '1');
-  await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
   await Promise.all([
     page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id, { waitUntil: 'domcontentloaded' }),
-    page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click(),
+    page.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter'),
   ]);
   await page.frameLocator('.preview').getByRole('heading', { name: 'CLI original revision', exact: true }).waitFor();
   assert.equal(await page.locator('.artifact-detail').getAttribute('data-revision-id'), created.revision.id);
