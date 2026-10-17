@@ -70,6 +70,7 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .workspace-breadcrumb { flex: 1 1 220px; min-width: 0; color: var(--muted); font-size: 14px; }
 .workspace-breadcrumb ol { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .workspace-breadcrumb li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.workspace-breadcrumb li:first-child { flex: none; }
 .workspace-breadcrumb li > svg { flex: none; }
 .workspace-breadcrumb li:last-child { color: var(--foreground); }
 .workspace-breadcrumb a, .workspace-breadcrumb li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

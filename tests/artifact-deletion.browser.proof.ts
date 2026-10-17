@@ -91,7 +91,7 @@ try {
     await page.getByRole('heading', { name: 'Eliminar artefacto', exact: true }).waitFor();
   };
   await openConfirmation();
-  assert.equal(await page.getByRole('heading', { level: 2 }).textContent(), title);
+  assert.equal(await page.locator('.deletion-card').getByRole('heading', { level: 2 }).textContent(), title);
   assert.match(await page.locator('.deletion-card').innerText(), /permanentemente.*todas sus revisiones.*archivos.*publicación/);
   await page.screenshot({ path: `${evidence}/confirmation-desktop.png`, fullPage: true });
   await page.getByRole('link', { name: 'Cancelar', exact: true }).click();
@@ -118,6 +118,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator('header').count(), 1, 'Confirmation renders one panel header');
+  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Confirmation uses the shared shell header');
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await writeFile(`${evidence}/confirmation-mobile.aria.yml`, await page.locator('body').ariaSnapshot());
   await page.screenshot({ path: `${evidence}/confirmation-mobile.png`, fullPage: true });
