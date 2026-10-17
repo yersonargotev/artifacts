@@ -103,6 +103,7 @@ try {
   await capture('remove-readback');
   const removedReadback = await readbacks(null);
   await json('remove-readback.json', removedReadback);
+  await page.waitForTimeout(3500);
   assert.deepEqual(await immutable(), unchanged);
   const escape = (value: unknown) => JSON.stringify(value, null, 2).replaceAll('&', '&amp;').replaceAll('<', '&lt;');
   await writeFile(join(evidence, 'public-readback.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><title>Recorded public readback</title><style>body{font:16px system-ui;padding:32px;background:#1e1e2e;color:#cdd6f4}pre{font:15px monospace;white-space:pre-wrap}main{display:grid;grid-template-columns:1fr 1fr;gap:30px}</style><h1>Actual CLI and HTTP MCP readback</h1><p>Recorded from this disposable run after each native panel action.</p><main><section><h2>Created by move</h2><pre>${escape({ cliProjects: createdReadback.cliProjects, mcpProjects: createdReadback.mcpProjects, artifact: { id: item.artifactId, project: createdReadback.read.project, head: item.headRevisionId, publicationVersion: 1 } })}</pre></section><section><h2>Removed last member</h2><pre>${escape({ cliProjects: removedReadback.cliProjects, mcpProjects: removedReadback.mcpProjects, artifact: { id: item.artifactId, project: removedReadback.read.project, head: item.headRevisionId, publicationVersion: 1 } })}</pre></section></main>`);
