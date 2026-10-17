@@ -129,7 +129,7 @@ try {
   assert.equal(await home.getAttribute('href'), `${dashboard}/`);
   await home.click();
   await page.waitForURL(`${dashboard}/`);
-  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
   await page.goto(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
@@ -610,9 +610,9 @@ try {
   assert.equal((await anonymous.request.get(`${dashboard}/artifacts/${created.artifactId}/export?revisionId=${created.revision.id}`)).status(), 401);
   await anonymous.close();
   await panel.goto(dashboard);
-  await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await panel.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await panel.locator('.library-navigation > summary').click();
-  await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+  await panel.locator('summary[aria-label="Mi cuenta"]').click();
   await panel.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();

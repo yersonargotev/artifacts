@@ -4,6 +4,7 @@ import PublicationForm from '../../../components/PublicationForm.astro';
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 import { parsePublicationForm, publishSelectedRevision, type PublicationOutcome } from '../../../publish.ts';
+import { workspaceQuery } from '../../../presentation.ts';
 if (Astro.request.method !== 'POST') return new Response('Método no permitido.', { status: 405, headers: { allow: 'POST' } });
 if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
 const command = await parsePublicationForm(Astro.request, Astro.params.artifactId).catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
@@ -16,8 +17,10 @@ const selectedUrl = `/artifacts/${encodeURIComponent(command.artifactId)}?${new 
 const observed = result.kind === 'uncertain' ? undefined : result.observed;
 const current = observed?.publication;
 const heading = { published: 'Revisión publicada', superseded: 'La publicación cambió después', conflict: 'La publicación cambió', uncertain: 'No pudimos confirmar la publicación' }[result.kind];
+const snapshot = await getRuntime().then(({ panel }) => panel.library(panelActor(Astro.locals.identity!), workspaceQuery)).catch((error: unknown) => result.kind === 'uncertain' ? undefined : artifactErrorResponse(error));
+if (snapshot instanceof Response) return snapshot;
 ---
-<Panel title={heading} section="Publicación">
+<Panel title={heading} workspace={snapshot?.workspace}>
   <a class="back" href={selectedUrl}>Volver a la revisión seleccionada</a>
   <section class="publication" data-publication-result={result.kind}>
     <h1>{heading}</h1>

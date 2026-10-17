@@ -79,7 +79,7 @@ try {
   const pending = await store.issuePublicationGrant(actor, { artifactId: created.artifactId, state: pendingState });
   const page = await context.newPage();
   await page.goto(dashboard);
-  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Todos (1)', exact: true }).waitFor();
   const openConfirmation = async () => {
     const trigger = page.getByRole('button', { name: `Opciones de ${title}`, exact: true });

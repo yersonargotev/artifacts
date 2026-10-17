@@ -13,6 +13,13 @@
   --green: #a6e3a1;
   --yellow: #f9e2af;
   --red: #f38ba8;
+  --peach: #fab387;
+  --teal: #94e2d5;
+  --pink: #f5c2e7;
+  --sky: #89dceb;
+  --lavender: #b4befe;
+  --flamingo: #f2cdcd;
+  --maroon: #eba0ac;
   --accent-surface: #89b4fa14;
   --border-control: #45475a;
   --accent-selection: #89b4fa40;
@@ -38,3 +45,12 @@
   --ring-active: var(--blue);
   --elevation-overlay: 0 12px 36px #11111b80;
 }
+
+[data-tone="peach"] { --tone: var(--peach); }
+[data-tone="teal"] { --tone: var(--teal); }
+[data-tone="pink"] { --tone: var(--pink); }
+[data-tone="sky"] { --tone: var(--sky); }
+[data-tone="lavender"] { --tone: var(--lavender); }
+[data-tone="flamingo"] { --tone: var(--flamingo); }
+[data-tone="sapphire"] { --tone: var(--sapphire); }
+[data-tone="maroon"] { --tone: var(--maroon); }

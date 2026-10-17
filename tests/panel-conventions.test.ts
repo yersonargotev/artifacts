@@ -3,9 +3,21 @@ import { readFile, readdir } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { test } from 'node:test';
 import { transform, type Selector } from 'lightningcss';
+import { projectTone, projectTones } from '../apps/dashboard/src/presentation.ts';
 
 const sourceRoot = resolve('apps/dashboard/src');
 const styleRoot = resolve(sourceRoot, 'styles');
+
+test('project tones have stylesheet rules and ignore letter case', async () => {
+  const tokens = await readFile(resolve(styleRoot, 'tokens.css'), 'utf8');
+  for (const tone of projectTones) assert(tokens.includes(`[data-tone="${tone}"]`), `Missing project tone rule for ${tone}`);
+  assert.equal(projectTone('Beta'), projectTone('beta'));
+  assert.equal(projectTone('Beta'), 'maroon');
+  assert.equal(projectTone('Éxito'), projectTone('ÉXITO'));
+  assert.equal(projectTone('Éxito'), 'sky');
+  assert.equal(new Set(projectTones).size, 8);
+  assert(projectTones.every((tone) => !['green', 'yellow', 'mauve'].includes(tone)));
+});
 const effectPolicy = {
   '--glow-primary-fill': { property: 'background', subject: 'primary' },
   '--glow-primary': { property: 'box-shadow', subject: 'primary' },
