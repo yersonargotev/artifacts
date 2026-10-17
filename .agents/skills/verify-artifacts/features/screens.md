@@ -31,6 +31,7 @@ The drive captures these pages at both widths:
 | --- | --- | --- |
 | Signed-out welcome | `/` before login | `screens-welcome` |
 | Library | `/` after login | `screens-library` |
+| Projects index | `/projects` | `screens-projects` |
 | Project library | `/?project=Alpha` | `screens-project` |
 | Artifact detail | `/artifacts/<Alpha overview ID>` | `screens-detail` |
 | Move page | `/artifacts/<Alpha overview ID>/move` | `screens-move` |
