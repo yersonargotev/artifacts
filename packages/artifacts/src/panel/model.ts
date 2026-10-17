@@ -62,6 +62,13 @@ export type LibraryPage = {
 
 export type LibrarySnapshot = { readonly workspace: Workspace; readonly page: LibraryPage };
 
+export type RecentArtifact = Pick<ArtifactCard, 'artifactId' | 'title'>;
+export type ProjectsOverview = {
+  readonly projects: readonly { readonly project: ProjectAggregate; readonly recent: readonly RecentArtifact[] }[];
+  readonly unfiled: { readonly tally: Tally; readonly recent: readonly RecentArtifact[] };
+};
+export type ProjectsSnapshot = { readonly workspace: Workspace; readonly overview: ProjectsOverview };
+
 export type ClientRef = { readonly clientId: string; readonly name: string | null };
 export type DetailQuery = {
   readonly artifactId: string;

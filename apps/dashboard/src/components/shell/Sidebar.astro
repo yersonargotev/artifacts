@@ -17,7 +17,7 @@ const current = location.kind === 'artifact' ? 'true' : 'page';
   <div class="sidebar-content">
     <nav aria-label="Principal">
       <a class="sidebar-link" href="/" aria-label={workspace ? `Biblioteca (${workspace.total.count})` : 'Biblioteca'} aria-current={location.kind === 'library' ? 'page' : undefined}><Icon name="layout-grid" size={18} /><span>Biblioteca</span>{workspace && <span class="project-count">{workspace.total.count}</span>}</a>
-      <div class="sidebar-label"><Icon name="folder" size={18} /><span>Proyectos</span>{workspace && <span class="project-count">{workspace.projects.length}</span>}</div>
+      <a class="sidebar-link" href="/projects" aria-label={workspace ? `Proyectos (${workspace.projects.length})` : 'Proyectos'} aria-current={location.kind === 'projects' ? 'page' : undefined}><Icon name="folder" size={18} /><span>Proyectos</span>{workspace && <span class="project-count">{workspace.projects.length}</span>}</a>
     </nav>
     <nav class="sidebar-projects" aria-label="Tus proyectos">
       <h2>Tus proyectos</h2>

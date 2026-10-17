@@ -43,7 +43,6 @@
   --glow-primary-fill: linear-gradient(120deg, var(--blue), var(--sapphire));
   --glow-primary: 0 0 18px #89b4fa33;
   --glow-active: 0 0 12px #89b4fa14;
-  --cover-wash: linear-gradient(120deg, #89b4fa24, #74c7ec0d);
   --ring-active: var(--blue);
   --elevation-overlay: 0 12px 36px #11111b80;
 }
@@ -56,3 +55,7 @@
 [data-tone="flamingo"] { --tone: var(--flamingo); }
 [data-tone="sapphire"] { --tone: var(--sapphire); }
 [data-tone="maroon"] { --tone: var(--maroon); }
+
+[data-tone] {
+  --cover-wash: linear-gradient(120deg, color-mix(in srgb, var(--tone, var(--blue)) 18%, transparent), color-mix(in srgb, var(--tone, var(--blue)) 3%, transparent));
+}

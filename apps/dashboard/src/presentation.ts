@@ -4,6 +4,7 @@ import { scopeRequestOf } from './urls.ts';
 
 export type NavLocation =
   | { readonly kind: 'library' }
+  | { readonly kind: 'projects' }
   | { readonly kind: 'project'; readonly name: string }
   | { readonly kind: 'unfiled' }
   | { readonly kind: 'artifact'; readonly project: string | null }

@@ -13,6 +13,7 @@ const scopeName = scope.kind === 'project' ? scope.name : 'Sin proyecto';
 <nav class="workspace-breadcrumb" aria-label="Ruta">
   <ol>
     <li>{location.kind === 'library' ? <><Icon name="home" size={17} /><span>Biblioteca</span></> : <a href="/">Biblioteca</a>}</li>
+    {location.kind === 'projects' && <li><Icon name="chevron-right" size={14} /><span>Proyectos</span></li>}
     {scoped && <li><Icon name="chevron-right" size={14} />{nested ? <a href={scopeHref(scope)} title={scopeName}>{scope.kind === 'project' && <span class="project-dot" data-tone={projectTone(scope.name)}></span>}<span>{scopeName}</span></a> : <span title={scopeName}>{scopeName}</span>}</li>}
     {nested && <li><Icon name="chevron-right" size={14} /><span title={title}>{title}</span></li>}
   </ol>

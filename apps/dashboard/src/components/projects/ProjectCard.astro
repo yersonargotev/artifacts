@@ -1,0 +1,24 @@
+---
+import type { ProjectAggregate, RecentArtifact } from '@artifacts/artifacts/panel/model';
+import { absoluteTime, projectTone, relativeTime } from '../../presentation.ts';
+import { detailHref, scopeHref } from '../../urls.ts';
+import Icon from '../Icon.astro';
+import TallyBar from './TallyBar.astro';
+interface Props { project: ProjectAggregate; recent: readonly RecentArtifact[]; now: Date }
+const { project, recent, now } = Astro.props;
+const href = scopeHref({ kind: 'project', name: project.name });
+---
+<li class="project-card" data-project={project.name} data-tone={projectTone(project.name)}>
+  <div class="project-cover" aria-hidden="true">
+    <svg viewBox="0 0 400 84" preserveAspectRatio="none" fill="none"><path d="M-10 20 C60 0 120 40 200 22 S330 -4 410 18 M-10 34 C60 14 130 56 210 36 S330 10 410 32 M-10 48 C70 30 140 70 220 50 S340 24 410 46 M-10 62 C80 44 150 84 230 64 S350 38 410 60 M-10 76 C90 58 160 98 240 78 S360 52 410 74" /></svg>
+  </div>
+  <div class="project-card-body">
+    <div class="project-card-heading">
+      <span class="project-folder" aria-hidden="true"><Icon name="folder" size={23} /></span>
+      <div><h2><a href={href}>{project.name}</a></h2><p class="project-card-counts">{project.count} {project.count === 1 ? 'artefacto' : 'artefactos'} · {project.published} {project.published === 1 ? 'publicado' : 'publicados'}</p></div>
+    </div>
+    <TallyBar tally={project} />
+    <ul class="project-recent" aria-label={`Artefactos recientes de ${project.name}`}>{recent.map((item) => <li><a href={detailHref({ artifactId: item.artifactId, tab: 'preview' })} title={item.title}><Icon name="file-text" size={15} /><span>{item.title}</span></a></li>)}</ul>
+    <div class="project-card-footer"><p>Actualizado <time datetime={project.updatedAt.toISOString()} title={absoluteTime(project.updatedAt)}>{relativeTime(project.updatedAt, now)}</time></p><a href={href} aria-label={`Abrir proyecto ${project.name}`}>Abrir proyecto<Icon name="chevron-right" size={15} /></a></div>
+  </div>
+</li>
