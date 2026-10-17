@@ -362,9 +362,15 @@ export async function driveProjects({ page, browser, context, instance, director
       await demo.getByRole('link', { name: 'Asignar proyecto', exact: true }).click();
       await demo.getByRole('heading', { level: 1, name: 'Sin proyecto', exact: true }).waitFor();
       await delay(10_000);
+      await demo.goto(`${instance.panel}/?${new URLSearchParams({ project: specialName })}`);
+      const finalCopy = demo.getByRole('button', { name: 'Copiar comando para crear aquí', exact: true });
+      await finalCopy.focus();
+      await finalCopy.press('Enter');
+      await demo.locator('#project-copy-feedback').getByText('Comando copiado.', { exact: true }).waitFor();
+      await delay(1_000);
       await checkScreen(demo, 'projects-review-video');
     } finally { await recording.close(); }
-    await record('Record index, native project opening, and unfiled navigation', { directory: 'video', minimumSeconds: 30 });
+    await record('Record project copy, unfiled navigation, and final quoted-project keyboard copy', { directory: 'video', minimumSeconds: 30 });
   }
   const unfiledBefore = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
   await ok('move', loose.artifactId, '--project', 'Alpha');
