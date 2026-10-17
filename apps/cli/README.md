@@ -1,6 +1,6 @@
 # Artifacts CLI reference
 
-The `artifacts` Node CLI reads and writes retained artifacts through REST. It prints JSON results to stdout and diagnostics to stderr. Node 24 or later is required. Its private credential database uses Node's experimental built-in SQLite API.
+The `artifacts` Node CLI reads and writes retained artifacts through REST. It prints JSON results to stdout and diagnostics to stderr. Offline skills commands print plain text. Node 24 or later is required. Its private credential database uses Node's experimental built-in SQLite API.
 
 The `@yargote/artifacts-cli` package exposes the `artifacts` binary as compiled ESM JavaScript. Its client and contracts dependencies install automatically. Repository development uses `pnpm artifacts` with the same command syntax.
 
@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.1
+npm install --global @yargote/artifacts-cli@0.1.0-beta.2
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.1
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.2
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.1 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.1 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.2 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.2 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
@@ -80,6 +80,8 @@ Run `artifacts logout` before uninstalling if you want to clear credentials. Uni
 
 ## Server and local state
 
+Skills, help, and version commands work without a server or login. Skills commands do not read credentials or create private state. They accept and ignore global `--server` and `--state-dir` values, including their environment defaults.
+
 `--server RESOURCE` selects the exact canonical OAuth resource. `ARTIFACTS_SERVER` supplies the same value. A resource ending in `/mcp` uses REST under `/mcp/v1`. The CLI has no production default.
 
 `--state-dir DIR` overrides `ARTIFACTS_STATE_DIR`. The default is `~/.local/state/artifacts`. The state directory must be private and owned by the current user. Credentials are separate from operation files. Profiles bind credentials to the exact resource. Retained operation paths hash the resource and request ID, so request IDs cannot select filesystem paths.
@@ -119,9 +121,41 @@ artifacts publish ID --revision REV --expected-version N [--request-id ID]
 artifacts publish [ID] --command FILE
 artifacts export ID --revision REV --out FILE
 artifacts retry REQUEST_ID
+artifacts skills [list]
+artifacts skills get NAME [--full]
+artifacts skills get --all [--full]
+artifacts skills path [NAME]
+artifacts skills install [NAME] [--agent claude] [--global] [--force]
 ```
 
 Global `--server RESOURCE` and `--state-dir DIR` options can appear before or after the command. Options cannot be repeated. Unknown options and options for another command fail before submission.
+
+## Bundled skills
+
+Check `artifacts --help` for `skills` support. The published `0.1.0-beta.1` package predates this command group. These commands describe the current source and packages built from it.
+
+`artifacts skills` and `artifacts skills list` print each bundled skill's name and description, separated by a tab. The initial catalog contains `artifacts-cli`. Its complete source directory is bundled with the CLI, so the instructions match the installed version and work offline.
+
+`artifacts skills get artifacts-cli` prints the complete `SKILL.md` without headers or changes to its bytes. `--full` includes every bundled reference and template. Each file starts with a catalog-relative marker such as `=== artifacts-cli/references/commands.md ===`. `artifacts skills get --all` prints every `SKILL.md` with these markers. Add `--full` to include every skill's support files.
+
+`artifacts skills path` prints the absolute bundled catalog directory. Add a skill name to print that skill's directory. These paths belong to the CLI package and do not depend on the current directory.
+
+Install a discovery skill for an agent with one of these commands.
+
+| Command | Destination |
+| --- | --- |
+| `artifacts skills install` | `./.agents/skills/artifacts-cli/SKILL.md` |
+| `artifacts skills install --agent claude` | `./.claude/skills/artifacts-cli/SKILL.md` |
+| `artifacts skills install --global` | `~/.agents/skills/artifacts-cli/SKILL.md` |
+| `artifacts skills install --agent claude --global` | `~/.claude/skills/artifacts-cli/SKILL.md` |
+
+The optional name defaults to `artifacts-cli`. The default destination always uses `.agents`, even if `.claude` already exists. Only explicit `--agent claude` selects `.claude`. Local paths resolve from the current directory. Global paths resolve from the user's home directory.
+
+The command prints the absolute destination. It leaves identical files unchanged, including their modification time. A differing file requires `--force`. Forced installation replaces only `SKILL.md` and preserves neighboring files. A directory or symbolic link at `SKILL.md` is rejected.
+
+The discovery file instructs the agent to run `artifacts skills get artifacts-cli --full` and follow the returned instructions. It contains no copied workflow or fixed package path. After a CLI upgrade, the same discovery command loads that installed version's skill.
+
+## Artifact input and output
 
 Create and update snapshot files contain the complete domain snapshot.
 

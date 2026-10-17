@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { chmod, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { basename, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
-import { inspectTarball, packageDefinitions, packageOutput as defaultOutput, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
+import { bundledSkillFiles, inspectTarball, packageDefinitions, packageOutput as defaultOutput, root, type PackageInventory, type PackageManifest } from './package-catalog.ts';
 
 const { values } = parseArgs({ options: { out: { type: 'string' } } });
 if (values.out !== undefined && !isAbsolute(values.out)) throw new Error('--out requires an absolute new directory');
@@ -39,6 +39,10 @@ for (const source of sources) {
   const directory = join(packageOutput, basename(source.directory));
   await mkdir(directory, { recursive: true });
   await cp(join(compiled, source.directory, 'src'), join(directory, 'src'), { recursive: true });
+  for (const [path, bytes] of await bundledSkillFiles(original)) {
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), bytes);
+  }
   const dependencies = Object.fromEntries(Object.entries(original.dependencies ?? {}).map(([name, version]) => {
     if (!version.startsWith('workspace:')) return [name, version];
     const target = byName.get(name);
@@ -52,7 +56,8 @@ for (const source of sources) {
     engines: engines ?? { node: '>=24' },
     ...(original.exports ? { exports: rewrite(original.exports) } : {}),
     ...(original.bin ? { bin: rewrite(original.bin) as Record<string, string> } : {}),
-    files: ['src', 'README.md', 'LICENSE'], dependencies,
+    files: ['src', 'README.md', 'LICENSE', ...(original.artifactsSkills ? ['skills'] : [])], dependencies,
+    ...(original.artifactsSkills ? { artifactsSkills: original.artifactsSkills } : {}),
     ...(source.public ? { publishConfig: { access: 'public', tag: 'beta', provenance: false } } : {}),
   };
   await writeFile(join(directory, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);

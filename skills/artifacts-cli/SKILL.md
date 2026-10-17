@@ -5,11 +5,11 @@ description: Create, revise, inspect, publish, and export retained Artifacts thr
 
 # Manage retained Artifacts with the CLI
 
-Use the installed `artifacts` executable. Run `artifacts --help` and read [the command workflow](references/commands.md) before the first operation. If the executable is unavailable, report that prerequisite. Do not substitute database writes or invent CLI results.
+Use the installed `artifacts` executable. Run `artifacts --help` and read [the command workflow](references/commands.md) before the first operation. With bundled skills support, `artifacts skills get artifacts-cli --full` returns this skill and its complete command reference. If the executable is unavailable, report that prerequisite. Do not substitute database writes or invent CLI results.
 
 ## Select the account and resource
 
-Use the resource selected by the user or the existing `ARTIFACTS_SERVER` environment value. Pass `--server RESOURCE` or set `ARTIFACTS_SERVER` for every command. Login does not set an implicit default. A resource is the canonical OAuth URL, such as `https://artifacts.example.test/mcp`. REST routes are below that resource at `/v1`. Do not infer a production connection from an example or silently switch to a local server.
+Use the resource selected by the user or the existing `ARTIFACTS_SERVER` environment value. Pass `--server RESOURCE` or set `ARTIFACTS_SERVER` for service commands. Skills, help, and version commands work offline without a server or login. Login does not set an implicit default. A resource is the canonical OAuth URL, such as `https://artifacts.example.test/mcp`. REST routes are below that resource at `/v1`. Do not infer a production connection from an example or silently switch to a local server.
 
 Run `artifacts whoami` before the first mutation when the current identity is not established. Keep the selected resource and owner consistent throughout one operation. If login is needed, use `artifacts login --server RESOURCE`. The user authenticates in the browser. Do not collect their password or read another application's credentials. Never put tokens in command arguments, operation files, logs, or the final reply.
 

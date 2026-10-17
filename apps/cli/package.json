@@ -1,8 +1,11 @@
 {
   "name": "@yargote/artifacts-cli",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "private": true,
   "type": "module",
+  "artifactsSkills": [
+    "artifacts-cli"
+  ],
   "bin": {
     "artifacts": "./src/index.ts"
   },

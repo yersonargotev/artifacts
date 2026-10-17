@@ -132,12 +132,31 @@ try {
   await writeFile(join(directory, 'cli/src/secret.ts'), 'export const secret = "not-for-publication";\n');
   await assert.rejects(verifyRelease(await changedTarball(), directory), /Unexpected published file src\/secret.ts/);
   await rm(join(directory, 'cli/src/secret.ts'));
+  const skillPath = join(directory, 'cli/skills/artifacts-cli/SKILL.md');
+  const skillBytes = await readFile(skillPath);
+  await writeFile(skillPath, Buffer.concat([skillBytes, Buffer.from('changed')]));
+  await assert.rejects(verifyRelease(await changedTarball(), directory), /Bundled skill file differs from source at skills\/artifacts-cli\/SKILL.md/);
+  await writeFile(skillPath, skillBytes);
+  const referencePath = join(directory, 'cli/skills/artifacts-cli/references/commands.md');
+  const referenceBytes = await readFile(referencePath);
+  await rm(referencePath);
+  await assert.rejects(verifyRelease(await changedTarball(), directory), /Missing bundled skill file skills\/artifacts-cli\/references\/commands.md/);
+  await writeFile(referencePath, referenceBytes);
+  const unexpectedSkillPath = join(directory, 'cli/skills/artifacts-cli/secret.md');
+  await writeFile(unexpectedSkillPath, 'not-for-publication\n');
+  await assert.rejects(verifyRelease(await changedTarball(), directory), /Unexpected published file skills\/artifacts-cli\/secret.md/);
+  await rm(unexpectedSkillPath);
   const manifestPath = join(directory, 'cli/package.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  const selection = manifest.artifactsSkills;
+  manifest.artifactsSkills = ['artifacts'];
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  await assert.rejects(verifyRelease(await changedTarball(), directory), /Published skills selection must preserve the source declaration/);
+  manifest.artifactsSkills = selection;
   manifest.dependencies['@artifacts/db'] = '0.1.0';
   await writeFile(manifestPath, JSON.stringify(manifest));
   await assert.rejects(verifyRelease(await changedTarball(), directory), /Published dependencies must preserve source dependency edges/);
-  console.log('Release gate rejects beta tagged latest, stable versions, private packages, altered bytes, TypeScript leaks, and private dependency edges.');
+  console.log('Release gate rejects beta tagged latest, stable versions, private packages, altered bytes, TypeScript leaks, changed or missing skill content, undeclared skill files, changed skill selection, and private dependency edges.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
