@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.1
+npm install --global @yargote/artifacts-cli@0.1.0-beta.2
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.1
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.2
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.1 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.1 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.2 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.2 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.

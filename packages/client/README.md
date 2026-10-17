@@ -3,7 +3,7 @@
 `@yargote/artifacts-client` is a typed Fetch client for the Artifacts REST API. It depends on `@yargote/artifacts-contracts` and Zod. It does not install the artifact store or a database driver. Node 24 or later is required.
 
 ```sh
-npm install @yargote/artifacts-client@0.1.0-beta.1
+npm install @yargote/artifacts-client@0.1.0-beta.2
 ```
 
 ```ts
