@@ -1,0 +1,25 @@
+---
+import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { detailHref, type DetailUrl } from '../../urls.ts';
+interface Props { detail: ArtifactDetail; url: DetailUrl }
+const { detail, url } = Astro.props;
+const { revision } = detail.selected;
+const { head, compared, comparison } = detail;
+const published = detail.publication?.revision;
+const revisions = detail.choices.filter((ref) => ref.revisionId !== revision.id);
+const before = url.before;
+const revisionUrl = (revisionId: string) => detailHref(url, { revisionId, before: undefined });
+const metadataLabels = { title: 'Título', description: 'Descripción', custom: 'Metadatos personalizados' };
+const fileLabels = { added: 'Agregado', removed: 'Eliminado', changed: 'Modificado' };
+const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+---
+<section class="detail-card comparison" id="comparison">
+    <h2 tabindex="-1">Comparar revisiones</h2>
+    {revisions.length > 0 && <form class="compare-form" method="get" action={Astro.url.pathname}><input type="hidden" name="tab" value="compare" /><input type="hidden" name="revisionId" value={revision.id} />{before && <input type="hidden" name="before" value={before} />}<label for="compareTo">Comparar la seleccionada con</label><select id="compareTo" name="compareTo">{revisions.map((item) => <option value={item.revisionId} selected={item.revisionId === compared?.revisionId}>Revisión {item.sequence}{item.revisionId === published?.revisionId ? ' · publicada' : ''}{item.revisionId === head.revisionId ? ' · más reciente' : ''}</option>)}</select><button class="secondary">Comparar</button></form>}
+    {comparison && compared ? <>
+      <p>De la <a href={revisionUrl(compared.revisionId)}>revisión {compared.sequence}</a> a la seleccionada, revisión {revision.sequence}.</p>
+      <h3>Metadatos</h3>{comparison.metadata.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Campo</th><th scope="col">Revisión {compared.sequence}</th><th scope="col">Seleccionada, revisión {revision.sequence}</th></tr></thead><tbody>{comparison.metadata.map((row) => <tr><th scope="row">{metadataLabels[row.field]}</th><td><pre>{metadataValue(row.before)}</pre></td><td><pre>{metadataValue(row.after)}</pre></td></tr>)}</tbody></table></div> : <p class="muted">Los metadatos no cambiaron.</p>}
+      <h3>Contenido</h3><p>{comparison.content.kindChanged ? `El formato cambió de ${comparison.content.before.kind} a ${comparison.content.after.kind}.` : `Formato ${comparison.content.after.kind}.`}{comparison.content.textChanged ? ' El texto cambió.' : ' El texto no cambió.'}</p><div class="content-comparison"><div><h4>Revisión {compared.sequence}</h4><pre>{comparison.content.before.text}</pre></div><div><h4>Seleccionada, revisión {revision.sequence}</h4><pre>{comparison.content.after.text}</pre></div></div>
+      <h3>Archivos</h3>{comparison.files.length ? <ul class="file-changes">{comparison.files.map((row) => <li><h4>{row.path} <span class="badge">{fileLabels[row.change]}</span></h4><div class="file-comparison">{[{ label: `Revisión ${compared.sequence}`, file: row.before }, { label: `Seleccionada, revisión ${revision.sequence}`, file: row.after }].map(({ label, file }) => <div><p>{label}</p>{file ? <><p>{file.mediaType} · {file.encoding} · {file.decodedBytes} bytes</p><code>{file.sha256}</code></> : <p class="muted">Sin archivo</p>}</div>)}</div></li>)}</ul> : <p class="muted">Los archivos no cambiaron.</p>}
+    </> : <p class="muted">No hay otra revisión disponible para comparar.</p>}
+  </section>

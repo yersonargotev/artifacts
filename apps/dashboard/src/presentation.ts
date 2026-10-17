@@ -1,5 +1,5 @@
 import { projectKey } from '@artifacts/artifacts/panel/model';
-import type { LibraryPage, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
+import type { ArtifactDetail, ClientRef, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
 import { scopeRequestOf } from './urls.ts';
 
 export type NavLocation =
@@ -34,4 +34,16 @@ export function scopeOf(location: NavLocation): ScopeRequest {
 
 export function searchFor(page: LibraryPage): LibraryQuery {
   return { scope: scopeRequestOf(page.scope), status: page.status, q: page.q };
+}
+
+export const clientLabel = (client: ClientRef) => client.name ?? client.clientId;
+export const absoluteTime = (at: Date) => `${at.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
+export const contentLabels = { html: 'HTML', markdown: 'Markdown', text: 'Texto' } as const;
+
+export function revisionLabel(ref: RevisionRef, detail: ArtifactDetail): string {
+  return `Revisión ${ref.sequence}${ref.revisionId === detail.publication?.revision.revisionId ? ' · publicada' : ''}${ref.revisionId === detail.head.revisionId ? ' · más reciente' : ''}`;
+}
+
+export function retainedMarkers(detail: ArtifactDetail) {
+  return { 'data-artifact-id': detail.artifactId, 'data-revision-id': detail.selected.revision.id, 'data-revision-sha256': detail.selected.revision.sha256, 'data-publication-version': String(detail.publication?.version ?? 0) };
 }

@@ -1,0 +1,11 @@
+---
+import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { absoluteTime, clientLabel } from '../../presentation.ts';
+interface Props { detail: ArtifactDetail }
+const { detail } = Astro.props;
+const { revision } = detail.selected;
+---
+<section class="detail-card information-panel" id="information" aria-labelledby="information-title">
+  <h2 id="information-title">Información de la revisión {revision.sequence}</h2>
+  <dl><dt>Título</dt><dd>{revision.snapshot.metadata.title}</dd><dt>Descripción</dt><dd>{revision.snapshot.metadata.description}</dd>{revision.snapshot.metadata.custom !== undefined && <><dt>Metadatos personalizados</dt><dd><pre>{JSON.stringify(revision.snapshot.metadata.custom, null, 2)}</pre></dd></>}<dt>Artefacto</dt><dd>{detail.artifactId}</dd><dt>Proyecto</dt><dd>{detail.project ?? 'Sin proyecto'}</dd><dt>Revisión</dt><dd>{revision.id}</dd><dt>Cliente autor</dt><dd>{clientLabel(detail.selected.author)}</dd><dt>Creada</dt><dd>{absoluteTime(new Date(revision.createdAt))}</dd><dt>SHA-256</dt><dd>{revision.sha256}</dd></dl>
+</section>

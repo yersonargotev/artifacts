@@ -1,6 +1,6 @@
 import { Button } from './ui/button.tsx';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu.tsx';
-import type { ArtifactLink } from './ArtifactTitleMenu.tsx';
+import type { ArtifactLink } from './ArtifactMenu.tsx';
 import Icon from './Icon.tsx';
 
 type Props = Readonly<{ title: string; deleteUrl: string; actions: readonly ArtifactLink[] }>;

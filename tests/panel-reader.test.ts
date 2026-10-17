@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
-import { readLibraryUrl, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
+import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
 import { session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
@@ -152,11 +152,12 @@ test('detail reads one selected snapshot, light history and real client names in
   try {
     const actor = await actorFor(app);
     await app.db.insert(schema.oauthClient).values({ id: 'different-primary-key', clientId: actor.clientId, name: 'Authoring client', redirectUris: [] });
+    await app.db.insert(schema.oauthClient).values({ id: 'nullable-name-key', clientId: 'nullable-name-client', name: null, redirectUris: [] });
     const store = createArtifactStore(app.db, options);
     const first = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('First'), project: 'Alpha' });
     const revisions = [first.revision];
     for (let sequence = 2; sequence <= 7; sequence++) {
-      const next = await store.update({ ...actor, clientId: sequence === 7 ? 'unregistered-client' : actor.clientId }, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: revisions.at(-1)!.id, snapshot: snapshot(`Revision ${sequence}`) });
+      const next = await store.update({ ...actor, clientId: sequence === 7 ? 'unregistered-client' : sequence === 6 ? 'nullable-name-client' : actor.clientId }, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: revisions.at(-1)!.id, snapshot: snapshot(`Revision ${sequence}`) });
       revisions.push(next.revision);
     }
     await store.publish(actor, { requestId: randomUUID(), artifactId: first.artifactId, revisionId: first.revision.id, expectedPublicationVersion: 0 });
@@ -175,6 +176,7 @@ test('detail reads one selected snapshot, light history and real client names in
     assert.deepEqual(result.detail.publication, { revision: { revisionId: first.revision.id, sequence: 1, createdAt: new Date(first.revision.createdAt) }, version: 1, url: `https://published.example.test/a/${first.artifactId}` });
     assert.deepEqual(result.detail.history.entries.map(({ sequence }) => sequence), [7, 6, 5, 4, 3]);
     assert.deepEqual(result.detail.history.entries[0].author, { clientId: 'unregistered-client', name: null });
+    assert.deepEqual(result.detail.history.entries[1].author, { clientId: 'nullable-name-client', name: null });
     assert.equal(result.detail.history.olderBefore, 3);
     assert.equal(result.detail.history.before, null);
     assert.equal(result.detail.compared?.revisionId, first.revision.id);
@@ -249,4 +251,18 @@ test('detail rejects invalid IDs, another artifact or owner, missing scope, and 
     await app.db.delete(session).where(eq(session.id, actor.sessionId));
     await assert.rejects(panel.artifact(actor, input), { code: 'forbidden' });
   } finally { await app.close(); }
+});
+
+test('detail URLs preserve selection and cursors without rewriting the default preview URL', () => {
+  const read = (query: string) => readDetailUrl('artifact-one', new URL(`https://panel.example.test/artifacts/artifact-one${query}`));
+  assert.equal(read('').tab, 'preview');
+  assert.equal(read('?tab=unknown').tab, 'preview');
+  const state = read('?revisionId=second&compareTo=first&before=3&tab=files');
+  assert.deepEqual(detailQuery(state), { artifactId: 'artifact-one', revisionId: 'second', compareTo: 'first', before: 3, includeComparison: false });
+  assert.equal(detailQuery(read('?tab=compare')).includeComparison, true);
+  assert.equal(detailHref(state, { tab: 'compare' }), '/artifacts/artifact-one?revisionId=second&compareTo=first&before=3&tab=compare');
+  assert.equal(detailHref(state, { revisionId: 'first', before: undefined, tab: 'preview' }), '/artifacts/artifact-one?revisionId=first');
+  assert.equal(previewHref('artifact-one', 'second'), '/artifacts/artifact-one/preview?revisionId=second');
+  assert.equal(exportHref('artifact-one', 'second'), '/artifacts/artifact-one/export?revisionId=second');
+  for (const query of ['?revisionId=', '?compareTo=', '?before=', '?before=invalid']) assert.throws(() => read(query), { name: 'ZodError' });
 });

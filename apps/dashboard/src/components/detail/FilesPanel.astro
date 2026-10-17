@@ -1,0 +1,6 @@
+---
+import type { summarizeRevision } from '@artifacts/artifacts/workflow';
+interface Props { files: Awaited<ReturnType<typeof summarizeRevision>>['files']; sequence: number }
+const { files, sequence } = Astro.props;
+---
+<section class="detail-card inventory" id="files"><h2 tabindex="-1">Archivos de la revisión {sequence}</h2><p>La descarga de esta revisión incluye estos archivos con sus bytes originales.</p>{files.length ? <div class="table-scroll"><table><thead><tr><th scope="col">Archivo</th><th scope="col">Tipo y codificación</th><th scope="col">Bytes</th><th scope="col">SHA-256</th></tr></thead><tbody>{files.map((file) => <tr><th scope="row">{file.path}</th><td>{file.mediaType}<br />{file.encoding}</td><td>{file.decodedBytes}</td><td><code>{file.sha256}</code></td></tr>)}</tbody></table></div> : <p class="muted">Esta revisión no tiene archivos adjuntos.</p>}</section>

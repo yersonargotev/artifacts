@@ -1,0 +1,8 @@
+---
+import { detailHref, detailTabs, type DetailUrl } from '../../urls.ts';
+interface Props { url: DetailUrl; fileCount: number }
+const { url, fileCount } = Astro.props;
+---
+<nav class="detail-tabs" aria-label="Secciones del artefacto">
+  {detailTabs.map(({ value, label }) => <a href={detailHref(url, { tab: value })} aria-current={url.tab === value ? 'page' : undefined}>{label}{value === 'files' && <span class="tab-count">{fileCount}</span>}</a>)}
+</nav>

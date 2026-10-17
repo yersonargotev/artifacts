@@ -1,0 +1,17 @@
+---
+import { isPending, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { detailHref, type DetailUrl } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { detail: ArtifactDetail; url: DetailUrl }
+const { detail, url } = Astro.props;
+---
+<section class="detail-card publication-card" aria-labelledby="publication-title">
+  <h2 id="publication-title">Publicación</h2>
+  <div class="protected-access"><span class="card-icon"><Icon name="lock" size={20} /></span><div><strong>Acceso protegido</strong><p>Solo tú puedes abrir el enlace.</p></div></div>
+  {detail.publication ? <>
+    <p class="published-revision"><a href={detailHref(url, { revisionId: detail.publication.revision.revisionId, before: undefined })}>Revisión {detail.publication.revision.sequence} publicada</a></p>
+    {isPending(detail) ? <p class="pending-notice">La revisión {detail.head.sequence} todavía no está publicada. El enlace sigue mostrando la revisión {detail.publication.revision.sequence}.</p> : <p class="publication-state">La revisión más reciente está publicada.</p>}
+    <a class="button secondary publication-link" href={detail.publication.url}><Icon name="external-link" size={16} />Abrir publicación</a>
+  </> : <p class="publication-state">Este artefacto aún no está publicado.</p>}
+  <p class="publication-help">Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.</p>
+</section>

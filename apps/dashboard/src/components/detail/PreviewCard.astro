@@ -1,0 +1,23 @@
+---
+import { isSelectedPublished, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { previewHref } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { detail: ArtifactDetail }
+const { detail } = Astro.props;
+const { revision } = detail.selected;
+---
+<section class="preview-card" data-preview-size="desktop" aria-labelledby="preview-title">
+  <div class="preview-heading">
+    <h2 id="preview-title">Vista previa <span>· revisión {revision.sequence}</span></h2>
+    {isSelectedPublished(detail) && <span class="badge">Publicada</span>}
+    <div class="preview-controls" hidden>
+      <div class="preview-sizes" role="group" aria-label="Tamaño de la vista previa">
+        <button class="icon-button" type="button" aria-label="Escritorio" aria-pressed="true" data-preview-size="desktop"><Icon name="device-desktop" size={17} /></button>
+        <button class="icon-button" type="button" aria-label="Móvil" aria-pressed="false" data-preview-size="mobile"><Icon name="device-mobile" size={17} /></button>
+      </div>
+      <button class="icon-button" type="button" aria-label="Abrir vista previa en pantalla completa" data-preview-fullscreen><Icon name="arrows-maximize" size={17} /></button>
+    </div>
+  </div>
+  <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={previewHref(detail.artifactId, revision.id)}></iframe>
+  <p class="preview-feedback sr-only" role="status"></p>
+</section>

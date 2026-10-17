@@ -4,7 +4,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 
 ## Sub-features
 
-- `preview-list` opens an artifact from `Biblioteca` and displays its title and selected revision. Full metadata is available under `Información`.
+- `preview-list` opens an artifact from `Biblioteca` and displays its title and selected revision. Full metadata is available on the `Información` tab. `Archivos` and `Comparar` use GET navigation and preserve the selected revision. Only `Vista previa` renders the pinned iframe.
 - `preview-current` displays the newest draft and its revision badge.
 - `preview-history` selects a retained revision without replacing its saved content.
 - `preview-interaction` runs the supported HTML interaction in the actual preview iframe.
@@ -18,7 +18,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 - Sign in at the panel root, find an artifact under `Biblioteca`, and choose its title link.
 - Open the artifact's saved detail URL directly; a signed-out owner must complete login before viewing it.
 - Choose a native `Revisión seleccionada` option and submit `Ver revisión`, or follow `Ver revisión 1` or another revision link in `Historial`. The selector covers the loaded history page and required references.
-- The title menu contains the selected download, `Información`, and section links. Choosing `Información` opens its native disclosure. The visible `Archivos`, `Comparar revisiones` and `Historial` anchors also reach the secondary sections below the preview.
+- Use `Vista previa`, `Archivos`, `Comparar`, and `Información` to browse the selected revision. These tabs are ordinary GET links. The title menu contains `Descargar revisión N`, `Mover a proyecto`, and `Eliminar artefacto`. `Exportar` and the information card's `Mover` link work without JavaScript, as do the tabs and revision selector form. The menu, preview sizing, fullscreen, and clipboard controls require JavaScript.
 - Use `Ver más artefactos` on a sufficiently populated list, or `Ver revisiones anteriores` when history spans pages.
 - The library orders artifacts by the time of their newest content revision. Moving or publishing an artifact does not change that order. Rows show the head revision and the separately published revision.
 - Open `/?unfiled=1` to see only artifacts without a project. Search, publication filters, and pagination preserve this scope.
@@ -50,3 +50,9 @@ Preconditions:
 - `tests/artifact-browser.proof.ts` checks historical content, preview denial, and containment using store-seeded artifact fixtures. `tests/publication-network.proof.ts` adds renderer/UDP probes. Neither a screenshot nor a raw HTML render proves the complete sandbox, network, and authentication behavior.
 - The fixed drive has a two-revision verification artifact and three library documents. It cannot prove pagination, empty-list state, arbitrary content kinds, or every mobile browser. The extended identity proof captures the empty library.
 - The `Más reciente` and `Publicada` badges describe different pointers. A historical selection may show neither; this is not a failed preview.
+
+## Extended detail proof
+
+After `pnpm build`, run `node --import tsx tests/panel-detail.browser.proof.ts`. Set `PANEL_DETAIL_EVIDENCE` to an unused evidence directory when retaining a named run. The proof creates the first revision with the source CLI and the second through HTTP MCP, so the history checks real client names. It exercises keyboard GET tabs at 1440px and 390px, all publication states, actual clipboard and fullscreen calls, CSS preview sizing, history selection, publication, and selected ZIP bytes against MCP export. A separate context disables JavaScript and checks tabs, revision selection, selected export, and the native move link.
+
+The proof waits for the served iframe's heading, fonts, and two animation frames before capturing it. It records internal frame dimensions, verifies page overflow, retains each changed tab and a browser video, and runs the unchanged retained verifier at both widths. It fails on panel console errors or non-GET requests during tab browsing. Cleanup stops its isolated fixture and removes temporary credentials while preserving evidence.

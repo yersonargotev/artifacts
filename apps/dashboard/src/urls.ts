@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { panelLibraryQuerySchema } from '@artifacts/artifacts/panel';
-import type { LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
+import { panelDetailQuerySchema, panelLibraryQuerySchema } from '@artifacts/artifacts/panel';
+import type { DetailQuery, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
 
 export function readLibraryUrl(url: URL): LibraryQuery {
   const params = url.searchParams;
@@ -24,3 +24,33 @@ export function libraryHref(query: LibraryQuery, patch: Partial<LibraryQuery> = 
 export function scopeHref(scope: ScopeRequest): string {
   return libraryHref({ scope, status: 'all', q: '' });
 }
+
+export const detailTabs = [
+  { value: 'preview', label: 'Vista previa' },
+  { value: 'files', label: 'Archivos' },
+  { value: 'compare', label: 'Comparar' },
+  { value: 'information', label: 'Información' },
+] as const;
+export type DetailTab = typeof detailTabs[number]['value'];
+export type DetailUrl = Omit<DetailQuery, 'includeComparison'> & { readonly tab: DetailTab };
+
+export function readDetailUrl(artifactId: string | undefined, url: URL): DetailUrl {
+  const params = url.searchParams;
+  const tab = detailTabs.find(({ value }) => value === params.get('tab'))?.value ?? 'preview';
+  const { includeComparison: _, ...query } = panelDetailQuerySchema.parse({ artifactId, revisionId: params.get('revisionId') ?? undefined,
+    compareTo: params.get('compareTo') ?? undefined, before: params.has('before') ? Number(params.get('before')) : undefined, includeComparison: tab === 'compare' });
+  return { ...query, tab };
+}
+
+export function detailQuery({ tab, ...query }: DetailUrl): DetailQuery {
+  return { ...query, includeComparison: tab === 'compare' };
+}
+
+export function detailHref(state: DetailUrl, patch: Partial<DetailUrl> = {}): string {
+  const { artifactId, revisionId, compareTo, before, tab } = { ...state, ...patch };
+  const params = new URLSearchParams({ ...(revisionId ? { revisionId } : {}), ...(compareTo && compareTo !== revisionId ? { compareTo } : {}), ...(before === undefined ? {} : { before: String(before) }), ...(tab === 'preview' ? {} : { tab }) });
+  return `/artifacts/${encodeURIComponent(artifactId)}${params.size ? `?${params}` : ''}`;
+}
+
+export const previewHref = (artifactId: string, revisionId: string) => `/artifacts/${encodeURIComponent(artifactId)}/preview?${new URLSearchParams({ revisionId })}`;
+export const exportHref = (artifactId: string, revisionId: string) => `/artifacts/${encodeURIComponent(artifactId)}/export?${new URLSearchParams({ revisionId })}`;

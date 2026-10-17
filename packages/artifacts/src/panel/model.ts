@@ -1,3 +1,6 @@
+import type { Revision } from '../contracts.ts';
+import type { RevisionComparison } from '../workflow.ts';
+
 export type ProjectName = string & { readonly __brand: 'ProjectName' };
 export type ContentKind = 'html' | 'markdown' | 'text';
 
@@ -58,9 +61,6 @@ export type LibraryPage = {
 };
 
 export type LibrarySnapshot = { readonly workspace: Workspace; readonly page: LibraryPage };
-import type { Revision } from '../contracts.ts';
-import type { RevisionComparison } from '../workflow.ts';
-
 
 export type ClientRef = { readonly clientId: string; readonly name: string | null };
 export type DetailQuery = {

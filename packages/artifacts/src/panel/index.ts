@@ -6,7 +6,6 @@ import { artifact, artifactPublication, artifactRevision, oauthClient } from '@a
 import { ArtifactError, historySchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
 import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ScopeRequest, type Tally, type Workspace } from './model.ts';
-
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
