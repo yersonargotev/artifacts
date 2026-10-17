@@ -5,6 +5,15 @@
       "id": "pstack",
       "surface_intents": [
         {
+          "surface": "claude",
+          "version": "4.4.0",
+          "selection": {
+            "mode": "all",
+            "roots": []
+          },
+          "aliases": []
+        },
+        {
           "surface": "codex",
           "version": "4.3.0",
           "selection": {
