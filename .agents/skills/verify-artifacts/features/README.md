@@ -40,7 +40,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - [Identity and sessions](./identity.md): `identity` covers panel login, canonical identity, panel logout, central SSO, and global revocation.
 - [Authoring and publication selection](./authoring.md): `authoring` covers real MCP creation, retained updates, retries/conflicts, reads, and publication selection.
 - [Standalone CLI over REST](./cli.md): `cli` drives the source `artifacts` CLI through whoami, create, edit, stale update, history, publish and export against the local REST resource.
-- [Projects](./projects.md): `projects` creates artifacts in projects through MCP, moves one with the source CLI, and browses the panel's `Proyectos` sidebar at desktop and 390px.
+- [Projects](./projects.md): `projects` creates artifacts in projects through MCP, moves one with the source CLI, moves another into and out of a project from the panel, and browses the panel's `Proyectos` sidebar at desktop and 390px.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.
