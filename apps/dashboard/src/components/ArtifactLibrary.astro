@@ -40,6 +40,7 @@ const date = (value: string) => new Date(value).toLocaleDateString('es', { dateS
         { label: 'Ver artefacto', href: detailUrl },
         { label: 'Descargar revisión más reciente', href: `${detailUrl}/export?${new URLSearchParams({ revisionId: artifact.headRevisionId })}` },
         ...(artifact.publication ? [{ label: 'Abrir publicación', href: artifact.publication.url }] : []),
+        { label: 'Mover a proyecto', href: `${detailUrl}/move` },
       ]} client:load />
     </li>;
   })}</ul></div> : <div class="library-empty" data-slot="card"><span class="empty-icon"><Icon name={empty.icon} size={30} /></span><h2>{empty.title}</h2><p>{empty.text}</p>{empty.link ? <a class="button secondary" href={empty.link.href}>{empty.link.label}</a> : <button type="button" data-open-tools><Icon name="plug-connected" size={18} />Conectar herramientas</button>}</div>}

@@ -4,8 +4,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import Icon from './Icon.tsx';
 import type { IconName } from './icons.ts';
 
-const iconNames = { download: 'download', information: 'info-circle', files: 'file-text', comparison: 'arrows-diff', history: 'history', library: 'layout-dashboard', publication: 'external-link' } as const satisfies Record<string, IconName>;
-export type ArtifactLink = Readonly<{ label: string; href: string; icon?: keyof typeof iconNames; group?: 'revision' | 'sections' | 'destinations' }>;
+const iconNames = { download: 'download', information: 'info-circle', files: 'file-text', comparison: 'arrows-diff', history: 'history', library: 'layout-dashboard', publication: 'external-link', move: 'folder' } as const satisfies Record<string, IconName>;
+export type ArtifactLink = Readonly<{ label: string; href: string; icon?: keyof typeof iconNames; group?: 'revision' | 'sections' | 'destinations' | 'artifact' }>;
 type Props = Readonly<{ title: string; revisionLabel: string; actions: readonly ArtifactLink[] }>;
 
 export default function ArtifactTitleMenu({ title, revisionLabel, actions }: Props) {

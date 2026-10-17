@@ -2,7 +2,7 @@
 
 ## Problem and decision
 
-Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel sidebar group the owner's artifacts by that column. There is no project table, no command that creates or deletes a project, and no empty project.
+Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel sidebar group the owner's artifacts by that column. MCP, REST, the CLI, and the panel's `Mover a proyecto` page all move an artifact through the same store command. There is no project table, no command that creates or deletes a project, and no empty project.
 
 ## Derived label instead of a project table
 
@@ -20,9 +20,9 @@ The comparison runs in the store rather than in SQL because SQLite `lower()` fol
 
 ## Not part of the revision snapshot
 
-A project is mutable artifact-level organization. A snapshot is the immutable content of a revision. A project inside the snapshot would make every move create a revision and change its digest. It would also appear in revision comparisons, exports, and publications. Instead, `artifacts_move` and `PUT /v1/artifacts/:id/project` update only the artifact row. A move never creates a revision and never changes the publication. Exports and published pages do not contain the project.
+A project is mutable artifact-level organization. A snapshot is the immutable content of a revision. A project inside the snapshot would make every move create a revision and change its digest. It would also appear in revision comparisons, exports, and publications. Instead, `artifacts_move`, `PUT /v1/artifacts/:id/project`, and the panel's move form update only the artifact row. A move never creates a revision and never changes the publication. Exports and published pages do not contain the project.
 
-Move is a command with an owner-scoped receipt like the other mutations. An exact retry returns the original result, and a changed command under the same request ID fails with `request_conflict`. Moving to the current project succeeds without change. Deleting the artifact invalidates its move receipts along with its other receipts.
+Move is a command with an owner-scoped receipt like the other mutations. An exact retry returns the original result, and a changed command under the same request ID fails with `request_conflict`. The panel move form carries its request ID like the deletion form, so a resubmitted form replays the receipt instead of moving the artifact again. Moving to the current project succeeds without change. Deleting the artifact invalidates its move receipts along with its other receipts.
 
 ## Compatibility and rollout
 
