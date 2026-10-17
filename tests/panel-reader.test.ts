@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/libsql';
+import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
 import { readLibraryUrl, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
@@ -142,4 +144,109 @@ test('panel URLs validate explicit scopes and cursors and reset cursors when fil
   for (const value of ['?project=Beta&unfiled=1', '?project=', '?unfiled=0', '?q=' + 'x'.repeat(257), '?cursor=1', '?cursor=-1:abc', '?cursor=01:abc', '?cursor=1.5:abc', '?cursor=8640000000000001:abc', '?cursor=1:']) assert.throws(() => read(value), { name: 'ZodError' }, value);
   assert.deepEqual(panelLibraryQuerySchema.parse({}), { scope: { kind: 'all' }, status: 'all', q: '' });
   assert.equal(panelLibraryQuerySchema.safeParse({ status: 'unknown' }).success, false);
+});
+
+
+test('detail reads one selected snapshot, light history and real client names in one transaction', async (t) => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    await app.db.insert(schema.oauthClient).values({ id: 'different-primary-key', clientId: actor.clientId, name: 'Authoring client', redirectUris: [] });
+    const store = createArtifactStore(app.db, options);
+    const first = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('First'), project: 'Alpha' });
+    const revisions = [first.revision];
+    for (let sequence = 2; sequence <= 7; sequence++) {
+      const next = await store.update({ ...actor, clientId: sequence === 7 ? 'unregistered-client' : actor.clientId }, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: revisions.at(-1)!.id, snapshot: snapshot(`Revision ${sequence}`) });
+      revisions.push(next.revision);
+    }
+    await store.publish(actor, { requestId: randomUUID(), artifactId: first.artifactId, revisionId: first.revision.id, expectedPublicationVersion: 0 });
+    const queries: string[] = [];
+    const db = drizzle(app.client, { schema, logger: { logQuery(query) { queries.push(query); } } });
+    const transactions = t.mock.method(db, 'transaction');
+    const panel = createPanel(db, options);
+    const input = { artifactId: first.artifactId, revisionId: revisions[1].id, includeComparison: false };
+    const result = await panel.artifact(actor, input);
+    assert.equal(transactions.mock.callCount(), 1);
+    assert.equal(queries.filter((query) => query.startsWith('select') && query.includes('"snapshot"')).length, 1);
+    assert.deepEqual(result.workspace.total, { count: 1, published: 1, pending: 1 });
+    assert.deepEqual(result.detail.selected, { revision: revisions[1], author: { clientId: actor.clientId, name: 'Authoring client' } });
+    assert.equal(result.detail.createdAt.toISOString(), first.revision.createdAt);
+    assert.equal(result.detail.head.revisionId, revisions[6].id);
+    assert.deepEqual(result.detail.publication, { revision: { revisionId: first.revision.id, sequence: 1, createdAt: new Date(first.revision.createdAt) }, version: 1, url: `https://published.example.test/a/${first.artifactId}` });
+    assert.deepEqual(result.detail.history.entries.map(({ sequence }) => sequence), [7, 6, 5, 4, 3]);
+    assert.deepEqual(result.detail.history.entries[0].author, { clientId: 'unregistered-client', name: null });
+    assert.equal(result.detail.history.olderBefore, 3);
+    assert.equal(result.detail.history.before, null);
+    assert.equal(result.detail.compared?.revisionId, first.revision.id);
+    assert.equal(result.detail.comparison, null);
+    assert.deepEqual(result.detail.choices.map(({ sequence }) => sequence), [7, 6, 5, 4, 3, 2, 1]);
+    assert(result.detail.history.entries.every((entry) => !('snapshot' in entry)));
+    queries.length = 0;
+    const explicit = await panel.artifact(actor, { ...input, compareTo: revisions[5].id });
+    assert.equal(explicit.detail.compared?.sequence, 6);
+    assert.equal(explicit.detail.comparison, null);
+    assert.equal(queries.filter((query) => query.startsWith('select') && query.includes('"snapshot"')).length, 1);
+    queries.length = 0;
+    const compared = await panel.artifact(actor, { ...input, compareTo: revisions[5].id, includeComparison: true });
+    assert.equal(queries.filter((query) => query.startsWith('select') && query.includes('"snapshot"')).length, 2);
+    assert.equal(compared.detail.comparison?.content.before.text, 'Revision 6');
+    assert.equal(compared.detail.comparison?.content.after.text, 'Revision 2');
+    const older = await panel.artifact(actor, { ...input, before: 3, compareTo: revisions[1].id });
+    assert.deepEqual(older.detail.history.entries.map(({ sequence }) => sequence), [2, 1]);
+    assert.equal(older.detail.history.olderBefore, null);
+    assert.equal(older.detail.compared?.sequence, 1);
+    assert.deepEqual(older.detail.choices.map(({ sequence }) => sequence), [7, 2, 1]);
+  } finally { await app.close(); }
+});
+
+test('detail comparison falls through self, publication, head, parent, and the current history page', async () => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const first = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('One') });
+    const input = { artifactId: first.artifactId, includeComparison: true };
+    const single = await panel.artifact(actor, input);
+    assert.equal(single.detail.compared, null);
+    assert.equal(single.detail.comparison, null);
+    const second = await store.update(actor, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, snapshot: snapshot('Two') });
+    const head = await panel.artifact(actor, { ...input, revisionId: first.revision.id, compareTo: first.revision.id });
+    assert.equal(head.detail.compared?.sequence, 2);
+    const parent = await panel.artifact(actor, { ...input, before: 1, compareTo: second.revision.id });
+    assert.deepEqual(parent.detail.history.entries, []);
+    assert.equal(parent.detail.compared?.sequence, 1);
+    assert.equal(parent.detail.comparison?.content.before.text, 'One');
+    const detachedId = randomUUID();
+    await app.db.insert(schema.artifactRevision).values({ id: detachedId, artifactId: first.artifactId, parentRevisionId: null, sequence: 3, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: second.revision.sha256, snapshot: JSON.stringify(second.revision.snapshot) });
+    await app.db.update(schema.artifact).set({ headRevisionId: detachedId }).where(eq(schema.artifact.id, first.artifactId));
+    const history = await panel.artifact(actor, input);
+    assert.equal(history.detail.compared?.sequence, 2);
+    await store.publish(actor, { requestId: randomUUID(), artifactId: first.artifactId, revisionId: detachedId, expectedPublicationVersion: 0 });
+    const selfPublication = await panel.artifact(actor, input);
+    assert.equal(selfPublication.detail.compared?.sequence, 2);
+  } finally { await app.close(); }
+});
+
+test('detail rejects invalid IDs, another artifact or owner, missing scope, and revoked sessions', async () => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const own = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Own') });
+    const otherArtifact = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Other artifact') });
+    const input = { artifactId: own.artifactId, includeComparison: false };
+    for (const patch of [{ revisionId: '' }, { compareTo: '' }, { before: 0 }, { before: 1.5 }]) await assert.rejects(panel.artifact(actor, { ...input, ...patch }), { name: 'ZodError' });
+    for (const patch of [{ artifactId: 'missing' }, { revisionId: 'missing' }, { compareTo: 'missing' }, { revisionId: otherArtifact.revision.id }, { compareTo: otherArtifact.revision.id }]) await assert.rejects(panel.artifact(actor, { ...input, ...patch }), { code: 'not_found' });
+    const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'detail-other@example.test', password: app.password } });
+    await app.auth.api.signInEmail({ body: { email: 'detail-other@example.test', password: app.password } });
+    const [otherSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
+    const other = { ...actor, userId: outsider.user.id, sessionId: otherSession.id };
+    await assert.rejects(panel.artifact(other, input), { code: 'not_found' });
+    await assert.rejects(panel.artifact({ ...actor, sessionId: other.sessionId }, input), { code: 'forbidden' });
+    await assert.rejects(panel.artifact({ ...actor, scopes: [] }, input), { code: 'forbidden' });
+    await app.db.delete(session).where(eq(session.id, actor.sessionId));
+    await assert.rejects(panel.artifact(actor, input), { code: 'forbidden' });
+  } finally { await app.close(); }
 });
