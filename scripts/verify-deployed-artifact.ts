@@ -85,8 +85,7 @@ try {
     await panel.getByRole('link', { name: original.revision.snapshot.metadata.title, exact: true }).click();
     await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).waitFor();
     await panel.getByRole('link', { name: 'Ver revisión 2', exact: true }).waitFor();
-    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-    await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === original.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
+    await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === original.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
     await panel.frameLocator('iframe').getByRole('heading', { name: 'Created by Claude', exact: true }).waitFor();
     const downloadEvent = panel.waitForEvent('download');
     await panel.getByRole('link', { name: 'Descargar revisión 1', exact: true }).first().click();

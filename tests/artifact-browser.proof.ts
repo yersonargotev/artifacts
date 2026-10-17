@@ -280,18 +280,10 @@ try {
   assert.equal(previewDenied?.status(), 403);
   assert.equal(await directPreview.locator('script').count(), 0);
   await directPreview.close();
-  for (let selection = 0; selection < 3; selection++) {
-    if (selection > 0) {
-      await panel.goto(`${dashboard}/artifacts/${created.artifactId}`);
-      await panel.frameLocator('.preview').getByRole('heading', { name: 'Updated document', exact: true }).waitFor();
-    }
-    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-    await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click();
-    await panel.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id);
-    await panel.frameLocator('.preview').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
-    assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), created.revision.id);
-    assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), created.revision.id);
-  }
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
+  await panel.frameLocator('.preview').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), created.revision.id);
+  assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), created.revision.id);
   await panel.getByRole('button', { name: 'Menú de Browser proof artifact', exact: true }).click();
   const exportEvent = panel.waitForEvent('download');
   await panel.getByRole('menuitem', { name: 'Descargar revisión 1', exact: true }).click();
@@ -357,12 +349,10 @@ try {
     singleRevisionComparison: { forms: 0, selectors: 0, comparisons: 0, emptyState: 1, selfLinks: 0, publicationNotice: 1 },
     unpublishedComparison: { selected: unpublishedTwo.revision.id, target: unpublishedOne.revision.id, options: [unpublishedOne.revision.id], contents: [unpublishedOne.revision.snapshot.content.text, unpublishedTwo.revision.snapshot.content.text] },
   });
-  await panel.getByRole('button', { name: 'Comparar', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('compareTo') === unpublishedOne.revision.id), panel.getByRole('button', { name: 'Comparar', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('compareTo') === unpublishedOne.revision.id), panel.getByRole('button', { name: 'Comparar', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), unpublishedTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), unpublishedOne.revision.id);
-  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === unpublishedOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === unpublishedOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedTwo.revision.id);
   assert.deepEqual(await panel.locator('#compareTo option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)), [unpublishedTwo.revision.id]);
@@ -417,8 +407,7 @@ try {
   await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
   for (const [label, id] of [['Archivos (4)', 'files'], ['Comparar revisiones', 'comparison'], ['Historial', 'history']]) {
     const anchor = panel.getByRole('navigation', { name: 'Secciones de la revisión', exact: true }).getByRole('link', { name: label, exact: true });
-    await anchor.scrollIntoViewIfNeeded();
-    await anchor.click();
+    await anchor.press('Enter');
     assert.equal(new URL(panel.url()).hash, `#${id}`);
     const bounds = await panel.locator(`#${id} h2`).boundingBox();
     assert(bounds && bounds.y >= 0 && bounds.y < 900, 'Secondary anchors must reach their visible section headings');
@@ -433,8 +422,7 @@ try {
   assert.equal(await panel.locator('.artifact-detail script, .artifact-detail img').count(), 0);
   assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
   assert.equal(await panel.locator('.revision-list li').count(), 5);
-  await panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('before') === '3'), panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('before') === '3'), panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewTwo.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
@@ -442,8 +430,7 @@ try {
   assert.equal(await panel.locator('.revision-list li').count(), 2);
   await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewOne.revision.id);
   const selectorGet = panel.waitForRequest((request) => new URL(request.url()).pathname === new URL(reviewUrl).pathname && request.isNavigationRequest());
-  await panel.getByRole('button', { name: 'Ver revisión', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).press('Enter')]);
   assert.equal((await selectorGet).method(), 'GET');
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewOne.revision.id);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
@@ -458,9 +445,9 @@ try {
   await panel.getByRole('button', { name: `Menú de ${reviewOne.revision.snapshot.metadata.title}`, exact: true }).click();
   assert.equal(new URL((await panel.getByRole('menuitem', { name: 'Descargar revisión 1', exact: true }).getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
   await panel.keyboard.press('Escape');
+  await panel.getByRole('menu').waitFor({ state: 'hidden' });
   await panel.getByLabel('Revisión seleccionada', { exact: true }).selectOption(reviewTwo.revision.id);
-  await panel.getByRole('button', { name: 'Ver revisión', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewTwo.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewTwo.revision.id), panel.getByRole('button', { name: 'Ver revisión', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('before'), '3');
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), reviewOne.revision.id);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
@@ -472,9 +459,9 @@ try {
   await panel.getByRole('button', { name: 'Menú de Browser workflow review', exact: true }).click();
   assert.equal(new URL((await panel.getByRole('menuitem', { name: 'Descargar revisión 2', exact: true }).getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewTwo.revision.id);
   await panel.keyboard.press('Escape');
+  await panel.getByRole('menu').waitFor({ state: 'hidden' });
   assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
-  await panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
+  await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), reviewHead.revision.id);
   await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();

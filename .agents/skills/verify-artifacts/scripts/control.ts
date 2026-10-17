@@ -364,8 +364,7 @@ async function drive(feature: Feature) {
         await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
         assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', 'true']]);
         await record('Open Información', {});
-        await page.locator('#information > summary').scrollIntoViewIfNeeded();
-        await page.locator('#information > summary').click();
+        await page.locator('#information > summary').press('Enter');
         const projectValue = page.locator('#information[open] dt', { hasText: /^Proyecto$/ }).locator('xpath=following-sibling::dd[1]');
         await projectValue.waitFor();
         assert.equal(await projectValue.textContent(), 'Beta', 'Información shows the artifact project');
@@ -596,8 +595,7 @@ async function drive(feature: Feature) {
             await capture(page, 'preview-r2-desktop');
           }
           await record('Choose Ver revisión 1 from history', {});
-          await page.getByRole('link', { name: 'Ver revisión 1', exact: true }).scrollIntoViewIfNeeded();
-          await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), page.getByRole('link', { name: 'Ver revisión 1', exact: true }).click()]);
+          await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === created.revision.id), page.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
           await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 1', exact: true }).waitFor();
           if (feature === 'export') {
             await page.getByRole('button', { name: 'Menú de Verification artifact', exact: true }).click();
@@ -621,8 +619,7 @@ async function drive(feature: Feature) {
           } else {
             await capture(page, 'preview-r1-desktop');
             await record('Choose Ver revisión 2 and use 390px viewport', {});
-            await page.getByRole('link', { name: 'Ver revisión 2', exact: true }).scrollIntoViewIfNeeded();
-            await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === updated.revision.id), page.getByRole('link', { name: 'Ver revisión 2', exact: true }).click()]);
+            await Promise.all([page.waitForURL((url) => url.searchParams.get('revisionId') === updated.revision.id), page.getByRole('link', { name: 'Ver revisión 2', exact: true }).press('Enter')]);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
             await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
