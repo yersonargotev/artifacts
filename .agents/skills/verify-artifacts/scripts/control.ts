@@ -339,7 +339,7 @@ async function drive(feature: Feature) {
         const screens = [
           { name: 'library', path: '/', heading: 'Biblioteca' },
           { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
-          { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: `Menú de ${detail.revision.snapshot.metadata.title}` },
+          { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: detail.revision.snapshot.metadata.title },
           { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
           { name: 'delete', path: `/artifacts/${detail.artifactId}/delete`, heading: 'Eliminar artefacto' },
         ];
