@@ -8,7 +8,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - Run `pnpm build` before the first launch so the helper can start the built Astro panel. Complete builds while no verification instance is active.
 - Start a disposable instance with `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch`. Read the JSON output for its run path and service URLs. A new run owns its database, credentials, processes, and ephemeral ports.
 - Pass that same run path to `doctor`, `drive`, and `cleanup`. Require `doctor` to pass before driving. Never substitute the normal `.env`, an existing account, or a deployed service.
-- Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account. Most other drives create an artifact with the same fixed title; `projects` creates three titled artifacts.
+- Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account. Most other drives create an artifact with the same fixed title. `projects` creates three titled artifacts, and `screens` creates 12.
 - The feature files show explicit run paths for reproducibility. `launch --run` requires the path to be absent. Use a new path for subsequent runs; keep completed evidence.
 - The local authorization, panel, and publication hosts are deliberately distinct. Preserve the URLs from the run rather than replacing them with the normal development ports.
 - These disposable preconditions apply to the fixed `control.ts` drives. Existing retained artifacts use the separate [retained recipe](./retained.md) with an independent saved read. It supports partial browser-control inspection or complete verification with a supplied authenticated context. That verifier has no disposable setup or mutation phase.
@@ -18,6 +18,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 
 - The harness is `control.ts`: fixed Playwright recipes plus JSON-RPC `tools/call` requests to the real public HTTP MCP endpoint. Run it from the repository root with `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts`.
 - Each feature command performs its own health check and records actions and outcomes. The selectors below document the user path executed by that recipe; the helper does not expose a generic browser-click command.
+- Browser drives start at 1440x900. Mobile captures use 390x844. The `screens` drive captures every listed page at both widths.
 - Use exact ARIA names for Spanish interface controls. The disposable artifact title is `Verification artifact`; its document headings are `Verification revision 1` and `Verification revision 2`.
 - The HTML interaction button changes from `Try interaction` to `Interaction verified`. The attachment `notes.txt` contains `Revision 1 attachment.\n`, including its trailing newline, and is retained in revision 2.
 - Authenticated setup creates a disposable identity and OAuth client. Artifact setup inside drives must use public MCP tools; direct store or database insertion is not evidence of user authoring.
@@ -41,6 +42,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - [Authoring and publication selection](./authoring.md): `authoring` covers real MCP creation, retained updates, retries/conflicts, reads, and publication selection.
 - [Standalone CLI over REST](./cli.md): `cli` drives the source `artifacts` CLI through whoami, create, edit, stale update, history, publish and export against the local REST resource.
 - [Projects](./projects.md): `projects` creates artifacts in projects through MCP, moves one with the source CLI, moves another into and out of a project from the panel, and browses the panel's `Proyectos` sidebar at desktop and 390px.
+- [Panel screen captures](./screens.md): `screens` seeds a repeatable library and captures the welcome, library, project, detail, move, and delete confirmation pages at 1440x900 and 390x844, with overflow, browser-error, and primary-action checks.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.

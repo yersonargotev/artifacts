@@ -16,17 +16,14 @@ import { artifactReadSchema, publishResultSchema } from '../../../../packages/ar
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'cli', 'projects', 'preview', 'publication', 'export'] as const;
+const features = ['identity', 'authoring', 'cli', 'projects', 'screens', 'preview', 'publication', 'export'] as const;
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
 type Credentials = { controlToken: string; accessToken: string; password: string };
 type ToolResult = { isError?: boolean; structuredContent: Record<string, any> };
-const args = process.argv.slice(2);
-const command = args[0];
-const runIndex = args.indexOf('--run');
-const run = resolve(root, runIndex >= 0 ? args[runIndex + 1] ?? '' : `.test-artifacts/verify-artifacts/${Date.now()}-${randomUUID().slice(0, 8)}`);
-assert(run.startsWith(join(root, '.test-artifacts/verify-artifacts/')), 'Run directories must be below .test-artifacts/verify-artifacts/');
-const runtime = join(run, 'runtime');
+let args: string[];
+let run: string;
+let runtime: string;
 const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 const hash = (data: Uint8Array) => createHash('sha256').update(data).digest('hex');
 const json = async (path: string, value: unknown) => writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
@@ -176,6 +173,31 @@ async function cleanup() {
 
 const firstSnapshot = { metadata: { title: 'Verification artifact', description: 'Disposable user-path proof.' }, content: { kind: 'html' as const, text: '<!doctype html><html lang="en"><meta charset="utf-8"><title>Verification artifact</title><h1>Verification revision 1</h1><button onclick="this.textContent=\'Interaction verified\'">Try interaction</button></html>' }, files: [{ path: 'notes.txt', mediaType: 'text/plain', encoding: 'utf8' as const, data: 'Revision 1 attachment.\n' }] };
 const secondSnapshot = { ...firstSnapshot, content: { ...firstSnapshot.content, text: firstSnapshot.content.text.replace('Verification revision 1', 'Verification revision 2') } };
+type ScreenArtifact = { title: string; project: string | null; kind: 'html' | 'markdown' | 'text'; publication: 'draft' | 'current' | 'pending' };
+const screenArtifacts: readonly ScreenArtifact[] = [
+  { title: 'Alpha overview', project: 'Alpha', kind: 'html', publication: 'pending' },
+  { title: 'Alpha delivery', project: 'Alpha', kind: 'markdown', publication: 'current' },
+  { title: 'Alpha notes', project: 'Alpha', kind: 'text', publication: 'draft' },
+  { title: 'Beta overview', project: 'Beta', kind: 'markdown', publication: 'current' },
+  { title: 'Beta delivery', project: 'Beta', kind: 'text', publication: 'draft' },
+  { title: 'Beta notes', project: 'Beta', kind: 'markdown', publication: 'draft' },
+  { title: 'Gamma overview', project: 'Gamma', kind: 'text', publication: 'draft' },
+  { title: 'Gamma notes', project: 'Gamma', kind: 'markdown', publication: 'draft' },
+  { title: 'Delta overview', project: 'Delta', kind: 'text', publication: 'draft' },
+  { title: 'Delta notes', project: 'Delta', kind: 'markdown', publication: 'draft' },
+  { title: 'Unfiled overview', project: null, kind: 'text', publication: 'draft' },
+  { title: 'Unfiled notes', project: null, kind: 'markdown', publication: 'draft' },
+];
+const screenViewports = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
+
+export async function checkScreen(page: Page, label: string) {
+  const errors = [...(await page.consoleMessages()).filter((message) => message.type() === 'error').map((message) => message.text()), ...(await page.pageErrors()).map((error) => error.message)];
+  assert.equal(errors.length, 0, `${label}: console or page error: ${errors.join('; ')}`);
+  const bounds = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
+  assert(bounds.scrollWidth <= bounds.innerWidth, `${label}: horizontal overflow (${bounds.scrollWidth}px > ${bounds.innerWidth}px)`);
+  const primaries = await page.locator('.button:not(.secondary)').filter({ visible: true }).evaluateAll((buttons) => buttons.filter((button) => !button.closest('dialog[open], [role="dialog"][aria-modal="true"]')).length);
+  assert(primaries <= 1, `${label}: ${primaries} visible primary actions outside an open dialog, expected at most 1`);
+}
 
 async function drive(feature: Feature) {
   const { instance, credentials } = await doctor();
@@ -278,14 +300,62 @@ async function drive(feature: Feature) {
       assert.equal(read.publication?.revisionId, published.revisionId);
       checks.push('Source CLI whoami/create/edit/history/publish/export over local REST', 'Stale CLI update rejected with exit 1', 'Edit preserves omitted metadata and attachment', 'CLI ZIP equals MCP export bytes', 'Head and publication independently read through MCP');
     } else {
-      browser = await chromium.launch({ channel: 'chrome' });
-      context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      browser = await chromium.launch({ channel: 'chrome', headless: !args.includes('--headed') });
+      context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...(feature === 'screens' && args.includes('--headed') ? { recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } } : {}) });
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
       const browserVersion = browser.version();
       assert(Number(browserVersion.split('.')[0]) >= 152, 'Chrome 152+ is required for interactive HTML proof');
-      await record('Start isolated Chrome context', { version: browserVersion, viewport: { width: 1280, height: 900 } });
-      if (feature === 'identity') {
+      await record('Start isolated Chrome context', { version: browserVersion, viewport: { width: 1440, height: 900 } });
+      if (feature === 'screens') {
+        page.setDefaultTimeout(10_000);
+        const seeded = [];
+        for (const fixture of screenArtifacts) {
+          const snapshot = { metadata: { title: fixture.title, description: `Screen verification for ${fixture.title}.` }, content: fixture.kind === 'html' ? firstSnapshot.content : { kind: fixture.kind, text: fixture.kind === 'markdown' ? `# ${fixture.title}\n\nScreen verification document.` : `${fixture.title}\n\nScreen verification document.` }, files: [] };
+          let artifact = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot, ...(fixture.project ? { project: fixture.project } : {}) }));
+          if (fixture.publication !== 'draft') await call('artifacts_publish', { requestId: randomUUID(), artifactId: artifact.artifactId, revisionId: artifact.revision.id, expectedPublicationVersion: 0 });
+          if (fixture.publication === 'pending') artifact = artifactReadSchema.parse(await call('artifacts_update', { requestId: randomUUID(), artifactId: artifact.artifactId, expectedRevisionId: artifact.revision.id, snapshot: { ...snapshot, content: secondSnapshot.content } }));
+          seeded.push(artifactReadSchema.parse(await call('artifacts_read', { artifactId: artifact.artifactId })));
+        }
+        assert.equal(seeded.length, 12, 'Screens seed has 12 artifacts');
+        assert.equal(seeded.filter((artifact) => artifact.project === null).length, 2, 'Screens seed has two unfiled artifacts');
+        assert.equal(seeded.filter((artifact) => artifact.publication).length, 3, 'Screens seed has three published artifacts');
+        assert.equal(seeded.filter((artifact) => artifact.publication && artifact.publication.revisionId !== artifact.headRevisionId).length, 1, 'Screens seed has one pending publication');
+        assert.deepEqual(await call('projects_list'), { items: [{ name: 'Alpha', artifactCount: 3 }, { name: 'Beta', artifactCount: 3 }, { name: 'Delta', artifactCount: 2 }, { name: 'Gamma', artifactCount: 2 }] });
+        const detail = seeded[0]!;
+        assert.equal(detail.revision.sequence, 2, 'HTML detail has two revisions');
+        await json(join(directory, 'seed.json'), seeded.map((artifact) => ({ artifactId: artifact.artifactId, title: artifact.revision.snapshot.metadata.title, project: artifact.project, headRevisionId: artifact.headRevisionId, publication: artifact.publication })));
+        for (const viewport of screenViewports) {
+          await page.setViewportSize(viewport);
+          await page.goto(instance.panel);
+          await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();
+          const label = `screens-welcome-${viewport.width}`;
+          await capture(page, label);
+          await checkScreen(page, label);
+          checks.push(label);
+        }
+        await login(page);
+        await page.getByRole('heading', { level: 1, name: 'Tus artefactos', exact: true }).waitFor();
+        const screens = [
+          { name: 'library', path: '/', heading: 'Tus artefactos' },
+          { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
+          { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: `Menú de ${detail.revision.snapshot.metadata.title}` },
+          { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
+          { name: 'delete', path: `/artifacts/${detail.artifactId}/delete`, heading: 'Eliminar artefacto' },
+        ];
+        for (const screen of screens) for (const viewport of screenViewports) {
+          const label = `screens-${screen.name}-${viewport.width}`;
+          await page.setViewportSize(viewport);
+          await record(`Open ${label}`, { path: screen.path, viewport });
+          const response = await page.goto(`${instance.panel}${screen.path}`);
+          assert.equal(response?.status(), 200, `${label} responds successfully`);
+          await page.getByRole('heading', { level: 1, name: screen.heading, exact: true }).waitFor();
+          if (screen.name === 'detail') await page.frameLocator('.preview').getByRole('heading', { name: 'Verification revision 2', exact: true }).waitFor();
+          await capture(page, label);
+          await checkScreen(page, label);
+          checks.push(label);
+        }
+      } else if (feature === 'identity') {
         await login(page);
         await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
         await record('Open Cuenta', {});
@@ -301,7 +371,7 @@ async function drive(feature: Feature) {
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await capture(page, 'signed-in-mobile');
-        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.setViewportSize({ width: 1440, height: 900 });
         await record('Choose Cerrar sesión del panel', {});
         const responsePromise = page.waitForResponse((response) => new URL(response.url()).pathname === '/auth/logout' && response.request().method() === 'POST');
         await page.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
@@ -380,7 +450,7 @@ async function drive(feature: Feature) {
         await capture(page, 'projects-beta-mobile');
         const moveUrl = `${instance.panel}/artifacts/${loose.artifactId}/move`;
         const field = page.getByLabel('Proyecto', { exact: true });
-        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.setViewportSize({ width: 1440, height: 900 });
         await page.goto(instance.panel);
         await page.getByRole('heading', { level: 1, name: 'Tus artefactos', exact: true }).waitFor();
         await record('Open Opciones de Unfiled notes and choose Mover a proyecto', {});
@@ -497,7 +567,7 @@ async function drive(feature: Feature) {
           await page.getByRole('link', { name: 'notes.txt', exact: true }).click();
           await (await downloadPromise).saveAs(join(directory, 'notes.txt'));
           assert.equal(await readFile(join(directory, 'notes.txt'), 'utf8'), firstSnapshot.files[0]!.data);
-          const anonymous = await browser.newContext();
+          const anonymous = await browser.newContext({ viewport: { width: 1440, height: 900 } });
           try {
             const anonymousPage = await anonymous.newPage();
             await record('Open publication in anonymous context', { url: secondPublication.url });
@@ -517,7 +587,7 @@ async function drive(feature: Feature) {
           if (libraryDemo) {
             assert.equal(await page.locator('.artifact-list li').count(), 4);
             assert.equal(await page.locator('.artifact-list .pending').count(), 1);
-            for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+            for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
               await page.setViewportSize(viewport);
               await page.goto(instance.panel);
               await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('entrega');
@@ -552,7 +622,7 @@ async function drive(feature: Feature) {
               assert.equal(await page.locator('.artifact-list li').count(), 4);
               await record('Filter, recover empty results and restore library', { viewport: name, statuses: ['published', 'pending', 'unpublished'], restoredResults: 4 });
             }
-            await page.setViewportSize({ width: 1280, height: 900 });
+            await page.setViewportSize({ width: 1440, height: 900 });
             checks.push('Library search combines with publication filters at desktop and mobile', 'No-match state, browser Back and clear filters recover the library');
             const rowTrigger = page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true });
             await rowTrigger.focus();
@@ -577,7 +647,7 @@ async function drive(feature: Feature) {
             assert(menuBounds && menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 390);
             await capture(page, 'artifact-list-mobile-menu');
             await page.keyboard.press('Escape');
-            await page.setViewportSize({ width: 1280, height: 900 });
+            await page.setViewportSize({ width: 1440, height: 900 });
             await page.goto(instance.panel);
           }
           await record('Choose Verification artifact from list', {});
@@ -627,7 +697,7 @@ async function drive(feature: Feature) {
             await capture(page, 'preview-r2-mobile');
             if (libraryDemo) {
               const demoUrl = `${instance.panel}/artifacts/${libraryDemo.artifact.artifactId}?${new URLSearchParams({ revisionId: libraryDemo.artifact.revision.id })}`;
-              for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+              for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
                 await page.setViewportSize(viewport);
                 await page.goto(demoUrl);
                 await page.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
@@ -669,13 +739,19 @@ async function drive(feature: Feature) {
   }
 }
 
-try {
+if (process.argv[1] && resolve(process.argv[1]) === script) try {
+  args = process.argv.slice(2);
+  const command = args[0];
+  const runIndex = args.indexOf('--run');
+  run = resolve(root, runIndex >= 0 ? args[runIndex + 1] ?? '' : `.test-artifacts/verify-artifacts/${Date.now()}-${randomUUID().slice(0, 8)}`);
+  assert(run.startsWith(join(root, '.test-artifacts/verify-artifacts/')), 'Run directories must be below .test-artifacts/verify-artifacts/');
+  runtime = join(run, 'runtime');
   if (command === 'launch') await launch();
   else if (command === 'serve') await supervisor();
   else if (command === 'doctor') { const { proof } = await doctor(); console.log(JSON.stringify(proof)); }
   else if (command === 'cleanup') await cleanup();
   else if (command === 'drive') { const feature = args[1]; assert(features.includes(feature as Feature), `Choose drive ${features.join('|')}`); await drive(feature as Feature); }
-  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE --run PATH | cleanup --run PATH');
+  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | cleanup --run PATH');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

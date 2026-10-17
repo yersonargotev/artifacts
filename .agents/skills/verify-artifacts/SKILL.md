@@ -62,7 +62,9 @@ After the identity recipe deliberately revokes all sessions, a failing MCP docto
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run
 ```
 
-Choose `identity`, `authoring`, `cli`, `projects`, `preview`, `publication`, or `export` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps.
+Choose `identity`, `authoring`, `cli`, `projects`, `screens`, `preview`, `publication`, or `export` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps. Browser drives use a 1440x900 desktop viewport and 390x844 for mobile checks.
+
+`screens` seeds ten artifacts across four projects and two unfiled artifacts, then captures the welcome, library, project, detail, move, and delete confirmation pages at both widths. It checks overflow, browser errors, and the visible primary-action count. See [Panel screen captures](features/screens.md) for the exact fixture, selectors, evidence, and `--headed` video option.
 
 The primary visual route is the authenticated panel. `preview` creates two revisions via MCP, signs in through `Correo electrónico`, `Contraseña`, and `Iniciar sesión`, opens `Verification artifact`, selects `Ver revisión 1` and `Ver revisión 2`, and clicks `Try interaction` inside `frameLocator('.preview')`. It waits for `Interaction verified` and checks the 390px mobile layout. Opening extracted HTML in a generic server does not establish preview behavior.
 
