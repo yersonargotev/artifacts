@@ -49,7 +49,7 @@ const heading = { confirm: 'Mover a proyecto', invalid: 'Mover a proyecto', conf
         : <p id="project-help" class="field-help">Elige un proyecto existente o escribe uno nuevo. Mover no crea una revisión ni cambia la publicación.</p>}
       <div class="move-actions">
         {/* Enter submits the first button, so moving must precede removal. */}
-        <button type="submit" name="intent" value="move">Mover al proyecto</button>
+        <button data-variant="primary" type="submit" name="intent" value="move">Mover al proyecto</button>
         {artifact?.project !== null && <button class="secondary" type="submit" name="intent" value="remove">Quitar del proyecto</button>}
         <a class="button secondary" href="/">Cancelar</a>
       </div>

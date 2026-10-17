@@ -1,0 +1,18 @@
+[data-variant="primary"] {
+  background: var(--glow-primary-fill);
+  color: var(--crust);
+  box-shadow: var(--glow-primary);
+}
+
+[aria-current], [aria-selected="true"], [aria-pressed="true"] {
+  box-shadow: var(--glow-active);
+}
+
+.project-cover {
+  background: var(--cover-wash);
+}
+
+[data-variant="primary"].destructive-button {
+  background: var(--red);
+  box-shadow: none;
+}

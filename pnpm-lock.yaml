@@ -193,6 +193,9 @@ importers:
       jose:
         specifier: 6.2.12
         version: 6.2.12
+      lightningcss:
+        specifier: 1.32.0
+        version: 1.32.0
       playwright:
         specifier: 1.64.0
         version: 1.64.0

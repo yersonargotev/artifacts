@@ -51,7 +51,7 @@ const heading = { confirm: 'Eliminar artefacto', conflict: 'El artefacto cambió
         <input type="hidden" name="expectedRevisionId" value={command.expectedRevisionId} />
         <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
         <input type="hidden" name="requestId" value={command.requestId} />
-        <button class="destructive-button" type="submit">{outcome === 'uncertain' ? 'Reintentar eliminación' : 'Eliminar artefacto'}</button>
+        <button class="destructive-button" data-variant="primary" type="submit">{outcome === 'uncertain' ? 'Reintentar eliminación' : 'Eliminar artefacto'}</button>
       </form>}
     </div>
   </section>

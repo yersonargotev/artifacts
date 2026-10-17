@@ -195,7 +195,7 @@ export async function checkScreen(page: Page, label: string) {
   assert.equal(errors.length, 0, `${label}: console or page error: ${errors.join('; ')}`);
   const bounds = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
   assert(bounds.scrollWidth <= bounds.innerWidth, `${label}: horizontal overflow (${bounds.scrollWidth}px > ${bounds.innerWidth}px)`);
-  const primaries = await page.locator('.button:not(.secondary)').filter({ visible: true }).evaluateAll((buttons) => buttons.filter((button) => !button.closest('dialog[open], [role="dialog"][aria-modal="true"]')).length);
+  const primaries = await page.locator('[data-variant="primary"]').filter({ visible: true }).evaluateAll((buttons) => buttons.filter((button) => !button.closest('dialog[open], [role="dialog"][aria-modal="true"]')).length);
   assert(primaries <= 1, `${label}: ${primaries} visible primary actions outside an open dialog, expected at most 1`);
 }
 

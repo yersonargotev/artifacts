@@ -6,9 +6,15 @@ The library, artifact review page, and publication header use Catppuccin Mocha w
 
 The reference website is [catppuccin/website](https://github.com/catppuccin/website), inspected at commit `5618a222991628f2d8af556532f431c725be1721` on 2026-10-14. Its [`_typography.scss`](https://github.com/catppuccin/website/blob/5618a222991628f2d8af556532f431c725be1721/src/styles/_typography.scss) uses a native sans-serif stack. Its [`_buttons.scss`](https://github.com/catppuccin/website/blob/5618a222991628f2d8af556532f431c725be1721/src/styles/_buttons.scss) uses 120-degree gradients, including blue to sky. The [official palette](https://catppuccin.com/palette/) defines the Mocha colors.
 
-The application adapts those choices to a compact dashboard. Base, mantle, and crust establish depth. Text and subtext establish hierarchy. Blue identifies actions and focus. Sapphire provides a related gradient endpoint. Status colors retain semantic meaning. Mauve is not an action accent.
+The application adapts those choices to a compact dashboard. Base, mantle, and crust establish depth. Text and subtext establish hierarchy. Blue identifies actions and focus. Sapphire provides the endpoint of the 120-degree gradient on the primary action. Status colors retain semantic meaning. Mauve is not an action accent.
 
 The native font stack avoids remote font requests. The publication wrapper retains its independent stylesheet. Its trusted header is separated from the authenticated content iframe so the library link can navigate while the document keeps its own network denial policy. Tabler outline icons provide consistent geometry; their local notices retain attribution.
+
+## Panel effects
+
+`tokens.css` owns the Mocha palette and literal effect values. `effects.css` applies the primary glow and 120-degree gradient to `[data-variant="primary"]`, the active glow to current or selected controls, and the cover wash to `.project-cover`. Destructive primary actions retain a solid red background without a glow. Other buttons use flat Surface0.
+
+The focus ring is a solid blue outline. Menus use a neutral overlay shadow. The brand, page background, and empty states use solid fills. The parsed stylesheet conventions test rejects gradients and shadows outside the token policy, effect tokens outside their selector scope, Tailwind shadow and gradient classes, and inline shadows.
 
 ## Library behavior
 
