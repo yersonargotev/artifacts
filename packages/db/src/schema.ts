@@ -27,8 +27,10 @@ export const artifact = sqliteTable('artifact', {
   ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   headRevisionId: text('head_revision_id').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  project: text('project'),
 }, (table): SQLiteTableExtraConfigValue[] => [
   index('artifact_owner_idx').on(table.ownerId, table.id),
+  index('artifact_owner_project_idx').on(table.ownerId, table.project),
   foreignKey({ columns: [table.id, table.headRevisionId], foreignColumns: [artifactRevision.artifactId, artifactRevision.id], name: 'artifact_head_membership_fk' }),
 ]);
 

@@ -66,8 +66,37 @@ test('library search and publication filters query all owner artifacts before st
   } finally { await app.close(); }
 });
 
+test('library project filter scopes search, publication filters, and counts', async () => {
+  const app = await fixture();
+  try {
+    const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
+    assert(signedIn);
+    const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'library-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
+    const store = createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' });
+    const draft = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha draft'), project: 'Alpha' });
+    const shipped = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha shipped'), project: 'alpha' });
+    await store.publish(actor, { requestId: randomUUID(), artifactId: shipped.artifactId, revisionId: shipped.revision.id, expectedPublicationVersion: 0 });
+    await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Beta shipped'), project: 'Beta' });
+    await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Loose shipped') });
+    const ids = (page: { items: { artifactId: string }[] }) => page.items.map((item) => item.artifactId).sort();
+
+    const alpha = await store.queryLibrary(actor, { project: 'ALPHA' });
+    assert.deepEqual(ids(alpha), [draft.artifactId, shipped.artifactId].sort());
+    assert.deepEqual(alpha.counts, { all: 2, published: 1, unpublished: 1, pending: 0 });
+    assert(alpha.items.every((item) => item.project === 'Alpha'));
+    const searched = await store.queryLibrary(actor, { project: 'Alpha', q: 'shipped' });
+    assert.deepEqual(ids(searched), [shipped.artifactId]);
+    assert.deepEqual(searched.counts, { all: 1, published: 1, unpublished: 0, pending: 0 });
+    assert.deepEqual(ids(await store.queryLibrary(actor, { project: 'Alpha', status: 'unpublished' })), [draft.artifactId]);
+    assert.deepEqual((await store.queryLibrary(actor, {})).counts, { all: 4, published: 1, unpublished: 3, pending: 0 });
+    assert.deepEqual(await store.queryLibrary(actor, { project: 'Gamma' }), { items: [], nextCursor: null, counts: { all: 0, published: 0, unpublished: 0, pending: 0 } });
+  } finally { await app.close(); }
+});
+
 test('dashboard query validation leaves the public MCP list contract unchanged', () => {
   assert.deepEqual(libraryQuerySchema.parse({}), { q: '', status: 'all' });
+  assert.deepEqual(libraryQuerySchema.parse({ project: ' Alpha ' }), { q: '', status: 'all', project: 'Alpha' });
+  assert.deepEqual(listSchema.parse({ project: 'Alpha' }), { limit: 25, project: 'Alpha' });
   assert.equal(libraryQuerySchema.safeParse({ status: 'unknown' }).success, false);
   assert.equal(libraryQuerySchema.safeParse({ q: 'a'.repeat(257) }).success, false);
   assert.deepEqual(listSchema.parse({}), { limit: 25 });

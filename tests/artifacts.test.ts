@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactRevision, artifactPublication, publicationGrant, session } from '../packages/db/src/schema.ts';
-import { createArtifactStore, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore, projectNameSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { fixture, grant } from './helpers.ts';
 
@@ -169,6 +169,58 @@ test('snapshot validation rejects malformed bytes, unsafe paths, extra fields, a
   assert.equal(snapshotSchema.safeParse({ ...snapshot, files: Array(33).fill(file) }).success, false);
   assert.equal(snapshotSchema.safeParse({ ...snapshot, metadata: { ...snapshot.metadata, ignored: 'must reject' } }).success, false);
   assert.equal(snapshotSchema.safeParse({ ...snapshot, content: { kind: 'text', text: '🌎'.repeat(270_000) } }).success, false);
+});
+
+test('projects group case-insensitively, move without new revisions, and vanish with their last artifact', async () => {
+  const app = await artifactFixture();
+  try {
+    const alpha = await app.store.create(app.actor, { ...createInput(), project: 'Alpha' });
+    const beta = await app.store.create(app.actor, { ...createInput(), project: '  alpha ' });
+    const loose = await app.store.create(app.actor, createInput());
+    const accented = await app.store.create(app.actor, { ...createInput(), project: 'Éxito' });
+    const folded = await app.store.create(app.actor, { ...createInput(), project: 'éxito' });
+    assert.deepEqual([alpha.project, beta.project, loose.project, accented.project, folded.project], ['Alpha', 'Alpha', null, 'Éxito', 'Éxito']);
+    assert.deepEqual(await app.store.projects(app.actor), { items: [{ name: 'Alpha', artifactCount: 2 }, { name: 'Éxito', artifactCount: 2 }] });
+    assert.deepEqual((await app.store.list(app.actor, { project: 'ALPHA' })).items.map((item) => [item.artifactId, item.project]), [[alpha.artifactId, 'Alpha'], [beta.artifactId, 'Alpha']].sort(([left], [right]) => left!.localeCompare(right!)));
+    assert.deepEqual((await app.store.list(app.actor, { project: 'Missing' })).items, []);
+    assert.equal((await app.store.list(app.actor)).items.find((item) => item.artifactId === loose.artifactId)?.project, null);
+
+    const publication = await app.store.publish(app.actor, { requestId: randomUUID(), artifactId: beta.artifactId, revisionId: beta.revision.id, expectedPublicationVersion: 0 });
+    const move = { requestId: randomUUID(), artifactId: beta.artifactId, project: 'Beta' };
+    assert.deepEqual(await app.store.move(app.actor, move), { artifactId: beta.artifactId, project: 'Beta' });
+    assert.deepEqual(await app.store.move(app.actor, move), { artifactId: beta.artifactId, project: 'Beta' });
+    await assert.rejects(app.store.move(app.actor, { ...move, project: 'Gamma' }), { code: 'request_conflict' });
+    const moved = await app.store.read(app.actor, { artifactId: beta.artifactId });
+    assert.equal(moved.project, 'Beta');
+    assert.equal(moved.headRevisionId, beta.headRevisionId);
+    assert.deepEqual(moved.publication, { revisionId: beta.revision.id, version: 1, url: publication.url });
+    assert.deepEqual((await app.store.history(app.actor, { artifactId: beta.artifactId })).items.map((item) => item.id), [beta.revision.id]);
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: alpha.artifactId, project: 'ALPHA' }), { artifactId: alpha.artifactId, project: 'Alpha' });
+    assert.deepEqual((await app.store.projects(app.actor)).items, [{ name: 'Alpha', artifactCount: 1 }, { name: 'Beta', artifactCount: 1 }, { name: 'Éxito', artifactCount: 2 }]);
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: alpha.artifactId, project: null }), { artifactId: alpha.artifactId, project: null });
+    assert.equal((await app.store.read(app.actor, { artifactId: alpha.artifactId })).project, null);
+    assert.deepEqual((await app.store.projects(app.actor)).items, [{ name: 'Beta', artifactCount: 1 }, { name: 'Éxito', artifactCount: 2 }]);
+
+    await app.store.delete(app.actor, { requestId: randomUUID(), artifactId: beta.artifactId, expectedRevisionId: beta.headRevisionId, expectedPublicationVersion: 1 });
+    assert.deepEqual((await app.store.projects(app.actor)).items, [{ name: 'Éxito', artifactCount: 2 }]);
+    await assert.rejects(app.store.move(app.actor, move), { code: 'not_found' });
+    await assert.rejects(app.store.move(app.actor, { requestId: randomUUID(), artifactId: 'missing-artifact', project: 'Alpha' }), { code: 'not_found' });
+    await assert.rejects(app.store.move({ ...app.actor, scopes: ['artifacts:read'] }, { requestId: randomUUID(), artifactId: loose.artifactId, project: 'Alpha' }), { code: 'forbidden' });
+    await assert.rejects(app.store.projects({ ...app.actor, scopes: ['artifacts:write'] }), { code: 'forbidden' });
+    const outsider = await app.auth.api.signUpEmail({ body: { name: 'Project outsider', email: 'projects-other@example.test', password: app.password } });
+    await app.auth.api.signInEmail({ body: { email: 'projects-other@example.test', password: app.password } });
+    const [outsiderSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
+    const other = { ...app.actor, userId: outsider.user.id, sessionId: outsiderSession.id };
+    assert.deepEqual(await app.store.projects(other), { items: [] });
+    await assert.rejects(app.store.move(other, { requestId: randomUUID(), artifactId: accented.artifactId, project: null }), { code: 'not_found' });
+    assert.equal((await app.store.create(other, { ...createInput(), project: 'éxito' })).project, 'éxito');
+  } finally { await app.close(); }
+});
+
+test('project names are NFC-normalized, trimmed, bounded, and free of control characters', () => {
+  assert.equal(projectNameSchema.parse('  Cafe\u0301 '), 'Café');
+  assert.equal(projectNameSchema.parse('a'.repeat(80)), 'a'.repeat(80));
+  for (const name of ['', '   ', 'a'.repeat(81), 'bell\u0007', 'line\nbreak', 'lone\uD800']) assert.equal(projectNameSchema.safeParse(name).success, false, JSON.stringify(name));
 });
 
 test('MCP artifact tools use verified OAuth identity and individual operation scopes', async () => {

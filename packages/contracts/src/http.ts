@@ -12,8 +12,10 @@ export const revisionSummarySchema = revisionSchema.omit({ snapshot: true }).ext
   files: z.array(attachmentSummarySchema).max(32),
 });
 export const compactArtifactReadSchema = artifactReadSchema.omit({ revision: true }).extend({ revision: revisionSummarySchema });
-export const artifactSummarySchema = z.strictObject({ artifactId: identifier, title: z.string(), headRevisionId: identifier, createdAt: z.iso.datetime(), publication: publicationSchema.nullable() });
+export const artifactSummarySchema = z.strictObject({ artifactId: identifier, title: z.string(), headRevisionId: identifier, createdAt: z.iso.datetime(), project: z.string().nullable(), publication: publicationSchema.nullable() });
 export const listResultSchema = z.strictObject({ items: z.array(artifactSummarySchema).max(100), nextCursor: identifier.nullable() });
+export const projectSummarySchema = z.strictObject({ name: z.string(), artifactCount: z.number().int().positive() });
+export const projectsResultSchema = z.strictObject({ items: z.array(projectSummarySchema) });
 export const historyResultSchema = z.strictObject({ items: z.array(revisionSchema).max(10), nextBeforeSequence: z.number().int().positive().nullable() });
 export const summaryHistoryResultSchema = historyResultSchema.extend({ items: z.array(revisionSummarySchema).max(10) });
 export const httpErrorSchema = z.strictObject({ error: z.strictObject({ code: z.string().min(1), message: z.string(), details: z.record(z.string(), z.unknown()) }) });

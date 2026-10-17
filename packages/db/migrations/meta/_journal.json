@@ -15,6 +15,13 @@
       "when": 1791724133645,
       "tag": "0001_sleepy_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792219170585,
+      "tag": "0002_real_adam_warlock",
+      "breakpoints": true
     }
   ]
 }
