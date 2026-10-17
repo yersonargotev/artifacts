@@ -1,11 +1,11 @@
-import { and, count, desc, eq, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
-import { ArtifactError, historySchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
+import { ArtifactError, historySchema, moveSchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace } from './model.ts';
+import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject } from './model.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
@@ -27,6 +27,10 @@ export const panelDetailQuerySchema = z.strictObject({
   before: historySchema.shape.beforeSequence,
   includeComparison: z.boolean(),
 });
+
+export const panelMoveIdsSchema = z.array(readSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readSchema.shape.artifactId).max(25));
+export const panelMoveSchema = z.strictObject({ requestId: moveSchema.shape.requestId, artifactIds: panelMoveIdsSchema, project: projectNameSchema.nullable() });
+const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readSchema.shape.artifactId) });
 
 const publishedRevision = alias(artifactRevision, 'published_revision');
 const headJoin = and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId));
@@ -62,6 +66,27 @@ async function readWorkspace(connection: Connection, ownerId: string): Promise<W
 export function createPanel(db: Database, options: { publishOrigin: string }) {
   const access = createAccess(db, options);
   return {
+    async move(actor: Actor, value: PanelMoveInput): Promise<PanelMoveResult> {
+      const input = panelMoveSchema.parse(value);
+      return access.panelMove(actor, input, panelMoveResultSchema, async (connection) => {
+        const project = input.project === null ? null : await access.projectSpelling(connection, actor.userId, input.project);
+        const found = await connection.select({ id: artifact.id, project: artifact.project }).from(artifact)
+          .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, input.artifactIds)));
+        const changing = found.filter((row) => row.project !== project).map((row) => row.id);
+        if (changing.length) await connection.update(artifact).set({ project }).where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, changing)));
+        const owned = new Set(found.map((row) => row.id));
+        return { project, moved: changing.length, unchanged: found.length - changing.length, missing: input.artifactIds.filter((id) => !owned.has(id)) };
+      });
+    },
+    async moveSubject(actor: Actor, value: readonly string[]): Promise<MoveSubject> {
+      const ids = panelMoveIdsSchema.parse(value);
+      return access.transaction(async (connection) => {
+        await access.authorize(connection, actor, 'artifacts:read');
+        const items = await connection.select({ artifactId: artifact.id, title, project: artifact.project }).from(artifact).innerJoin(artifactRevision, headJoin)
+          .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, ids))).orderBy(artifact.id);
+        return { workspace: await readWorkspace(connection, actor.userId), items: items.map((item) => ({ ...item, project: item.project as ProjectName | null })) };
+      });
+    },
     async projectsIndex(actor: Actor): Promise<ProjectsSnapshot> {
       return access.transaction(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
