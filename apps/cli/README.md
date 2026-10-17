@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.2
+npm install --global @yargote/artifacts-cli@0.1.0-beta.3
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.2
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.3
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.2 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.2 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.3 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.3 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
@@ -134,9 +134,9 @@ Global `--server RESOURCE` and `--state-dir DIR` options can appear before or af
 
 Check `artifacts --help` for `skills` support. The published `0.1.0-beta.1` package predates this command group. These commands describe the current source and packages built from it.
 
-`artifacts skills` and `artifacts skills list` print each bundled skill's name and description, separated by a tab. The initial catalog contains `artifacts-cli`. Its complete source directory is bundled with the CLI, so the instructions match the installed version and work offline.
+`artifacts skills` and `artifacts skills list` print each bundled skill's name and description, separated by a tab. The catalog contains `artifacts-cli` and `artifacts-design`, which owns HTML design, bundled fonts, and the font embedding script. Their complete source directories are bundled with the CLI, so the instructions match the installed version and work offline.
 
-`artifacts skills get artifacts-cli` prints the complete `SKILL.md` without headers or changes to its bytes. `--full` includes every bundled reference and template. Each file starts with a catalog-relative marker such as `=== artifacts-cli/references/commands.md ===`. `artifacts skills get --all` prints every `SKILL.md` with these markers. Add `--full` to include every skill's support files.
+`artifacts skills get artifacts-cli` prints the complete `SKILL.md` without headers or changes to its bytes. `--full` includes every bundled reference and template. Binary files such as fonts appear as a marker with their size, for example `=== artifacts-design/fonts/public-sans.woff2 (binary, 26636 bytes) ===`; read them from `artifacts skills path artifacts-design`. Each file starts with a catalog-relative marker such as `=== artifacts-cli/references/commands.md ===`. `artifacts skills get --all` prints every `SKILL.md` with these markers. Add `--full` to include every skill's support files.
 
 `artifacts skills path` prints the absolute bundled catalog directory. Add a skill name to print that skill's directory. These paths belong to the CLI package and do not depend on the current directory.
 
