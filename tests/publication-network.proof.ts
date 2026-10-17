@@ -75,8 +75,10 @@ try {
     else assert.equal(packets, 0, `${path} sends no UDP packets`);
     observations.push({ path, packets, javascriptInteractive: path !== '/fallback' });
     if (path === '/publication') {
-      await page.locator('.title-menu > summary').click();
-      await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
+      await page.locator('.title-menu > summary').press('Enter');
+      const files = page.locator('summary').filter({ hasText: /^Archivos \(/ });
+      await files.waitFor({ state: 'visible' });
+      await files.press('Enter');
       const attachment = page.getByRole('link', { name: 'proof.txt', exact: true });
       await attachment.waitFor({ state: 'visible' });
       const event = page.waitForEvent('download');
