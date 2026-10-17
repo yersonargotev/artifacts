@@ -1,6 +1,6 @@
 # Artifacts verification map
 
-This directory is the maintained source for Artifacts verification. The primary surfaces are the authenticated Astro panel and the protected publication page. Authoring happens through the HTTP MCP tools, including clients such as Claude Code and Codex. Read this index and the matching feature file before driving a feature.
+This directory is the maintained source for Artifacts verification. The primary surfaces are the authenticated Astro panel and the protected publication page. Authoring happens through the HTTP MCP tools, including clients such as Claude Code and Codex, and through the standalone `artifacts` CLI over REST. Read this index and the matching feature file before driving a feature.
 
 ## Baseline preconditions
 
@@ -39,6 +39,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 
 - [Identity and sessions](./identity.md): `identity` covers panel login, canonical identity, panel logout, central SSO, and global revocation.
 - [Authoring and publication selection](./authoring.md): `authoring` covers real MCP creation, retained updates, retries/conflicts, reads, and publication selection.
+- [Standalone CLI over REST](./cli.md): `cli` drives the source `artifacts` CLI through whoami, create, edit, stale update, history, publish and export against the local REST resource.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.

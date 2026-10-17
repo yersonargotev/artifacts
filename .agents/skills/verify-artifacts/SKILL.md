@@ -1,6 +1,6 @@
 ---
 name: verify-artifacts
-description: "Verify Artifacts through its real Astro panel, protected publication page, and HTTP MCP tools. Use after changes to identity, authoring, history, preview, publication, or export, or when asked to prove an artifact inside the actual app."
+description: "Verify Artifacts through its real Astro panel, protected publication page, HTTP MCP tools, and standalone CLI over REST. Use after changes to identity, authoring, the CLI or REST, history, preview, publication, or export, or when asked to prove an artifact inside the actual app."
 ---
 
 # Verify Artifacts
@@ -40,7 +40,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch
 
 The helper prints JSON with `ready: true`, a unique absolute `run` path, and service URLs only after the built panel and live MCP identity respond. Pass that path unchanged to later commands. For a named run, add `--run .test-artifacts/verify-artifacts/preview-run`; that directory must not already exist.
 
-Launch starts a supervisor, auth, MCP, the built Astro Node panel, and publication. It migrates a temporary local SQLite/libSQL database, creates a disposable owner and confidential panel client, and obtains an MCP token through the existing public OAuth HTTP grant helper. This setup is scaffolding, not proof of interactive CLI OAuth consent. Each drive authors artifacts through the real public HTTP MCP endpoint.
+Launch starts a supervisor, auth, the combined MCP+REST resource, the built Astro Node panel, and publication. It migrates a temporary local SQLite/libSQL database, creates a disposable owner and confidential panel client, and obtains an MCP token through the existing public OAuth HTTP grant helper. This setup is scaffolding, not proof of interactive CLI OAuth consent. Each drive authors artifacts through the real public HTTP MCP endpoint.
 
 The run uses ephemeral ports with distinct auth (`127.0.0.1`), panel (`localhost`), and viewer (`[::1]`) hosts. It never loads the normal `.env`, rewrites MCP registrations, or uses the owner's Turso database. Credentials remain in the private `runtime/` directory. Run one feature per fresh instance; the seeded MCP token expires after approximately five minutes. The supervisor automatically stops after 15 minutes. If the token expires, clean up and start a fresh run.
 
@@ -62,11 +62,11 @@ After the identity recipe deliberately revokes all sessions, a failing MCP docto
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run
 ```
 
-Choose `identity`, `authoring`, `preview`, `publication`, or `export` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps.
+Choose `identity`, `authoring`, `cli`, `preview`, `publication`, or `export` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps.
 
 The primary visual route is the authenticated panel. `preview` creates two revisions via MCP, signs in through `Correo electrónico`, `Contraseña`, and `Iniciar sesión`, opens `Verification artifact`, selects `Ver revisión 1` and `Ver revisión 2`, and clicks `Try interaction` inside `frameLocator('.preview')`. It waits for `Interaction verified` and checks the 390px mobile layout. Opening extracted HTML in a generic server does not establish preview behavior.
 
-`publication` separately proves protected viewer admission and interaction. `authoring` records real JSON-RPC tool requests and independent reads. `export` compares a browser download of revision 1 with that exact revision's MCP archive. `identity` proves native panel logout and global revocation on the disposable account.
+`publication` separately proves protected viewer admission and interaction. `authoring` records real JSON-RPC tool requests and independent reads. `export` compares a browser download of revision 1 with that exact revision's MCP archive. `cli` runs the source `artifacts` CLI against the run's REST resource and compares its export with MCP. `identity` proves native panel logout and global revocation on the disposable account.
 
 ## Evidence
 
