@@ -4,11 +4,11 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, session } from '@artifacts/db/schema';
 import { ArtifactError, type Actor, type ProjectSummary } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
+import { projectKey } from './panel/model.ts';
 
 export type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 const deletedReceiptSchema = z.strictObject({ kind: z.literal('artifact_deleted'), artifactId: z.string().min(1).max(128) });
 
-export const projectKey = (name: string) => name.toLowerCase();
 export const projectOrder = (left: string, right: string) => left.localeCompare(right, 'en') || (left < right ? -1 : 1);
 
 function isBusy(error: unknown): boolean {
