@@ -324,6 +324,17 @@ try {
   await panel.setViewportSize({ width: 1280, height: 900 });
   await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}`);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '0');
+  assert.equal(await panel.locator('.detail-header h1').innerText(), reviewOne.revision.snapshot.metadata.title);
+  assert.equal(await panel.locator('.detail-header img, .detail-header [onerror], .detail-header [onclick]').count(), 0);
+  const hostileTrigger = panel.getByRole('button', { name: `Menú de ${reviewOne.revision.snapshot.metadata.title}`, exact: true });
+  await hostileTrigger.press('Enter');
+  await panel.getByRole('menu').waitFor();
+  assert.equal(await hostileTrigger.getAttribute('aria-label'), `Menú de ${reviewOne.revision.snapshot.metadata.title}`);
+  assert.equal(await panel.locator('.artifact-menu-heading > span').first().innerText(), reviewOne.revision.snapshot.metadata.title);
+  assert.equal(await panel.locator('.artifact-menu img, .artifact-menu script, .artifact-menu [onerror], .artifact-menu [onclick]').count(), 0);
+  assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
+  await panel.keyboard.press('Escape');
+  await panel.getByRole('menu').waitFor({ state: 'hidden' });
   assert.equal(await panel.getByLabel('Revisión seleccionada', { exact: true }).inputValue(), reviewOne.revision.id);
   assert.equal(await panel.locator('.selected-publication').innerText(), 'Sin publicar');
   await panel.locator('.detail-tabs').getByRole('link', { name: 'Comparar', exact: true }).press('Enter');
@@ -421,7 +432,7 @@ try {
   assert.equal(await panel.locator('.content-comparison pre').nth(1).innerText(), reviewTwo.revision.snapshot.content.text);
   assert.deepEqual(await panel.locator('.file-changes h4').allTextContents(), ['added.md Agregado', 'changed.bin Modificado', 'encoding.txt Modificado', 'removed.txt Eliminado']);
   assert.equal(await panel.locator('.comparison tbody tr').filter({ hasText: 'Metadatos personalizados' }).locator('td').nth(1).innerText(), JSON.stringify(reviewTwo.revision.snapshot.metadata.custom, null, 2));
-  assert.equal(await panel.locator('.detail-body script, .detail-body img').count(), 0);
+  assert.equal(await panel.locator('.detail-body script, .artifact-detail img').count(), 0);
   assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
   await panel.locator('.detail-tabs').getByRole('link', { name: 'Vista previa', exact: true }).press('Enter');
   await panel.locator('.preview').waitFor();
