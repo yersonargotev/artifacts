@@ -33,11 +33,14 @@ The drive captures these pages at both widths:
 | Library | `/` after login | `screens-library` |
 | Projects index | `/projects` | `screens-projects` |
 | Project library | `/?project=Alpha` | `screens-project` |
+| Project with two selected artifacts | `/?project=Alpha` after native checkbox selection | `screens-selection` |
 | Artifact detail | `/artifacts/<Alpha overview ID>` | `screens-detail` |
 | Move page | `/move?artifactId=<Alpha overview ID>` | `screens-move` |
 | Delete confirmation | `/artifacts/<Alpha overview ID>/delete` | `screens-delete` |
 
 Login uses `Correo electrónico`, `Contraseña`, and `Iniciar sesión`. The detail waits for `Verification revision 2` inside the real `.preview` iframe. Move and delete confirmations are inspected without submitting them. Publication results require a POST and are outside this capture drive. The `publication` recipe covers the protected viewer separately.
+
+After each project capture, the drive checks `Seleccionar Alpha overview` and `Seleccionar Alpha delivery`. It waits for `2 seleccionados`, compares `FormData` from the selection form with those two seeded IDs, and captures the selected state at both widths. The checkboxes are associated through `form="selection"` outside the form element. The create instruction never becomes selectable. This drive captures the controls without submitting a mutation.
 
 Each page writes `screens-<screen>-1440.png` and `screens-<screen>-390.png`, with matching `.aria.yml` snapshots. `actions.jsonl` records the MCP requests, reads, navigation, and capture paths. A successful `result.json` has `"status": "passed"` and names every completed capture. A failed check retains captures already written, a failure capture, and a failed result.
 

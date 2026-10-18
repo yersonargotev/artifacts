@@ -11,7 +11,7 @@ if (form) {
   for (const control of form.elements) {
     if (control instanceof HTMLInputElement && control.name === 'artifactId') control.addEventListener('change', synchronize);
   }
-  form.addEventListener('reset', () => queueMicrotask(synchronize));
+  form.addEventListener('reset', () => window.setTimeout(synchronize, 0));
   form.addEventListener('submit', (event) => {
     if (selectedCount() === 0) {
       event.preventDefault();
