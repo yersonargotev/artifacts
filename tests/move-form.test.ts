@@ -36,6 +36,12 @@ test('move forms retain submitted ID order, repetitions, project spelling and re
   assert.deepEqual(await parseMoveForm(request(body)), large);
 });
 
+test('the native bulk remove body parses two selected IDs without a project', async () => {
+  assert.deepEqual(await parseMoveForm(request('requestId=bulk-remove-request&intent=remove&artifactId=artifact-alpha&artifactId=artifact-beta')), {
+    artifactIds: ['artifact-alpha', 'artifact-beta'], requestId: 'bulk-remove-request', project: undefined, intent: 'remove',
+  });
+});
+
 test('move parsing rejects unknown, duplicate singleton, missing, malformed and oversized fields', async () => {
   const fields = encode(sample);
   const invalid = [

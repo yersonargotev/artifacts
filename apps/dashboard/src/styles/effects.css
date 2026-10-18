@@ -8,6 +8,10 @@
   box-shadow: var(--glow-active);
 }
 
+.artifact-card:has(input:checked) {
+  box-shadow: var(--glow-active);
+}
+
 .project-cover {
   background: var(--cover-wash);
 }

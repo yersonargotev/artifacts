@@ -356,6 +356,16 @@ async function drive(feature: Feature) {
           await capture(page, label);
           await checkScreen(page, label);
           checks.push(label);
+          if (screen.name === 'project') {
+            const selected = `screens-selection-${viewport.width}`;
+            await page.getByRole('checkbox', { name: 'Seleccionar Alpha overview', exact: true }).check();
+            await page.getByRole('checkbox', { name: 'Seleccionar Alpha delivery', exact: true }).check();
+            await page.locator('[data-selection-count]').getByText('2 seleccionados', { exact: true }).waitFor();
+            assert.deepEqual((await page.locator('#selection').evaluate((form) => new FormData(form as HTMLFormElement).getAll('artifactId'))).sort(), seeded.filter((item) => ['Alpha overview', 'Alpha delivery'].includes(item.revision.snapshot.metadata.title)).map((item) => item.artifactId).sort());
+            await capture(page, selected);
+            await checkScreen(page, selected);
+            checks.push(selected);
+          }
         }
       } else if (feature === 'identity') {
         await login(page);
