@@ -1,0 +1,20 @@
+---
+import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { absoluteTime, clientLabel } from '../../presentation.ts';
+import { detailHref, type DetailUrl } from '../../urls.ts';
+interface Props { detail: ArtifactDetail; url: DetailUrl }
+const { detail, url } = Astro.props;
+---
+<section class="detail-card history-card" id="history" aria-labelledby="history-title">
+  <h2 id="history-title">Historial</h2>
+  <ol class="revision-list">{detail.history.entries.map((entry) => <li aria-current={entry.revisionId === detail.selected.revision.id ? 'true' : undefined}>
+    <div class="revision-title"><a aria-label={`Ver revisión ${entry.sequence}`} href={detailHref(url, { revisionId: entry.revisionId, before: undefined })}>Revisión {entry.sequence}</a>
+      {entry.revisionId === detail.selected.revision.id && <span class="status-chip selected-chip">Seleccionada</span>}
+      {entry.revisionId === detail.publication?.revision.revisionId && <span class="status-chip published-chip">Publicada</span>}
+    </div>
+    <p><time datetime={entry.createdAt.toISOString()}>{absoluteTime(entry.createdAt)}</time> · {clientLabel(entry.author)}</p>
+    {entry.revisionId !== detail.selected.revision.id && <a class="history-compare" href={detailHref(url, { tab: 'compare', compareTo: entry.revisionId, before: undefined })}>Comparar con revisión {entry.sequence}</a>}
+  </li>)}</ol>
+  {detail.history.olderBefore && <a class="older-history" href={detailHref(url, { before: detail.history.olderBefore })}>Ver revisiones anteriores</a>}
+  <a class="compare-history" href={detailHref(url, { tab: 'compare' })}>Comparar revisiones</a>
+</section>

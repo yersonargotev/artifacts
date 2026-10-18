@@ -1,4 +1,12 @@
 export const icons = {
+  'device-desktop': ['M3 4h18v12H3z', 'M8 20h8M12 16v4'],
+  'device-mobile': ['M7 3h10v18H7z', 'M11 18h2'],
+  'arrows-maximize': ['M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7'],
+  'copy': ['M9 9h12v12H9z', 'M5 15V5h10'],
+  'lock': ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4M12 15v2'],
+  'home': ['M3 10l9 -7l9 7v10a1 1 0 0 1 -1 1h-5v-6h-6v6h-5a1 1 0 0 1 -1 -1z'],
+  'layers': ['M12 3l9 5l-9 5l-9 -5z', 'M3 13l9 5l9 -5'],
+  'layout-grid': ['M3 3h7v7h-7z', 'M14 3h7v7h-7z', 'M3 14h7v7h-7z', 'M14 14h7v7h-7z'],
   'user': ['M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0', 'M6 21v-2a6 6 0 0 1 12 0v2'],
   'layout-dashboard': ['M5 4h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1', 'M5 16h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1', 'M15 12h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1', 'M15 4h4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1'],
   'search': ['M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0', 'M21 21l-6 -6'],

@@ -24,6 +24,15 @@ async function assertPreviewInViewport(page: Page) {
   assert(bounds.top >= 0 && bounds.visibleHeight >= 180, 'The selected preview must begin in the initial viewport with usable height');
 }
 
+async function assertDetailHeaders(page: Page) {
+  assert.equal(await page.locator('header').count(), 2, 'Detail renders the workspace header and artifact toolbar');
+  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Detail has one shared shell header');
+  assert.equal(await page.locator('header.detail-header').count(), 1, 'Detail has one artifact toolbar');
+  assert.equal(await page.locator('header.workspace-toolbar').getByRole('navigation', { name: 'Ruta', exact: true }).count(), 1);
+  assert.equal(await page.locator('header.workspace-toolbar').getByRole('search').count(), 1);
+  assert.equal(await page.locator('h1').count(), 1);
+}
+
 async function assertViewerBounds(page: Page) {
   const bounds = await page.evaluate(() => {
     const header = document.querySelector('header')!.getBoundingClientRect();
@@ -129,7 +138,7 @@ try {
   assert.equal(await home.getAttribute('href'), `${dashboard}/`);
   await home.click();
   await page.waitForURL(`${dashboard}/`);
-  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
   await page.goto(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
@@ -235,32 +244,24 @@ try {
   await panel.waitForFunction(() => document.activeElement?.textContent === 'Descargar revisión 2');
   assert.equal(await panel.getByRole('menuitem', { name: 'Descargar revisión 2', exact: true }).evaluate((item) => item === document.activeElement), true);
   await panel.keyboard.press('ArrowDown');
-  assert.equal(await panel.getByRole('menuitem', { name: 'Información', exact: true }).evaluate((item) => item === document.activeElement), true);
+  assert.equal(await panel.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).evaluate((item) => item === document.activeElement), true);
   await panel.keyboard.press('Escape');
   await panel.getByRole('menu').waitFor({ state: 'hidden' });
   assert.equal(await titleTrigger.evaluate((trigger) => trigger === document.activeElement), true);
-  await titleTrigger.click();
-  await panel.getByRole('menuitem', { name: 'Información', exact: true }).click();
-  assert.equal(await panel.locator('.artifact-info').evaluate((details) => (details as HTMLDetailsElement).open), true);
-  await panel.locator('.artifact-info > summary').click();
-  for (const [label, target] of [['Información', '#information > summary'], ['Archivos (1)', '#files h2'], ['Comparar revisiones', '#comparison h2'], ['Historial', '#history h2']]) {
-    await titleTrigger.focus();
-    await titleTrigger.press('Enter');
-    await panel.getByRole('menuitem', { name: label, exact: true }).press('Enter');
-    await panel.getByRole('menu').waitFor({ state: 'hidden' });
-    await panel.waitForFunction((selector) => document.querySelector(selector) === document.activeElement, target);
-    assert.equal(await panel.locator(target).evaluate((element) => element === document.activeElement), true, 'Internal menu links must focus their destination');
-    await panel.keyboard.press('Tab');
-    assert.equal(await panel.evaluate(() => document.activeElement?.closest('.artifact-toolbar') === null && scrollY > 0), true, 'Tab must continue from the destination without returning to the toolbar');
+  for (const [label, tab, target] of [['Información', 'information', '#information'], ['Archivos', 'files', '#files'], ['Comparar', 'compare', '#comparison'], ['Vista previa', 'preview', '.preview']]) {
+    await Promise.all([panel.waitForURL((url) => (url.searchParams.get('tab') ?? 'preview') === tab), panel.locator('.detail-tabs').getByRole('link', { name: label, exact: label !== 'Archivos' }).press('Enter')]);
+    await panel.locator(target).waitFor();
+    assert.equal(new URL(panel.url()).searchParams.get('revisionId'), updated.revision.id);
+    assert.equal(await panel.locator('.detail-tabs [aria-current=page]').count(), 1);
   }
   await panel.evaluate(() => scrollTo(0, 0));
   assert.equal(await panel.locator('.publish-form').count(), 0, 'The currently published selection must not offer redundant publication');
-  assert.equal(await panel.locator('.artifact-toolbar').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), secondPublication.url);
-  assert.equal(await panel.locator('.artifact-toolbar').locator('.button').first().innerText(), 'Abrir publicación');
+  assert.equal(await panel.locator('.detail-header').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), secondPublication.url);
+  assert.equal(await panel.locator('.detail-header').locator('[data-variant=primary]').innerText(), 'Abrir publicación');
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), updated.revision.id);
   await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-published-desktop.png' });
-  await Promise.all([panel.waitForURL(secondPublication.url), panel.locator('.artifact-toolbar').getByRole('link', { name: 'Abrir publicación', exact: true }).click()]);
+  await Promise.all([panel.waitForURL(secondPublication.url), panel.locator('.detail-header').getByRole('link', { name: 'Abrir publicación', exact: true }).click()]);
   await panel.frameLocator('main > iframe').getByRole('heading', { name: 'Updated document', exact: true }).waitFor();
   assert.equal(await panel.locator('main').getAttribute('data-artifact-id'), created.artifactId);
   assert.equal(await panel.locator('main').getAttribute('data-revision-id'), updated.revision.id);
@@ -301,8 +302,7 @@ try {
     await document.fonts.ready;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-  assert.equal(await panel.locator('header').count(), 1);
-  assert.equal(await panel.locator('h1').count(), 1);
+  await assertDetailHeaders(panel);
   assert(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png' });
@@ -324,7 +324,21 @@ try {
   await panel.setViewportSize({ width: 1280, height: 900 });
   await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}`);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '0');
-  assert.equal(await panel.locator('.revision-state').innerText(), 'Seleccionada\nRevisión 1\nMás reciente\nRevisión 1\nPublicada\nSin publicar');
+  assert.equal(await panel.locator('.detail-header h1').innerText(), reviewOne.revision.snapshot.metadata.title);
+  assert.equal(await panel.locator('.detail-header img, .detail-header [onerror], .detail-header [onclick]').count(), 0);
+  const hostileTrigger = panel.getByRole('button', { name: `Menú de ${reviewOne.revision.snapshot.metadata.title}`, exact: true });
+  await hostileTrigger.press('Enter');
+  await panel.getByRole('menu').waitFor();
+  assert.equal(await hostileTrigger.getAttribute('aria-label'), `Menú de ${reviewOne.revision.snapshot.metadata.title}`);
+  assert.equal(await panel.locator('.artifact-menu-heading > span').first().innerText(), reviewOne.revision.snapshot.metadata.title);
+  assert.equal(await panel.locator('.artifact-menu img, .artifact-menu script, .artifact-menu [onerror], .artifact-menu [onclick]').count(), 0);
+  assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
+  await panel.keyboard.press('Escape');
+  await panel.getByRole('menu').waitFor({ state: 'hidden' });
+  assert.equal(await panel.getByLabel('Revisión seleccionada', { exact: true }).inputValue(), reviewOne.revision.id);
+  assert.equal(await panel.locator('.selected-publication').innerText(), 'Sin publicar');
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Comparar', exact: true }).press('Enter');
+  await panel.locator('#comparison').waitFor();
   const singleRevisionComparison = {
     forms: await panel.locator('.compare-form').count(),
     selectors: await panel.getByLabel('Comparar la seleccionada con', { exact: true }).count(),
@@ -337,7 +351,7 @@ try {
   const unpublishedOne = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: reviewOne.revision.snapshot });
   const unpublishedTwo = await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: unpublishedOne.artifactId, expectedRevisionId: unpublishedOne.revision.id, snapshot: { ...unpublishedOne.revision.snapshot, content: { kind: 'text', text: 'Second unpublished revision' } } });
   const unpublishedUrl = `${dashboard}/artifacts/${unpublishedOne.artifactId}`;
-  await panel.goto(unpublishedUrl);
+  await panel.goto(`${unpublishedUrl}?tab=compare`);
   const unpublishedComparison = {
     selected: await panel.locator('.artifact-detail').getAttribute('data-revision-id'),
     target: await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(),
@@ -356,14 +370,14 @@ try {
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedTwo.revision.id);
   assert.deepEqual(await panel.locator('#compareTo option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)), [unpublishedTwo.revision.id]);
-  await panel.goto(`${unpublishedUrl}?before=1`);
+  await panel.goto(`${unpublishedUrl}?before=1&tab=compare`);
   assert.equal(await panel.locator('.revision-list li').count(), 0);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedOne.revision.id);
-  await panel.goto(`${unpublishedUrl}?revisionId=${unpublishedTwo.revision.id}&compareTo=${unpublishedTwo.revision.id}`);
+  await panel.goto(`${unpublishedUrl}?revisionId=${unpublishedTwo.revision.id}&compareTo=${unpublishedTwo.revision.id}&tab=compare`);
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), unpublishedOne.revision.id);
   assert.equal(await panel.locator('.content-comparison pre').first().innerText(), unpublishedOne.revision.snapshot.content.text);
   assert.equal(await panel.locator('.content-comparison pre').last().innerText(), unpublishedTwo.revision.snapshot.content.text);
-  await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}&compareTo=${reviewOne.revision.id}`);
+  await panel.goto(`${reviewUrl}?revisionId=${reviewOne.revision.id}&compareTo=${reviewOne.revision.id}&tab=compare`);
   assert.equal(await panel.locator('.compare-form, .content-comparison').count(), 0);
   assert.equal(await panel.getByText('No hay otra revisión disponible para comparar.', { exact: true }).count(), 1);
   const firstPanelCommand = await panel.locator('.publish-form input').evaluateAll((inputs) => Object.fromEntries(inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value]))) as Record<string, string>;
@@ -390,37 +404,38 @@ try {
   let reviewHead = reviewTwo;
   for (let sequence = 3; sequence <= 7; sequence++) reviewHead = await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, expectedRevisionId: reviewHead.revision.id, snapshot: reviewTwo.revision.snapshot });
   await panel.goto(dashboard);
-  const reviewCard = panel.locator('.artifact-list li').filter({ has: panel.getByRole('link', { name: 'Browser workflow review', exact: true }) });
-  assert.equal(await reviewCard.locator('.pending').innerText(), 'Cambios pendientes de publicación');
+  const reviewCard = panel.locator('.artifact-card').filter({ has: panel.getByRole('link', { name: 'Browser workflow review', exact: true }) });
+  assert.equal(await reviewCard.locator('.artifact-status').innerText(), 'Cambios pendientes');
   await panel.goto(`${reviewUrl}?revisionId=${reviewTwo.revision.id}&compareTo=${reviewOne.revision.id}`);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-artifact-id'), reviewOne.artifactId);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewTwo.revision.id);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewTwo.revision.sha256);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-publication-version'), '1');
-  assert.equal(await panel.locator('.revision-state').innerText(), 'Seleccionada\nRevisión 2\nMás reciente\nRevisión 7\nPublicada\nRevisión 1');
-  assert.deepEqual(await panel.locator('.revision-state a').evaluateAll((links) => links.map((link) => new URL((link as HTMLAnchorElement).href).searchParams.get('revisionId'))), [reviewTwo.revision.id, reviewHead.revision.id, reviewOne.revision.id]);
+  assert.equal(await panel.getByLabel('Revisión seleccionada', { exact: true }).inputValue(), reviewTwo.revision.id);
+  assert.equal(await panel.locator('#revisionId option').first().getAttribute('value'), reviewHead.revision.id);
+  assert.equal(await panel.locator('.selected-publication').innerText(), 'Publicada: revisión 1');
+  assert.equal(new URL((await panel.locator('.published-revision a').getAttribute('href'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
   await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-review-desktop.png' });
-  await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
-  assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Revisión$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.id);
-  assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^SHA-256$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.sha256);
-  await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
-  for (const [label, id] of [['Archivos (4)', 'files'], ['Comparar revisiones', 'comparison'], ['Historial', 'history']]) {
-    const anchor = panel.getByRole('navigation', { name: 'Secciones de la revisión', exact: true }).getByRole('link', { name: label, exact: true });
-    await anchor.press('Enter');
-    assert.equal(new URL(panel.url()).hash, `#${id}`);
-    const bounds = await panel.locator(`#${id} h2`).boundingBox();
-    assert(bounds && bounds.y >= 0 && bounds.y < 900, 'Secondary anchors must reach their visible section headings');
-  }
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Información', exact: true }).press('Enter');
+  await panel.locator('#information').waitFor();
+  assert.equal(await panel.locator('#information dt').filter({ hasText: /^Revisión$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.id);
+  assert.equal(await panel.locator('#information dt').filter({ hasText: /^SHA-256$/ }).locator('xpath=following-sibling::dd[1]').innerText(), reviewTwo.revision.sha256);
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Archivos', exact: false }).press('Enter');
+  await panel.locator('#files').waitFor();
   assert.equal(await panel.locator('.inventory tbody tr').count(), 4);
   assert.equal(await panel.locator('.inventory tbody tr').filter({ hasText: 'changed.bin' }).locator('td').nth(1).innerText(), '3');
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Comparar', exact: true }).press('Enter');
+  await panel.locator('#comparison').waitFor();
   assert.equal(await panel.locator('.comparison tbody tr').count(), 3);
   assert.equal(await panel.locator('.content-comparison pre').nth(0).innerText(), reviewOne.revision.snapshot.content.text);
   assert.equal(await panel.locator('.content-comparison pre').nth(1).innerText(), reviewTwo.revision.snapshot.content.text);
   assert.deepEqual(await panel.locator('.file-changes h4').allTextContents(), ['added.md Agregado', 'changed.bin Modificado', 'encoding.txt Modificado', 'removed.txt Eliminado']);
   assert.equal(await panel.locator('.comparison tbody tr').filter({ hasText: 'Metadatos personalizados' }).locator('td').nth(1).innerText(), JSON.stringify(reviewTwo.revision.snapshot.metadata.custom, null, 2));
-  assert.equal(await panel.locator('.artifact-detail script, .artifact-detail img').count(), 0);
+  assert.equal(await panel.locator('.detail-body script, .artifact-detail img').count(), 0);
   assert.equal(await panel.locator('body').getAttribute('data-review-escaped'), null);
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Vista previa', exact: true }).press('Enter');
+  await panel.locator('.preview').waitFor();
   assert.equal(await panel.locator('.revision-list li').count(), 5);
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('before') === '3'), panel.getByRole('link', { name: 'Ver revisiones anteriores', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('revisionId'), reviewTwo.revision.id);
@@ -438,8 +453,8 @@ try {
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-id'), reviewOne.revision.id);
   assert.equal(await panel.locator('.artifact-detail').getAttribute('data-revision-sha256'), reviewOne.revision.sha256);
   assert.equal(await panel.locator('.publish-form').count(), 0);
-  assert.equal(await panel.locator('.artifact-toolbar').locator('.button').first().innerText(), 'Abrir publicación');
-  assert.equal(await panel.getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), `${publish}/a/${reviewOne.artifactId}`);
+  assert.equal(await panel.locator('.detail-header').locator('[data-variant=primary]').innerText(), 'Abrir publicación');
+  assert.equal(await panel.locator('.detail-header').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), `${publish}/a/${reviewOne.artifactId}`);
   await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();
   assert.equal(new URL((await panel.locator('.preview').getAttribute('src'))!, dashboard).searchParams.get('revisionId'), reviewOne.revision.id);
   await panel.getByRole('button', { name: `Menú de ${reviewOne.revision.snapshot.metadata.title}`, exact: true }).click();
@@ -463,7 +478,10 @@ try {
   assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 1);
   await Promise.all([panel.waitForURL((url) => url.searchParams.get('revisionId') === reviewOne.revision.id), panel.getByRole('link', { name: 'Ver revisión 1', exact: true }).press('Enter')]);
   assert.equal(new URL(panel.url()).searchParams.get('compareTo'), null);
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Comparar', exact: true }).press('Enter');
+  await panel.locator('#comparison').waitFor();
   assert.equal(await panel.getByLabel('Comparar la seleccionada con', { exact: true }).inputValue(), reviewHead.revision.id);
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Vista previa', exact: true }).press('Enter');
   await panel.frameLocator('.preview').getByRole('heading', { name: 'Saved review one', exact: true }).waitFor();
   await panel.goto(`${reviewUrl}?revisionId=${reviewTwo.revision.id}&compareTo=${reviewOne.revision.id}`);
   await panel.setViewportSize({ width: 390, height: 844 });
@@ -471,13 +489,15 @@ try {
     await document.fonts.ready;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-  assert.equal(await panel.locator('header').count(), 1);
-  assert.equal(await panel.locator('h1').count(), 1);
+  await assertDetailHeaders(panel);
   assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await panel.frameLocator('.preview').locator('pre').innerText(), reviewTwo.revision.snapshot.content.text);
   assert.equal(await panel.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
   await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-review-mobile.png' });
+  await panel.locator('.detail-tabs').getByRole('link', { name: 'Comparar', exact: true }).press('Enter');
+  await panel.locator('.comparison').waitFor();
+  assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await panel.locator('.comparison').scrollIntoViewIfNeeded();
   await panel.screenshot({ path: '.test-artifacts/artifact-comparison-mobile.png' });
   const commandFields = await panel.locator('.publish-form input').evaluateAll((inputs) => Object.fromEntries(inputs.map((input) => [(input as HTMLInputElement).name, (input as HTMLInputElement).value]))) as Record<string, string>;
@@ -534,14 +554,17 @@ try {
   const stalePost = await nativePost({ ...commandFields, requestId: randomBytes(16).toString('hex') });
   assert.equal(stalePost.status, 409);
   const staleHtml = await stalePost.text();
-  assert.match(staleHtml, /Versión 2/);
+  assert.match(staleHtml, /Esta es la publicación actual del artefacto/);
+  assert(staleHtml.includes(`revisionId=${reviewTwo.revision.id}`));
+  assert.doesNotMatch(staleHtml, /versión/i);
   assert(!staleHtml.includes('class="publish-form"'));
   await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: reviewOne.artifactId, revisionId: reviewHead.revision.id, expectedPublicationVersion: 2 });
   const superseded = await nativePost(commandFields);
   assert.equal(superseded.status, 200);
   const supersededHtml = await superseded.text();
   assert.match(supersededHtml, /data-publication-result="superseded"/);
-  assert.match(supersededHtml, /Versión 3/);
+  assert.match(supersededHtml, /otra revisión publicada/);
+  assert.doesNotMatch(supersededHtml, /versión/i);
   assert(supersededHtml.includes(`revisionId=${reviewHead.revision.id}`));
   const readbackCommand = { artifactId: reviewOne.artifactId, revisionId: reviewOne.revision.id, expectedPublicationVersion: 3, requestId: randomBytes(16).toString('hex') };
   const uncertainReadback = await publishSelectedRevision({ publish: store.publish, read: async () => { throw new Error('Independent read unavailable after commit'); } }, actor, readbackCommand);
@@ -591,12 +614,12 @@ try {
     await panel.setViewportSize(viewport);
     await panel.goto(`${dashboard}/artifacts/${long.artifactId}?revisionId=${long.revision.id}`);
     await panel.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
-    await assertPreviewInViewport(panel);
     await panel.screenshot({ path: `.test-artifacts/artifact-long-${name}.png` });
-    await panel.locator('summary').filter({ hasText: /^Información$/ }).scrollIntoViewIfNeeded();
-    await panel.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
-    assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Título$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longTitle.trim());
-    assert.equal(await panel.locator('.artifact-info dt').filter({ hasText: /^Descripción$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longDescription.trim());
+    await assertPreviewInViewport(panel);
+    await panel.locator('.detail-tabs').getByRole('link', { name: 'Información', exact: true }).press('Enter');
+    await panel.locator('#information').waitFor();
+    assert.equal(await panel.locator('#information dt').filter({ hasText: /^Título$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longTitle.trim());
+    assert.equal(await panel.locator('#information dt').filter({ hasText: /^Descripción$/ }).locator('xpath=following-sibling::dd[1]').innerText(), longDescription.trim());
   }
   const anonymous = await browser.newContext();
   const anonymousPage = await anonymous.newPage();
@@ -607,9 +630,9 @@ try {
   assert.equal((await anonymous.request.get(`${dashboard}/artifacts/${created.artifactId}/export?revisionId=${created.revision.id}`)).status(), 401);
   await anonymous.close();
   await panel.goto(dashboard);
-  await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await panel.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await panel.locator('.library-navigation > summary').click();
-  await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+  await panel.locator('summary[aria-label="Mi cuenta"]').click();
   await panel.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();

@@ -1,16 +1,31 @@
 ---
+import '../styles/tokens.css';
 import '../styles/panel.css';
-const { title = 'Tus artefactos', section = 'Tus artefactos', library = false, detail = false } = Astro.props;
+import '../styles/effects.css';
+import type { LibraryQuery, Workspace } from '@artifacts/artifacts/panel/model';
+import MoveDialog from '../components/move/MoveDialog.tsx';
+import Sidebar from '../components/shell/Sidebar.astro';
+import Breadcrumb from '../components/shell/Breadcrumb.astro';
+import SearchForm from '../components/shell/SearchForm.astro';
+import { scopeOf, type NavLocation } from '../presentation.ts';
+import { getRuntime } from '../runtime.ts';
+interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryQuery; detail?: boolean; move?: boolean }
+const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, detail = false, move = false } = Astro.props;
+const identity = Astro.locals.identity;
+const authUrl = identity ? (await getRuntime()).config.auth : '';
+const query = search ?? { scope: scopeOf(location), q: '', status: 'all' };
 ---
 <!doctype html>
 <html lang="es" class="dark">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#1e1e2e" /><title>{title} · Artifacts</title></head>
-  <body class:list={['panel', { 'library-shell': library, 'detail-shell': detail }]}>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#1e1e2e" /><link rel="icon" type="image/svg+xml" href="/favicon.svg" /><title>{title} · Artifacts</title></head>
+  <body class:list={['panel', { 'library-shell': Boolean(identity), 'detail-shell': detail }]}>
     <a class="skip-link" href="#main-content">Ir al contenido</a>
-    {library && <aside class="library-sidebar" aria-label="Espacio de trabajo"><slot name="sidebar" /></aside>}
+    {identity && <aside class="library-sidebar" aria-label="Espacio de trabajo"><Sidebar identity={identity} authUrl={authUrl} workspace={workspace} location={location} /></aside>}
     <div class="panel-workspace">
-      <slot name="header"><header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>{section}</span></header></slot>
+      {identity ? <header class="workspace-toolbar"><Breadcrumb location={location} title={title} /><SearchForm query={query} /></header> : <header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>Biblioteca</span></header>}
+      <slot name="header" />
       <main class="panel-main" id="main-content"><slot /></main>
     </div>
+    {move && workspace && <MoveDialog projects={JSON.stringify(workspace.projects.map(({ name }) => name))} client:load />}
   </body>
 </html>

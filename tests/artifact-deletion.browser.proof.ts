@@ -79,10 +79,10 @@ try {
   const pending = await store.issuePublicationGrant(actor, { artifactId: created.artifactId, state: pendingState });
   const page = await context.newPage();
   await page.goto(dashboard);
-  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Todos (1)', exact: true }).waitFor();
   const openConfirmation = async () => {
-    const trigger = page.getByRole('button', { name: `Opciones de ${title}`, exact: true });
+    const trigger = page.getByRole('button', { name: `Menú de ${title}`, exact: true });
     await trigger.focus();
     await trigger.press('Enter');
     await page.getByRole('menu').waitFor();
@@ -91,13 +91,13 @@ try {
     await page.getByRole('heading', { name: 'Eliminar artefacto', exact: true }).waitFor();
   };
   await openConfirmation();
-  assert.equal(await page.getByRole('heading', { level: 2 }).textContent(), title);
+  assert.equal(await page.locator('.deletion-card').getByRole('heading', { level: 2 }).textContent(), title);
   assert.match(await page.locator('.deletion-card').innerText(), /permanentemente.*todas sus revisiones.*archivos.*publicación/);
   await page.screenshot({ path: `${evidence}/confirmation-desktop.png`, fullPage: true });
   await page.getByRole('link', { name: 'Cancelar', exact: true }).click();
   await page.getByRole('link', { name: title, exact: true }).waitFor();
   assert.equal((await store.read(actor, { artifactId: created.artifactId })).headRevisionId, created.headRevisionId);
-  record('Keyboard row menu opens a read-only confirmation; Cancelar preserves all data.');
+  record('Keyboard card menu opens a read-only confirmation; Cancelar preserves all data.');
   await openConfirmation();
   const staleHead = await commandFrom(page);
   const updated = await store.update(actor, { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot });
@@ -118,6 +118,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator('header').count(), 1, 'Confirmation renders one panel header');
+  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Confirmation uses the shared shell header');
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await writeFile(`${evidence}/confirmation-mobile.aria.yml`, await page.locator('body').ariaSnapshot());
   await page.screenshot({ path: `${evidence}/confirmation-mobile.png`, fullPage: true });

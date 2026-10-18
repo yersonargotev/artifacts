@@ -1,0 +1,30 @@
+---
+import type { LibraryScope, Workspace } from '@artifacts/artifacts/panel/model';
+import { createCommand, projectTone } from '../../presentation.ts';
+import Icon from '../Icon.astro';
+import TallyBar from '../projects/TallyBar.astro';
+interface Props { workspace: Workspace; scope: LibraryScope }
+const { workspace, scope } = Astro.props;
+const project = scope.kind === 'project' ? scope.project.name : scope.kind === 'vanishedProject' ? scope.name : undefined;
+const title = scope.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
+const description = scope.kind === 'unfiled' ? 'Los artefactos que aún no tienen proyecto.' : project ? 'Los artefactos de este proyecto.' : 'Todo lo que creas, en un solo lugar.';
+---
+{scope.kind === 'project' ? <header class="library-header project-header" data-tone={projectTone(scope.project.name)}>
+  <div class="project-cover" aria-hidden="true"><svg viewBox="0 0 1000 120" preserveAspectRatio="none" fill="none"><path d="M-10 20 C150 0 300 50 500 24 S820 -6 1010 18 M-10 40 C160 18 320 72 520 44 S830 14 1010 38 M-10 60 C170 38 340 92 540 64 S840 34 1010 58 M-10 80 C180 58 360 112 560 84 S850 54 1010 78 M-10 100 C190 78 380 132 580 104 S860 74 1010 98" /></svg></div>
+  <div class="project-header-body">
+    <div class="project-header-identity"><span class="project-folder" aria-hidden="true"><Icon name="folder" size={28} /></span><div><h1>{scope.project.name}</h1><div class="project-header-counts"><span>{scope.project.count} {scope.project.count === 1 ? 'artefacto' : 'artefactos'}</span><TallyBar tally={scope.project} /><span>{scope.project.published} {scope.project.published === 1 ? 'publicado' : 'publicados'} · {scope.project.pending} con cambios</span></div></div></div>
+    <div class="project-header-action"><code>{createCommand(scope.project.name)}</code><button type="button" class="button secondary" data-copy-command={createCommand(scope.project.name)} aria-describedby="project-copy-feedback" hidden><Icon name="copy" size={18} />Copiar comando para crear aquí</button><p id="project-copy-feedback" class="sr-only" role="status"></p></div>
+  </div>
+</header> : <header class="library-header">
+  <div class="library-heading">
+    <div><h1>{title}</h1><p>{description}</p>{scope.kind === 'unfiled' && <p class="unfiled-count">{scope.tally.count} {scope.tally.count === 1 ? 'artefacto' : 'artefactos'}</p>}</div>
+    <a class="button secondary connect-button" href="#connect-tools" aria-label="Conectar herramientas" data-open-tools><Icon name="plug-connected" size={18} /><span>Conectar herramientas</span></a>
+  </div>
+  {scope.kind === 'all' && <dl class="library-stats" aria-label="Estadísticas de tu biblioteca">
+    <div><dt>Artefactos</dt><dd>{workspace.total.count}</dd></div>
+    <div><dt>Publicados</dt><dd>{workspace.total.published}</dd></div>
+    <div><dt>Con cambios pendientes</dt><dd>{workspace.total.pending}</dd></div>
+    <div><dt><a href="/?unfiled=1">Sin proyecto<Icon name="chevron-right" size={14} /></a></dt><dd>{workspace.unfiled.count}</dd></div>
+  </dl>}
+</header>}
+<script>import './copy.ts';</script>

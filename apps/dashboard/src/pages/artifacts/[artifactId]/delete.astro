@@ -4,6 +4,7 @@ import Panel from '../../../layouts/Panel.astro';
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 import { parseDeletionForm } from '../../../delete.ts';
+import { workspaceQuery } from '../../../presentation.ts';
 if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
 if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
 const actor = panelActor(Astro.locals.identity);
@@ -35,8 +36,10 @@ if (Astro.request.method === 'POST') {
 }
 const confirmationUrl = `/artifacts/${encodeURIComponent(command.artifactId)}/delete`;
 const heading = { confirm: 'Eliminar artefacto', conflict: 'El artefacto cambió', uncertain: 'No pudimos confirmar la eliminación' }[outcome];
+const snapshot = await getRuntime().then(({ panel }) => panel.library(actor, workspaceQuery)).catch((error: unknown) => outcome === 'uncertain' ? undefined : artifactErrorResponse(error));
+if (snapshot instanceof Response) return snapshot;
 ---
-<Panel title={heading} section="Biblioteca">
+<Panel title={heading} workspace={snapshot?.workspace}>
   <section class="deletion-card" data-deletion-result={outcome}>
     <h1>{heading}</h1>
     {title && <h2 class="deletion-title">{title}</h2>}
@@ -51,7 +54,7 @@ const heading = { confirm: 'Eliminar artefacto', conflict: 'El artefacto cambió
         <input type="hidden" name="expectedRevisionId" value={command.expectedRevisionId} />
         <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
         <input type="hidden" name="requestId" value={command.requestId} />
-        <button class="destructive-button" type="submit">{outcome === 'uncertain' ? 'Reintentar eliminación' : 'Eliminar artefacto'}</button>
+        <button class="destructive-button" data-variant="primary" type="submit">{outcome === 'uncertain' ? 'Reintentar eliminación' : 'Eliminar artefacto'}</button>
       </form>}
     </div>
   </section>

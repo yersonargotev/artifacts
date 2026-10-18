@@ -1,0 +1,43 @@
+---
+import type { LibraryPage } from '@artifacts/artifacts/panel/model';
+import { searchFor } from '../../presentation.ts';
+import { libraryHref } from '../../urls.ts';
+import ArtifactCard from './ArtifactCard.astro';
+import CreateHereCard from './CreateHereCard.astro';
+import SelectionBar from './SelectionBar.astro';
+import Icon from '../Icon.astro';
+interface Props { page: LibraryPage; workspaceCount: number; now: Date }
+const { page, workspaceCount, now } = Astro.props;
+const query = searchFor(page);
+const total = page.counts[page.status];
+const filtered = Boolean(page.q || page.status !== 'all');
+const selectable = page.scope.kind === 'project' || page.scope.kind === 'unfiled';
+const clearHref = libraryHref(query, { q: '', status: 'all' });
+const empty = page.continued
+  ? { icon: 'layers-intersect', title: 'Llegaste al final de los resultados', text: 'Vuelve al inicio para ver los artefactos más recientes.' } as const
+  : filtered
+    ? { icon: 'search', title: 'No hay resultados', text: 'Prueba con otro título o cambia los filtros de publicación.' } as const
+    : page.scope.kind === 'vanishedProject'
+      ? { icon: 'folder', title: 'Este proyecto ya no tiene artefactos', text: 'Un proyecto existe mientras contiene al menos un artefacto.' } as const
+      : workspaceCount === 0
+        ? { icon: 'layers-intersect', title: 'Tu próximo proyecto empieza aquí', text: 'Crea tu primer artefacto desde Claude Code o Codex. Aquí podrás revisarlo, descargarlo y publicarlo.' } as const
+        : { icon: 'folder', title: 'No hay artefactos sin proyecto', text: 'Todos tus artefactos están organizados en proyectos.' } as const;
+---
+<section class="library-collection" aria-label="Artefactos">
+  <div class="library-results">
+    <p role="status">{total} {total === 1 ? 'artefacto' : 'artefactos'}{page.q ? <> para <strong>"{page.q}"</strong></> : ''}{page.continued && total > 0 ? <span class="results-continuation">, continuación de resultados</span> : ''}</p>
+    <div>{filtered && page.cards.length > 0 && <a class="clear-filters" href={clearHref}>Limpiar filtros</a>}<span class="library-order">Más recientes primero</span></div>
+  </div>
+  {selectable && page.cards.length > 0 && <SelectionBar />}
+  {page.cards.length ? <ul class="artifact-grid">{page.cards.map((card) => <ArtifactCard card={card} now={now} selectable={selectable} />)}{page.scope.kind === 'project' && <CreateHereCard project={page.scope.project.name} />}</ul> : <div class="library-empty" data-slot="card">
+    <span class="empty-icon" aria-hidden="true"><Icon name={empty.icon} size={30} /></span><h2>{empty.title}</h2><p>{empty.text}</p>
+    {page.continued ? <a class="button secondary" href={libraryHref(query)}>Volver al inicio</a>
+      : filtered ? <a class="button secondary" href={clearHref}>Limpiar filtros</a>
+      : workspaceCount === 0 && page.scope.kind !== 'vanishedProject' ? <a class="button secondary" href="#connect-tools" data-open-tools><Icon name="plug-connected" size={18} />Conectar herramientas</a>
+      : <a class="button secondary" href="/">Ver todos tus artefactos</a>}
+  </div>}
+  <div class="library-pagination">
+    {page.continued && page.cards.length > 0 && <a class="button secondary" href={libraryHref(query)}>Volver al inicio</a>}
+    {page.next && <a class="library-next button secondary" href={libraryHref(query, { cursor: page.next })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
+  </div>
+</section>

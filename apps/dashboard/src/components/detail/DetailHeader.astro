@@ -1,0 +1,40 @@
+---
+import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { isPending, isSelectedPublished } from '@artifacts/artifacts/panel/model';
+import { contentLabels, revisionLabel } from '../../presentation.ts';
+import { moveHref, exportHref, type DetailUrl } from '../../urls.ts';
+import ArtifactMenu from '../ArtifactMenu.tsx';
+import PublicationForm from '../PublicationForm.astro';
+import Icon from '../Icon.astro';
+interface Props { detail: ArtifactDetail; url: DetailUrl }
+const { detail, url } = Astro.props;
+const { revision } = detail.selected;
+const path = `/artifacts/${encodeURIComponent(detail.artifactId)}`;
+const command = { artifactId: detail.artifactId, revisionId: revision.id, expectedPublicationVersion: detail.publication?.version ?? 0, requestId: crypto.randomUUID() };
+---
+<header class="detail-header">
+  <div class="detail-heading">
+    <div class="detail-title"><h1>{revision.snapshot.metadata.title}</h1><span class="kind-chip">{contentLabels[revision.snapshot.content.kind]}</span></div>
+    <div class="detail-selection">
+      <form class="revision-select" method="get" action={path}>
+        {url.tab !== 'preview' && <input type="hidden" name="tab" value={url.tab} />}
+        {url.before !== undefined && <input type="hidden" name="before" value={url.before} />}
+        {url.compareTo !== undefined && <input type="hidden" name="compareTo" value={url.compareTo} />}
+        <label class="sr-only" for="revisionId">Revisión seleccionada</label>
+        <select id="revisionId" name="revisionId">{detail.choices.map((ref) => <option value={ref.revisionId} selected={ref.revisionId === revision.id}>{revisionLabel(ref, detail)}</option>)}</select>
+        <button class="secondary">Ver revisión</button>
+      </form>
+      <span class="selected-publication">{detail.publication ? `Publicada: revisión ${detail.publication.revision.sequence}` : 'Sin publicar'}</span>
+      {isPending(detail) && <span class="status-chip pending-chip">Cambios pendientes</span>}
+    </div>
+  </div>
+  <div class="detail-actions">
+    <ArtifactMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={JSON.stringify([
+      { label: `Descargar revisión ${revision.sequence}`, href: exportHref(detail.artifactId, revision.id) },
+      { label: 'Mover a proyecto', href: moveHref([detail.artifactId]), moveItems: JSON.stringify([{ artifactId: detail.artifactId, title: revision.snapshot.metadata.title, project: detail.project }]) },
+    ])} deleteUrl={`${path}/delete`} client:load />
+    <noscript><a class="native-move-link" href={moveHref([detail.artifactId])}>Mover a proyecto</a></noscript>
+    <a class="button secondary" href={exportHref(detail.artifactId, revision.id)}><Icon name="download" size={16} />Exportar</a>
+    {isSelectedPublished(detail) ? <a class="button" data-variant="primary" href={detail.publication!.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
+  </div>
+</header>

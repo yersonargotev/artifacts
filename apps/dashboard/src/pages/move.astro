@@ -1,0 +1,41 @@
+---
+import Panel from '../layouts/Panel.astro';
+import MovePageForm from '../components/move/MoveForm.tsx';
+import { getRuntime } from '../runtime.ts';
+import { artifactErrorResponse, panelActor } from '../publication.ts';
+import { prepareMovePage } from '../move.ts';
+if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
+if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
+const { panel } = await getRuntime();
+const page = await prepareMovePage(panel, panelActor(Astro.locals.identity), Astro.request).catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
+if (page instanceof Response) return page;
+if (page.kind === 'redirect') return Astro.redirect(page.location, 303);
+Astro.response.status = page.status;
+const { form, outcome, subject, freshHref } = page;
+const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto completado parcialmente', invalid: 'Mover a proyecto', conflict: 'La solicitud cambió', uncertain: 'No pudimos confirmar el cambio de proyecto' }[outcome.kind];
+---
+<Panel title={heading} workspace={subject?.workspace}>
+  <section class="move-card" data-move-result={outcome.kind}>
+    <h1>{heading}</h1>
+    <p>No crea revisiones ni cambia lo publicado.</p>
+    {subject?.items.map((item) => <div><h2 class="move-title">{item.title}</h2><p>Proyecto actual: <strong>{item.project ?? 'Sin proyecto'}</strong></p></div>)}
+    {outcome.kind === 'partial' ? <>
+      <p>La solicitud registró {outcome.result.moved} artefactos movidos y {outcome.result.unchanged} sin cambios en <strong>{outcome.result.project ?? 'Sin proyecto'}</strong>.</p>
+      <p>Estos identificadores de la selección no estaban disponibles:</p>
+      <ul class="move-missing">{outcome.result.missing.map((id) => <li><code>{id}</code></li>)}</ul>
+      <div class="move-actions"><a class="button" data-variant="primary" href={outcome.location}>Ver destino</a><a class="button secondary" href={freshHref}>Revisar selección</a></div>
+    </> : outcome.kind === 'conflict' ? <>
+      <p role="alert">Esta solicitud ya se usó para otro cambio de proyecto. Abre un formulario nuevo para revisar la selección.</p>
+      <div class="move-actions"><a class="button secondary" href={freshHref}>Revisar el proyecto actual</a><a class="button secondary" href="/">Cancelar</a></div>
+    </> : outcome.kind === 'uncertain' ? <>
+      <p role="alert">La solicitud pudo haberse completado. Reintenta la misma acción para confirmar el resultado.</p>
+      <form method="post" action="/move">
+        {form.artifactIds.map((id) => <input type="hidden" name="artifactId" value={id} />)}
+        <input type="hidden" name="requestId" value={form.requestId} />
+        <input type="hidden" name="intent" value={form.intent} />
+        {form.project !== undefined && <input type="hidden" name="project" value={form.project} />}
+        <div class="move-actions"><button data-variant="primary" type="submit">Reintentar {form.intent === 'remove' ? 'quitar del proyecto' : 'mover al proyecto'}</button><a class="button secondary" href="/">Cancelar</a></div>
+      </form>
+    </> : <MovePageForm data={JSON.stringify({ form, projects: subject?.workspace.projects.map(({ name }) => name) ?? [], canRemove: !subject || subject.items.some(({ project }) => project !== null), invalid: outcome.kind === 'invalid' })} client:load />}
+  </section>
+</Panel>

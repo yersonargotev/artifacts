@@ -1,0 +1,15 @@
+---
+import type { LibraryQuery } from '@artifacts/artifacts/panel/model';
+import Icon from '../Icon.astro';
+import { Input } from '../ui/input.tsx';
+interface Props { query: LibraryQuery }
+const { query } = Astro.props;
+const placeholder = query.scope.kind === 'project' ? `Buscar en ${query.scope.name}…` : query.scope.kind === 'unfiled' ? 'Buscar en Sin proyecto…' : 'Buscar artefactos…';
+---
+<form class="shell-search" role="search" aria-label="Buscar en tus artefactos" method="get" action="/">
+  <div class="search-input"><Icon name="search" size={17} /><Input id="artifact-search" type="search" name="q" defaultValue={query.q} maxLength={256} placeholder={placeholder} aria-label="Buscar artefactos" /></div>
+  {query.scope.kind === 'project' && <input type="hidden" name="project" value={query.scope.name} />}
+  {query.scope.kind === 'unfiled' && <input type="hidden" name="unfiled" value="1" />}
+  {query.status !== 'all' && <input type="hidden" name="status" value={query.status} />}
+  <button class="secondary" type="submit">Buscar</button>
+</form>

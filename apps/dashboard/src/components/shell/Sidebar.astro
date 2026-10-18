@@ -1,0 +1,46 @@
+---
+import type { Workspace } from '@artifacts/artifacts/panel/model';
+import { projectKey } from '@artifacts/artifacts/panel/model';
+import type { PanelIdentity } from '../../identity.ts';
+import { projectTone, scopeOf, type NavLocation } from '../../presentation.ts';
+import { scopeHref } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { identity: PanelIdentity; authUrl: string; workspace?: Workspace; location: NavLocation }
+const { identity, authUrl, workspace, location } = Astro.props;
+const scope = scopeOf(location);
+const initials = identity.name.trim().split(/\s+/).slice(0, 2).map((part) => [...part][0]).join('').toUpperCase();
+const current = location.kind === 'artifact' ? 'true' : 'page';
+---
+<div class="sidebar-brand"><a class="wordmark" href="/"><span class="brand-symbol" aria-hidden="true"><Icon name="layers" size={20} /></span><span>Artifacts<span class="workspace-label">Tu espacio de trabajo</span></span></a></div>
+<details class="library-navigation" open>
+  <summary><span><Icon name="menu-2" size={18} />Navegación</span><Icon name="chevron-down" size={16} /></summary>
+  <div class="sidebar-content">
+    <nav aria-label="Principal">
+      <a class="sidebar-link" href="/" aria-label={workspace ? `Biblioteca (${workspace.total.count})` : 'Biblioteca'} aria-current={location.kind === 'library' ? 'page' : undefined}><Icon name="layout-grid" size={18} /><span>Biblioteca</span>{workspace && <span class="project-count">{workspace.total.count}</span>}</a>
+      <a class="sidebar-link" href="/projects" aria-label={workspace ? `Proyectos (${workspace.projects.length})` : 'Proyectos'} aria-current={location.kind === 'projects' ? 'page' : undefined}><Icon name="folder" size={18} /><span>Proyectos</span>{workspace && <span class="project-count">{workspace.projects.length}</span>}</a>
+    </nav>
+    <nav class="sidebar-projects" aria-label="Tus proyectos">
+      <h2>Tus proyectos</h2>
+      {workspace ? workspace.projects.length ? <ul>{workspace.projects.map(({ name, count }) => <li><a class="sidebar-link" href={scopeHref({ kind: 'project', name })} title={name} aria-label={`${name} (${count})`} aria-current={scope.kind === 'project' && projectKey(name) === projectKey(scope.name) ? current : undefined}><span class="project-icon" data-tone={projectTone(name)}><Icon name="folder" size={18} /></span><span>{name}</span><span class="project-count">{count}</span></a></li>)}</ul> : <p>Aún no tienes proyectos. Asigna uno al crear o mover un artefacto.</p> : <p>No pudimos cargar tus proyectos.</p>}
+    </nav>
+    <a class="sidebar-link unfiled-link" href={scopeHref({ kind: 'unfiled' })} aria-label={workspace ? `Sin proyecto (${workspace.unfiled.count})` : 'Sin proyecto'} aria-current={scope.kind === 'unfiled' ? current : undefined}><Icon name="folder" size={18} /><span>Sin proyecto</span>{workspace && <span class="project-count">{workspace.unfiled.count}</span>}</a>
+    <details class="tools" id="connect-tools"><summary><Icon name="plug-connected" size={18} />Conectar herramientas<Icon name="chevron-down" size={15} /></summary><div class="sidebar-disclosure"><p>Agrega este servidor MCP en Claude Code o Codex e inicia sesión con tu cuenta.</p><code>{process.env.MCP_URL}</code><p>Usa <strong>artifacts_create</strong> para crear tu primer artefacto. Cada revisión conserva su contenido y sus archivos.</p></div></details>
+    <details class="identity"><summary aria-label="Mi cuenta"><span class="account-avatar" aria-hidden="true">{initials}</span><span class="account-summary"><span>Mi cuenta</span><span class="session-indicator">Sesión activa</span></span><Icon name="chevron-right" size={16} /></summary><div class="sidebar-disclosure"><h2>{identity.name}</h2><p>Este identificador es el mismo en el panel y en tus herramientas.</p><code data-testid="user-id">{identity.userId}</code><dl><dt>Conexión</dt><dd>Sesión activa</dd><dt>Permisos del panel</dt><dd>Identidad y artefactos propios</dd></dl><footer><form method="post" action="/auth/logout"><button class="secondary"><Icon name="logout" size={16} />Cerrar sesión del panel</button></form><a href={`${authUrl}/revoke-all`}>Cerrar todas las sesiones</a></footer></div></details>
+  </div>
+</details>
+<script>
+  const navigation = document.querySelector('.library-navigation');
+  if (navigation instanceof HTMLDetailsElement) {
+    const desktop = matchMedia('(min-width: 761px)');
+    navigation.open = desktop.matches;
+    desktop.addEventListener('change', () => { navigation.open = desktop.matches; });
+  }
+  document.querySelectorAll('[data-open-tools]').forEach((button) => button.addEventListener('click', () => {
+    if (navigation instanceof HTMLDetailsElement) navigation.open = true;
+    const tools = document.querySelector('#connect-tools');
+    if (!(tools instanceof HTMLDetailsElement)) return;
+    tools.open = true;
+    tools.querySelector('summary')?.focus();
+    tools.scrollIntoView({ block: 'nearest' });
+  }));
+</script>

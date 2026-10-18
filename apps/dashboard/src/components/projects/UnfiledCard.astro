@@ -1,0 +1,13 @@
+---
+import type { RecentArtifact, Tally } from '@artifacts/artifacts/panel/model';
+import { detailHref, scopeHref } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { tally: Tally; recent: readonly RecentArtifact[] }
+const { tally, recent } = Astro.props;
+---
+<aside class="unfiled-card" aria-labelledby="unfiled-heading">
+  <div class="unfiled-card-heading"><span class="unfiled-folder" aria-hidden="true"><Icon name="folder" size={20} /></span><h2 id="unfiled-heading">{tally.count} {tally.count === 1 ? 'artefacto sin proyecto' : 'artefactos sin proyecto'}</h2></div>
+  <ul class="project-recent" aria-label="Artefactos recientes sin proyecto">{recent.map((item) => <li><a href={detailHref({ artifactId: item.artifactId, tab: 'preview' })} title={item.title}>{item.title}</a></li>)}</ul>
+  <a class="button secondary" href={scopeHref({ kind: 'unfiled' })}>Asignar proyecto</a>
+  <p class="project-note"><Icon name="info-circle" size={16} /><span>Un proyecto existe mientras tenga artefactos. Se crea al asignarlo al crear o mover uno.</span></p>
+</aside>
