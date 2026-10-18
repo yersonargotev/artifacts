@@ -40,7 +40,7 @@ const metadataValue = (value: unknown) => value === undefined ? 'Sin valor' : ty
     { label: 'Mover a proyecto', href: `/artifacts/${encodeURIComponent(artifact.artifactId)}/move`, icon: 'move', group: 'artifact' },
   ]} client:load /></h1>
   <span class="toolbar-revision">Revisión {revision.sequence}</span>
-  {selectedPublication ? <a class="button" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
+  {selectedPublication ? <a class="button" data-variant="primary" href={selectedPublication.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
 </header>
 <section class="artifact-detail" data-artifact-id={artifact.artifactId} data-revision-id={revision.id} data-revision-sha256={revision.sha256} data-publication-version={publication?.version ?? 0}>
   <div class="review-controls">

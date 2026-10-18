@@ -42,7 +42,7 @@ Each page writes `screens-<screen>-1440.png` and `screens-<screen>-390.png`, wit
 
 ## Screen checks
 
-The exported `checkScreen(page, label)` in `scripts/control.ts` can inspect an independent Playwright page without starting the CLI. It rejects `document.documentElement.scrollWidth > innerWidth` and more than one visible `.button:not(.secondary)` outside `dialog[open]` or a modal element with `role="dialog"` and `aria-modal="true"`. Native primary buttons without the `.button` class are outside this selector until the panel adopts explicit primary variants.
+The exported `checkScreen(page, label)` in `scripts/control.ts` can inspect an independent Playwright page without starting the CLI. It rejects `document.documentElement.scrollWidth > innerWidth` and more than one visible `[data-variant="primary"]` outside `dialog[open]` or a modal element with `role="dialog"` and `aria-modal="true"`. Native buttons and links declare the primary variant explicitly.
 
 Console and page errors come from Playwright's buffered `page.consoleMessages()` and `page.pageErrors()` APIs. Each API retains up to 200 recent records for the page, across navigation. This bounded drive reads them after each capture. A long independent scenario must collect error events itself before records can fall out of those buffers. Failure messages include the capture label and the overflow dimensions, primary count, or browser error text.
 

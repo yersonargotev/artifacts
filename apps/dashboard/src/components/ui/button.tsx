@@ -7,7 +7,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        default: 'bg-muted text-foreground hover:bg-muted/80',
+        primary: '',
         ghost: 'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground',
       },
       size: { default: 'h-11 gap-1.5 px-2.5', icon: 'size-11' },
@@ -17,7 +18,7 @@ const buttonVariants = cva(
 );
 
 function Button({ className, variant = 'default', size = 'default', ...props }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  return <ButtonPrimitive data-slot="button" className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <ButtonPrimitive data-slot="button" data-variant={variant} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
 
 export { Button };

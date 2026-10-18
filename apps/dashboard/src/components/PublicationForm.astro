@@ -8,5 +8,5 @@ const { command, label } = Astro.props;
   <input type="hidden" name="revisionId" value={command.revisionId} />
   <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
   <input type="hidden" name="requestId" value={command.requestId} />
-  <button>{label}</button>
+  <button data-variant="primary">{label}</button>
 </form>
