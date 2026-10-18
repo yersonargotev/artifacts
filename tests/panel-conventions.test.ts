@@ -38,6 +38,10 @@ function matchesSubject(selector: Selector, subject: Subject) {
   const lastCombinator = selector.findLastIndex((component) => component.type === 'combinator');
   const target = selector.slice(lastCombinator + 1);
   if (subject === 'overlay') return target.some((component) => (component.type === 'class' && ['artifact-menu', 'project-filter-links'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content'));
+  if (subject === 'active' && target.length === 2 && target[0].type === 'class' && target[0].name === 'artifact-card' && target[1].type === 'pseudo-class' && target[1].kind === 'has') {
+    const checked = target[1].selectors;
+    if (checked.length === 1 && checked[0].length === 2 && checked[0][0].type === 'type' && checked[0][0].name === 'input' && checked[0][1].type === 'pseudo-class' && checked[0][1].kind === 'checked') return true;
+  }
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (component.type !== 'attribute' || component.namespace) return false;
@@ -152,6 +156,19 @@ test('effect policy permits only scoped effect tokens and neutral overlay elevat
   assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--glow-primary-fill); box-shadow: var(--glow-primary) } [aria-current], [aria-selected="true"], [aria-pressed="true"] { box-shadow: var(--glow-active) } .project-cover { background: var(--cover-wash) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.artifact-menu { box-shadow: var(--elevation-overlay) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.project-filter-links { box-shadow: var(--elevation-overlay) }'), []);
+});
+
+test('selected card effects require the exact checked input subject', () => {
+  assert.deepEqual(stylesheetViolations('effects.css', '.artifact-card:has(input:checked) { box-shadow: var(--glow-active) }'), []);
+  for (const selector of [
+    '.artifact-card:has(input)', '.artifact-card:has(input:not(:checked))', '.artifact-card:has(input:checked, a)',
+    '.artifact-card:has(input:checked) .artifact-description', '.sidebar-link:has(input:checked)',
+    '.artifact-card:has(.other:checked)', '.artifact-card:has(input:checked), .sidebar-link',
+    '.artifact-card:has(input:checked, input)', '.artifact-card:has(input:checked) + .artifact-card',
+  ]) assert(stylesheetViolations('effects.css', `${selector} { box-shadow: var(--glow-active) }`).length > 0, selector);
+  for (const value of ['var(--glow-active, 0 0 12px blue)', 'var(--alias)', 'var(--glow-active) var(--glow-active)']) {
+    assert(stylesheetViolations('effects.css', `.artifact-card:has(input:checked) { box-shadow: ${value} }`).length > 0, value);
+  }
 });
 
 test('markup policy rejects effect utilities and inline shadows', () => {

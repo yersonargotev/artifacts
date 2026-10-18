@@ -1,0 +1,12 @@
+<form id="selection" class="selection-bar" action="/move" method="get" aria-label="Selección de artefactos">
+  <input type="hidden" name="requestId" value={crypto.randomUUID()} />
+  <p role="status" data-selection-count>0 seleccionados</p>
+  <div class="selection-actions">
+    <button type="submit" data-variant="primary">Mover a otro proyecto</button>
+    <button type="submit" class="secondary" formmethod="post" name="intent" value="remove">Quitar del proyecto</button>
+    <button type="reset" class="secondary">Limpiar selección</button>
+  </div>
+</form>
+<script>
+  import './selection.ts';
+</script>

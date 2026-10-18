@@ -3,14 +3,15 @@ import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
 import { moveHref, exportHref, scopeHref } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
-interface Props { card: Card; now: Date }
-const { card, now } = Astro.props;
+interface Props { card: Card; now: Date; selectable: boolean }
+const { card, now, selectable } = Astro.props;
 const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
 const publication = card.publication.state === 'unpublished' ? undefined : card.publication;
 const status = publicationStates[card.publication.state];
 ---
 <li class="artifact-card">
   <div class="artifact-card-heading">
+    {selectable && <label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} aria-label={`Seleccionar ${card.title}`} /></label>}
     <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>
     <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={[
       { label: 'Ver artefacto', href: detailUrl },

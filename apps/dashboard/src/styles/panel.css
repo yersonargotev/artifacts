@@ -193,6 +193,14 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .clear-filters:hover { text-decoration: underline; }
 .artifact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; margin: 0; padding: 0; list-style: none; }
 .artifact-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px 20px; border: 1px solid var(--divider); border-radius: 14px; background: var(--canvas); }
+.artifact-card:has(input:checked) { border-color: var(--blue); }
+.artifact-selection { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; min-height: 44px; cursor: pointer; }
+.artifact-selection input { width: 18px; height: 18px; margin: 0; accent-color: var(--blue); cursor: pointer; }
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid var(--accent-border); border-radius: 12px; background: var(--accent-surface); }
+.selection-bar[hidden] { display: none; }
+.selection-bar > p { flex: 1; margin: 0; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.selection-actions button { font-size: 12px; }
 .artifact-card-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .artifact-card-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 16px; font-weight: 650; line-height: 1.5; letter-spacing: -.2px; }
 .artifact-card-heading h2 a { display: block; min-width: 0; padding: 10px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
