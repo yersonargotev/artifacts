@@ -20,6 +20,14 @@ export function projectTone(name: string): ProjectTone {
   return projectTones[hash % projectTones.length]!;
 }
 
+export function shellQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
+export function createCommand(project: string): string {
+  return 'artifacts create --snapshot snapshot.json --project ' + shellQuote(project);
+}
+
 export function locationOf(scope: LibraryScope): NavLocation {
   if (scope.kind === 'all') return { kind: 'library' };
   if (scope.kind === 'unfiled') return { kind: 'unfiled' };
