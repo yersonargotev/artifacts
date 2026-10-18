@@ -11,14 +11,15 @@ const status = publicationStates[card.publication.state];
 ---
 <li class="artifact-card">
   <div class="artifact-card-heading">
-    {selectable && <label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} aria-label={`Seleccionar ${card.title}`} /></label>}
+    {selectable && <label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} data-move-item={JSON.stringify({ artifactId: card.artifactId, title: card.title, project: card.project })} aria-label={`Seleccionar ${card.title}`} /></label>}
     <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>
-    <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={[
+    <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={JSON.stringify([
       { label: 'Ver artefacto', href: detailUrl },
       { label: 'Descargar revisión más reciente', href: exportHref(card.artifactId, card.head.revisionId) },
       ...(publication ? [{ label: 'Abrir publicación', href: publication.url }] : []),
-      { label: 'Mover a proyecto', href: moveHref([card.artifactId]) },
-    ]} deleteUrl={`${detailUrl}/delete`} client:load />
+      { label: 'Mover a proyecto', href: moveHref([card.artifactId]), moveItems: JSON.stringify([{ artifactId: card.artifactId, title: card.title, project: card.project }]) },
+    ])} deleteUrl={`${detailUrl}/delete`} client:load />
+    <noscript><a class="native-move-link" href={moveHref([card.artifactId])}>Mover a proyecto</a></noscript>
   </div>
   <p class="artifact-description">{card.description}</p>
   <div class="artifact-card-labels">

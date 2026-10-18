@@ -139,12 +139,13 @@ try {
   await page.waitForTimeout(3500);
   for (const item of selected) await checkbox(page, item.revision.snapshot.metadata.title).check();
   await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
-  await page.getByRole('heading', { level: 1, name: 'Mover a proyecto', exact: true }).waitFor();
-  assert.deepEqual(new URL(page.url()).searchParams.getAll('artifactId').sort(), selectedIds);
+  await page.getByRole('dialog').waitFor();
+  assert.deepEqual((await page.getByRole('dialog').locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('artifactId'))).sort(), selectedIds);
   assert.equal(new URL(page.url()).searchParams.has('intent'), false);
   assert.equal(new URL(page.url()).searchParams.has('project'), false);
   await page.getByLabel('Proyecto', { exact: true }).fill('Delta');
-  await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).press('Enter');
+  await page.getByLabel('Proyecto', { exact: true }).press('Tab');
+  await page.getByRole('dialog').getByRole('button', { name: 'Mover', exact: true }).press('Enter');
   await page.waitForURL(`${app.dashboard}/?project=Delta`);
   const created = { cliProjects: await cli('projects'), mcpProjects: await mcp('projects_list'), list: await cli('list', '--project', 'Delta'), reads: await Promise.all(selectedIds.map((artifactId) => mcp('artifacts_read', { artifactId }))) };
   assert.deepEqual(created.cliProjects, created.mcpProjects);
@@ -237,8 +238,8 @@ try {
   assert.equal(nextIds.length, 1);
   assert(!firstPageIds.includes(nextIds[0]));
   await current.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
-  await current.getByRole('heading', { level: 1, name: 'Mover a proyecto', exact: true }).waitFor();
-  assert.deepEqual(new URL(current.url()).searchParams.getAll('artifactId'), nextIds);
+  await current.getByRole('dialog').waitFor();
+  assert.deepEqual(await current.getByRole('dialog').locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('artifactId')), nextIds);
   await current.goto(`${app.dashboard}/?project=Selection+pages`);
   await current.getByRole('checkbox').first().check();
   await current.getByRole('navigation', { name: 'Filtrar por publicación', exact: true }).getByRole('link', { name: 'Sin publicar (26)', exact: true }).press('Enter');

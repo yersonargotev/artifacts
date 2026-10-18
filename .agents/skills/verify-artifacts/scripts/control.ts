@@ -365,6 +365,16 @@ async function drive(feature: Feature) {
             await capture(page, selected);
             await checkScreen(page, selected);
             checks.push(selected);
+            await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
+            await page.getByRole('dialog').getByRole('heading', { name: 'Mover 2 artefactos', exact: true }).waitFor();
+            await page.getByRole('dialog').getByLabel('Proyecto', { exact: true }).fill('New project');
+            await page.getByRole('option', { name: 'Crear proyecto «New project»', exact: true }).waitFor();
+            const dialog = `screens-dialog-${viewport.width}`;
+            await capture(page, dialog);
+            await checkScreen(page, dialog);
+            checks.push(dialog);
+            await page.getByRole('dialog').getByLabel('Proyecto', { exact: true }).press('Escape');
+            await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).press('Enter');
           }
         }
       } else if (feature === 'identity') {

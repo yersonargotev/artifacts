@@ -114,18 +114,20 @@ export async function driveProjects({ page, browser, context, instance, director
   await record('Open Menú de Unfiled notes and choose Mover a proyecto', {});
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
-  await page.getByRole('heading', { level: 1, name: 'Mover a proyecto', exact: true }).waitFor();
-  assert.equal(page.url(), moveUrl);
-  assert.equal(await page.locator('.move-title').textContent(), 'Unfiled notes');
+  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefactos', exact: true }).waitFor();
+  assert.equal(await page.locator('.move-subjects li').textContent(), 'Unfiled notesSin proyecto');
   assert.equal(await field.inputValue(), '');
-  assert.deepEqual(await page.locator('#project-options option').evaluateAll((options) => options.map((option) => option.getAttribute('value'))), ['Alpha', 'Beta'], 'Proyecto suggests the existing projects');
+  await field.press('ArrowDown');
+  assert.deepEqual(await page.getByRole('option').allTextContents(), ['Alpha', 'Beta'], 'Proyecto suggests the existing projects');
+  await field.press('Escape');
   assert.equal(await page.getByRole('button', { name: 'Quitar del proyecto', exact: true }).count(), 0, 'An unfiled artifact offers no removal');
-  const requestId = await page.locator('input[name="requestId"]').inputValue();
+  const requestId = await page.getByRole('dialog').locator('input[name="requestId"]').inputValue();
   await capture(page, 'projects-move-desktop');
   await record('Submit Mover al proyecto with a blank name', { project: '   ' });
   await field.fill('   ');
+  await field.press('Tab');
   const invalidResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url() === `${instance.panel}/move`);
-  await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).click();
+  await page.getByRole('button', { name: 'Mover', exact: true }).click();
   assert.equal((await invalidResponse).status(), 400, 'A blank project name returns 400');
   await page.getByText('Escribe un nombre de proyecto de 1 a 80 caracteres, sin caracteres de control.', { exact: true }).waitFor();
   assert.equal(await field.getAttribute('aria-invalid'), 'true');
@@ -133,6 +135,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await capture(page, 'projects-move-invalid-desktop');
   await record('Type Gamma and submit Mover al proyecto', { project: 'Gamma' });
   await field.fill('Gamma');
+  await field.press('Tab');
   await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).click();
   await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('project') === 'Gamma');
   await page.getByRole('heading', { level: 1, name: 'Gamma', exact: true }).waitFor();
@@ -148,8 +151,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await record('Open Menú de Unfiled notes at 390px and choose Mover a proyecto', {});
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
-  await page.getByRole('heading', { level: 1, name: 'Mover a proyecto', exact: true }).waitFor();
-  assert.equal(page.url(), moveUrl);
+  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefactos', exact: true }).waitFor();
   assert.equal(await field.inputValue(), 'Gamma');
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow on the move page at 390px');
   await capture(page, 'projects-move-mobile');
@@ -433,10 +435,11 @@ export async function driveProjects({ page, browser, context, instance, director
   await checkScreen(page, 'bulk-remove-readback');
   for (const item of bulk) await page.getByRole('checkbox', { name: `Seleccionar ${item.revision.snapshot.metadata.title}`, exact: true }).check();
   await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
-  assert.deepEqual(new URL(page.url()).searchParams.getAll('artifactId').sort(), ids(bulk));
-  assert.equal(new URL(page.url()).searchParams.has('intent'), false);
+  await page.getByRole('dialog').waitFor();
+  assert.deepEqual((await page.getByRole('dialog').locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('artifactId'))).sort(), ids(bulk));
   await page.getByLabel('Proyecto', { exact: true }).fill('Delta');
-  await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).press('Enter');
+  await page.getByLabel('Proyecto', { exact: true }).press('Tab');
+  await page.getByRole('dialog').getByRole('button', { name: 'Mover', exact: true }).press('Enter');
   await page.waitForURL(`${instance.panel}/?project=Delta`);
   const deltaCli = await ok('projects');
   const deltaMcp = await call('projects_list');
@@ -454,5 +457,5 @@ export async function driveProjects({ page, browser, context, instance, director
   await capture(page, 'no-checkboxes-1440');
   checks.push('Two externally associated checkboxes derive count 2 at 1440 and 390 without overflow', 'Native reset clears checks, count and enhanced bar', 'Bulk removal lands in Sin proyecto and exact MCP reads retain revision and publication with project null', 'Native repeated-ID GET creates Delta and CLI projects/list plus MCP projects/read confirm count 2 and unchanged retained data', 'Biblioteca has no selection controls');
   checks.push('Projects index empty and unfiled-only owners', 'Index project counts match source CLI lists', 'Inclusive publication count and partitioned current/pending/unpublished tally', 'Top-three recent titles use actual IDs and head order', 'Index has exactly one active navigation item', 'Native project, detail, and unfiled links work without JavaScript', 'Long project names and titles fit at 390px', 'Only covers and active navigation carry effects', 'CLI assignment removes the unfiled aside and fills the grid', 'Last-member MCP move removes the project without changing head or publication');
-  checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu reaches the move page at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
+  checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu opens the move dialog sheet at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
 }

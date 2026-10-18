@@ -22,7 +22,7 @@ const scope = snapshot?.page.scope;
 const project = scope?.kind === 'project' ? scope.project.name : scope?.kind === 'vanishedProject' ? scope.name : undefined;
 const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
 ---
-<Panel title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={snapshot ? searchFor(snapshot.page) : undefined}>
+<Panel move title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={snapshot ? searchFor(snapshot.page) : undefined}>
   {snapshot ? <>
     <LibraryHeading workspace={snapshot.workspace} scope={snapshot.page.scope} />
     <div class="library-controls"><StatusTabs page={snapshot.page} /><ProjectFilter workspace={snapshot.workspace} page={snapshot.page} /></div>

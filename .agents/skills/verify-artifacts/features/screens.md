@@ -34,6 +34,7 @@ The drive captures these pages at both widths:
 | Projects index | `/projects` | `screens-projects` |
 | Project library | `/?project=Alpha` | `screens-project` |
 | Project with two selected artifacts | `/?project=Alpha` after native checkbox selection | `screens-selection` |
+| Move dialog with two selected artifacts | `/?project=Alpha` after the move trigger and a new name | `screens-dialog` |
 | Artifact detail | `/artifacts/<Alpha overview ID>` | `screens-detail` |
 | Move page | `/move?artifactId=<Alpha overview ID>` | `screens-move` |
 | Delete confirmation | `/artifacts/<Alpha overview ID>/delete` | `screens-delete` |

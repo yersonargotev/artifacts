@@ -1,6 +1,6 @@
 ---
 import Panel from '../layouts/Panel.astro';
-import { Input } from '../components/ui/input.tsx';
+import MovePageForm from '../components/move/MoveForm.tsx';
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
 import { prepareMovePage } from '../move.ts';
@@ -35,20 +35,6 @@ const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto comp
         {form.project !== undefined && <input type="hidden" name="project" value={form.project} />}
         <div class="move-actions"><button data-variant="primary" type="submit">Reintentar {form.intent === 'remove' ? 'quitar del proyecto' : 'mover al proyecto'}</button><a class="button secondary" href="/">Cancelar</a></div>
       </form>
-    </> : <form method="post" action="/move">
-      {form.artifactIds.map((id) => <input type="hidden" name="artifactId" value={id} />)}
-      <input type="hidden" name="requestId" value={form.requestId} />
-      <label for="project">Proyecto</label>
-      <Input id="project" name="project" defaultValue={form.project ?? ''} list="project-options" autoComplete="off" aria-invalid={outcome.kind === 'invalid' || undefined} aria-describedby="project-help" />
-      <datalist id="project-options">{subject?.workspace.projects.map(({ name }) => <option value={name} />)}</datalist>
-      {outcome.kind === 'invalid'
-        ? <p id="project-help" class="field-error" role="alert">Escribe un nombre de proyecto de 1 a 80 caracteres, sin caracteres de control.</p>
-        : <p id="project-help" class="field-help">Elige un proyecto existente o escribe uno nuevo. Mover no crea una revisión ni cambia la publicación.</p>}
-      <div class="move-actions">
-        <button data-variant="primary" type="submit" name="intent" value="move">Mover al proyecto</button>
-        {(!subject || subject.items.some(({ project }) => project !== null)) && <button class="secondary" type="submit" name="intent" value="remove">Quitar del proyecto</button>}
-        <a class="button secondary" href="/">Cancelar</a>
-      </div>
-    </form>}
+    </> : <MovePageForm data={JSON.stringify({ form, projects: subject?.workspace.projects.map(({ name }) => name) ?? [], canRemove: !subject || subject.items.some(({ project }) => project !== null), invalid: outcome.kind === 'invalid' })} client:load />}
   </section>
 </Panel>
