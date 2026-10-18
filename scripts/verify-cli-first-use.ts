@@ -287,7 +287,7 @@ try {
     const panelSignIn = page.getByRole('link', { name: 'Iniciar sesión', exact: true });
     if (await panelSignIn.count()) await panelSignIn.click();
     const consent = page.getByRole('button', { name: 'Permitir acceso', exact: true });
-    const sidebarLink = page.getByRole('navigation', { name: 'Proyectos', exact: true }).getByRole('link', { name: `${projects[1]} (1)`, exact: true });
+    const sidebarLink = page.getByRole('navigation', { name: 'Tus proyectos', exact: true }).getByRole('link', { name: `${projects[1]} (1)`, exact: true });
     await Promise.race([sidebarLink.waitFor(), consent.waitFor().then(() => consent.click())]);
     await sidebarLink.waitFor();
     assert.equal(await sidebarLink.getAttribute('aria-current'), 'page');

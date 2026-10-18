@@ -1,14 +1,13 @@
 ---
 import Panel from '../../../layouts/Panel.astro';
-import LibrarySidebar from '../../../components/LibrarySidebar.astro';
-import Icon from '../../../components/Icon.astro';
 import { Input } from '../../../components/ui/input.tsx';
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 import { parseMoveForm, submitMove, type MoveForm } from '../../../move.ts';
+import { workspaceQuery } from '../../../presentation.ts';
 if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
 if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
-const { config, artifacts } = await getRuntime();
+const { panel, artifacts } = await getRuntime();
 const actor = panelActor(Astro.locals.identity);
 let submitted: MoveForm | undefined;
 let outcome: 'confirm' | 'invalid' | 'conflict' | 'uncertain' = 'confirm';
@@ -22,17 +21,14 @@ if (Astro.request.method === 'POST') {
   outcome = result.kind;
   Astro.response.status = { invalid: 400, conflict: 409, uncertain: 503 }[outcome];
 }
-// After an uncertain write the retry form must still render even when these reads fail too.
-const observed = await Promise.all([artifacts.read(actor, { artifactId: Astro.params.artifactId! }), artifacts.projects(actor)]).catch((error: unknown) => outcome === 'uncertain' ? undefined : artifactErrorResponse(error));
+const observed = await Promise.all([artifacts.read(actor, { artifactId: Astro.params.artifactId! }), panel.library(actor, workspaceQuery)]).catch((error: unknown) => outcome === 'uncertain' ? undefined : artifactErrorResponse(error));
 if (observed instanceof Response) return observed;
-const [artifact, projects] = observed ?? [];
+const [artifact, snapshot] = observed ?? [];
 const form: MoveForm = submitted ?? { artifactId: Astro.params.artifactId!, requestId: crypto.randomUUID(), project: artifact?.project ?? '', intent: 'move' };
 const moveUrl = `/artifacts/${encodeURIComponent(form.artifactId)}/move`;
 const heading = { confirm: 'Mover a proyecto', invalid: 'Mover a proyecto', conflict: 'La solicitud cambió', uncertain: 'No pudimos confirmar el cambio de proyecto' }[outcome];
 ---
-<Panel title={heading} library={Boolean(projects)}>
-  {projects && <LibrarySidebar slot="sidebar" identity={Astro.locals.identity} authUrl={config.auth} projects={projects.items} project={artifact?.project ?? undefined} active={false} />}
-  <header slot="header" class="workspace-toolbar"><span class="workspace-breadcrumb"><Icon name="layout-dashboard" size={17} />Espacio de trabajo<Icon name="chevron-right" size={14} /><span>Mover a proyecto</span></span></header>
+<Panel title={heading} workspace={snapshot?.workspace}>
   <section class="move-card" data-move-result={outcome}>
     <h1>{heading}</h1>
     {artifact && <><h2 class="move-title">{artifact.revision.snapshot.metadata.title}</h2><p>Proyecto actual: <strong>{artifact.project ?? 'Sin proyecto'}</strong></p></>}
@@ -43,12 +39,11 @@ const heading = { confirm: 'Mover a proyecto', invalid: 'Mover a proyecto', conf
       <input type="hidden" name="requestId" value={form.requestId} />
       <label for="project">Proyecto</label>
       <Input id="project" name="project" defaultValue={form.project} list="project-options" autoComplete="off" aria-invalid={outcome === 'invalid' || undefined} aria-describedby="project-help" />
-      <datalist id="project-options">{projects?.items.map(({ name }) => <option value={name} />)}</datalist>
+      <datalist id="project-options">{snapshot?.workspace.projects.map(({ name }) => <option value={name} />)}</datalist>
       {outcome === 'invalid'
         ? <p id="project-help" class="field-error" role="alert">Escribe un nombre de proyecto de 1 a 80 caracteres, sin caracteres de control.</p>
         : <p id="project-help" class="field-help">Elige un proyecto existente o escribe uno nuevo. Mover no crea una revisión ni cambia la publicación.</p>}
       <div class="move-actions">
-        {/* Enter submits the first button, so moving must precede removal. */}
         <button data-variant="primary" type="submit" name="intent" value="move">Mover al proyecto</button>
         {artifact?.project !== null && <button class="secondary" type="submit" name="intent" value="remove">Quitar del proyecto</button>}
         <a class="button secondary" href="/">Cancelar</a>

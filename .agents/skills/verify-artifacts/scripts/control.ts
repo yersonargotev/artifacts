@@ -335,9 +335,9 @@ async function drive(feature: Feature) {
           checks.push(label);
         }
         await login(page);
-        await page.getByRole('heading', { level: 1, name: 'Tus artefactos', exact: true }).waitFor();
+        await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
         const screens = [
-          { name: 'library', path: '/', heading: 'Tus artefactos' },
+          { name: 'library', path: '/', heading: 'Biblioteca' },
           { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
           { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: `Menú de ${detail.revision.snapshot.metadata.title}` },
           { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
@@ -357,16 +357,16 @@ async function drive(feature: Feature) {
         }
       } else if (feature === 'identity') {
         await login(page);
-        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
-        await record('Open Cuenta', {});
-        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+        await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
+        await record('Open Mi cuenta', {});
+        await page.locator('summary[aria-label="Mi cuenta"]').click();
         await page.getByTestId('user-id').waitFor();
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
         await capture(page, 'signed-in');
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(instance.panel);
         await page.locator('.library-navigation > summary').click();
-        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+        await page.locator('summary[aria-label="Mi cuenta"]').click();
         await page.getByTestId('user-id').waitFor();
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -383,9 +383,9 @@ async function drive(feature: Feature) {
         await capture(page, 'panel-logged-out');
         await record('Reenter panel through central SSO', {});
         await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
-        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
-        await record('Open Cuenta', {});
-        await page.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+        await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
+        await record('Open Mi cuenta', {});
+        await page.locator('summary[aria-label="Mi cuenta"]').click();
         await page.getByTestId('user-id').waitFor();
         await record('Choose Cerrar todas las sesiones and confirm', {});
         await page.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
@@ -414,8 +414,8 @@ async function drive(feature: Feature) {
         assert.equal(moved.project, 'Beta', 'Independent MCP read shows the moved project');
         assert.equal(moved.headRevisionId, beta.headRevisionId, 'Move keeps the head revision');
         await login(page);
-        await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
-        const projects = page.getByRole('navigation', { name: 'Proyectos', exact: true });
+        await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
+        const projects = page.getByRole('navigation', { name: 'Tus proyectos', exact: true });
         const projectLinks = async () => projects.getByRole('link').evaluateAll((links) => links.map((link) => ({ name: link.getAttribute('aria-label'), text: link.textContent, href: link.getAttribute('href'), current: link.getAttribute('aria-current') })));
         assert.deepEqual(await projectLinks(), [{ name: 'Alpha (1)', text: 'Alpha1', href: '/?project=Alpha', current: null }, { name: 'Beta (1)', text: 'Beta1', href: '/?project=Beta', current: null }]);
         for (const name of ['Alpha (1)', 'Beta (1)']) assert.equal(await projects.getByRole('link', { name, exact: true }).count(), 1, `Accessible name ${name}`);
@@ -452,7 +452,7 @@ async function drive(feature: Feature) {
         const field = page.getByLabel('Proyecto', { exact: true });
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.goto(instance.panel);
-        await page.getByRole('heading', { level: 1, name: 'Tus artefactos', exact: true }).waitFor();
+        await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
         await record('Open Opciones de Unfiled notes and choose Mover a proyecto', {});
         await page.getByRole('button', { name: 'Opciones de Unfiled notes', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
@@ -498,7 +498,7 @@ async function drive(feature: Feature) {
         await record('Choose Quitar del proyecto at 390px', {});
         await page.getByRole('button', { name: 'Quitar del proyecto', exact: true }).click();
         await page.waitForURL((url) => url.pathname === '/' && url.search === '');
-        await page.getByRole('heading', { level: 1, name: 'Tus artefactos', exact: true }).waitFor();
+        await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
         await page.locator('.library-navigation > summary').click();
         await projects.getByRole('link', { name: 'Alpha (1)', exact: true }).waitFor();
         assert.deepEqual((await projectLinks()).map(({ name }) => name), ['Alpha (1)', 'Beta (1)'], 'Gamma disappears with its last artifact');
@@ -582,7 +582,7 @@ async function drive(feature: Feature) {
           checks.push('Real MCP publication versions retain stable URL', 'Browser login and viewer admission', 'Published iframe interaction', 'Exact attachment bytes', 'Anonymous document login and attachment 401');
         } else {
           await login(page);
-          await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+          await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
           await capture(page, 'artifact-list');
           if (libraryDemo) {
             assert.equal(await page.locator('.artifact-list li').count(), 4);
@@ -642,7 +642,7 @@ async function drive(feature: Feature) {
             assert.equal(await rowTrigger.evaluate((trigger) => trigger === document.activeElement), true);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.goto(instance.panel);
-            await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+            await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
             await capture(page, 'artifact-list-mobile');
             await page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true }).click();
@@ -717,7 +717,7 @@ async function drive(feature: Feature) {
                 assert(homeBounds && homeBounds.width >= 44 && homeBounds.height >= 44);
                 await record('Return from publication to library', { viewport: name, destination: instance.panel });
                 await home.click();
-                await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+                await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
                 assert.equal(new URL(page.url()).origin, instance.panel);
                 assert.equal(await page.locator('.artifact-list li').count(), 4);
               }

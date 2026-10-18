@@ -4,7 +4,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 
 ## Sub-features
 
-- `preview-list` opens an artifact from `Tus artefactos` and displays its title and selected revision. Full metadata is available under `Información`.
+- `preview-list` opens an artifact from `Biblioteca` and displays its title and selected revision. Full metadata is available under `Información`.
 - `preview-current` displays the newest draft and its revision badge.
 - `preview-history` selects a retained revision without replacing its saved content.
 - `preview-interaction` runs the supported HTML interaction in the actual preview iframe.
@@ -15,7 +15,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 
 ## How to get to it (user POV)
 
-- Sign in at the panel root, find an artifact under `Tus artefactos`, and choose its title link.
+- Sign in at the panel root, find an artifact under `Biblioteca`, and choose its title link.
 - Open the artifact's saved detail URL directly; a signed-out owner must complete login before viewing it.
 - Choose a native `Revisión seleccionada` option and submit `Ver revisión`, or follow `Ver revisión 1` or another revision link in `Historial`. The selector covers the loaded history page and required references.
 - The title menu contains the selected download, `Información`, and section links. Choosing `Información` opens its native disclosure. The visible `Archivos`, `Comparar revisiones` and `Historial` anchors also reach the secondary sections below the preview.
@@ -33,7 +33,7 @@ Preconditions:
 - Actual Chrome is available at version 152 or newer for the interactive path. Source-only fallback cannot pass an interaction assertion.
 
 - **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/preview-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/preview-run`.
-- **Create and browse.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run`. The recipe creates two retained revisions through HTTP MCP, signs in through the panel's login UI, waits for the visible `Tus artefactos` library heading, and chooses `getByRole('link', { name: 'Verification artifact', exact: true })`. The detail page exposes `getByRole('heading', { name: 'Historial', exact: true })`, contains two revision rows, and its actual preview initially shows `Verification revision 2`.
+- **Create and browse.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run`. The recipe creates two retained revisions through HTTP MCP, signs in through the panel's login UI, waits for the visible `Biblioteca` library heading, and chooses `getByRole('link', { name: 'Verification artifact', exact: true })`. The detail page exposes `getByRole('heading', { name: 'Historial', exact: true })`, contains two revision rows, and its actual preview initially shows `Verification revision 2`.
 - **Review the library.** The same recipe creates three additional documents through HTTP MCP. Their states cover a draft, a current publication, and a publication with pending changes. It checks row menu keyboard behavior, the exact-head download link, the stable publication link, and menu bounds at 390px. It retains library and menu screenshots at both viewports.
 - **Search and filter.** At both viewports, the recipe searches for `entrega`, combines the query with each publication filter, checks the returned rows, submits an unmatched query, uses browser Back, and clears the filters. Publicados includes only artifacts whose head is published. Cambios pendientes includes artifacts whose publication points to an older revision, so the three publication counts add up to Todos. Literal search is covered by `tests/library.test.ts`; recent pagination, scopes, and owner isolation are covered by `tests/panel-reader.test.ts`.
 - **Return from publication.** At desktop and 390px viewports, the recipe opens the saved publication and clicks `Volver a la biblioteca`. The link must target the configured panel origin, have a 44px target, and return to the authenticated library with its four artifacts.

@@ -2,12 +2,12 @@
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
 import { readLibraryUrl } from '../urls.ts';
+import { locationOf, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
 import ArtifactLibrary from '../components/ArtifactLibrary.astro';
-import LibrarySidebar from '../components/LibrarySidebar.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
-const { config, panel } = await getRuntime();
+const { panel } = await getRuntime();
 const failed = Astro.url.searchParams.get('login') === 'failed';
 const revoked = Astro.url.searchParams.has('revoked');
 let query;
@@ -17,10 +17,8 @@ const snapshot = identity ? await panel.library(panelActor(identity), query).cat
 if (snapshot instanceof Response) return snapshot;
 const scope = snapshot?.page.scope;
 const project = scope?.kind === 'project' ? scope.project.name : scope?.kind === 'vanishedProject' ? scope.name : undefined;
-const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project;
+const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
 ---
-<Panel library={Boolean(identity)} title={title}>
-  {identity && <LibrarySidebar slot="sidebar" identity={identity} authUrl={config.auth} projects={snapshot!.workspace.projects.map(({ name, count }) => ({ name, artifactCount: count }))} project={project} unfiled={scope?.kind === 'unfiled'} unfiledCount={snapshot!.workspace.unfiled.count} />}
-  {identity && <header slot="header" class="workspace-toolbar"><span class="workspace-breadcrumb"><Icon name="layout-dashboard" size={17} />Espacio de trabajo<Icon name="chevron-right" size={14} /><span>Biblioteca</span></span><span class="session-indicator">Sesión activa</span></header>}
+<Panel title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={snapshot ? searchFor(snapshot.page) : undefined}>
   {identity ? <ArtifactLibrary page={snapshot!.page} /> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>

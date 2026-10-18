@@ -78,8 +78,8 @@ try {
     const panel = await context.newPage();
     await panel.goto(dashboard);
     if (await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).count()) await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
-    await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
-    await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+    await panel.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
+    await panel.locator('summary[aria-label="Mi cuenta"]').click();
     await panel.getByTestId('user-id').waitFor();
     assert.equal(await panel.getByTestId('user-id').textContent(), original.ownerId);
     await panel.getByRole('link', { name: original.revision.snapshot.metadata.title, exact: true }).click();

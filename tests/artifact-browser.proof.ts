@@ -24,6 +24,15 @@ async function assertPreviewInViewport(page: Page) {
   assert(bounds.top >= 0 && bounds.visibleHeight >= 180, 'The selected preview must begin in the initial viewport with usable height');
 }
 
+async function assertDetailHeaders(page: Page) {
+  assert.equal(await page.locator('header').count(), 2, 'Detail renders the workspace header and artifact toolbar');
+  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Detail has one shared shell header');
+  assert.equal(await page.locator('header.artifact-toolbar').count(), 1, 'Detail has one artifact toolbar');
+  assert.equal(await page.locator('header.workspace-toolbar').getByRole('navigation', { name: 'Ruta', exact: true }).count(), 1);
+  assert.equal(await page.locator('header.workspace-toolbar').getByRole('search').count(), 1);
+  assert.equal(await page.locator('h1').count(), 1);
+}
+
 async function assertViewerBounds(page: Page) {
   const bounds = await page.evaluate(() => {
     const header = document.querySelector('header')!.getBoundingClientRect();
@@ -129,7 +138,7 @@ try {
   assert.equal(await home.getAttribute('href'), `${dashboard}/`);
   await home.click();
   await page.waitForURL(`${dashboard}/`);
-  await page.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
   await page.goto(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
@@ -301,8 +310,7 @@ try {
     await document.fonts.ready;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-  assert.equal(await panel.locator('header').count(), 1);
-  assert.equal(await panel.locator('h1').count(), 1);
+  await assertDetailHeaders(panel);
   assert(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await assertPreviewInViewport(panel);
   await panel.screenshot({ path: '.test-artifacts/artifact-history-mobile.png' });
@@ -471,8 +479,7 @@ try {
     await document.fonts.ready;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-  assert.equal(await panel.locator('header').count(), 1);
-  assert.equal(await panel.locator('h1').count(), 1);
+  await assertDetailHeaders(panel);
   assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await panel.frameLocator('.preview').locator('pre').innerText(), reviewTwo.revision.snapshot.content.text);
   assert.equal(await panel.locator('.preview').getAttribute('sandbox'), 'allow-scripts');
@@ -610,9 +617,9 @@ try {
   assert.equal((await anonymous.request.get(`${dashboard}/artifacts/${created.artifactId}/export?revisionId=${created.revision.id}`)).status(), 401);
   await anonymous.close();
   await panel.goto(dashboard);
-  await panel.getByRole('heading', { name: 'Tus artefactos', exact: true }).waitFor();
+  await panel.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await panel.locator('.library-navigation > summary').click();
-  await panel.locator('summary').filter({ hasText: /^Cuenta$/ }).click();
+  await panel.locator('summary[aria-label="Mi cuenta"]').click();
   await panel.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();

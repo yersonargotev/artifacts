@@ -68,7 +68,7 @@ Choose `identity`, `authoring`, `cli`, `projects`, `screens`, `preview`, `public
 
 The primary visual route is the authenticated panel. `preview` creates two revisions via MCP, signs in through `Correo electrónico`, `Contraseña`, and `Iniciar sesión`, opens `Verification artifact`, selects `Ver revisión 1` and `Ver revisión 2`, and clicks `Try interaction` inside `frameLocator('.preview')`. It waits for `Interaction verified` and checks the 390px mobile layout. Opening extracted HTML in a generic server does not establish preview behavior.
 
-`publication` separately proves protected viewer admission and interaction. `authoring` records real JSON-RPC tool requests and independent reads. `export` compares a browser download of revision 1 with that exact revision's MCP archive. `cli` runs the source `artifacts` CLI against the run's REST resource and compares its export with MCP. `projects` creates projects through MCP, moves an artifact with the source CLI and with the panel's `Mover a proyecto` page, and checks the panel's `Proyectos` navigation. `identity` proves native panel logout and global revocation on the disposable account.
+`publication` separately proves protected viewer admission and interaction. `authoring` records real JSON-RPC tool requests and independent reads. `export` compares a browser download of revision 1 with that exact revision's MCP archive. `cli` runs the source `artifacts` CLI against the run's REST resource and compares its export with MCP. `projects` creates projects through MCP, moves an artifact with the source CLI and with the panel's `Mover a proyecto` page, and checks the panel's `Tus proyectos` navigation. `identity` proves native panel logout and global revocation on the disposable account.
 
 ## Evidence
 

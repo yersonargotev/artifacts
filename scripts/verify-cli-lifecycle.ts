@@ -804,7 +804,7 @@ try {
   await page.goto(app.dashboard);
   await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
   await page
-    .getByRole('heading', { name: 'Tus artefactos', exact: true })
+    .getByRole('heading', { name: 'Biblioteca', exact: true })
     .waitFor();
   await checked(active);
   active = 'standalone-rendering';
