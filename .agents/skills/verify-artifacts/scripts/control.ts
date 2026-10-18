@@ -10,6 +10,7 @@ import { serve } from '@hono/node-server';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { unzipSync, strFromU8 } from 'fflate';
 import { driveProjects } from './projects.ts';
+import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
 import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
 import { artifactReadSchema, publishResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
@@ -196,7 +197,7 @@ export async function checkScreen(page: Page, label: string) {
   assert.equal(errors.length, 0, `${label}: console or page error: ${errors.join('; ')}`);
   const bounds = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth }));
   assert(bounds.scrollWidth <= bounds.innerWidth, `${label}: horizontal overflow (${bounds.scrollWidth}px > ${bounds.innerWidth}px)`);
-  const primaries = await page.locator('[data-variant="primary"]').filter({ visible: true }).evaluateAll((buttons) => buttons.filter((button) => !button.closest('dialog[open], [role="dialog"][aria-modal="true"]')).length);
+  const primaries = await page.locator('[data-variant="primary"]').filter({ visible: true }).evaluateAll((buttons) => buttons.filter((button) => !button.closest('dialog[open], [role="dialog"][aria-modal="true"], [role="dialog"][data-slot="dialog-content"][data-open]')).length);
   assert(primaries <= 1, `${label}: ${primaries} visible primary actions outside an open dialog, expected at most 1`);
 }
 
@@ -303,6 +304,7 @@ async function drive(feature: Feature) {
     } else {
       browser = await chromium.launch({ channel: 'chrome', headless: !args.includes('--headed') });
       context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...(feature === 'screens' && args.includes('--headed') ? { recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } } : {}) });
+      if (feature === 'screens' || feature === 'projects') await observeMoveReadiness(context);
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
       const browserVersion = browser.version();
@@ -365,6 +367,18 @@ async function drive(feature: Feature) {
             await capture(page, selected);
             await checkScreen(page, selected);
             checks.push(selected);
+            await waitForMoveReadiness(page);
+            await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
+            await page.getByRole('dialog').getByRole('heading', { name: 'Mover 2 artefactos', exact: true }).waitFor();
+            assert.deepEqual(await page.getByRole('dialog').locator('[data-variant="primary"]').filter({ visible: true }).allTextContents(), ['Mover']);
+            await page.getByRole('dialog').getByLabel('Proyecto', { exact: true }).fill('New project');
+            await page.getByRole('option', { name: 'Crear proyecto «New project»', exact: true }).waitFor();
+            const dialog = `screens-dialog-${viewport.width}`;
+            await capture(page, dialog);
+            await checkScreen(page, dialog);
+            checks.push(dialog);
+            await page.getByRole('dialog').getByLabel('Proyecto', { exact: true }).press('Escape');
+            await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).press('Enter');
           }
         }
       } else if (feature === 'identity') {

@@ -34,6 +34,7 @@ The drive captures these pages at both widths:
 | Projects index | `/projects` | `screens-projects` |
 | Project library | `/?project=Alpha` | `screens-project` |
 | Project with two selected artifacts | `/?project=Alpha` after native checkbox selection | `screens-selection` |
+| Move dialog with two selected artifacts | `/?project=Alpha` after the move trigger and a new name | `screens-dialog` |
 | Artifact detail | `/artifacts/<Alpha overview ID>` | `screens-detail` |
 | Move page | `/move?artifactId=<Alpha overview ID>` | `screens-move` |
 | Delete confirmation | `/artifacts/<Alpha overview ID>/delete` | `screens-delete` |
@@ -46,7 +47,9 @@ Each page writes `screens-<screen>-1440.png` and `screens-<screen>-390.png`, wit
 
 ## Screen checks
 
-The exported `checkScreen(page, label)` in `scripts/control.ts` can inspect an independent Playwright page without starting the CLI. It rejects `document.documentElement.scrollWidth > innerWidth` and more than one visible `[data-variant="primary"]` outside `dialog[open]` or a modal element with `role="dialog"` and `aria-modal="true"`. Native buttons and links declare the primary variant explicitly.
+The exported `checkScreen(page, label)` in `scripts/control.ts` can inspect an independent Playwright page without starting the CLI. It rejects `document.documentElement.scrollWidth > innerWidth` and more than one visible `[data-variant="primary"]` outside `dialog[open]`, `[role="dialog"][aria-modal="true"]`, or the open Base UI popup `[role="dialog"][data-slot="dialog-content"][data-open]`. Native buttons and links declare the primary variant explicitly. The dialog capture separately requires exactly one visible primary, named Mover.
+
+Before activating a dialog trigger, the projects and screens drives observe the actual capture listener registration. The shared observer preserves the original listener calls and tracks removal. The Astro SSR marker alone can disappear before React commits that listener. This instrumentation belongs to the verifier and adds no product readiness hook.
 
 Console and page errors come from Playwright's buffered `page.consoleMessages()` and `page.pageErrors()` APIs. Each API retains up to 200 recent records for the page, across navigation. This bounded drive reads them after each capture. A long independent scenario must collect error events itself before records can fall out of those buffers. Failure messages include the capture label and the overflow dimensions, primary count, or browser error text.
 
