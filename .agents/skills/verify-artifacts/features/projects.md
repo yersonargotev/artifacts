@@ -19,7 +19,7 @@ An owner files artifacts under named projects from MCP or the CLI, finds a proje
 
 - From an MCP client, pass `project` to `artifacts_create`, call `projects_list`, filter `artifacts_list` with `project`, and call `artifacts_move`.
 - From a terminal, run `artifacts create --snapshot FILE --project NAME`, `artifacts projects`, `artifacts list --project NAME`, and `artifacts move ID --project NAME` or `--no-project`.
-- In the panel, sign in and choose a project link such as `Beta (1)` under `Tus proyectos`. On a 390px screen, open `Navegación` first. Search, publication filters, and pagination keep the selected project. Open an artifact to see its project highlighted and listed under `Información`. To move it, choose `Mover a proyecto` from the row's `Opciones de TITLE` menu or the detail page's `Menú de TITLE` menu. Type or pick a name in `Proyecto` and choose `Mover al proyecto`, or choose `Quitar del proyecto`.
+- In the panel, sign in and choose a project link such as `Beta (1)` under `Tus proyectos`. On a 390px screen, open `Navegación` first. Search, publication filters, and pagination keep the selected project. Open an artifact to see its project highlighted and listed on the `Información` tab. To move it, choose `Mover a proyecto` from the row's `Opciones de TITLE` menu or the detail page's `Menú de TITLE` menu. Type or pick a name in `Proyecto` and choose `Mover al proyecto`, or choose `Quitar del proyecto`.
 - The header search submits a normal GET to `/`. Inside a project it says `Buscar en NAME…` and keeps the hidden `project` field. Inside Sin proyecto it keeps `unfiled=1`. Search also keeps the selected publication filter and starts at the first result page. The header breadcrumb links back to Biblioteca and, on a detail page, to the artifact's project or Sin proyecto.
 
 ## Driving it with control.ts (HTTP MCP + source CLI + Playwright)
@@ -42,7 +42,7 @@ Expected end state:
 - An independent MCP `artifacts_read` of `Beta handoff` shows project `Beta` and the same `headRevisionId` as before the move.
 - The sidebar links are `Alpha (1)` and `Beta (1)` with hrefs `/?project=Alpha` and `/?project=Beta`. Library rows show `Alpha`, `Beta`, and `Artefacto` under their titles.
 - After `Beta (1)` is chosen, the level 1 heading is `Beta`, the library lists only `Beta handoff`, and `Beta (1)` has `aria-current="page"`.
-- On the `Beta handoff` detail page, `Beta (1)` has `aria-current="true"` and `Información` lists `Proyecto` as `Beta`.
+- On the `Beta handoff` detail page, `Beta (1)` has `aria-current="true"` and the `Información` tab lists `Proyecto` as `Beta`.
 - At 390px, `/?project=Beta` lists only `Beta handoff` without horizontal page overflow.
 - `Opciones de Unfiled notes` > `Mover a proyecto` opens `/artifacts/<C>/move`. It shows `Unfiled notes`, `Proyecto actual: Sin proyecto`, an empty `Proyecto` field with suggestions `Alpha` and `Beta`, and no `Quitar del proyecto` button.
 - Submitting `Mover al proyecto` with a blank name returns 400 and shows `Escribe un nombre de proyecto de 1 a 80 caracteres, sin caracteres de control.` with `aria-invalid="true"` on the field. The re-rendered form keeps the same `requestId`.
@@ -54,7 +54,7 @@ Evidence under `<run>/projects/` includes `actions.jsonl` with every MCP request
 
 ## Gotchas
 
-- At 1440x900, the `Información` summary straddles the bottom edge of the viewport. A pointer click below the preview iframe can leave the disclosure closed. The drive focuses the summary, presses Enter, and then waits for `#information[open]`.
+- The drive opens the `Información` tab by keyboard and waits for `#information`. The tab uses GET navigation and preserves the selected revision. Controls below the preview iframe use Enter because pointer clicks can be intercepted by the frame.
 - The panel compares a `?project=` value with the owner's projects regardless of letter case and shows the stored spelling. A hand-typed `?project=beta` therefore highlights `Beta (1)`.
 - Project names in URLs are encoded by `URLSearchParams`, so a space appears as `+`.
 - The `Proyecto` field has a `list` attribute, so its ARIA role is `combobox`, not `textbox`. The drive finds it with `getByLabel('Proyecto', { exact: true })`.

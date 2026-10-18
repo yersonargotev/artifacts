@@ -4,7 +4,7 @@ import { createPanelIdentity } from './identity.ts';
 import { createArtifactStore, type ArtifactStore } from '@artifacts/artifacts';
 import { createPanel } from '@artifacts/artifacts/panel';
 
-type DashboardStore = Pick<ArtifactStore, 'read' | 'publish' | 'delete' | 'export' | 'history' | 'move' | 'projects' | 'issuePublicationGrant' | 'consumePublicationGrant' | 'readPublished'>;
+type DashboardStore = Pick<ArtifactStore, 'read' | 'publish' | 'delete' | 'export' | 'move' | 'projects' | 'issuePublicationGrant' | 'consumePublicationGrant' | 'readPublished'>;
 
 let runtime: ReturnType<typeof createRuntime> | undefined;
 async function createRuntime() {

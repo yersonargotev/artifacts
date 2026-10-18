@@ -434,8 +434,8 @@ async function drive(feature: Feature) {
         await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
         assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', 'true']]);
         await record('Open Información', {});
-        await page.locator('#information > summary').press('Enter');
-        const projectValue = page.locator('#information[open] dt', { hasText: /^Proyecto$/ }).locator('xpath=following-sibling::dd[1]');
+        await page.locator('.detail-tabs').getByRole('link', { name: 'Información', exact: true }).press('Enter');
+        const projectValue = page.locator('#information dt', { hasText: /^Proyecto$/ }).locator('xpath=following-sibling::dd[1]');
         await projectValue.waitFor();
         assert.equal(await projectValue.textContent(), 'Beta', 'Información shows the artifact project');
         await capture(page, 'projects-detail-desktop');

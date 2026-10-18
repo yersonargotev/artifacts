@@ -181,6 +181,7 @@ function readerViolations(filename: string, source: string) {
     for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["']@artifacts\/artifacts\/panel(?:\/model)?["']/g)) issues.push(`${filename}: panel imports belong to the dashboard or tests`);
   }
   if (filename === 'packages/artifacts/src/panel/model.ts' && /(?:^|\n)\s*import\s+(?!type\b)/.test(source)) issues.push(`${filename}: panel model imports must be type-only`);
+  if (filename.startsWith('apps/dashboard/src/components/') && filename.endsWith('.tsx') && /new\s+Date\s*\(|Date\.now\s*\(|toLocale/.test(source)) issues.push(`${filename}: islands must receive preformatted dates`);
   return issues;
 }
 
@@ -196,4 +197,8 @@ test('reader policy rejects version labels, external imports, and runtime model 
   assert.deepEqual(readerViolations('apps/dashboard/src/fixture.ts', "import { createPanel } from '@artifacts/artifacts/panel';"), []);
   assert.deepEqual(readerViolations('packages/artifacts/src/panel/model.ts', "import { z } from 'zod';"), ['packages/artifacts/src/panel/model.ts: panel model imports must be type-only']);
   assert.deepEqual(readerViolations('packages/artifacts/src/panel/model.ts', "import type { Actor } from '../contracts.ts';"), []);
+});
+
+test('islands receive preformatted dates', () => {
+  for (const source of ['new Date(value)', 'Date.now()', 'value.toLocaleString()']) assert.deepEqual(readerViolations('apps/dashboard/src/components/Fixture.tsx', source), ['apps/dashboard/src/components/Fixture.tsx: islands must receive preformatted dates']);
 });

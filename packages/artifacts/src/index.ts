@@ -3,19 +3,14 @@ import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, snapshotSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
+import { revision } from './revision.ts';
 
 export * from './contracts.ts';
 
 const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null) });
-
-type RevisionRow = typeof artifactRevision.$inferSelect;
-
-function revision(row: RevisionRow): Revision {
-  return { id: row.id, parentRevisionId: row.parentRevisionId, sequence: row.sequence, authorUserId: row.authorUserId, authorClientId: row.authorClientId, createdAt: row.createdAt.toISOString(), sha256: row.sha256, snapshot: snapshotSchema.parse(JSON.parse(row.snapshot)) };
-}
 
 export function createArtifactStore(db: Database, options: { publishOrigin: string }) {
   const { transaction, authorize, liveSession, command, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);

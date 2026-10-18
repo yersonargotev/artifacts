@@ -1,3 +1,6 @@
+import type { Revision } from '../contracts.ts';
+import type { RevisionComparison } from '../workflow.ts';
+
 export type ProjectName = string & { readonly __brand: 'ProjectName' };
 export type ContentKind = 'html' | 'markdown' | 'text';
 
@@ -58,3 +61,29 @@ export type LibraryPage = {
 };
 
 export type LibrarySnapshot = { readonly workspace: Workspace; readonly page: LibraryPage };
+
+export type ClientRef = { readonly clientId: string; readonly name: string | null };
+export type DetailQuery = {
+  readonly artifactId: string;
+  readonly revisionId?: string;
+  readonly compareTo?: string;
+  readonly before?: number;
+  readonly includeComparison: boolean;
+};
+export type RevisionEntry = RevisionRef & { readonly author: ClientRef };
+export type ArtifactDetail = {
+  readonly artifactId: string;
+  readonly project: ProjectName | null;
+  readonly createdAt: Date;
+  readonly selected: { readonly revision: Revision; readonly author: ClientRef };
+  readonly head: RevisionRef;
+  readonly publication: { readonly revision: RevisionRef; readonly version: number; readonly url: string } | null;
+  readonly history: { readonly entries: readonly RevisionEntry[]; readonly before: number | null; readonly olderBefore: number | null };
+  readonly choices: readonly RevisionRef[];
+  readonly compared: RevisionRef | null;
+  readonly comparison: RevisionComparison | null;
+};
+export type DetailSnapshot = { readonly workspace: Workspace; readonly detail: ArtifactDetail };
+
+export const isSelectedPublished = (detail: ArtifactDetail) => detail.publication?.revision.revisionId === detail.selected.revision.id;
+export const isPending = (detail: ArtifactDetail) => detail.publication !== null && detail.publication.revision.revisionId !== detail.head.revisionId;
