@@ -339,7 +339,7 @@ async function drive(feature: Feature) {
         const screens = [
           { name: 'library', path: '/', heading: 'Biblioteca' },
           { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
-          { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: `Menú de ${detail.revision.snapshot.metadata.title}` },
+          { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: detail.revision.snapshot.metadata.title },
           { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
           { name: 'delete', path: `/artifacts/${detail.artifactId}/delete`, heading: 'Eliminar artefacto' },
         ];
@@ -419,14 +419,14 @@ async function drive(feature: Feature) {
         const projectLinks = async () => projects.getByRole('link').evaluateAll((links) => links.map((link) => ({ name: link.getAttribute('aria-label'), text: link.textContent, href: link.getAttribute('href'), current: link.getAttribute('aria-current') })));
         assert.deepEqual(await projectLinks(), [{ name: 'Alpha (1)', text: 'Alpha1', href: '/?project=Alpha', current: null }, { name: 'Beta (1)', text: 'Beta1', href: '/?project=Beta', current: null }]);
         for (const name of ['Alpha (1)', 'Beta (1)']) assert.equal(await projects.getByRole('link', { name, exact: true }).count(), 1, `Accessible name ${name}`);
-        const rows = async () => page.locator('.artifact-list li').evaluateAll((items) => items.map((item) => [item.querySelector('h2')?.textContent, item.querySelector('.row-kind')?.textContent]).sort());
-        assert.deepEqual(await rows(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Artefacto']]);
+        const cards = async () => page.locator('.artifact-card').evaluateAll((items) => items.map((item) => [item.querySelector('h2')?.textContent, item.querySelector('.project-chip')?.textContent]).sort());
+        assert.deepEqual(await cards(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Sin proyecto']]);
         await capture(page, 'projects-library-desktop');
         await record('Choose Beta (1) in Proyectos', {});
         await projects.getByRole('link', { name: 'Beta (1)', exact: true }).click();
         await page.waitForURL((url) => url.searchParams.get('project') === 'Beta');
         await page.getByRole('heading', { level: 1, name: 'Beta', exact: true }).waitFor();
-        assert.deepEqual(await rows(), [['Beta handoff', 'Beta']], 'Beta library lists only B');
+        assert.deepEqual(await cards(), [['Beta handoff', 'Beta']], 'Beta library lists only B');
         assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', 'page']]);
         await capture(page, 'projects-beta-desktop');
         await record('Open Beta handoff from the Beta project', {});
@@ -445,7 +445,7 @@ async function drive(feature: Feature) {
         await record('Open Navegación at 390px', {});
         await page.locator('.library-navigation > summary').click();
         await projects.getByRole('link', { name: 'Beta (1)', exact: true }).waitFor();
-        assert.deepEqual(await rows(), [['Beta handoff', 'Beta']]);
+        assert.deepEqual(await cards(), [['Beta handoff', 'Beta']]);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow at 390px');
         await capture(page, 'projects-beta-mobile');
         const moveUrl = `${instance.panel}/artifacts/${loose.artifactId}/move`;
@@ -453,8 +453,8 @@ async function drive(feature: Feature) {
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.goto(instance.panel);
         await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
-        await record('Open Opciones de Unfiled notes and choose Mover a proyecto', {});
-        await page.getByRole('button', { name: 'Opciones de Unfiled notes', exact: true }).click();
+        await record('Open Menú de Unfiled notes and choose Mover a proyecto', {});
+        await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
         await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
         await page.getByRole('heading', { level: 1, name: 'Mover a proyecto', exact: true }).waitFor();
         assert.equal(page.url(), moveUrl);
@@ -478,7 +478,7 @@ async function drive(feature: Feature) {
         await page.getByRole('button', { name: 'Mover al proyecto', exact: true }).click();
         await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('project') === 'Gamma');
         await page.getByRole('heading', { level: 1, name: 'Gamma', exact: true }).waitFor();
-        assert.deepEqual(await rows(), [['Unfiled notes', 'Gamma']], 'Gamma library lists only C');
+        assert.deepEqual(await cards(), [['Unfiled notes', 'Gamma']], 'Gamma library lists only C');
         assert.deepEqual((await projectLinks()).map(({ name, current }) => [name, current]), [['Alpha (1)', null], ['Beta (1)', null], ['Gamma (1)', 'page']]);
         await capture(page, 'projects-gamma-desktop');
         const filed = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
@@ -502,7 +502,7 @@ async function drive(feature: Feature) {
         await page.locator('.library-navigation > summary').click();
         await projects.getByRole('link', { name: 'Alpha (1)', exact: true }).waitFor();
         assert.deepEqual((await projectLinks()).map(({ name }) => name), ['Alpha (1)', 'Beta (1)'], 'Gamma disappears with its last artifact');
-        assert.deepEqual(await rows(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Artefacto']]);
+        assert.deepEqual(await cards(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Sin proyecto']]);
         await capture(page, 'projects-removed-mobile');
         const unfiled = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
         assert.equal(unfiled.project, null, 'Independent MCP read shows the removal');
@@ -516,7 +516,7 @@ async function drive(feature: Feature) {
         assert.deepEqual(await resubmit('Gamma'), { status: 303, location: '/?project=Gamma', changed: false }, 'An exact resubmission replays the Gamma receipt');
         assert.deepEqual(await resubmit('Delta'), { status: 409, location: undefined, changed: true }, 'A changed resubmission conflicts');
         assert.equal(artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId })).project, null, 'Resubmissions do not move C again');
-        checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, row project labels and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Row menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu reaches the move page at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
+        checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu reaches the move page at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
         let libraryDemo: { artifact: ReturnType<typeof artifactReadSchema.parse>; publication: ReturnType<typeof publishResultSchema.parse> } | undefined;
@@ -583,38 +583,38 @@ async function drive(feature: Feature) {
         } else {
           await login(page);
           await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
-          await capture(page, 'artifact-list');
+          await capture(page, 'artifact-grid');
           if (libraryDemo) {
-            assert.equal(await page.locator('.artifact-list li').count(), 4);
-            assert.equal(await page.locator('.artifact-list .pending').count(), 1);
+            assert.equal(await page.locator('.artifact-card').count(), 4);
+            assert.equal(await page.locator('.artifact-card .artifact-status[data-state=pending]').count(), 1);
             for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
               await page.setViewportSize(viewport);
               await page.goto(instance.panel);
               await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('entrega');
               await page.getByRole('button', { name: 'Buscar', exact: true }).click();
               await page.waitForURL((url) => url.searchParams.get('q') === 'entrega');
-              assert.equal(await page.locator('.artifact-list li').count(), 2);
+              assert.equal(await page.locator('.artifact-card').count(), 2);
               await record('Search library by title', { viewport: name, query: 'entrega', results: 2 });
               const filters = page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true });
               for (const label of ['Todos (2)', 'Publicados (0)', 'Sin publicar (1)', 'Cambios pendientes (1)']) assert.equal(await filters.getByRole('link', { name: label, exact: true }).count(), 1);
               await filters.getByRole('link', { name: /^Publicados \(/ }).click();
               await page.waitForURL((url) => url.searchParams.get('status') === 'published');
               assert.equal(new URL(page.url()).searchParams.get('q'), 'entrega');
-              assert.equal(await page.locator('.artifact-list li').count(), 0);
+              assert.equal(await page.locator('.artifact-card').count(), 0);
               await page.getByRole('heading', { name: 'No hay resultados', exact: true }).waitFor();
               await record('Current-publication filter excludes pending revisions', { viewport: name, all: 2, published: 0, pending: 1, unpublished: 1 });
               await filters.getByRole('link', { name: /^Cambios pendientes \(/ }).click();
               await page.waitForURL((url) => url.searchParams.get('status') === 'pending');
-              assert.equal(await page.locator('.artifact-list .pending').count(), 1);
+              assert.equal(await page.locator('.artifact-card .artifact-status[data-state=pending]').count(), 1);
               await page.getByRole('link', { name: 'Guía de revisión de entregas', exact: true }).waitFor();
               await filters.getByRole('link', { name: /^Sin publicar \(/ }).click();
               await page.waitForURL((url) => url.searchParams.get('status') === 'unpublished');
-              assert.equal(await page.locator('.artifact-list li').count(), 1);
+              assert.equal(await page.locator('.artifact-card').count(), 1);
               await page.getByRole('link', { name: 'Notas para publicar una entrega', exact: true }).waitFor();
               await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('no-match-library-proof');
               await page.getByRole('button', { name: 'Buscar', exact: true }).click();
               await page.getByRole('heading', { name: 'No hay resultados', exact: true }).waitFor();
-              assert.equal(await page.locator('.artifact-list li').count(), 0);
+              assert.equal(await page.locator('.artifact-card').count(), 0);
               assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
               await capture(page, `library-no-results-${name}`);
               await page.goBack();
@@ -622,33 +622,33 @@ async function drive(feature: Feature) {
               assert.equal(new URL(page.url()).searchParams.get('q'), 'entrega');
               await page.getByRole('link', { name: 'Limpiar filtros', exact: true }).click();
               await page.waitForURL(`${instance.panel}/`);
-              assert.equal(await page.locator('.artifact-list li').count(), 4);
+              assert.equal(await page.locator('.artifact-card').count(), 4);
               await record('Filter, recover empty results and restore library', { viewport: name, statuses: ['published', 'pending', 'unpublished'], restoredResults: 4 });
             }
             await page.setViewportSize({ width: 1440, height: 900 });
             checks.push('Library search combines with publication filters at desktop and mobile', 'No-match state, browser Back and clear filters recover the library');
-            const rowTrigger = page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true });
-            await rowTrigger.focus();
-            await rowTrigger.press('Space');
+            const cardTrigger = page.getByRole('button', { name: 'Menú de Guía de revisión de entregas', exact: true });
+            await cardTrigger.focus();
+            await cardTrigger.press('Space');
             await page.waitForFunction(() => document.activeElement?.textContent === 'Ver artefacto');
             await page.keyboard.press('ArrowDown');
             assert.equal(await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).evaluate((item) => item === document.activeElement), true);
             assert.equal(new URL((await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).getAttribute('href'))!, instance.panel).searchParams.get('revisionId'), libraryDemo.artifact.revision.id);
             assert.equal(await page.getByRole('menuitem', { name: 'Abrir publicación', exact: true }).getAttribute('href'), libraryDemo.publication.url);
-            await capture(page, 'artifact-list-menu');
+            await capture(page, 'artifact-grid-menu');
             await page.keyboard.press('Escape');
             await page.getByRole('menu').waitFor({ state: 'hidden' });
-            await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Opciones de Guía de revisión de entregas');
-            assert.equal(await rowTrigger.evaluate((trigger) => trigger === document.activeElement), true);
+            await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Menú de Guía de revisión de entregas');
+            assert.equal(await cardTrigger.evaluate((trigger) => trigger === document.activeElement), true);
             await page.setViewportSize({ width: 390, height: 844 });
             await page.goto(instance.panel);
             await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-            await capture(page, 'artifact-list-mobile');
-            await page.getByRole('button', { name: 'Opciones de Guía de revisión de entregas', exact: true }).click();
+            await capture(page, 'artifact-grid-mobile');
+            await page.getByRole('button', { name: 'Menú de Guía de revisión de entregas', exact: true }).click();
             const menuBounds = await page.getByRole('menu').boundingBox();
             assert(menuBounds && menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= 390);
-            await capture(page, 'artifact-list-mobile-menu');
+            await capture(page, 'artifact-grid-mobile-menu');
             await page.keyboard.press('Escape');
             await page.setViewportSize({ width: 1440, height: 900 });
             await page.goto(instance.panel);
@@ -719,9 +719,9 @@ async function drive(feature: Feature) {
                 await home.click();
                 await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
                 assert.equal(new URL(page.url()).origin, instance.panel);
-                assert.equal(await page.locator('.artifact-list li').count(), 4);
+                assert.equal(await page.locator('.artifact-card').count(), 4);
               }
-              checks.push('Real MCP library drafts, publication and pending state', 'Row menu keyboard, exact-head download and stable publication links', 'Library desktop and 390px rows and menu without overflow', 'Publication home returns to authenticated library at both viewports');
+              checks.push('Real MCP library drafts, publication and pending state', 'Card menu keyboard, exact-head download and stable publication links', 'Library desktop and 390px cards and menu without overflow', 'Publication home returns to authenticated library at both viewports');
             }
             checks.push('Real MCP creates two retained revisions', 'Panel list and history select each revision', 'Interaction inside actual sandbox iframe', 'Desktop and 390px mobile without page overflow');
           }

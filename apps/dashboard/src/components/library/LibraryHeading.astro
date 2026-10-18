@@ -1,0 +1,21 @@
+---
+import type { LibraryScope, Workspace } from '@artifacts/artifacts/panel/model';
+import Icon from '../Icon.astro';
+interface Props { workspace: Workspace; scope: LibraryScope }
+const { workspace, scope } = Astro.props;
+const project = scope.kind === 'project' ? scope.project.name : scope.kind === 'vanishedProject' ? scope.name : undefined;
+const title = scope.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
+const description = scope.kind === 'unfiled' ? 'Los artefactos que aún no tienen proyecto.' : project ? 'Los artefactos de este proyecto.' : 'Todo lo que creas, en un solo lugar.';
+---
+<header class="library-header">
+  <div class="library-heading">
+    <div><h1>{title}</h1><p>{description}</p></div>
+    <a class="button secondary connect-button" href="#connect-tools" aria-label="Conectar herramientas" data-open-tools><Icon name="plug-connected" size={18} /><span>Conectar herramientas</span></a>
+  </div>
+  {scope.kind === 'all' && <dl class="library-stats" aria-label="Estadísticas de tu biblioteca">
+    <div><dt>Artefactos</dt><dd>{workspace.total.count}</dd></div>
+    <div><dt>Publicados</dt><dd>{workspace.total.published}</dd></div>
+    <div><dt>Con cambios pendientes</dt><dd>{workspace.total.pending}</dd></div>
+    <div><dt><a href="/?unfiled=1">Sin proyecto<Icon name="chevron-right" size={14} /></a></dt><dd>{workspace.unfiled.count}</dd></div>
+  </dl>}
+</header>

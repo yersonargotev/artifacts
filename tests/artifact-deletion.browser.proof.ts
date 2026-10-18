@@ -82,7 +82,7 @@ try {
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await page.getByRole('link', { name: 'Todos (1)', exact: true }).waitFor();
   const openConfirmation = async () => {
-    const trigger = page.getByRole('button', { name: `Opciones de ${title}`, exact: true });
+    const trigger = page.getByRole('button', { name: `Menú de ${title}`, exact: true });
     await trigger.focus();
     await trigger.press('Enter');
     await page.getByRole('menu').waitFor();
@@ -97,7 +97,7 @@ try {
   await page.getByRole('link', { name: 'Cancelar', exact: true }).click();
   await page.getByRole('link', { name: title, exact: true }).waitFor();
   assert.equal((await store.read(actor, { artifactId: created.artifactId })).headRevisionId, created.headRevisionId);
-  record('Keyboard row menu opens a read-only confirmation; Cancelar preserves all data.');
+  record('Keyboard card menu opens a read-only confirmation; Cancelar preserves all data.');
   await openConfirmation();
   const staleHead = await commandFrom(page);
   const updated = await store.update(actor, { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot });

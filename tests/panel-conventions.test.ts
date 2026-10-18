@@ -37,7 +37,7 @@ function objects(value: unknown): Record<string, unknown>[] {
 function matchesSubject(selector: Selector, subject: Subject) {
   const lastCombinator = selector.findLastIndex((component) => component.type === 'combinator');
   const target = selector.slice(lastCombinator + 1);
-  if (subject === 'overlay') return target.some((component) => (component.type === 'class' && component.name === 'artifact-menu') || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content'));
+  if (subject === 'overlay') return target.some((component) => (component.type === 'class' && ['artifact-menu', 'project-filter-links'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content'));
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (component.type !== 'attribute' || component.namespace) return false;
@@ -132,6 +132,8 @@ test('effect policy rejects stray gradients, shadows, aliases, and selector esca
     '.sidebar-link { box-shadow: 0 0 12px blue }',
     '.sidebar-link { box-shadow: var(--glow-primary) }',
     '.sidebar-link { box-shadow: var(--elevation-overlay) }',
+    '.project-filter-links .sidebar-link { box-shadow: var(--elevation-overlay) }',
+    '.project-filter-links, .sidebar-link { box-shadow: var(--elevation-overlay) }',
     '[data-variant="primary"] .sidebar-link { box-shadow: var(--glow-primary) }',
     '[data-variant="primary"], .sidebar-link { box-shadow: var(--glow-primary) }',
     '[aria-selected="false"] { box-shadow: var(--glow-active) }',
@@ -149,6 +151,7 @@ test('effect policy rejects stray gradients, shadows, aliases, and selector esca
 test('effect policy permits only scoped effect tokens and neutral overlay elevation', () => {
   assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--glow-primary-fill); box-shadow: var(--glow-primary) } [aria-current], [aria-selected="true"], [aria-pressed="true"] { box-shadow: var(--glow-active) } .project-cover { background: var(--cover-wash) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.artifact-menu { box-shadow: var(--elevation-overlay) }'), []);
+  assert.deepEqual(stylesheetViolations('panel.css', '.project-filter-links { box-shadow: var(--elevation-overlay) }'), []);
 });
 
 test('markup policy rejects effect utilities and inline shadows', () => {

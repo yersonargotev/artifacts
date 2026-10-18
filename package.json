@@ -17,7 +17,7 @@
     "dev:auth": "tsx apps/auth/src/server.ts",
     "dev:mcp": "tsx apps/mcp/src/server.ts",
     "dev:dashboard": "tsx scripts/dashboard.ts",
-    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/artifact-deletion.browser.proof.ts && node --import tsx tests/publication-network.proof.ts && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts && node --import tsx tests/panel-detail.browser.proof.ts",
+    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/artifact-deletion.browser.proof.ts && node --import tsx tests/publication-network.proof.ts && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts && node --import tsx tests/panel-detail.browser.proof.ts && node --import tsx tests/panel-library.browser.proof.ts",
     "verify:turso": "tsx scripts/verify-turso.ts",
     "dev": "tsx scripts/dev.ts",
     "build:workers": "tsx scripts/build-workers.ts",

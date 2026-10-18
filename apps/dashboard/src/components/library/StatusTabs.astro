@@ -1,0 +1,11 @@
+---
+import type { LibraryPage } from '@artifacts/artifacts/panel/model';
+import { searchFor, statusTabs } from '../../presentation.ts';
+import { libraryHref } from '../../urls.ts';
+interface Props { page: LibraryPage }
+const { page } = Astro.props;
+const query = searchFor(page);
+---
+<nav class="library-filters" aria-label="Filtrar por publicación">
+  {statusTabs.map(({ value, label }) => <a href={libraryHref(query, { status: value })} aria-current={page.status === value ? 'page' : undefined} aria-label={`${label} (${page.counts[value]})`}>{label}<span>{page.counts[value]}</span></a>)}
+</nav>

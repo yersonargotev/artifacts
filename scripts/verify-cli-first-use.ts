@@ -291,7 +291,7 @@ try {
     await Promise.race([sidebarLink.waitFor(), consent.waitFor().then(() => consent.click())]);
     await sidebarLink.waitFor();
     assert.equal(await sidebarLink.getAttribute('aria-current'), 'page');
-    assert.deepEqual(await page.locator('.artifact-list h2').allTextContents(), [title]);
+    assert.deepEqual(await page.locator('.artifact-card h2').allTextContents(), [title]);
     checked('panel-sidebar-groups-moved-artifact');
   }
 
