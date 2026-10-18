@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { artifactReadSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { waitForMoveReadiness } from './move-readiness.ts';
 
 type Snapshot = ReturnType<typeof artifactReadSchema.parse>['revision']['snapshot'];
 interface ProjectsDrive {
@@ -112,6 +113,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(instance.panel);
   await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
   await record('Open Menú de Unfiled notes and choose Mover a proyecto', {});
+  await waitForMoveReadiness(page);
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
   await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefacto', exact: true }).waitFor();
@@ -149,6 +151,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(`${instance.panel}/artifacts/${loose.artifactId}`);
   await page.getByRole('heading', { name: 'Historial', exact: true }).waitFor();
   await record('Open Menú de Unfiled notes at 390px and choose Mover a proyecto', {});
+  await waitForMoveReadiness(page);
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
   await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefacto', exact: true }).waitFor();
@@ -434,6 +437,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await capture(page, 'bulk-remove-readback');
   await checkScreen(page, 'bulk-remove-readback');
   for (const item of bulk) await page.getByRole('checkbox', { name: `Seleccionar ${item.revision.snapshot.metadata.title}`, exact: true }).check();
+  await waitForMoveReadiness(page);
   await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
   await page.getByRole('dialog').waitFor();
   assert.deepEqual((await page.getByRole('dialog').locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('artifactId'))).sort(), ids(bulk));

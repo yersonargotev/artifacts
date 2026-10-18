@@ -9,6 +9,7 @@ import { artifact, artifactPublication, artifactRevision } from '../packages/db/
 import { artifactReadSchema } from '../packages/contracts/src/index.ts';
 import { grant } from './helpers.ts';
 import { verifyRetainedArtifact } from '../.agents/skills/verify-artifacts/scripts/retained.ts';
+import { observeMoveReadiness, waitForMoveReadiness } from '../.agents/skills/verify-artifacts/scripts/move-readiness.ts';
 import { restCliFixture } from './rest-cli-fixture.ts';
 
 const exec = promisify(execFile);
@@ -86,10 +87,11 @@ try {
   await mcp('artifacts_publish', { requestId: randomUUID(), artifactId: html.artifactId, revisionId: html.headRevisionId, expectedPublicationVersion: 0 });
   const before = await immutable();
   const context = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(evidence, 'video'), size: { width: 1440, height: 900 } } });
+  await observeMoveReadiness(context);
   const page = await context.newPage(); active = page; observe(page);
   const video = page.video()!;
   const started = Date.now();
-  const hydrated = () => page.locator('astro-island[component-url*="MoveDialog"]:not([ssr])').waitFor({ state: 'attached' });
+  const hydrated = () => waitForMoveReadiness(page);
   const dialog = page.getByRole('dialog');
   const field = dialog.getByLabel('Proyecto', { exact: true });
   const menu = (title: string) => page.getByRole('button', { name: `Menú de ${title}`, exact: true });
@@ -158,11 +160,12 @@ try {
   await video.saveAs(join(evidence, 'review.webm'));
   checks.push('Three selected IDs match native FormData and public readers after one native move');
   const live = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 } });
+  await observeMoveReadiness(live);
   const next = await live.newPage(); active = next; observe(next);
   const modal = next.getByRole('dialog');
   const project = modal.getByLabel('Proyecto', { exact: true });
   const open = async (title: string) => {
-    await next.locator('astro-island[component-url*="MoveDialog"]:not([ssr])').waitFor({ state: 'attached' });
+    await waitForMoveReadiness(next);
     await next.getByRole('button', { name: `Menú de ${title}`, exact: true }).press('Enter');
     await next.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).press('Enter');
     await modal.waitFor();
@@ -260,6 +263,21 @@ try {
   await inventory();
   await delayed.close();
   checks.push('Delayed hydration retains native draft, focus, selection and one successful project field');
+  const fallback = await browser.newContext({ storageState: state });
+  await observeMoveReadiness(fallback);
+  const invalidTrigger = await fallback.newPage(); active = invalidTrigger; observe(invalidTrigger);
+  await invalidTrigger.goto(`${app.dashboard}/artifacts/${single.artifactId}`);
+  await waitForMoveReadiness(invalidTrigger);
+  const invalidLink = invalidTrigger.getByRole('link', { name: 'Mover', exact: true });
+  await invalidLink.evaluate((element) => element.setAttribute('data-move-items', 'invalid'));
+  await invalidLink.press('Enter');
+  await invalidTrigger.waitForURL(`${app.dashboard}/move?artifactId=${single.artifactId}`);
+  await invalidTrigger.getByRole('heading', { name: 'Mover a proyecto', exact: true }).waitFor();
+  assert.equal(await invalidTrigger.getByRole('dialog').count(), 0);
+  await capture(invalidTrigger, 'dialog-invalid-metadata-fallback');
+  await inventory();
+  await fallback.close();
+  checks.push('Invalid trigger metadata keeps native navigation after the actual dialog listener is registered');
   const native = await browser.newContext({ storageState: state, javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const nojs = await native.newPage(); active = nojs;
   for (const entry of ['card', 'header', 'facts', 'selection']) {
