@@ -32,7 +32,7 @@ Save a private JSON configuration. `expected` is the full saved `ArtifactRead`, 
   "expected": "Replace this value with the full saved ArtifactRead object",
   "panelUrl": "https://panel.example.test/artifacts/ARTIFACT_ID?revisionId=REVISION_ID",
   "publicationUrl": "https://viewer.example.test/a/ARTIFACT_ID",
-  "viewports": [{ "width": 1280, "height": 900 }, { "width": 390, "height": 844 }],
+  "viewports": [{ "width": 1440, "height": 900 }, { "width": 390, "height": 844 }],
   "expectations": [
     { "kind": "text", "selector": "#total", "text": "5.00" },
     { "kind": "click", "selector": "#change" },

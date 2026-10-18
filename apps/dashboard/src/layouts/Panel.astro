@@ -4,7 +4,7 @@ const { title = 'Tus artefactos', section = 'Tus artefactos', library = false, d
 ---
 <!doctype html>
 <html lang="es" class="dark">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#1e1e2e" /><title>{title} · Artifacts</title></head>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#1e1e2e" /><link rel="icon" type="image/svg+xml" href="/favicon.svg" /><title>{title} · Artifacts</title></head>
   <body class:list={['panel', { 'library-shell': library, 'detail-shell': detail }]}>
     <a class="skip-link" href="#main-content">Ir al contenido</a>
     {library && <aside class="library-sidebar" aria-label="Espacio de trabajo"><slot name="sidebar" /></aside>}

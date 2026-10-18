@@ -30,7 +30,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive proje
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts cleanup --run "$R"
 ```
 
-The drive creates `Alpha plan` with project `Alpha`, `Beta handoff` with project `alpha`, and `Unfiled notes` without a project through HTTP MCP. It runs the source CLI with the same environment as the `cli` drive. It then signs in through the panel login UI and uses `getByRole('navigation', { name: 'Proyectos', exact: true })`. After the browsing checks it moves `Unfiled notes` into a new `Gamma` project from its row menu at 1280px, then removes it from its detail title menu at 390px.
+The drive creates `Alpha plan` with project `Alpha`, `Beta handoff` with project `alpha`, and `Unfiled notes` without a project through HTTP MCP. It runs the source CLI with the same environment as the `cli` drive. It then signs in through the panel login UI and uses `getByRole('navigation', { name: 'Proyectos', exact: true })`. After the browsing checks it moves `Unfiled notes` into a new `Gamma` project from its row menu at 1440px, then removes it from its detail title menu at 390px.
 
 Expected end state:
 
@@ -52,7 +52,7 @@ Evidence under `<run>/projects/` includes `actions.jsonl` with every MCP request
 
 ## Gotchas
 
-- At 1280x900, the `Información` summary straddles the bottom edge of the viewport. A Playwright click that relies on automatic scrolling can leave the disclosure closed. The drive scrolls the summary into view, clicks it, and then waits for `#information[open]`.
+- At 1440x900, the `Información` summary straddles the bottom edge of the viewport. A pointer click below the preview iframe can leave the disclosure closed. The drive focuses the summary, presses Enter, and then waits for `#information[open]`.
 - The panel compares a `?project=` value with the owner's projects regardless of letter case and shows the stored spelling. A hand-typed `?project=beta` therefore highlights `Beta (1)`.
 - Project names in URLs are encoded by `URLSearchParams`, so a space appears as `+`.
 - The `Proyecto` field has a `list` attribute, so its ARIA role is `combobox`, not `textbox`. The drive finds it with `getByLabel('Proyecto', { exact: true })`.
