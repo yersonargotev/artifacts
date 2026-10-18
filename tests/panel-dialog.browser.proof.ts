@@ -76,6 +76,7 @@ try {
   await login.getByRole('button', { name: 'Iniciar sesión', exact: true }).press('Enter');
   await login.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
   const state = await setup.storageState();
+  await inventory();
   await setup.close();
   const single = await create('Plan de entrega');
   const three = [await create('Entrega uno', 'Alpha'), await create('Entrega dos', 'Alpha'), await create('Entrega tres', 'Alpha')];
@@ -131,11 +132,15 @@ try {
   const selectionTrigger = page.getByRole('button', { name: 'Mover a otro proyecto', exact: true });
   await selectionTrigger.press('Enter');
   await dialog.getByRole('heading', { name: 'Mover 3 artefactos', exact: true }).waitFor();
+  await dialog.getByRole('button', { name: 'Cancelar', exact: true }).press('Enter');
+  await page.waitForFunction(() => document.activeElement?.matches('#selection [data-move-trigger]'));
+  await selectionTrigger.press('Enter');
+  await dialog.getByRole('heading', { name: 'Mover 3 artefactos', exact: true }).waitFor();
   assert.deepEqual((await successful()).filter(([name]) => name === 'artifactId').map(([, value]) => value).sort(), nativeIds.sort());
   await field.fill('Entrega final');
+  await field.press('Tab');
   await capture(page, 'dialog-many-1440');
   await page.waitForTimeout(1500);
-  await field.press('Tab');
   await dialog.getByRole('button', { name: 'Mover', exact: true }).press('Enter');
   await page.waitForURL(`${app.dashboard}/?project=Entrega+final`);
   const batchReadback = { cli: await cli('list', '--project', 'Entrega final'), mcp: await mcp('artifacts_list', { project: 'Entrega final' }), projects: await cli('projects') };
@@ -147,6 +152,7 @@ try {
   await writeFile(join(evidence, 'public-readback.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><title>Actual public readback</title><style>body{background:#1e1e2e;color:#cdd6f4;font:16px system-ui;padding:24px}pre{white-space:pre-wrap;font-size:13px;columns:2}</style><h1>Actual CLI and HTTP MCP readback</h1><p>Captured after the native dialog POSTs in this disposable run.</p><pre>${escaped}</pre>`);
   await page.goto(`file://${join(evidence, 'public-readback.html')}`);
   await page.waitForTimeout(Math.max(3500, 32_000 - (Date.now() - started)));
+  await inventory();
   await context.close();
   await video.saveAs(join(evidence, 'review.webm'));
   checks.push('Three selected IDs match native FormData and public readers after one native move');
@@ -172,6 +178,7 @@ try {
   assert.deepEqual(await modal.locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('project')), ['New draft']);
   await project.press('Escape');
   assert.equal(await modal.isVisible(), true, 'First Escape closes the nested list');
+  assert.equal(await project.inputValue(), 'New draft');
   await project.press('Escape');
   await modal.waitFor({ state: 'hidden' });
   await next.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Menú de Plan de entrega');
@@ -190,6 +197,7 @@ try {
   await direct.press('Enter');
   await modal.waitFor();
   await modal.getByRole('button', { name: 'Cancelar', exact: true }).press('Enter');
+  await next.waitForFunction(() => document.activeElement?.matches('.facts-card [data-move-trigger]'));
   assert.equal(await direct.evaluate((element) => element === document.activeElement), true);
   await next.setViewportSize({ width: 390, height: 844 });
   await direct.press('Enter');
@@ -197,9 +205,10 @@ try {
   await project.fill('pag');
   await next.getByRole('option', { name: 'Crear proyecto «pag»', exact: true }).waitFor();
   assert.equal(await modal.evaluate((element) => { const box = element.getBoundingClientRect(); return box.x >= 0 && box.right <= innerWidth && box.bottom <= innerHeight && element.scrollWidth <= element.clientWidth; }), true);
-  await capture(next, 'dialog-390');
+  await capture(next, 'dialog-390-options');
   await next.getByRole('option', { name: 'Crear proyecto «pag»', exact: true }).click();
   assert.equal(await project.inputValue(), 'pag');
+  await capture(next, 'dialog-390');
   await modal.getByRole('button', { name: 'Quitar del proyecto', exact: true }).press('Enter');
   await next.waitForURL(`${app.dashboard}/?unfiled=1`);
   const removed = artifactReadSchema.parse(await mcp('artifacts_read', { artifactId: html.artifactId }));
@@ -212,6 +221,7 @@ try {
   const report = await verifyRetainedArtifact(live, { expected: removed, panelUrl: `${app.dashboard}/artifacts/${html.artifactId}?revisionId=${html.headRevisionId}`, publicationUrl: removed.publication!.url, viewports: [{ width: 1440, height: 900 }, { width: 390, height: 844 }], expectations: [{ kind: 'text', selector: '#total', text: '5' }, { kind: 'click', selector: '#change' }, { kind: 'text', selector: '#total', text: '8' }], evidenceDirectory: join(evidence, 'retained') });
   assert.equal(report.status, 'passed', JSON.stringify(report.errors));
   checks.push('Canonical choice and edited draft serialize once, nested Escape, fresh requests, persistent menu/direct focus, 390 sheet, removal preserves revisions/publication and complete retained verification');
+  await inventory();
   await live.close();
   const delayed = await browser.newContext({ storageState: state });
   let release!: () => void;
@@ -227,6 +237,14 @@ try {
   assert.equal(await draft.getByLabel('Proyecto', { exact: true }).inputValue(), 'Before hydration');
   assert.deepEqual(await draft.getByLabel('Proyecto', { exact: true }).evaluate((element) => ({ focus: element === document.activeElement, start: (element as HTMLInputElement).selectionStart, end: (element as HTMLInputElement).selectionEnd })), { focus: true, start: 3, end: 7 });
   assert.deepEqual(await draft.locator('.move-form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('project')), ['Before hydration']);
+  const composing = draft.getByLabel('Proyecto', { exact: true });
+  await composing.dispatchEvent('compositionstart');
+  await composing.fill('Proyecto 日本');
+  await composing.dispatchEvent('compositionend', { data: '日本' });
+  await composing.press('Tab');
+  assert.deepEqual(await draft.locator('.move-form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('project')), ['Proyecto 日本']);
+  await record('DOM composition event sequence preserves the committed draft', { value: 'Proyecto 日本', limitation: 'Synthetic composition boundaries with browser input, not an operating-system IME session' });
+  await inventory();
   await delayed.close();
   checks.push('Delayed hydration retains native draft, focus, selection and one successful project field');
   const native = await browser.newContext({ storageState: state, javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
@@ -243,6 +261,7 @@ try {
     assert.equal((await mcp('artifacts_read', { artifactId: single.artifactId })).project, 'Gamma');
   }
   await capture(nojs, 'dialog-nojs');
+  await inventory();
   await native.close();
   checks.push('All card, header, FactsCard and selection entry points complete native movement without JavaScript');
   for (const post of posts) { assert.equal(post.fields.filter(([name]) => name === 'intent').length, 1); assert.equal(post.fields.filter(([name]) => name === 'project').length, 1); }

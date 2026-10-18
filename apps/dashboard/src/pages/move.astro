@@ -17,6 +17,7 @@ const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto comp
 <Panel title={heading} workspace={subject?.workspace}>
   <section class="move-card" data-move-result={outcome.kind}>
     <h1>{heading}</h1>
+    <p>No crea revisiones ni cambia lo publicado.</p>
     {subject?.items.map((item) => <div><h2 class="move-title">{item.title}</h2><p>Proyecto actual: <strong>{item.project ?? 'Sin proyecto'}</strong></p></div>)}
     {outcome.kind === 'partial' ? <>
       <p>La solicitud registró {outcome.result.moved} artefactos movidos y {outcome.result.unchanged} sin cambios en <strong>{outcome.result.project ?? 'Sin proyecto'}</strong>.</p>
