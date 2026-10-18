@@ -146,7 +146,7 @@ try {
   const downloadItem = page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true });
   assert.equal(await downloadItem.evaluate((item) => item === document.activeElement), true);
   assert.equal(new URL((await downloadItem.getAttribute('href'))!, app.dashboard).searchParams.get('revisionId'), seeded[1]!.headRevisionId);
-  assert.equal(await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).getAttribute('href'), `/artifacts/${seeded[1]!.artifactId}/move`);
+  assert.equal(await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).getAttribute('href'), `/move?artifactId=${seeded[1]!.artifactId}`);
   assert.equal(await page.getByRole('menuitem', { name: 'Abrir publicación', exact: true }).count(), 1);
   const bounds = await page.getByRole('menu').boundingBox();
   assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390);

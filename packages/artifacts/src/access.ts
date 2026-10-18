@@ -4,7 +4,7 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, session } from '@artifacts/db/schema';
 import { ArtifactError, type Actor, type ProjectSummary } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
-import { projectKey } from './panel/model.ts';
+import { projectKey, type PanelMoveInput, type PanelMoveResult } from './panel/model.ts';
 
 export type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;
 const deletedReceiptSchema = z.strictObject({ kind: z.literal('artifact_deleted'), artifactId: z.string().min(1).max(128) });
@@ -50,16 +50,14 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
     }
   }
 
-  async function command<T extends { artifactId: string }>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
+  async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, decode: (result: unknown) => T, work: (connection: Connection) => Promise<T>): Promise<T> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
     return transaction(async (connection) => {
       await authorize(connection, actor, scope);
       const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, actor.userId), eq(artifactCommand.requestId, input.requestId))).limit(1);
       if (receipt) {
         if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
-        const result: unknown = JSON.parse(receipt.result);
-        if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
-        return output.parse(result);
+        return decode(JSON.parse(receipt.result));
       }
       const result = await work(connection);
       await connection.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson(result), createdAt: new Date() });
@@ -67,5 +65,16 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
     });
   }
 
-  return { transaction, authorize, liveSession, command, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
+  function command<T extends { artifactId: string }>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
+    return receipt(actor, scope, kind, input, (result) => {
+      if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
+      return output.parse(result);
+    }, work);
+  }
+
+  function panelMove(actor: Actor, input: PanelMoveInput, output: z.ZodType<PanelMoveResult>, work: (connection: Connection) => Promise<PanelMoveResult>): Promise<PanelMoveResult> {
+    return receipt(actor, 'artifacts:write', 'panel_move', input, (result) => output.parse(result), work);
+  }
+
+  return { transaction, authorize, liveSession, command, panelMove, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
 }

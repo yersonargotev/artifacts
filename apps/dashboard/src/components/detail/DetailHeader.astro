@@ -2,7 +2,7 @@
 import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
 import { isPending, isSelectedPublished } from '@artifacts/artifacts/panel/model';
 import { contentLabels, revisionLabel } from '../../presentation.ts';
-import { exportHref, type DetailUrl } from '../../urls.ts';
+import { moveHref, exportHref, type DetailUrl } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 import PublicationForm from '../PublicationForm.astro';
 import Icon from '../Icon.astro';
@@ -31,7 +31,7 @@ const command = { artifactId: detail.artifactId, revisionId: revision.id, expect
   <div class="detail-actions">
     <ArtifactMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={[
       { label: `Descargar revisión ${revision.sequence}`, href: exportHref(detail.artifactId, revision.id) },
-      { label: 'Mover a proyecto', href: `${path}/move` },
+      { label: 'Mover a proyecto', href: moveHref([detail.artifactId]) },
     ]} deleteUrl={`${path}/delete`} client:load />
     <a class="button secondary" href={exportHref(detail.artifactId, revision.id)}><Icon name="download" size={16} />Exportar</a>
     {isSelectedPublished(detail) ? <a class="button" data-variant="primary" href={detail.publication!.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}

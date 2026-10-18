@@ -1,6 +1,8 @@
 import type { createArtifactStore } from '@artifacts/artifacts';
 import { ArtifactError, publishSchema, type Actor, type ArtifactRead, type Publication } from '@artifacts/artifacts/contracts';
 
+import { readForm } from './form.ts';
+
 export type PublishCommand = { artifactId: string; revisionId: string; expectedPublicationVersion: number; requestId: string };
 export type PublicationOutcome =
   | { kind: 'published' | 'superseded'; committed: Publication; observed: ArtifactRead }
@@ -8,15 +10,8 @@ export type PublicationOutcome =
   | { kind: 'uncertain' };
 
 export async function parsePublicationForm(request: Request, artifactId: string | undefined): Promise<PublishCommand> {
-  if (!/^application\/x-www-form-urlencoded(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get('content-type') ?? '')) throw new Response('Usa el formulario de publicación.', { status: 400 });
-  const body = await request.text();
-  if (body.length > 4096) throw new Response('El formulario no es válido.', { status: 400 });
-  try {
-    for (const part of body.split('&')) for (const value of part.split('=')) decodeURIComponent(value.replace(/\+/g, ' '));
-  } catch { throw new Response('El formulario no es válido.', { status: 400 }); }
-  const fields = new URLSearchParams(body);
-  const names = ['artifactId', 'revisionId', 'expectedPublicationVersion', 'requestId'];
-  if ([...fields.keys()].some((name) => !names.includes(name)) || names.some((name) => fields.getAll(name).length !== 1)) throw new Response('El formulario no es válido.', { status: 400 });
+  const fields = await readForm(request, { artifactId: [1, 1], revisionId: [1, 1], expectedPublicationVersion: [1, 1], requestId: [1, 1] }, 4096);
+  if (!fields) throw new Response('El formulario de publicación no es válido.', { status: 400 });
   const version = fields.get('expectedPublicationVersion')!;
   if (!/^(0|[1-9]\d*)$/.test(version) || !Number.isSafeInteger(Number(version)) || fields.get('artifactId') !== artifactId) throw new Response('El formulario no coincide con este artefacto.', { status: 400 });
   return publishSchema.parse({ ...Object.fromEntries(fields), expectedPublicationVersion: Number(version) });

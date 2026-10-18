@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { panelDetailQuerySchema, panelLibraryQuerySchema } from '@artifacts/artifacts/panel';
+import { panelDetailQuerySchema, panelLibraryQuerySchema, panelMoveIdsSchema } from '@artifacts/artifacts/panel';
 import type { DetailQuery, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
 
 export function readLibraryUrl(url: URL): LibraryQuery {
@@ -54,3 +54,13 @@ export function detailHref(state: DetailUrl, patch: Partial<DetailUrl> = {}): st
 
 export const previewHref = (artifactId: string, revisionId: string) => `/artifacts/${encodeURIComponent(artifactId)}/preview?${new URLSearchParams({ revisionId })}`;
 export const exportHref = (artifactId: string, revisionId: string) => `/artifacts/${encodeURIComponent(artifactId)}/export?${new URLSearchParams({ revisionId })}`;
+
+export function moveHref(artifactIds: readonly string[]): string {
+  return `/move?${new URLSearchParams(artifactIds.map((id) => ['artifactId', id]))}`;
+}
+
+export function readMoveUrl(url: URL): string[] {
+  const ids = url.searchParams.getAll('artifactId');
+  z.array(z.string()).max(25).parse(ids);
+  return panelMoveIdsSchema.parse(ids);
+}

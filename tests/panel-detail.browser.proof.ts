@@ -177,7 +177,7 @@ try {
   const nativeZip = join(evidence, 'no-js-selected.zip');
   await (await nativeDownload).saveAs(nativeZip);
   assert.deepEqual(await readFile(nativeZip), Buffer.from(archive.base64, 'base64'));
-  await Promise.all([native.waitForURL(`${url}/move`), native.getByRole('link', { name: 'Mover', exact: true }).press('Enter')]);
+  await Promise.all([native.waitForURL(`${app.dashboard}/move?artifactId=${created.artifactId}`), native.getByRole('link', { name: 'Mover', exact: true }).press('Enter')]);
   await native.getByRole('heading', { name: 'Mover a proyecto', exact: true }).waitFor();
   await noScript.close();
   const retained = await browser.newContext({ storageState });

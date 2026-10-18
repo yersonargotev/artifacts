@@ -1,7 +1,7 @@
 ---
 import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
 import { absoluteTime, clientLabel, contentLabels, projectTone } from '../../presentation.ts';
-import { scopeHref } from '../../urls.ts';
+import { moveHref, scopeHref } from '../../urls.ts';
 import Icon from '../Icon.astro';
 interface Props { detail: ArtifactDetail }
 const { detail } = Astro.props;
@@ -9,7 +9,7 @@ const { detail } = Astro.props;
 <section class="detail-card facts-card" aria-labelledby="facts-title">
   <h2 id="facts-title">Información</h2>
   <dl>
-    <div><dt>Proyecto</dt><dd><a class="project-chip" data-tone={detail.project ? projectTone(detail.project) : undefined} href={scopeHref(detail.project === null ? { kind: 'unfiled' } : { kind: 'project', name: detail.project })}>{detail.project ?? 'Sin proyecto'}</a><a href={`/artifacts/${encodeURIComponent(detail.artifactId)}/move`}>Mover</a></dd></div>
+    <div><dt>Proyecto</dt><dd><a class="project-chip" data-tone={detail.project ? projectTone(detail.project) : undefined} href={scopeHref(detail.project === null ? { kind: 'unfiled' } : { kind: 'project', name: detail.project })}>{detail.project ?? 'Sin proyecto'}</a><a href={moveHref([detail.artifactId])}>Mover</a></dd></div>
     <div><dt>Identificador</dt><dd><code>{detail.artifactId}</code><button class="icon-button copy-id" type="button" aria-label="Copiar identificador" data-copy-id={detail.artifactId} hidden><Icon name="copy" size={16} /></button></dd></div>
     <div><dt>Creado</dt><dd>{absoluteTime(detail.createdAt)}</dd></div>
     <div><dt>Cliente autor</dt><dd>{clientLabel(detail.selected.author)}</dd></div>
