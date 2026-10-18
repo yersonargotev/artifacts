@@ -114,7 +114,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await record('Open Menú de Unfiled notes and choose Mover a proyecto', {});
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
-  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefactos', exact: true }).waitFor();
+  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefacto', exact: true }).waitFor();
   assert.equal(await page.locator('.move-subjects li').textContent(), 'Unfiled notesSin proyecto');
   assert.equal(await field.inputValue(), '');
   await field.press('ArrowDown');
@@ -151,7 +151,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await record('Open Menú de Unfiled notes at 390px and choose Mover a proyecto', {});
   await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Mover a proyecto', exact: true }).click();
-  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefactos', exact: true }).waitFor();
+  await page.getByRole('dialog').getByRole('heading', { name: 'Mover 1 artefacto', exact: true }).waitFor();
   assert.equal(await field.inputValue(), 'Gamma');
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow on the move page at 390px');
   await capture(page, 'projects-move-mobile');
@@ -455,7 +455,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(instance.panel);
   assert.equal(await page.getByRole('checkbox').count(), 0);
   await capture(page, 'no-checkboxes-1440');
-  checks.push('Two externally associated checkboxes derive count 2 at 1440 and 390 without overflow', 'Native reset clears checks, count and enhanced bar', 'Bulk removal lands in Sin proyecto and exact MCP reads retain revision and publication with project null', 'Native repeated-ID GET creates Delta and CLI projects/list plus MCP projects/read confirm count 2 and unchanged retained data', 'Biblioteca has no selection controls');
+  checks.push('Two externally associated checkboxes derive count 2 at 1440 and 390 without overflow', 'Native reset clears checks, count and enhanced bar', 'Bulk removal lands in Sin proyecto and exact MCP reads retain revision and publication with project null', 'Dialog native repeated-ID POST creates Delta and CLI projects/list plus MCP projects/read confirm count 2 and unchanged retained data', 'Biblioteca has no selection controls');
   checks.push('Projects index empty and unfiled-only owners', 'Index project counts match source CLI lists', 'Inclusive publication count and partitioned current/pending/unpublished tally', 'Top-three recent titles use actual IDs and head order', 'Index has exactly one active navigation item', 'Native project, detail, and unfiled links work without JavaScript', 'Long project names and titles fit at 390px', 'Only covers and active navigation carry effects', 'CLI assignment removes the unfiled aside and fills the grid', 'Last-member MCP move removes the project without changing head or publication');
   checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu opens the move dialog sheet at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
 }

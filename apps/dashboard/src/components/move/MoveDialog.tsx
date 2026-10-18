@@ -27,7 +27,7 @@ export default function MoveDialog({ projects: encodedProjects }: { projects: st
   return <Dialog open={open} onOpenChange={setOpen}>
     <DialogContent ref={content} initialFocus={() => content.current?.querySelector('input:not([type="hidden"])') ?? false} finalFocus={() => opening?.trigger.isConnected ? opening.trigger : opening?.fallback ?? false}>
       {opening && <>
-        <DialogTitle>Mover {opening.artifactIds.length} artefactos</DialogTitle>
+        <DialogTitle>Mover {opening.artifactIds.length} {opening.artifactIds.length === 1 ? 'artefacto' : 'artefactos'}</DialogTitle>
         <DialogDescription>No crea revisiones ni cambia lo publicado.</DialogDescription>
         <ul className="move-subjects">{opening.items.map((item) => <li key={item.artifactId}>{item.title}<span>{item.project ?? 'Sin proyecto'}</span></li>)}</ul>
         <MoveForm key={opening.requestId} form={{ artifactIds: opening.artifactIds, requestId: opening.requestId, project: opening.items.length === 1 ? opening.items[0].project ?? '' : '', intent: 'move' }} projects={projects} canRemove={opening.items.some((item) => item.project !== null)} invalid={false} cancel={<DialogClose type="button" className="secondary">Cancelar</DialogClose>} />

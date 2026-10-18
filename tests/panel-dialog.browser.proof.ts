@@ -104,6 +104,7 @@ try {
   const successful = () => dialog.locator('form').evaluate((form) => [...new FormData(form as HTMLFormElement)]);
   await page.goto(app.dashboard);
   await openMenu('Plan de entrega');
+  await dialog.getByRole('heading', { name: 'Mover 1 artefacto', exact: true }).waitFor();
   assert.equal(page.url(), `${app.dashboard}/`);
   assert.deepEqual(await dialog.locator('[data-variant="primary"]').allTextContents(), ['Mover']);
   assert.equal(await dialog.getByRole('button', { name: 'Quitar del proyecto', exact: true }).count(), 0);
@@ -175,15 +176,27 @@ try {
   await project.press('Enter');
   assert.equal(await project.inputValue(), 'Checkout · pagos');
   await project.fill('New draft');
+  await next.getByRole('option', { name: 'Crear proyecto «New draft»', exact: true }).waitFor();
   assert.deepEqual(await modal.locator('form').evaluate((form) => new FormData(form as HTMLFormElement).getAll('project')), ['New draft']);
   await project.press('Escape');
+  await next.getByRole('listbox').waitFor({ state: 'hidden' });
   assert.equal(await modal.isVisible(), true, 'First Escape closes the nested list');
   assert.equal(await project.inputValue(), 'New draft');
+  await record('Nested Escape after edited selection', { expanded: await project.getAttribute('aria-expanded'), draft: await project.inputValue() });
   await project.press('Escape');
   await modal.waitFor({ state: 'hidden' });
   await next.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Menú de Plan de entrega');
   await open('Plan de entrega');
   assert.notEqual(await modal.locator('input[name="requestId"]').inputValue(), firstRequest);
+  await project.fill('checkout');
+  await project.press('ArrowDown');
+  await project.press('Enter');
+  await next.getByRole('listbox').waitFor({ state: 'hidden' });
+  assert.equal(await project.inputValue(), 'Checkout · pagos');
+  await project.press('Escape');
+  await modal.waitFor({ state: 'hidden' });
+  await next.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Menú de Plan de entrega');
+  await open('Plan de entrega');
   await modal.getByRole('button', { name: 'Cancelar', exact: true }).press('Enter');
   await next.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Menú de Plan de entrega');
   await capture(next, 'dialog-focus-return');
@@ -270,6 +283,7 @@ try {
   console.log(JSON.stringify({ status: 'passed', evidence, checks }));
 } catch (error) {
   await active?.screenshot({ path: join(evidence, 'failure.png'), fullPage: true }).catch(() => {});
+  if (active) await writeFile(join(evidence, 'failure.aria.yml'), await active.locator('body').ariaSnapshot()).catch(() => {});
   await json('failure.json', { status: 'failed', error: String(error), checks, errors, posts });
   throw error;
 } finally {

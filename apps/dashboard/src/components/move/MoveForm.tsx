@@ -35,7 +35,7 @@ export function MoveForm({ form, projects, canRemove, invalid, cancel }: Props) 
     <label htmlFor={id}>Proyecto</label>
     {enhanced ? <>
       <input type="hidden" name="project" value={draft} />
-      <Combobox items={groups.items} filter={null} value={selected} inputValue={draft} onInputValueChange={(value, details) => { if (details.reason === 'input-change') setDraft(value); }} onValueChange={(value) => { setSelected(value); if (value !== null) setDraft(value); }}>
+      <Combobox items={groups.items} filter={null} value={selected} inputValue={draft} onInputValueChange={(value, details) => { if (details.reason === 'input-change') setDraft(value); }} onValueChange={(value, details) => { if (details.reason === 'escape-key') details.allowPropagation(); setSelected(value); if (value !== null) setDraft(value); }}>
         <ComboboxInput id={id} ref={input} autoComplete="off" aria-invalid={invalid || undefined} aria-describedby={`${id}-help`} />
         <ComboboxContent><ComboboxList>
           {groups.matches.length > 0 && <ComboboxGroup>{choices(groups.matches)}</ComboboxGroup>}
