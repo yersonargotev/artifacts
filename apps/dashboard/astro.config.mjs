@@ -21,6 +21,6 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   vite: {
     plugins: [tailwindcss()],
-    ...(worker ? { ssr: { noExternal: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts'] } } : { build: { rolldownOptions: { external: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts'] } } }),
+    ...(worker ? { ssr: { noExternal: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts', '@artifacts/artifacts/panel', '@artifacts/artifacts/panel/model'] } } : { build: { rolldownOptions: { external: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts', '@artifacts/artifacts/panel', '@artifacts/artifacts/panel/model'] } } }),
   },
 });

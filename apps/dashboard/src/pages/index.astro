@@ -1,24 +1,26 @@
 ---
 import { getRuntime } from '../runtime.ts';
-import { panelActor } from '../publication.ts';
-import { libraryQuerySchema } from '@artifacts/artifacts/contracts';
+import { artifactErrorResponse, panelActor } from '../publication.ts';
+import { readLibraryUrl } from '../urls.ts';
 import Panel from '../layouts/Panel.astro';
 import ArtifactLibrary from '../components/ArtifactLibrary.astro';
 import LibrarySidebar from '../components/LibrarySidebar.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
-const { config, artifacts } = await getRuntime();
+const { config, panel } = await getRuntime();
 const failed = Astro.url.searchParams.get('login') === 'failed';
 const revoked = Astro.url.searchParams.has('revoked');
-const status = libraryQuerySchema.shape.status.safeParse(Astro.url.searchParams.get('status') ?? undefined);
-const parsed = libraryQuerySchema.safeParse({ q: Astro.url.searchParams.get('q') ?? undefined, status: status.success ? status.data : 'all', project: Astro.url.searchParams.get('project') ?? undefined, cursor: Astro.url.searchParams.get('cursor') ?? undefined });
-if (!parsed.success) return new Response('Los parámetros de búsqueda no son válidos.', { status: 400 });
-const [listed, projects] = identity ? await Promise.all([artifacts.queryLibrary(panelActor(identity), parsed.data), artifacts.projects(panelActor(identity))]) : [];
-const requested = parsed.data.project?.toLowerCase();
-const query = { ...parsed.data, project: projects?.items.find(({ name }) => name.toLowerCase() === requested)?.name ?? parsed.data.project };
+let query;
+try { query = readLibraryUrl(Astro.url); }
+catch (error) { return artifactErrorResponse(error); }
+const snapshot = identity ? await panel.library(panelActor(identity), query).catch(artifactErrorResponse) : undefined;
+if (snapshot instanceof Response) return snapshot;
+const scope = snapshot?.page.scope;
+const project = scope?.kind === 'project' ? scope.project.name : scope?.kind === 'vanishedProject' ? scope.name : undefined;
+const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project;
 ---
-<Panel library={Boolean(identity)} title={query.project}>
-  {identity && <LibrarySidebar slot="sidebar" identity={identity} authUrl={config.auth} projects={projects!.items} project={query.project} />}
+<Panel library={Boolean(identity)} title={title}>
+  {identity && <LibrarySidebar slot="sidebar" identity={identity} authUrl={config.auth} projects={snapshot!.workspace.projects.map(({ name, count }) => ({ name, artifactCount: count }))} project={project} unfiled={scope?.kind === 'unfiled'} unfiledCount={snapshot!.workspace.unfiled.count} />}
   {identity && <header slot="header" class="workspace-toolbar"><span class="workspace-breadcrumb"><Icon name="layout-dashboard" size={17} />Espacio de trabajo<Icon name="chevron-right" size={14} /><span>Biblioteca</span></span><span class="session-indicator">Sesión activa</span></header>}
-  {identity ? <ArtifactLibrary page={listed!} query={query} /> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
+  {identity ? <ArtifactLibrary page={snapshot!.page} /> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>
