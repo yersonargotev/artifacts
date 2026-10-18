@@ -1,0 +1,24 @@
+---
+import { getRuntime } from '../runtime.ts';
+import { artifactErrorResponse, panelActor } from '../publication.ts';
+import Panel from '../layouts/Panel.astro';
+import ProjectCard from '../components/projects/ProjectCard.astro';
+import UnfiledCard from '../components/projects/UnfiledCard.astro';
+import Icon from '../components/Icon.astro';
+const identity = Astro.locals.identity;
+if (!identity) return Astro.redirect('/auth/login');
+const { panel } = await getRuntime();
+const result = await panel.projectsIndex(panelActor(identity)).catch(artifactErrorResponse);
+if (result instanceof Response) return result;
+const { workspace, overview } = result;
+const now = new Date();
+---
+<Panel title="Proyectos" workspace={workspace} location={{ kind: 'projects' }}>
+  <section class="projects-index" aria-labelledby="projects-heading">
+    <header class="projects-heading"><div><h1 id="projects-heading">Proyectos</h1><p>Organiza tus artefactos por contexto.</p></div><a class="button secondary" href="/">Ver biblioteca<Icon name="chevron-right" size={16} /></a></header>
+    <div class:list={['projects-layout', { 'has-unfiled': workspace.unfiled.count > 0 }]}>
+      {overview.projects.length ? <ul class="projects-grid" aria-label="Proyectos">{overview.projects.map(({ project, recent }) => <ProjectCard project={project} recent={recent} now={now} />)}</ul> : <div class="projects-empty"><span class="empty-icon" aria-hidden="true"><Icon name="folder" size={30} /></span><h2>Aún no tienes proyectos</h2><p>Asigna un proyecto al crear o mover un artefacto. El proyecto aparece aquí mientras tenga artefactos.</p><a href="/">Ver biblioteca</a></div>}
+      {workspace.unfiled.count > 0 && <UnfiledCard tally={overview.unfiled.tally} recent={overview.unfiled.recent} />}
+    </div>
+  </section>
+</Panel>

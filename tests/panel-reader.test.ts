@@ -146,6 +146,92 @@ test('panel URLs validate explicit scopes and cursors and reset cursors when fil
   assert.equal(panelLibraryQuerySchema.safeParse({ status: 'unknown' }).success, false);
 });
 
+test('projects index returns inclusive tallies, the three newest titles per group, and head-derived update times', async (t) => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const timestamp = Date.now();
+    t.mock.timers.enable({ apis: ['Date'], now: timestamp });
+    const alpha: Awaited<ReturnType<typeof store.create>>[] = [];
+    const loose: Awaited<ReturnType<typeof store.create>>[] = [];
+    for (let index = 0; index < 4; index++) {
+      alpha.push(await store.create(actor, { requestId: randomUUID(), snapshot: snapshot(`Alpha ${index}`), project: index ? 'álpha' : 'Álpha' }));
+      loose.push(await store.create(actor, { requestId: randomUUID(), snapshot: snapshot(`Loose ${index}`) }));
+    }
+    const beta = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Beta draft'), project: 'Beta' });
+    await store.publish(actor, { requestId: randomUUID(), artifactId: alpha[0].artifactId, revisionId: alpha[0].revision.id, expectedPublicationVersion: 0 });
+    await store.publish(actor, { requestId: randomUUID(), artifactId: alpha[1].artifactId, revisionId: alpha[1].revision.id, expectedPublicationVersion: 0 });
+    t.mock.timers.setTime(timestamp + 1_000);
+    await store.update(actor, { requestId: randomUUID(), artifactId: alpha[1].artifactId, expectedRevisionId: alpha[1].revision.id, snapshot: snapshot('Newest Alpha') });
+    const result = await panel.projectsIndex(actor);
+    assert.deepEqual(result.workspace.total, { count: 9, published: 2, pending: 1 });
+    assert.deepEqual(result.workspace.unfiled, { count: 4, published: 0, pending: 0 });
+    assert.deepEqual(result.workspace.projects, [
+      { name: 'Álpha', count: 4, published: 2, pending: 1, updatedAt: new Date(timestamp + 1_000) },
+      { name: 'Beta', count: 1, published: 0, pending: 0, updatedAt: new Date(timestamp) },
+    ]);
+    const tied = alpha.filter((item) => item.artifactId !== alpha[1].artifactId).sort((left, right) => left.artifactId < right.artifactId ? 1 : -1);
+    assert.deepEqual(result.overview.projects[0].recent, [{ artifactId: alpha[1].artifactId, title: 'Newest Alpha' }, ...tied.slice(0, 2).map((item) => ({ artifactId: item.artifactId, title: item.revision.snapshot.metadata.title }))]);
+    assert.deepEqual(result.overview.projects[1].recent, [{ artifactId: beta.artifactId, title: 'Beta draft' }]);
+    assert.deepEqual(result.overview.unfiled, { tally: { count: 4, published: 0, pending: 0 }, recent: [...loose].sort((left, right) => left.artifactId < right.artifactId ? 1 : -1).slice(0, 3).map((item) => ({ artifactId: item.artifactId, title: item.revision.snapshot.metadata.title })) });
+    t.mock.timers.setTime(timestamp + 2_000);
+    await store.update(actor, { requestId: randomUUID(), artifactId: beta.artifactId, expectedRevisionId: beta.revision.id, snapshot: snapshot('Newest Beta') });
+    const reordered = await panel.projectsIndex(actor);
+    assert.deepEqual(reordered.workspace.projects.map(({ name }) => name), ['Álpha', 'Beta'], 'Sidebar retains project order');
+    assert.deepEqual(reordered.overview.projects.map(({ project: { name, updatedAt } }) => ({ name, updatedAt })), [{ name: 'Beta', updatedAt: new Date(timestamp + 2_000) }, { name: 'Álpha', updatedAt: new Date(timestamp + 1_000) }]);
+    t.mock.timers.setTime(timestamp + 3_000);
+    await store.publish(actor, { requestId: randomUUID(), artifactId: loose[0].artifactId, revisionId: loose[0].revision.id, expectedPublicationVersion: 0 });
+    await store.move(actor, { requestId: randomUUID(), artifactId: loose[0].artifactId, project: 'Beta' });
+    const moved = await panel.projectsIndex(actor);
+    assert.deepEqual(moved.overview.projects[0].project, { name: 'Beta', count: 2, published: 1, pending: 0, updatedAt: new Date(timestamp + 2_000) });
+    await store.move(actor, { requestId: randomUUID(), artifactId: beta.artifactId, project: null });
+    assert.deepEqual((await panel.projectsIndex(actor)).overview.projects.map(({ project: { name } }) => name), ['Álpha', 'Beta'], 'Move time does not become update time');
+  } finally { t.mock.timers.reset(); await app.close(); }
+});
+
+test('projects index breaks project timestamp ties by project order and represents empty and unfiled-only owners', async (t) => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    assert.deepEqual(await panel.projectsIndex(actor), { workspace: { total: { count: 0, published: 0, pending: 0 }, unfiled: { count: 0, published: 0, pending: 0 }, projects: [] }, overview: { projects: [], unfiled: { tally: { count: 0, published: 0, pending: 0 }, recent: [] } } });
+    const loose = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Only loose') });
+    assert.deepEqual(await panel.projectsIndex(actor), { workspace: { total: { count: 1, published: 0, pending: 0 }, unfiled: { count: 1, published: 0, pending: 0 }, projects: [] }, overview: { projects: [], unfiled: { tally: { count: 1, published: 0, pending: 0 }, recent: [{ artifactId: loose.artifactId, title: 'Only loose' }] } } });
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Zeta'), project: 'Zeta' });
+    await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha'), project: 'Alpha' });
+    assert.deepEqual((await panel.projectsIndex(actor)).overview.projects.map(({ project: { name } }) => name), ['Alpha', 'Zeta']);
+  } finally { t.mock.timers.reset(); await app.close(); }
+});
+
+test('projects index filters owners before ranking and rejects missing scope, mismatched sessions, and revocation', async () => {
+  const app = await fixture();
+  try {
+    const actor = await actorFor(app);
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const own = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Own Alpha'), project: 'Alpha' });
+    const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'index-other@example.test', password: app.password } });
+    await app.auth.api.signInEmail({ body: { email: 'index-other@example.test', password: app.password } });
+    const [otherSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
+    const other = { ...actor, userId: outsider.user.id, sessionId: otherSession.id };
+    for (let index = 0; index < 4; index++) await store.create(other, { requestId: randomUUID(), snapshot: snapshot(`Private ${index}`), project: 'Alpha' });
+    await store.create(other, { requestId: randomUUID(), snapshot: snapshot('Private loose') });
+    const result = await panel.projectsIndex(actor);
+    assert.deepEqual(result.workspace.total, { count: 1, published: 0, pending: 0 });
+    assert.deepEqual(result.overview.projects, [{ project: { name: 'Alpha', count: 1, published: 0, pending: 0, updatedAt: new Date(own.revision.createdAt) }, recent: [{ artifactId: own.artifactId, title: 'Own Alpha' }] }]);
+    assert.deepEqual(result.overview.unfiled, { tally: { count: 0, published: 0, pending: 0 }, recent: [] });
+    assert.deepEqual((await panel.projectsIndex(other)).workspace.total, { count: 5, published: 0, pending: 0 });
+    await assert.rejects(panel.projectsIndex({ ...actor, scopes: [] }), { code: 'forbidden' });
+    await assert.rejects(panel.projectsIndex({ ...actor, sessionId: other.sessionId }), { code: 'forbidden' });
+    await app.db.delete(session).where(eq(session.id, actor.sessionId));
+    await assert.rejects(panel.projectsIndex(actor), { code: 'forbidden' });
+  } finally { await app.close(); }
+});
+
 
 test('detail reads one selected snapshot, light history and real client names in one transaction', async (t) => {
   const app = await fixture();

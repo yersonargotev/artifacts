@@ -5,7 +5,7 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
 import { ArtifactError, historySchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ScopeRequest, type Tally, type Workspace } from './model.ts';
+import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace } from './model.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
@@ -62,6 +62,28 @@ async function readWorkspace(connection: Connection, ownerId: string): Promise<W
 export function createPanel(db: Database, options: { publishOrigin: string }) {
   const access = createAccess(db, options);
   return {
+    async projectsIndex(actor: Actor): Promise<ProjectsSnapshot> {
+      return access.transaction(async (connection) => {
+        await access.authorize(connection, actor, 'artifacts:read');
+        const workspace = await readWorkspace(connection, actor.userId);
+        const ranked = connection.select({ artifactId: artifact.id, project: artifact.project, title: title.as('title'), createdAt: artifactRevision.createdAt,
+          rank: sql<number>`row_number() over (partition by ${artifact.project} order by ${artifactRevision.createdAt} desc, ${artifact.id} desc)`.as('rank'),
+        }).from(artifact).innerJoin(artifactRevision, headJoin).where(eq(artifact.ownerId, actor.userId)).as('ranked');
+        const rows = await connection.select({ artifactId: ranked.artifactId, project: ranked.project, title: ranked.title }).from(ranked)
+          .where(sql`${ranked.rank} <= 3`).orderBy(desc(ranked.createdAt), desc(ranked.artifactId));
+        const recent = new Map<string | null, RecentArtifact[]>();
+        for (const { project, ...reference } of rows) {
+          const group = recent.get(project) ?? [];
+          group.push(reference);
+          recent.set(project, group);
+        }
+        return { workspace, overview: {
+          projects: [...workspace.projects].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime() || projectOrder(left.name, right.name))
+            .map((project) => ({ project, recent: recent.get(project.name) ?? [] })),
+          unfiled: { tally: workspace.unfiled, recent: recent.get(null) ?? [] },
+        } };
+      });
+    },
     async artifact(actor: Actor, value: z.input<typeof panelDetailQuerySchema>): Promise<DetailSnapshot> {
       const input = panelDetailQuerySchema.parse(value);
       return access.transaction(async (connection) => {

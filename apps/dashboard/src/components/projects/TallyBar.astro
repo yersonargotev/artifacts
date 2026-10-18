@@ -1,0 +1,13 @@
+---
+import type { Tally } from '@artifacts/artifacts/panel/model';
+interface Props { tally: Tally }
+const { tally } = Astro.props;
+const current = tally.published - tally.pending;
+const unpublished = tally.count - tally.published;
+const summary = `${tally.count} ${tally.count === 1 ? 'artefacto' : 'artefactos'}. ${current} ${current === 1 ? 'publicado sin cambios' : 'publicados sin cambios'}, ${tally.pending} con cambios pendientes y ${unpublished} sin publicar.`;
+---
+<div class="tally-bar" role="img" aria-label={summary}>
+  {current > 0 && <span data-state="published" data-count={current} style={`flex-grow: ${current}`}></span>}
+  {tally.pending > 0 && <span data-state="pending" data-count={tally.pending} style={`flex-grow: ${tally.pending}`}></span>}
+  {unpublished > 0 && <span data-state="unpublished" data-count={unpublished} style={`flex-grow: ${unpublished}`}></span>}
+</div>

@@ -338,6 +338,7 @@ async function drive(feature: Feature) {
         await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
         const screens = [
           { name: 'library', path: '/', heading: 'Biblioteca' },
+          { name: 'projects', path: '/projects', heading: 'Proyectos' },
           { name: 'project', path: '/?project=Alpha', heading: 'Alpha' },
           { name: 'detail', path: `/artifacts/${detail.artifactId}`, heading: detail.revision.snapshot.metadata.title },
           { name: 'move', path: `/artifacts/${detail.artifactId}/move`, heading: 'Mover a proyecto' },
@@ -401,9 +402,23 @@ async function drive(feature: Feature) {
       } else if (feature === 'projects') {
         const titled = (title: string) => ({ ...firstSnapshot, metadata: { ...firstSnapshot.metadata, title } });
         const ids = (items: { artifactId: string }[]) => items.map((item) => item.artifactId).sort();
+        await login(page);
+        await page.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
+        await page.goto(`${instance.panel}/projects`);
+        await page.getByRole('heading', { level: 1, name: 'Proyectos', exact: true }).waitFor();
+        assert.equal(await page.locator('.project-card, .unfiled-card').count(), 0, 'An empty owner has no project or unfiled cards');
+        assert.match(await page.locator('.projects-empty').innerText(), /Asigna un proyecto al crear o mover un artefacto/);
+        await capture(page, 'projects-empty-1440');
+        await checkScreen(page, 'projects-empty-1440');
+        const loose = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Unfiled notes') }));
+        await page.reload();
+        assert.equal(await page.locator('.project-card').count(), 0);
+        assert.equal(await page.locator('.unfiled-card h2').textContent(), '1 artefacto sin proyecto');
+        assert.equal(await page.getByRole('link', { name: 'Asignar proyecto', exact: true }).getAttribute('href'), '/?unfiled=1');
+        await capture(page, 'projects-unfiled-only-1440');
+        await checkScreen(page, 'projects-unfiled-only-1440');
         const alpha = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Alpha plan'), project: 'Alpha' }));
         const beta = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Beta handoff'), project: 'alpha' }));
-        const loose = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled('Unfiled notes') }));
         assert.deepEqual([alpha.project, beta.project, loose.project], ['Alpha', 'Alpha', null], 'Lowercase alpha reuses the stored Alpha spelling');
         assert.deepEqual(ids((await call('artifacts_list', { project: 'Alpha' })).items), [alpha.artifactId, beta.artifactId].sort(), 'MCP list by project returns exactly A and B');
         assert.deepEqual(await call('projects_list'), { items: [{ name: 'Alpha', artifactCount: 2 }] });
@@ -413,7 +428,7 @@ async function drive(feature: Feature) {
         const moved = artifactReadSchema.parse(await call('artifacts_read', { artifactId: beta.artifactId }));
         assert.equal(moved.project, 'Beta', 'Independent MCP read shows the moved project');
         assert.equal(moved.headRevisionId, beta.headRevisionId, 'Move keeps the head revision');
-        await login(page);
+        await page.goto(instance.panel);
         await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
         const projects = page.getByRole('navigation', { name: 'Tus proyectos', exact: true });
         const projectLinks = async () => projects.getByRole('link').evaluateAll((links) => links.map((link) => ({ name: link.getAttribute('aria-label'), text: link.textContent, href: link.getAttribute('href'), current: link.getAttribute('aria-current') })));
@@ -422,6 +437,18 @@ async function drive(feature: Feature) {
         const cards = async () => page.locator('.artifact-card').evaluateAll((items) => items.map((item) => [item.querySelector('h2')?.textContent, item.querySelector('.project-chip')?.textContent]).sort());
         assert.deepEqual(await cards(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Sin proyecto']]);
         await capture(page, 'projects-library-desktop');
+        await page.getByRole('navigation', { name: 'Principal', exact: true }).getByRole('link', { name: 'Proyectos (2)', exact: true }).click();
+        await page.getByRole('heading', { level: 1, name: 'Proyectos', exact: true }).waitFor();
+        assert.deepEqual(await page.locator('.project-card').evaluateAll((items) => items.map((item) => [item.getAttribute('data-project'), item.querySelector('.project-card-counts')?.textContent]).sort()), [['Alpha', '1 artefacto · 0 publicados'], ['Beta', '1 artefacto · 0 publicados']]);
+        assert.equal(await page.locator('.library-sidebar a[aria-current]').count(), 1, 'Projects index has one active sidebar link');
+        assert.equal(await page.locator('.library-sidebar a[aria-current]').getAttribute('href'), '/projects');
+        assert.equal(await page.getByRole('navigation', { name: 'Ruta', exact: true }).innerText(), 'Biblioteca\nProyectos');
+        assert.equal(await page.locator('.project-card[data-project="Beta"] .project-recent a').getAttribute('href'), `/artifacts/${beta.artifactId}`);
+        await capture(page, 'projects-index-1440');
+        await checkScreen(page, 'projects-index-1440');
+        await page.getByRole('link', { name: 'Abrir proyecto Beta', exact: true }).click();
+        await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('project') === 'Beta');
+        await capture(page, 'projects-open-project-1440');
         await record('Choose Beta (1) in Proyectos', {});
         await projects.getByRole('link', { name: 'Beta (1)', exact: true }).click();
         await page.waitForURL((url) => url.searchParams.get('project') === 'Beta');
@@ -516,6 +543,107 @@ async function drive(feature: Feature) {
         assert.deepEqual(await resubmit('Gamma'), { status: 303, location: '/?project=Gamma', changed: false }, 'An exact resubmission replays the Gamma receipt');
         assert.deepEqual(await resubmit('Delta'), { status: 409, location: undefined, changed: true }, 'A changed resubmission conflicts');
         assert.equal(artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId })).project, null, 'Resubmissions do not move C again');
+        const review = [];
+        for (const [title, state] of [['Review current', 'current'], ['Review pending', 'pending'], ['Review draft one', 'draft'], ['Review draft two', 'draft'], ['Review draft three', 'draft']] as const) {
+          let item = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled(title), project: 'Release review' }));
+          if (state !== 'draft') await call('artifacts_publish', { requestId: randomUUID(), artifactId: item.artifactId, revisionId: item.revision.id, expectedPublicationVersion: 0 });
+          if (state === 'pending') item = artifactReadSchema.parse(await call('artifacts_update', { requestId: randomUUID(), artifactId: item.artifactId, expectedRevisionId: item.revision.id, snapshot: { ...titled(title), content: secondSnapshot.content } }));
+          review.push(artifactReadSchema.parse(await call('artifacts_read', { artifactId: item.artifactId })));
+        }
+        const longName = 'P'.repeat(80);
+        await json(join(directory, 'long-title-snapshot.json'), titled('T'.repeat(256)));
+        const longArtifact = artifactReadSchema.parse(await ok('create', '--snapshot', join(directory, 'long-title-snapshot.json'), '--project', longName));
+        assert.equal(artifactReadSchema.parse(await call('artifacts_read', { artifactId: longArtifact.artifactId })).project, longName);
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto(`${instance.panel}/projects`);
+        const reviewCard = page.locator('.project-card[data-project="Release review"]');
+        assert.equal(await reviewCard.locator('.project-card-counts').textContent(), '5 artefactos · 2 publicados');
+        assert.equal(await reviewCard.getByRole('img').getAttribute('aria-label'), '5 artefactos. 1 publicado sin cambios, 1 con cambios pendientes y 3 sin publicar.');
+        assert.deepEqual(await reviewCard.locator('.tally-bar > span').evaluateAll((segments) => segments.map((segment) => [segment.getAttribute('data-state'), Number(segment.getAttribute('data-count'))])), [['published', 1], ['pending', 1], ['unpublished', 3]]);
+        const recent = [...review].sort((left, right) => Date.parse(right.revision.createdAt) - Date.parse(left.revision.createdAt) || (left.artifactId < right.artifactId ? 1 : -1)).slice(0, 3);
+        assert.deepEqual(await reviewCard.locator('.project-recent a').evaluateAll((links) => links.map((link) => ({ href: link.getAttribute('href'), title: link.textContent }))), recent.map((item) => ({ href: `/artifacts/${item.artifactId}`, title: item.revision.snapshot.metadata.title })));
+        const listedProjects = await ok('projects');
+        for (const project of listedProjects.items) {
+          const listed = await ok('list', '--project', project.name);
+          assert.equal(listed.items.length, project.artifactCount);
+          const count = `${project.artifactCount} ${project.artifactCount === 1 ? 'artefacto' : 'artefactos'}`;
+          assert((await page.locator('.project-card').filter({ has: page.getByRole('heading', { level: 2, name: project.name, exact: true }) }).locator('.project-card-counts').innerText()).startsWith(`${count} · `), 'Index count matches source CLI list');
+        }
+        await capture(page, 'projects-tally-1440');
+        await checkScreen(page, 'projects-tally-1440');
+        const effects = await page.locator('body *').evaluateAll((elements) => elements.flatMap((element) => {
+          const style = getComputedStyle(element);
+          if (style.boxShadow === 'none' && !style.backgroundImage.includes('gradient(')) return [];
+          return [{ tag: element.tagName, className: element.className, allowed: element.matches('.project-cover, [aria-current], [aria-selected="true"], [aria-pressed="true"], [data-variant="primary"]') }];
+        }));
+        assert(effects.length > 0 && effects.every((effect) => effect.allowed), 'Only project covers and the active navigation carry effects');
+        await record('Inspect active effects', effects);
+        await capture(page, 'projects-effects-1440');
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.reload();
+        await capture(page, 'projects-index-390');
+        await checkScreen(page, 'projects-index-390');
+        const columns = await page.locator('.project-card').evaluateAll((items) => [...new Set(items.map((item) => Math.round(item.getBoundingClientRect().left)))]);
+        assert.equal(columns.length, 1, 'Project cards stack in one column at 390px');
+        const noJs = await browser.newContext({ javaScriptEnabled: false, storageState: await context.storageState(), viewport: { width: 1440, height: 900 } });
+        try {
+          const native = await noJs.newPage();
+          await native.goto(`${instance.panel}/projects`);
+          await native.getByRole('link', { name: 'Abrir proyecto Beta', exact: true }).click();
+          await native.waitForURL((url) => url.searchParams.get('project') === 'Beta');
+          await native.goto(`${instance.panel}/projects`);
+          await native.locator('.project-card[data-project="Beta"] .project-recent a').click();
+          await native.getByRole('heading', { level: 1, name: 'Beta handoff', exact: true }).waitFor();
+          assert.equal(new URL(native.url()).pathname, `/artifacts/${beta.artifactId}`, 'Recent title uses ordinary detail navigation without JavaScript');
+          await native.goto(`${instance.panel}/projects`);
+          await native.getByRole('link', { name: 'Asignar proyecto', exact: true }).click();
+          await native.waitForURL((url) => url.searchParams.get('unfiled') === '1');
+          await record('Follow native index links with JavaScript disabled', { project: 'Beta', artifactId: beta.artifactId, unfiled: true });
+        } finally { await noJs.close(); }
+        if (args.includes('--record-video')) {
+          const recording = await browser.newContext({ storageState: await context.storageState(), viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } });
+          try {
+            const demo = await recording.newPage();
+            await demo.goto(`${instance.panel}/projects`);
+            await demo.getByRole('heading', { level: 1, name: 'Proyectos', exact: true }).waitFor();
+            await delay(10_000);
+            await demo.getByRole('link', { name: 'Abrir proyecto Release review', exact: true }).click();
+            await demo.getByRole('heading', { level: 1, name: 'Release review', exact: true }).waitFor();
+            await delay(10_000);
+            await demo.getByRole('navigation', { name: 'Principal', exact: true }).getByRole('link', { name: /^Proyectos \(/ }).click();
+            await demo.getByRole('link', { name: 'Asignar proyecto', exact: true }).click();
+            await demo.getByRole('heading', { level: 1, name: 'Sin proyecto', exact: true }).waitFor();
+            await delay(10_000);
+            await checkScreen(demo, 'projects-review-video');
+          } finally { await recording.close(); }
+          await record('Record index, native project opening, and unfiled navigation', { directory: 'video', minimumSeconds: 30 });
+        }
+        const unfiledBefore = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
+        await ok('move', loose.artifactId, '--project', 'Alpha');
+        const unfiledAfter = artifactReadSchema.parse(await call('artifacts_read', { artifactId: loose.artifactId }));
+        assert.equal(unfiledAfter.headRevisionId, unfiledBefore.headRevisionId);
+        assert.deepEqual(unfiledAfter.publication, unfiledBefore.publication);
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto(`${instance.panel}/projects`);
+        assert.equal(await page.locator('.unfiled-card').count(), 0, 'Assigning every unfiled artifact removes the aside');
+        assert.equal(await page.locator('.projects-layout.has-unfiled').count(), 0);
+        const fullWidth = await page.locator('.projects-grid').evaluate((grid) => Math.round(grid.getBoundingClientRect().width) === Math.round(grid.parentElement!.getBoundingClientRect().width));
+        assert(fullWidth, 'The project grid occupies the full layout width');
+        await capture(page, 'projects-no-unfiled-1440');
+        await checkScreen(page, 'projects-no-unfiled-1440');
+        await call('artifacts_publish', { requestId: randomUUID(), artifactId: beta.artifactId, revisionId: beta.revision.id, expectedPublicationVersion: 0 });
+        const betaBefore = artifactReadSchema.parse(await call('artifacts_read', { artifactId: beta.artifactId }));
+        assert.equal(betaBefore.publication?.revisionId, beta.revision.id);
+        await call('artifacts_move', { requestId: randomUUID(), artifactId: beta.artifactId, project: 'Alpha' });
+        const betaAfter = artifactReadSchema.parse(await call('artifacts_read', { artifactId: beta.artifactId }));
+        assert.equal(betaAfter.headRevisionId, betaBefore.headRevisionId);
+        assert.deepEqual(betaAfter.publication, betaBefore.publication);
+        await page.reload();
+        assert.equal(await page.locator('.project-card[data-project="Beta"]').count(), 0, 'The index removes a project after its last member moves through MCP');
+        assert.equal(await page.getByRole('navigation', { name: 'Tus proyectos', exact: true }).getByRole('link', { name: 'Beta (1)', exact: true }).count(), 0);
+        await capture(page, 'projects-vanished-1440');
+        await checkScreen(page, 'projects-vanished-1440');
+        checks.push('Projects index empty and unfiled-only owners', 'Index project counts match source CLI lists', 'Inclusive publication count and partitioned current/pending/unpublished tally', 'Top-three recent titles use actual IDs and head order', 'Index has exactly one active navigation item', 'Native project, detail, and unfiled links work without JavaScript', 'Long project names and titles fit at 390px', 'Only covers and active navigation carry effects', 'CLI assignment removes the unfiled aside and fills the grid', 'Last-member MCP move removes the project without changing head or publication');
         checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu reaches the move page at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
