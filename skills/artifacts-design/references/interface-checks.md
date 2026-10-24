@@ -31,7 +31,9 @@ Keep input-driven calculations in document memory. Use labeled controls without 
 
 Keep filters and tabs local to the document. Do not depend on host URL synchronization, router packages, persistent storage, network requests, or remote fonts. Embed fonts and other required assets as `data:` URIs within the snapshot budget.
 
-## Check the result
+## Required checks
+
+Check content fidelity, sandbox compatibility, and usable behavior regardless of the composition. Preserve supplied facts, units, qualifications, and requested controls. For a visual revision, record the existing content and actions before editing and confirm that they still work afterward.
 
 When browser tools are available, inspect the generated document at a narrow viewport around 375 px and a wide viewport around 1280 px, or the user's requested sizes. Verify that body content fits, labels remain legible, and only intentionally wide tables or code regions scroll locally. Check the artifact itself rather than relying on the surrounding application's appearance.
 
@@ -41,10 +43,18 @@ Finish when each relevant check passes or an unavailable check is identified. Fi
 
 For a requested audit, identify each issue by element or source location and state its correction. Distinguish source inspection from browser verification. Do not turn ordinary artifact delivery into an unsolicited audit report.
 
+## Visual judgment
+
+Check whether the main visual or result answers the reader's task, whether its labels stay close to what they describe, and whether the reading order is clear at both widths. Read the headings alone and check that they describe this document's content. Remove containers and repeated labels that add no grouping or information.
+
+Choose density, alignment, cards, and section rhythm for the content. A long report, a diagram sequence, and a calculator need different compositions. These choices are defaults to reconsider with a concrete reason, not automatic failures. Keep the user's requested style and content. Do not remove evidence or simplify away a qualification to meet an aesthetic preference.
+
 ## Sources
 
 Adapted on 2026-10-14 from [Emil Kowalski's design engineering skill](https://raw.githubusercontent.com/emilkowalski/skills/refs/heads/main/skills/emil-design-eng/SKILL.md) and [Vercel's web design guidelines skill](https://raw.githubusercontent.com/vercel-labs/agent-skills/refs/heads/main/skills/web-design-guidelines/SKILL.md).
 
 The accessibility and interface checks incorporate Vercel's Web Interface Guidelines `command.md` as local guidance. Its remote command workflow and output format are not required. The sandbox adaptations are specific to Artifacts.
+
+The composition workflow and the distinction between required checks and visual judgment draw on [Hallmark](https://github.com/Nutlope/hallmark), reviewed on 2026-10-24. This adaptation retains Artifacts' document types, palette, embedded fonts, and sandbox constraints.
 
 License notices are retained in [Third-party notices](../THIRD-PARTY-NOTICES.md).

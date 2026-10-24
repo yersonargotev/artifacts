@@ -119,6 +119,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Hallmark
+
+The composition guidance in [SKILL.md](SKILL.md) and the review categories in
+[references/interface-checks.md](references/interface-checks.md) adapt ideas from
+[Hallmark](https://github.com/Nutlope/hallmark), reviewed on 2026-10-24.
+[Upstream license](https://github.com/Nutlope/hallmark/blob/main/LICENSE).
+
+```text
+MIT License
+
+Copyright (c) 2026 Hallmark contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## Bundled fonts
 
 The files in [fonts](fonts) are the Latin subsets of Bricolage Grotesque, Public Sans, JetBrains Mono, and Newsreader, as served by Google Fonts on 2026-10-17. Each is licensed under the SIL Open Font License, Version 1.1. The copyright lines and the complete license text are in [fonts/OFL.txt](fonts/OFL.txt).
