@@ -26,7 +26,7 @@ let directory: string;
 before(async () => { directory = await mkdtemp(join(tmpdir(), 'retained-contract-')); browser = await chromium.launch({ channel: 'chrome' }); });
 after(async () => { await browser?.close(); await rm(directory, { recursive: true, force: true }); });
 
-async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectation = false, transport: 'response' | 'srcdoc' = 'response') {
+async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectation = false, transport: 'response' | 'srcdoc' = 'response', revisionMarkup: 'current' | 'original' = 'current') {
   let expected: ArtifactRead;
   let panelReads = 0;
   const requests: { method: string; path: string }[] = [];
@@ -78,6 +78,11 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
       let html = publicationDocument(expected, { library: 'https://panel.example.test/', project: (name) => `https://panel.example.test/?project=${encodeURIComponent(name)}`, content: `/a/artifact-retained/r/${failure === 'content-binding' ? 'revision-two' : 'revision-one'}/content`, attachment: (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}` }, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
+      if (revisionMarkup === 'original') {
+        const originalHeader = html.replace(/<span class="revision"[^>]*><span class="revision-full">([^<]*)<\/span><span class="revision-short"[^>]*>[^<]*<\/span><\/span>/, '<span>$1</span>');
+        assert.notEqual(originalHeader, html, 'Original publication fixture must use its single revision span');
+        html = originalHeader;
+      }
       if (transport === 'srcdoc') html = html.replace(/src="[^"]*"/, `srcdoc="${escapeHtml(previewDocument(expected, true))}"`);
       if (failure === 'sequence') {
         assert(html.includes('Revisión 1</span>'), 'Sequence corruption must target the actual rendered revision');
@@ -92,7 +97,7 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
   await once(server, 'listening');
   const address = server.address();
   assert(address && typeof address === 'object');
-  const input = config(join(directory, `${mode}-${failure}-${falseExpectation}-${transport}`), `http://127.0.0.1:${address.port}`);
+  const input = config(join(directory, `${mode}-${failure}-${falseExpectation}-${transport}-${revisionMarkup}`), `http://127.0.0.1:${address.port}`);
   expected = input.expected;
   if (['console', 'page', 'frame-overflow'].includes(failure)) {
     expected = structuredClone(expected);
@@ -129,6 +134,18 @@ test('browser verifier accepts exact legacy srcdoc transport with its original n
   const report = await run('legacy', 'none', false, 'srcdoc');
   assert.equal(report.status, 'passed', JSON.stringify(report.errors));
   assert.equal(report.publication, 'verified');
+});
+
+test('browser verifier accepts the original single-span publication revision', async () => {
+  const report = await run('legacy', 'none', false, 'response', 'original');
+  assert.equal(report.status, 'passed', JSON.stringify(report.errors));
+  assert.equal(report.publication, 'verified');
+});
+
+test('browser verifier rejects an altered original single-span publication revision', async () => {
+  const report = await run('legacy', 'sequence', false, 'response', 'original');
+  assert.equal(report.status, 'failed');
+  assert.match(report.errors.at(-1)!.message, /sequence differs/);
 });
 
 test('browser verifier rejects corrupted legacy srcdoc bytes', async () => {

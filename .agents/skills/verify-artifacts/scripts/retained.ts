@@ -317,7 +317,11 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         assert(response, 'Publication must return a response');
         assert.equal(publication.url(), config.publicationUrl, 'Publication admission must end at the expected stable URL');
         result.publication = await identity(publication, expected);
-        if (result.publication === 'legacy') assert.equal(await publication.locator('header span').textContent(), `Revisión ${expected.revision.sequence}`, 'Legacy publication revision sequence differs');
+        if (result.publication === 'legacy') {
+          const fullRevision = publication.locator('header .revision-full');
+          const revisionLabel = await fullRevision.count() === 0 ? publication.locator('header span') : fullRevision;
+          assert.equal(await revisionLabel.textContent(), `Revisión ${expected.revision.sequence}`, 'Legacy publication revision sequence differs');
+        }
         const publishedIframe = publication.locator('main > iframe');
         const legacySrcdoc = await publishedIframe.getAttribute('srcdoc');
         const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive);
@@ -349,7 +353,10 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         await capture(publication, `publication-${index}-closed`);
         const titleSummary = publication.locator('.title-menu > summary');
         if (await titleSummary.count()) await titleSummary.click();
-        if (await fileSummary.count()) await fileSummary.press('Enter');
+        if (await fileSummary.count()) {
+          await fileSummary.waitFor({ state: 'visible' });
+          await fileSummary.press('Enter');
+        }
         const files = expected.revision.snapshot.files;
         const attachmentLinks = publication.locator('nav[aria-label="Archivos adjuntos"] a');
         assert.equal(await publication.locator('a[download]').count(), files.length, 'Publication must contain only its complete retained attachment download inventory');
@@ -369,11 +376,14 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
           assert.equal(response.headers()['x-content-type-options'], 'nosniff', 'Attachment must suppress MIME sniffing');
           assert.equal(response.headers()['content-security-policy'], "default-src 'none'; sandbox", 'Attachment must retain its inert CSP');
         }
+        if (await publication.locator('.title-menu[open]').count()) await titleSummary.click();
         await expectations(publishedFrame, config.expectations, timeout);
         assert.equal(publishedFrame.url(), expectedFrameUrl, 'Content expectations must not replace the publication frame');
         await overflow(publication, publishedFrame);
         await capture(publication, `publication-${index}`);
         if (disclosed) {
+          if (await titleSummary.count()) await titleSummary.click();
+          await informationSummary.waitFor({ state: 'visible' });
           await informationSummary.press('Enter');
           assert.equal(await publication.locator('.information[open], .files[open]').count(), 2, 'Both native viewer disclosures must open');
           await overflow(publication, publishedFrame);
