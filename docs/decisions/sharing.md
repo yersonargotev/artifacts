@@ -24,11 +24,11 @@ Sharing an address that already has a share returns the existing share with its 
 
 ## Lifecycle
 
-No unpublish operation exists. A share on an artifact that the owner never published is kept, and its viewers get 404 until the owner publishes it. Publishing a new revision keeps every share.
+No unpublish operation exists. A share on an artifact that the owner never published is kept, and its viewers get 404 until the owner publishes it. Once viewer authorization lands (S2), a share lets a viewer read the published revision. At this head, shares affect no read. Publishing a new revision keeps every share.
 
 While the artifact exists, a share receipt keeps the address even after `unshare`. The receipt keeps its original result and the hash of its input, so a retry gets the original answer.
 
-Deleting an artifact deletes its shares through the foreign-key cascade. In the same transaction, the delete command rewrites every receipt whose result names the artifact. It replaces the result with a deletion marker and clears the payload hash. After the delete commits, no share row or receipt row for that artifact holds the address or a hash of it. A later request under one of those request IDs gets `not_found` with any arguments, because the store can no longer compare them. This covers the logical rows only. SQLite can keep the deleted bytes in free pages and in the write-ahead log until it overwrites them.
+Deleting an artifact deletes its shares through the foreign-key cascade. In the same transaction, the delete command rewrites every receipt whose result names the artifact. It replaces the result with a deletion marker and clears the payload hash. After the delete commits, no share row or receipt row for that artifact holds the address or a hash of it. A later request under one of those request IDs gets `not_found` with any arguments, because the store can no longer compare them. The delete command's own receipt is the exception. The delete writes it after the rewrite, so it keeps its hash and its `{ artifactId }` result. An exact delete retry replays success, and a delete retry with changed arguments gets `request_conflict`. This covers the logical rows only. SQLite can keep the deleted bytes in free pages and in the write-ahead log until it overwrites them.
 
 ## Domain shares are an enterprise feature
 
