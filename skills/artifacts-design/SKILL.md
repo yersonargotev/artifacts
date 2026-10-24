@@ -9,9 +9,15 @@ The calling skill owns the snapshot, size limit, and save workflow. This skill o
 
 The document renders in a sandbox that blocks every network request. Fonts, images, and icons load only as `data:` URIs. External stylesheets, Google Fonts links, and CDN scripts silently fail. Inline all CSS and JavaScript.
 
-## Start from the starter
+## Choose the composition
 
-Copy the `<style>` block of [the starter](templates/starter.html) into the new document. It defines the color, font, and spacing tokens and the shared primitives: eyebrow and label, lede, summary strip, pills, expandable rows, panel, note, table, filter bar, and footer. Delete primitives the page does not use. Derive every new color and type decision from its tokens.
+Before writing HTML, identify the reader's task, the facts and assets available, and what the reader should understand or do first. Use supplied facts. Label illustrative inputs and assumptions, and leave unavailable evidence absent.
+
+Choose the element that carries the answer: a comparison, a diagram, a sequence, a chart, or a result beside its inputs. Give it the most space and put its supporting text nearby. If the same composition would fit an unrelated topic unchanged, use the subject's actual relationships or quantities to make the structure more specific. A report can be dense, an explanation can use large scenes, and a calculator can fit on one screen. Do not impose a hero, a section count, or a word budget.
+
+## Use the starter's tokens
+
+Copy the `<style>` block of [the starter](templates/starter.html) into the new document. It defines the color, font, and spacing tokens and shared components: contextual text and labels, lede, summary strip, pills, expandable rows, panel, note, table, filter bar, and footer. Delete components the page does not use. Derive every new color and type decision from its tokens.
 
 The starter supplies a vocabulary, not a layout. Compose the body for the reader's task:
 
@@ -31,11 +37,11 @@ Open in a complete state with the user's real data. Never ship an empty shell or
 Use the bundled faces through the starter's tokens:
 
 - `--f-display` is Bricolage Grotesque. Use it for `h1` to `h3` and large figures only.
-- `--f-body` is Public Sans for running text and controls.
-- `--f-mono` is JetBrains Mono for code, identifiers, table headers, eyebrows, and labels.
+- `--f-body` is Public Sans for running text, controls, labels, and table headers.
+- `--f-mono` is JetBrains Mono for code and identifiers. Use it for measurements when it helps the reader read or align them.
 - Newsreader is an optional reading face. For a long essay or editorial guide, set `--f-body` to `"Newsreader",Charter,Georgia,serif` and keep Public Sans for controls.
 
-Keep the starter's scale: `h1` at `clamp(28px,4vw,40px)`, body at 15 to 16 px with a 1.55 line height, uppercase mono labels at 11 to 12 px with `.06em` tracking, and `text-wrap: balance` on headings. Use `font-variant-numeric: tabular-nums` wherever digits align.
+Start with `h1` at `clamp(28px,4vw,40px)` and body at 15 to 16 px with a 1.55 line height. Set labels in the body face at 12 to 13 px, in sentence case without added tracking. Adjust the scale for the document's main visual and reading density. Keep `text-wrap: balance` on headings and `font-variant-numeric: tabular-nums` wherever digits align.
 
 After the HTML file is complete, embed the fonts it names:
 
@@ -59,7 +65,7 @@ The starter follows the viewer's system theme. Light uses Catppuccin Latte and d
 
 - Center one `.wrap` column at `--width` with `max(16px, env(safe-area-inset-*))` side gutters. Space siblings with grid or flex `gap`.
 - Use borders and fills by role. A summary strip, a table, and one panel can each earn a surface. Running text and headings sit on the page.
-- Mark structure that is true: an eyebrow names the source or scope, a label names a field, and numbering appears only for real sequences.
+- Use an eyebrow only for source or scope information the heading does not already give. A label names a field, and numbering appears only for real sequences.
 - Encode attention in form. A row that needs action gets a pill or a muted closed state, not only a different word.
 - Put wide code and diagrams in their own `overflow-x: auto` container. Use a `<table>` only for short records that stay readable when scrolled; use expandable rows for records with long text. The page itself never scrolls sideways at 375 px.
 - Draw diagrams in inline SVG with token colors and labels inside the view box. For icons, use inline Tabler outline SVGs with `currentColor`.
@@ -71,6 +77,6 @@ Give the `<title>` a specific name of two to four words, or the name the user al
 
 ## Check the rendered page
 
-Run the [interface checks](references/interface-checks.md) when browser tools are available. Render at 375 px and 1280 px in both light and dark. Confirm that the fonts loaded, nothing overflows, and every control changes something visible. Fix what you see once, then save. Report checks you could not run.
+Run the [interface checks](references/interface-checks.md) before saving. They distinguish required checks from visual judgment. Render the finished page at 375 px and 1280 px in both light and dark when browser tools are available. Fix observed failures and repeat the affected checks. Report checks you could not run.
 
 The license notices for bundled fonts and adapted guidance are in [third-party notices](THIRD-PARTY-NOTICES.md).
