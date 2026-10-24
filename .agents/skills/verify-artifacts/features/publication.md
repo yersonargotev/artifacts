@@ -4,6 +4,7 @@ An owner opens a published artifact at one stable authenticated URL, interacts w
 
 ## Sub-features
 
+- `publication-navigation` returns to the library or the current project from the viewer header. It is covered by the extended artifact browser proof.
 - `publication-open` completes the panel/account handoff to the protected publication.
 - `publication-interaction` interacts with the served sandboxed publication frame.
 - `publication-stable-url` shows the new selected revision at the unchanged URL.
@@ -17,6 +18,7 @@ An owner opens a published artifact at one stable authenticated URL, interacts w
 - After `artifacts_publish`, open its returned stable URL.
 - In an artifact's panel detail page, the header exposes `Abrir publicación` when the selected revision is published. The title menu also links to the current publication. To select another publication, open that retained revision and choose its `Publicar revisión N` button.
 - If signed out, complete the account login and return to the original publication.
+- Choose the home icon named `Volver a la biblioteca` to open the library. An assigned artifact also shows its project below the title. Choose `Volver al proyecto <name>` to open that project. Reloading after a move updates this destination without republishing. Unfiled artifacts omit the project link.
 - Interact with the document inside the frame titled `Contenido del artefacto`.
 - Open the viewer title menu, then its native `Archivos` disclosure. Choose a filename link under the `Archivos adjuntos` navigation region. The adjacent `Información` disclosure exposes the complete title, description and revision provenance.
 - Reload the bookmarked URL after another retained revision is published.
@@ -42,6 +44,7 @@ Preconditions:
 - The draft head and published revision can differ. `artifacts_publish` and the panel publication form select what the stable URL serves. Neither advances the draft head.
 - Attachment URLs include a revision ID. An old attachment URL after republication is denied; use the current page's filename link rather than reusing an old link.
 - A download must preserve bytes, serve as an attachment, and avoid execution. Binary/nested attachments, obsolete attachment links, and content-disposition checks are additional cases in `tests/artifact-browser.proof.ts`.
+- `pnpm build && node --import tsx tests/artifact-browser.proof.ts` additionally clicks the home and project links, checks project assignment, moves and removal without republication, and checks long project names at desktop and 390px. The fixed publication drive does not cover these navigation paths.
 - The fixed drive covers the returned publication URL. The panel's `Abrir publicación` link is a distinct entry point; report it unverified unless actually clicked.
 - Revocation, backend-failure 503 behavior, callback replay, and full containment are covered by extended tests, not implied by this drive. `tests/artifact-browser.proof.ts` exercises real routes with store fixtures; `tests/publication-network.proof.ts` uses renderer fixtures with an active UDP control.
 - Unsupported browser HTML falls back to escaped source. Do not claim interactive containment from a source-only screenshot or by opening raw HTML outside the production wrapper.

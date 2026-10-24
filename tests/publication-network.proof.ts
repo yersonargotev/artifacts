@@ -44,7 +44,7 @@ const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
   const headers: Record<string, string> = { 'content-type': 'text/html', 'content-security-policy': wrapper ? documentPolicy : interactive ? previewPolicy : inertPreviewPolicy };
   if (!wrapper && path !== '/control') headers['connection-allowlist'] = '()';
   if (path !== '/control') headers['cross-origin-opener-policy'] = 'same-origin';
-  return new Response(wrapper ? publicationDocument(snapshot, { library: '/panel', content: `${path}/content`, attachment: () => '/file' }, interactive) : previewDocument(snapshot, interactive), { headers });
+  return new Response(wrapper ? publicationDocument(snapshot, { library: '/panel', project: (name) => `/panel?project=${encodeURIComponent(name)}`, content: `${path}/content`, attachment: () => '/file' }, interactive) : previewDocument(snapshot, interactive), { headers });
 } });
 await once(server, 'listening');
 const address = server.address();
