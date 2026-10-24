@@ -35,18 +35,27 @@ async function assertDetailHeaders(page: Page) {
 
 async function assertViewerBounds(page: Page) {
   const bounds = await page.evaluate(() => {
-    const header = document.querySelector('header')!.getBoundingClientRect();
-    const frame = document.querySelector('main > iframe')!.getBoundingClientRect();
-    const home = document.querySelector('.home')!.getBoundingClientRect();
-    const title = document.querySelector('.title-menu > summary')!.getBoundingClientRect();
-    const revision = document.querySelector('.title-row > span')!.getBoundingClientRect();
-    return { height: innerHeight, headerHeight: header.height, frameTop: frame.top, frameBottom: frame.bottom, frameHeight: frame.height, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, width: innerWidth, homeWidth: home.width, homeHeight: home.height, homeLeft: home.left, homeRight: home.right, titleLeft: title.left, titleRight: title.right, titleWidth: title.width, revisionLeft: revision.left, revisionRight: revision.right };
+    const [header, frame, home, project, title, revision, disclosure] = ['header', 'main > iframe', '.home', '.project-navigation > a', '.title-menu > summary', '.revision', '.title-menu[open] .disclosures'].map((selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height, centerY: (rect.top + rect.bottom) / 2 };
+    });
+    return { height: innerHeight, width: innerWidth, header: header!, frame: frame!, home: home!, project, title: title!, revision: revision!, disclosure, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth };
   });
-  assert(bounds.headerHeight <= bounds.height * .45 + 1, 'The complete viewer header must leave the majority of the viewport for the artifact');
-  assert(bounds.frameHeight >= bounds.height * .55 - 1 && bounds.frameBottom <= bounds.height + 1 && bounds.frameTop >= 0, 'The viewer frame must fill the usable remainder of the viewport');
+  assert(bounds.header.height <= 60, 'The viewer header must remain one compact row even when its menu opens');
+  assert(bounds.frame.height >= bounds.height - 60 && bounds.frame.bottom <= bounds.height + 1 && bounds.frame.top >= 0, 'The viewer frame must fill the usable remainder of the viewport');
   assert(bounds.scrollHeight <= bounds.height + 1 && bounds.scrollWidth <= bounds.width + 1, 'The viewer wrapper must stay within its viewport');
-  assert(bounds.homeWidth >= 44 && bounds.homeHeight >= 44, 'The library home link must keep a 44px target');
-  assert(bounds.homeLeft >= 0 && bounds.homeRight <= bounds.titleLeft && bounds.titleWidth > 0 && bounds.titleRight <= bounds.revisionLeft && bounds.revisionRight <= bounds.width, 'Home, title menu and revision must fit without overlap');
+  assert(bounds.home.width >= 44 && bounds.home.height >= 44 && bounds.title.height >= 44, 'Home and the title menu must keep 44px touch targets');
+  assert(bounds.home.left >= 0 && bounds.home.right <= bounds.title.left && bounds.title.width > 0 && bounds.title.right <= bounds.revision.left && bounds.revision.right <= bounds.width, 'Home, title menu and revision must fit without overlap');
+  assert(Math.abs(bounds.home.centerY - bounds.title.centerY) <= 1 && Math.abs(bounds.home.centerY - bounds.revision.centerY) <= 1, 'Home, title and revision must share one row');
+  if (bounds.project) {
+    assert(bounds.project.width >= 44 && bounds.project.height >= 44, 'The current project must keep a 44px touch target');
+    assert(bounds.home.right <= bounds.project.left && bounds.project.right <= bounds.title.left && Math.abs(bounds.home.centerY - bounds.project.centerY) <= 1, 'The project must fit between home and title on the same row');
+  }
+  if (bounds.disclosure) {
+    assert(bounds.disclosure.top >= bounds.header.bottom && bounds.disclosure.bottom <= bounds.height && bounds.disclosure.left >= 0 && bounds.disclosure.right <= bounds.width, 'The title menu overlay must remain inside the viewport without resizing the header');
+  }
 }
 
 const reservation = createServer().listen(0, '127.0.0.1');
@@ -135,6 +144,11 @@ try {
   assert.equal((await fetch(callbackUrl, { headers: { cookie: transactionCookie }, redirect: 'manual' })).status, 403);
   assert.equal((await fetch(callbackUrl, { redirect: 'manual' })).status, 403);
   assert.equal(await page.getByRole('navigation', { name: 'Proyecto', exact: true }).count(), 0);
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await assertViewerBounds(page);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
   const home = page.getByRole('link', { name: 'Volver a la biblioteca', exact: true });
   assert.equal(await home.getAttribute('href'), `${dashboard}/`);
   await home.click();
@@ -604,7 +618,7 @@ try {
   const longProject = 'Documentación y revisión de entregas para todos los equipos y proyectos especiales'.slice(0, 80);
   const long = await store.create(actor, { requestId: randomBytes(16).toString('hex'), project: longProject, snapshot: { ...readable.revision.snapshot, metadata: { title: longTitle, description: longDescription } } });
   const longPublication = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: long.artifactId, revisionId: long.revision.id, expectedPublicationVersion: 0 });
-  for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
+  for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }], ['mobile-small', { width: 320, height: 844 }]] as const) {
     await page.setViewportSize(viewport);
     await page.goto(readablePublication.url);
     await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
@@ -644,7 +658,9 @@ try {
     await page.screenshot({ path: `.test-artifacts/publication-long-open-${name}.png` });
     await page.getByRole('link', { name: 'notas.txt', exact: true }).focus();
     const attachmentBounds = await page.getByRole('link', { name: 'notas.txt', exact: true }).boundingBox();
-    assert(attachmentBounds && attachmentBounds.y >= 0 && attachmentBounds.y + attachmentBounds.height <= viewport.height * .45 + 1, 'An attachment must remain focusable within the scrolling viewer header');
+    const disclosureBounds = await page.locator('.disclosures').boundingBox();
+    assert(attachmentBounds && disclosureBounds && attachmentBounds.y >= disclosureBounds.y && attachmentBounds.y + attachmentBounds.height <= disclosureBounds.y + disclosureBounds.height, 'An attachment must remain focusable within the scrolling title menu overlay');
+    if (name === 'mobile-small') continue;
     await panel.setViewportSize(viewport);
     await panel.goto(`${dashboard}/artifacts/${long.artifactId}?revisionId=${long.revision.id}`);
     await panel.frameLocator('.preview').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
