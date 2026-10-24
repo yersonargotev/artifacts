@@ -104,7 +104,16 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         return new Response(previewDocument(artifact, interactive), { headers: { ...headers, 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()' } });
       }
       const revisionPath = `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}`;
-      return new Response(publicationDocument(artifact, { library: libraryUrl, content: `${revisionPath}/content`, attachment: (file) => `${revisionPath}/files/${file.split('/').map(encodeURIComponent).join('/')}` }, interactive), { headers: { ...headers, 'content-security-policy': documentPolicy } });
+      return new Response(publicationDocument(artifact, {
+        library: libraryUrl,
+        project: (name) => {
+          const target = new URL(libraryUrl);
+          target.searchParams.set('project', name);
+          return target.href;
+        },
+        content: `${revisionPath}/content`,
+        attachment: (file) => `${revisionPath}/files/${file.split('/').map(encodeURIComponent).join('/')}`,
+      }, interactive), { headers: { ...headers, 'content-security-policy': documentPolicy } });
     } catch {
       return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
     }

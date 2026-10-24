@@ -77,7 +77,7 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       if (transport === 'response' && failure !== 'wrapper-opener') response.setHeader('cross-origin-opener-policy', 'same-origin');
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
-      let html = publicationDocument(expected, { library: 'https://panel.example.test/', content: `/a/artifact-retained/r/${failure === 'content-binding' ? 'revision-two' : 'revision-one'}/content`, attachment: (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}` }, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
+      let html = publicationDocument(expected, { library: 'https://panel.example.test/', project: (name) => `https://panel.example.test/?project=${encodeURIComponent(name)}`, content: `/a/artifact-retained/r/${failure === 'content-binding' ? 'revision-two' : 'revision-one'}/content`, attachment: (path) => `/a/artifact-retained/r/${failure === 'attachment-binding' ? 'revision-two' : 'revision-one'}/files/${path}` }, true).replace(/<main\b[^>]*>/, `<main${failure === 'publication-partial' ? ' data-artifact-id="artifact-retained"' : markers()}>`);
       if (transport === 'srcdoc') html = html.replace(/src="[^"]*"/, `srcdoc="${escapeHtml(previewDocument(expected, true))}"`);
       if (failure === 'sequence') {
         assert(html.includes('Revisión 1</span>'), 'Sequence corruption must target the actual rendered revision');

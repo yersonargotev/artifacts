@@ -134,6 +134,7 @@ try {
   assert(transactionCookie);
   assert.equal((await fetch(callbackUrl, { headers: { cookie: transactionCookie }, redirect: 'manual' })).status, 403);
   assert.equal((await fetch(callbackUrl, { redirect: 'manual' })).status, 403);
+  assert.equal(await page.getByRole('navigation', { name: 'Proyecto', exact: true }).count(), 0);
   const home = page.getByRole('link', { name: 'Volver a la biblioteca', exact: true });
   assert.equal(await home.getAttribute('href'), `${dashboard}/`);
   await home.click();
@@ -142,6 +143,28 @@ try {
   await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
   await page.goto(firstPublication.url);
   await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  for (const project of ['Diseño & "QA" + 50%/β', 'Next project']) {
+    await store.move(actor, { requestId: randomBytes(16).toString('hex'), artifactId: created.artifactId, project });
+    await page.reload();
+    await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+    assert.equal(await page.locator('main').getAttribute('data-revision-id'), created.revision.id);
+    assert.equal(await page.locator('main').getAttribute('data-publication-version'), '1');
+    const projectLink = page.getByRole('link', { name: `Volver al proyecto ${project}`, exact: true });
+    const destination = new URL((await projectLink.getAttribute('href'))!);
+    assert.equal(destination.origin, dashboard);
+    assert.equal(destination.pathname, '/');
+    assert.equal(destination.searchParams.get('project'), project);
+    await projectLink.click();
+    await page.getByRole('heading', { name: project, exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('project'), project);
+    await page.getByRole('link', { name: 'Browser proof artifact', exact: true }).waitFor();
+    await page.goto(firstPublication.url);
+    await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  }
+  await store.move(actor, { requestId: randomBytes(16).toString('hex'), artifactId: created.artifactId, project: null });
+  await page.reload();
+  await page.frameLocator('iframe').getByRole('heading', { name: 'Original document', exact: true }).waitFor();
+  assert.equal(await page.getByRole('navigation', { name: 'Proyecto', exact: true }).count(), 0);
   await page.locator('.title-menu > summary').press('Enter');
   await page.locator('.title-menu[open]').waitFor();
   await page.locator('summary').filter({ hasText: /^Archivos \(/ }).press('Enter');
@@ -574,11 +597,12 @@ try {
   assert.equal(confirmedReadback.kind, 'published');
   assert.equal((await store.read(actor, { artifactId: reviewOne.artifactId })).publication?.version, 4);
   assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, readbackCommand.requestId))).length, 1);
-  const readable = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: { metadata: { title: 'Guía de revisión de entregas', description: 'Un documento retenido con sus notas de revisión.' }, content: { kind: 'html', text: '<main style="max-width:720px;margin:40px auto;padding:0 24px;font:18px/1.6 system-ui;color:#132943"><h1>Revisar una entrega</h1><p>Comprueba el contenido guardado y descarga las notas antes de publicar una revisión.</p><h2>Contenido de la entrega</h2><ul><li>Documento completo de la revisión.</li><li>Notas originales como archivo adjunto.</li></ul></main>' }, files: [{ path: 'notas.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Notas originales de la entrega.\n' }] } });
+  const readable = await store.create(actor, { requestId: randomBytes(16).toString('hex'), project: 'Entregas', snapshot: { metadata: { title: 'Guía de revisión de entregas', description: 'Un documento retenido con sus notas de revisión.' }, content: { kind: 'html', text: '<main style="max-width:720px;margin:40px auto;padding:0 24px;font:18px/1.6 system-ui;color:#132943"><h1>Revisar una entrega</h1><p>Comprueba el contenido guardado y descarga las notas antes de publicar una revisión.</p><h2>Contenido de la entrega</h2><ul><li>Documento completo de la revisión.</li><li>Notas originales como archivo adjunto.</li></ul></main>' }, files: [{ path: 'notas.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Notas originales de la entrega.\n' }] } });
   const readablePublication = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: readable.artifactId, revisionId: readable.revision.id, expectedPublicationVersion: 0 });
   const longTitle = 'Guía de revisión de entregas con documentación completa y referencias para todos los equipos. '.repeat(3).slice(0, 256);
   const longDescription = 'Esta revisión conserva los criterios de aceptación, las decisiones y los archivos originales de la entrega. '.repeat(24);
-  const long = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: { ...readable.revision.snapshot, metadata: { title: longTitle, description: longDescription } } });
+  const longProject = 'Documentación y revisión de entregas para todos los equipos y proyectos especiales'.slice(0, 80);
+  const long = await store.create(actor, { requestId: randomBytes(16).toString('hex'), project: longProject, snapshot: { ...readable.revision.snapshot, metadata: { title: longTitle, description: longDescription } } });
   const longPublication = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: long.artifactId, revisionId: long.revision.id, expectedPublicationVersion: 0 });
   for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]] as const) {
     await page.setViewportSize(viewport);
@@ -600,6 +624,16 @@ try {
     await assertViewerBounds(page);
     await page.locator('main > iframe').screenshot({ path: `.test-artifacts/publication-long-frame-${name}.png` });
     await page.screenshot({ path: `.test-artifacts/publication-long-${name}.png` });
+    const projectLink = page.getByRole('link', { name: `Volver al proyecto ${longProject}`, exact: true });
+    const projectBounds = await projectLink.boundingBox();
+    assert(projectBounds && projectBounds.height >= 44 && projectBounds.x >= 0 && projectBounds.x + projectBounds.width <= viewport.width, 'The project link must remain a visible 44px target within the viewport');
+    assert.equal(await projectLink.locator('span').innerText(), longProject);
+    await projectLink.click();
+    await page.getByRole('heading', { name: longProject, exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('project'), longProject);
+    await page.getByRole('link', { name: longTitle.trim(), exact: true }).waitFor();
+    await page.goto(longPublication.url);
+    await page.frameLocator('main > iframe').getByRole('heading', { name: 'Revisar una entrega', exact: true }).waitFor();
     await page.locator('.title-menu > summary').press('Enter');
     await page.locator('summary').filter({ hasText: /^Información$/ }).press('Enter');
     await page.locator('summary').filter({ hasText: /^Archivos \(/ }).press('Enter');

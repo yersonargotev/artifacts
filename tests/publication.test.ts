@@ -34,6 +34,34 @@ async function authorize(handler: ReturnType<typeof createPublicationApp>) {
   return { begin, request, admitted: await handler(request) };
 }
 
+test('publication navigation follows current project membership and encodes project names', async () => {
+  let project: string | null = null;
+  const backend: typeof fetch = async (input) => String(input).endsWith('/consume')
+    ? Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 })
+    : Response.json({ ...artifact, project });
+  const handler = createPublicationApp(environment(), backend);
+  const { admitted } = await authorize(handler);
+  const cookie = cookieHeader(admitted);
+  const read = async () => {
+    const response = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, referer: 'https://attacker.example/', 'x-forwarded-host': 'attacker.example' } }));
+    assert.equal(response.status, 200);
+    return response.text();
+  };
+  assert.doesNotMatch(await read(), /<nav class="project-navigation"/);
+  project = 'Diseño & "QA" + 50%/β';
+  const filed = await read();
+  assert(filed.includes('href="https://panel.example.test/?project=Dise%C3%B1o+%26+%22QA%22+%2B+50%25%2F%CE%B2"'));
+  assert(filed.includes('aria-label="Volver al proyecto Diseño &amp; &quot;QA&quot; + 50%/β"'));
+  assert(filed.includes('<span>Diseño &amp; &quot;QA&quot; + 50%/β</span>'));
+  assert(filed.includes('href="https://panel.example.test/" rel="noreferrer" aria-label="Volver a la biblioteca"'));
+  project = 'Next project';
+  const moved = await read();
+  assert(moved.includes('href="https://panel.example.test/?project=Next+project"'));
+  assert(!moved.includes('Dise%C3%B1o'));
+  project = null;
+  assert.doesNotMatch(await read(), /<nav class="project-navigation"/);
+});
+
 test('encrypted publication handoff binds state and artifact, clears the callback, and serves revision-bound downloads', async () => {
   const config = environment();
   const calls: string[] = [];
