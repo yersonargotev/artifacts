@@ -126,7 +126,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           throw new ArtifactError('conflict', 'Artifact changed since confirmation', { currentRevisionId: current.headRevisionId, currentPublicationVersion: current.publication?.version ?? 0 });
         }
         const matching = and(eq(artifactCommand.ownerId, actor.userId), sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`);
-        await connection.update(artifactCommand).set({ result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
+        await connection.update(artifactCommand).set({ payloadHash: '', result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
         const removed = await connection.delete(artifact).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId))).returning({ artifactId: artifact.id });
         if (removed.length !== 1) throw new ArtifactError('not_found', 'Artifact not found');
         return { artifactId: input.artifactId };

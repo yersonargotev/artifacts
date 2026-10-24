@@ -20,13 +20,15 @@ Only the owner manages shares, under the `artifacts:publish` scope. `share`, `un
 
 `share` and `unshare` commit an owner-scoped `requestId` receipt in the same transaction as the write, like the other mutations. The receipt hashes the normalized input. A retry that sends `Ana@Example.com` under the same request ID as `ana@example.com` replays the same receipt.
 
-Sharing an address that already has a share returns the existing share with its original ID and creation time. The unique index on `(artifact_id, kind, value)` turns a concurrent duplicate insert into a no-op. `unshare` takes the share ID and returns `not_found` when that share does not exist, unless its request ID replays an earlier `unshare`. `listShares` is a read, so it takes no request ID. It returns the artifact's shares ordered by kind and value.
+Sharing an address that already has a share returns the existing share with its original ID and creation time. The unique index on `(artifact_id, kind, value)` turns a concurrent duplicate insert into a no-op. `unshare` takes the artifact ID and the share ID. It returns `not_found` when that artifact has no share with that ID, unless its request ID replays an earlier `unshare`. `listShares` is a read, so it takes no request ID. It returns the artifact's shares ordered by kind and value.
 
 ## Lifecycle
 
-Unpublishing keeps the shares. Viewers get 404 until the owner publishes the artifact again.
+No unpublish operation exists. A share on an artifact that the owner never published is kept, and its viewers get 404 until the owner publishes it. Publishing a new revision keeps every share.
 
-Deleting an artifact deletes its shares through the foreign-key cascade. The delete command also replaces every receipt that names the artifact, so no share receipt keeps the address after the artifact is gone. Before that, a share receipt keeps the address even after `unshare`, because a receipt keeps its original result for retries.
+While the artifact exists, a share receipt keeps the address even after `unshare`. The receipt keeps its original result and the hash of its input, so a retry gets the original answer.
+
+Deleting an artifact deletes its shares through the foreign-key cascade. In the same transaction, the delete command rewrites every receipt whose result names the artifact. It replaces the result with a deletion marker and clears the payload hash. After the delete commits, no share row or receipt row for that artifact holds the address or a hash of it. A later request under one of those request IDs gets `not_found` with any arguments, because the store can no longer compare them. This covers the logical rows only. SQLite can keep the deleted bytes in free pages and in the write-ahead log until it overwrites them.
 
 ## Domain shares are an enterprise feature
 

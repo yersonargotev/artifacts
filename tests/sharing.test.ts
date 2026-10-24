@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { artifactCommand, artifactShare, session } from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { fixture } from './helpers.ts';
 
 const snapshot: Snapshot = { metadata: { title: 'Shared artifact', description: '' }, content: { kind: 'html', text: '<p>shared</p>' }, files: [] };
@@ -54,6 +55,30 @@ test('unshare removes the share, replays its receipt, and rejects a share that i
   } finally { await app.close(); }
 });
 
+test('unshare through another artifact of the same owner returns not_found and keeps the share', async () => {
+  const app = await setup();
+  try {
+    const first = await app.create(app.owner);
+    const second = await app.create(app.owner);
+    const ana = await app.share(app.owner, second, 'ana@example.com');
+    await assert.rejects(app.store.unshare(app.owner, { requestId: randomUUID(), artifactId: first, shareId: ana.shareId }), { code: 'not_found' });
+    assert.deepEqual(await app.store.listShares(app.owner, { artifactId: second }), { items: [ana] });
+    assert.equal((await app.db.select().from(artifactShare)).length, 1);
+  } finally { await app.close(); }
+});
+
+test('unshare of another owner\'s share through an owned artifact returns not_found and keeps the share', async () => {
+  const app = await setup();
+  try {
+    const artifactId = await app.create(app.owner);
+    const foreign = await app.create(app.other);
+    const ana = await app.share(app.owner, artifactId, 'ana@example.com');
+    await assert.rejects(app.store.unshare(app.other, { requestId: randomUUID(), artifactId: foreign, shareId: ana.shareId }), { code: 'not_found' });
+    assert.deepEqual(await app.store.listShares(app.owner, { artifactId }), { items: [ana] });
+    assert.equal((await app.db.select().from(artifactShare)).length, 1);
+  } finally { await app.close(); }
+});
+
 test('listShares returns only the shares of the requested owned artifact, ordered by email', async () => {
   const app = await setup();
   try {
@@ -95,17 +120,22 @@ test('an invalid email fails validation and writes nothing', async () => {
   } finally { await app.close(); }
 });
 
-test('deleting the artifact deletes its shares and scrubs the share receipts', async () => {
+test('deleting the artifact deletes its shares and scrubs the share receipts and their payload hashes', async () => {
   const app = await setup();
   try {
     const artifactId = await app.create(app.owner);
-    const request = { requestId: randomUUID(), artifactId, email: 'ana@example.com' };
+    const request = { requestId: randomUUID(), artifactId, email: 'Ana@Example.com' };
     await app.store.share(app.owner, request);
     await app.share(app.owner, artifactId, 'bob@example.com');
+    const shareHash = await sha256(canonicalJson({ kind: 'share', input: { ...request, email: 'ana@example.com' } }));
+    const receiptHashes = async () => (await app.db.select().from(artifactCommand)).filter((row) => JSON.parse(row.result).artifactId === artifactId).map((row) => row.payloadHash);
+    assert((await receiptHashes()).includes(shareHash), 'the share receipt carries the hash of its input');
     const current = await app.store.read(app.owner, { artifactId });
     await app.store.delete(app.owner, { requestId: randomUUID(), artifactId, expectedRevisionId: current.headRevisionId, expectedPublicationVersion: 0 });
     assert.deepEqual(await app.db.select().from(artifactShare), []);
     assert(!JSON.stringify(await app.db.select().from(artifactCommand)).includes('@example.com'));
+    assert(!(await receiptHashes()).includes(shareHash), 'no receipt keeps the hash of the share input');
     await assert.rejects(app.store.share(app.owner, request), { code: 'not_found' });
+    await assert.rejects(app.store.share(app.owner, { ...request, email: 'eve@example.com' }), { code: 'not_found' });
   } finally { await app.close(); }
 });
