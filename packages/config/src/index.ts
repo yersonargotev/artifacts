@@ -1,3 +1,5 @@
+import { emailConfiguration, type EmailConfiguration } from './email.ts';
+
 export const scopes = ['openid', 'profile', 'offline_access', 'artifacts:read', 'artifacts:write', 'artifacts:publish'] as const;
 export const identityScope = 'artifacts:read';
 
@@ -27,11 +29,11 @@ export function serviceUrl(name: string, env: Environment = process.env): string
   return value.href.replace(/\/$/, '');
 }
 
-export function authConfig(env: Environment = process.env) {
+export function authConfig(env: Environment = process.env): { origin: string; issuer: string; secret: string; resource: string; dashboard: string; email?: EmailConfiguration } {
   const origin = serviceUrl('AUTH_URL', env);
   const secret = required('BETTER_AUTH_SECRET', env);
   if (secret.length < 32) throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
-  return { origin, issuer: `${origin}/api/auth`, secret, resource: serviceUrl('MCP_URL', env), dashboard: serviceUrl('DASHBOARD_URL', env) };
+  return { origin, issuer: `${origin}/api/auth`, secret, resource: serviceUrl('MCP_URL', env), dashboard: serviceUrl('DASHBOARD_URL', env), email: emailConfiguration(env, origin) };
 }
 
 export function mcpConfig(env: Environment = process.env) {

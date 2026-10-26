@@ -114,7 +114,7 @@ async function supervisor() {
     const view = serve({ fetch: (request) => viewHandler(request), hostname: '::1', port: 0 });
     servers.push(view);
     const viewOrigin = `http://[::1]:${await listen(view)}`;
-    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin });
+    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin, emailCode: args.includes('--email-code') });
     const serviceSecret = randomBytes(32).toString('hex');
     const cookieSecret = randomBytes(32).toString('hex');
     viewHandler = createPublicationApp({ DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
@@ -165,6 +165,7 @@ async function supervisor() {
     } });
     servers.push(control);
     const instance: Instance = { id, pid: process.pid, panelPid: panel.pid!, build: hash(await readFile(entry)), ownerId: app.ownerId, auth: app.config.origin, mcp: app.config.resource, panel: panelOrigin, view: viewOrigin, control: `http://127.0.0.1:${await listen(control)}/doctor`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
+    if (app.emailSink) await json(join(runtime, 'email-code.json'), { path: app.emailSink });
     await json(join(runtime, 'credentials.json'), { controlToken, accessToken: tokens.access_token, password: app.password } satisfies Credentials);
     await json(join(run, 'instance.json'), instance);
     console.log(JSON.stringify({ ready: true, run, auth: instance.auth, mcp: instance.mcp, panel: instance.panel, view: instance.view }));
@@ -185,7 +186,7 @@ async function launch() {
   await mkdir(run, { mode: 0o700 });
   await mkdir(runtime, { mode: 0o700 });
   const log = await open(join(run, 'supervisor.log'), 'a', 0o600);
-  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
+  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run, ...(args.includes('--email-code') ? ['--email-code'] : [])], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
   await log.close();
   child.unref();
   try {
@@ -714,7 +715,7 @@ if (process.argv[1] && resolve(process.argv[1]) === script) try {
     const { accessToken: _accessToken, ...created } = await account(email, !args.includes('--unverified'));
     console.log(JSON.stringify({ ...created, credentials: accountFile(created.email) }));
   }
-  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
+  else throw new Error('Usage: control.ts launch [--email-code] [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
