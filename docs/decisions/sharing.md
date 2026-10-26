@@ -52,6 +52,8 @@ Only the owner manages shares, under the `artifacts:publish` scope. `share`, `un
 
 Sharing an address that already has a share returns the existing share with its original ID and creation time. The unique index on `(artifact_id, kind, value)` turns a concurrent duplicate insert into a no-op. `unshare` takes the artifact ID and the share ID. It returns `not_found` when that artifact has no share with that ID, unless its request ID replays an earlier `unshare`. `listShares` is a read, so it takes no request ID. It returns the artifact's shares ordered by kind and value.
 
+MCP exposes the three methods as `artifacts_share`, `artifacts_unshare`, and `artifacts_shares_list`. Each tool returns the store result as structured content and reports a store error as `{ error, message, ...details }`, like the other tools. A token without `artifacts:publish` therefore gets `forbidden` with `requiredScope: "artifacts:publish"`. The HTTP `insufficient_scope` challenge applies only to the identity scope that every MCP request needs. `artifacts_unshare` sets `destructiveHint: true` because it removes a person's access, so a host can ask the user before it runs.
+
 ## Lifecycle
 
 No unpublish operation exists. A share on an artifact that the owner never published is kept, and its viewers get 404 until the owner publishes it. Publishing a new revision keeps every share, and the viewer sees the new revision at the same URL.

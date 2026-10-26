@@ -15,9 +15,8 @@ import { driveSharing, type Account } from './sharing.ts';
 import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
 import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
-import { createArtifactStore } from '../../../../packages/artifacts/src/index.ts';
 import { user } from '../../../../packages/db/src/schema.ts';
-import { artifactReadSchema, publishResultSchema, shareSchema, unshareSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, shareSchema } from '../../../../packages/artifacts/src/contracts.ts';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
@@ -136,10 +135,6 @@ async function supervisor() {
     assert(ready, 'Built panel is ready');
     const tokens = await grant(app, scopes);
     const fixtureApp = app;
-    const store = createArtifactStore(app.db, { publishOrigin: viewOrigin });
-    const ownerSession = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
-    assert(ownerSession, 'Disposable owner has a central session');
-    const owner = { userId: app.ownerId, sessionId: ownerSession.session.id, clientId: 'verification-supervisor', scopes: ['artifacts:publish'] };
     async function ensureAccount(email: string, verified: boolean): Promise<Account> {
       const find = async () => (await fixtureApp.db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1))[0];
       if (!await find()) await fixtureApp.auth.api.signUpEmail({ body: { name: `Disposable ${email}`, email, password: fixtureApp.password } });
@@ -156,8 +151,6 @@ async function supervisor() {
         assert(typeof verified === 'boolean', 'verified must be a boolean');
         return ensureAccount(shareSchema.shape.email.parse(email), verified);
       },
-      'POST /share': (body) => store.share(owner, { requestId: randomUUID(), ...shareSchema.omit({ requestId: true }).parse(body) }),
-      'POST /unshare': (body) => store.unshare(owner, { requestId: randomUUID(), ...unshareSchema.omit({ requestId: true }).parse(body) }),
     };
     const controlToken = randomBytes(32).toString('hex');
     const id = randomUUID();
@@ -477,7 +470,7 @@ async function drive(feature: Feature) {
       } else if (feature === 'projects') {
         await driveProjects({ page, browser, context, instance, directory, root, cliEnv: { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken }, firstSnapshot, secondSnapshot, recordVideo: args.includes('--record-video'), checks, call, ok, login, capture, checkScreen, record, json });
       } else if (feature === 'sharing') {
-        await driveSharing({ page, browser, firstSnapshot, checks, call, control, account, login, capture, record });
+        await driveSharing({ page, browser, firstSnapshot, checks, call, account, login, capture, record });
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
         let libraryDemo: { artifact: ReturnType<typeof artifactReadSchema.parse>; publication: ReturnType<typeof publishResultSchema.parse> } | undefined;

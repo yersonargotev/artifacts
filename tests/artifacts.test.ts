@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
-import { artifact, artifactRevision, artifactPublication, publicationGrant, session } from '../packages/db/src/schema.ts';
+import { artifact, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
 import { createArtifactStore, projectNameSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { fixture, grant } from './helpers.ts';
@@ -25,6 +25,13 @@ async function artifactFixture() {
   return { ...app, store, actor };
 }
 const createInput = () => ({ requestId: randomUUID(), snapshot });
+const allScopes = 'openid profile artifacts:read artifacts:write artifacts:publish';
+async function mcp(resource: string, token: string, method: string, params: unknown) {
+  const response = await fetch(resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${token}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  assert.equal(response.status, 200);
+  const body = await response.text();
+  return JSON.parse(body.startsWith('event:') ? body.split('\n').find((line) => line.startsWith('data:'))!.slice(5) : body).result;
+}
 
 test('immutable revisions retain metadata and bytes, while publication advances independently', async () => {
   const app = await artifactFixture();
@@ -226,21 +233,21 @@ test('project names are NFC-normalized, trimmed, bounded, and free of control ch
 test('MCP artifact tools use verified OAuth identity and individual operation scopes', async () => {
   const app = await artifactFixture();
   try {
-    const tokens = await grant(app, 'openid profile artifacts:read artifacts:write artifacts:publish');
-    async function tool(name: string, input: unknown, token = tokens.access_token) {
-      const response = await fetch(app.config.resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${token}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: input } }) });
-      assert.equal(response.status, 200);
-      const body = await response.text();
-      const payload = body.startsWith('event:') ? body.split('\n').find((line) => line.startsWith('data:'))!.slice(5) : body;
-      return JSON.parse(payload).result;
-    }
-    const discoveryResponse = await fetch(app.config.resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${tokens.access_token}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) });
-    const discoveryText = await discoveryResponse.text();
-    const discovery = JSON.parse(discoveryText.startsWith('event:') ? discoveryText.split('\n').find((line) => line.startsWith('data:'))!.slice(5) : discoveryText);
-    assert.deepEqual(discovery.result.tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_move', 'artifacts_publish', 'artifacts_read', 'artifacts_update', 'projects_list', 'whoami']);
-    const annotations = (name: string) => discovery.result.tools.find((tool: { name: string }) => tool.name === name).annotations;
+    const tokens = await grant(app, allScopes);
+    const tool = (name: string, input: unknown, token = tokens.access_token) => mcp(app.config.resource, token, 'tools/call', { name, arguments: input });
+    const { tools } = await mcp(app.config.resource, tokens.access_token, 'tools/list', {});
+    assert.deepEqual(tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_move', 'artifacts_publish', 'artifacts_read', 'artifacts_share', 'artifacts_shares_list', 'artifacts_unshare', 'artifacts_update', 'projects_list', 'whoami']);
+    const listed = (name: string) => tools.find((tool: { name: string }) => tool.name === name);
+    const annotations = (name: string) => listed(name).annotations;
     assert.deepEqual(annotations('artifacts_move'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
     assert.deepEqual(annotations('projects_list'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
+    assert.deepEqual(annotations('artifacts_share'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+    assert.deepEqual(annotations('artifacts_unshare'), { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false });
+    assert.deepEqual(annotations('artifacts_shares_list'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
+    assert.deepEqual(listed('artifacts_share').inputSchema.required.sort(), ['artifactId', 'email', 'requestId']);
+    assert.deepEqual(listed('artifacts_share').inputSchema.properties.email, { type: 'string', format: 'email', description: 'Email address, trimmed and lowercased; at most 254 characters after trimming' });
+    assert.deepEqual(listed('artifacts_unshare').inputSchema.required.sort(), ['artifactId', 'requestId', 'shareId']);
+    assert.deepEqual(listed('artifacts_shares_list').inputSchema.required, ['artifactId']);
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);
@@ -263,6 +270,83 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     assert.equal(publisherWrite.structuredContent.error, 'forbidden');
     const exported = await tool('artifacts_export', { artifactId: first.artifactId, revisionId: first.revision.id });
     assert.equal(strFromU8(unzipSync(Buffer.from(exported.structuredContent.base64, 'base64'))['content.html']), '<h1>Original</h1>');
+  } finally { await app.close(); }
+});
+
+test('MCP share tools share, list, and revoke an owned artifact, and a retry replays the original result', async () => {
+  const app = await artifactFixture();
+  try {
+    const { access_token: token } = await grant(app, allScopes);
+    const tool = (name: string, input: unknown) => mcp(app.config.resource, token, 'tools/call', { name, arguments: input });
+    const { artifactId } = (await tool('artifacts_create', createInput())).structuredContent;
+    const rows = () => app.db.select().from(artifactShare).where(eq(artifactShare.artifactId, artifactId)).orderBy(artifactShare.value);
+
+    const sharing = { requestId: randomUUID(), artifactId, email: ' Ana@Example.COM ' };
+    const shared = await tool('artifacts_share', sharing);
+    const [ana] = await rows();
+    assert.equal(shared.isError, undefined);
+    assert.deepEqual(shared.structuredContent, { shareId: ana!.id, artifactId, kind: 'email', value: 'ana@example.com', createdAt: ana!.createdAt.toISOString() });
+    assert.deepEqual(JSON.parse(shared.content[0].text), shared.structuredContent);
+    assert.deepEqual(await tool('artifacts_share', sharing), shared);
+    assert.equal((await rows()).length, 1);
+    const conflict = await tool('artifacts_share', { ...sharing, email: 'bob@example.com' });
+    assert.equal(conflict.isError, true);
+    assert.deepEqual(conflict.structuredContent, { error: 'request_conflict', message: 'Request ID already used with different arguments' });
+
+    await tool('artifacts_share', { requestId: randomUUID(), artifactId, email: 'Cara@Example.com' });
+    await tool('artifacts_share', { requestId: randomUUID(), artifactId, email: 'bob@example.com' });
+    const listed = await tool('artifacts_shares_list', { artifactId });
+    assert.deepEqual(listed.structuredContent.items.map((item: { value: string }) => item.value), ['ana@example.com', 'bob@example.com', 'cara@example.com']);
+    assert.deepEqual(listed.structuredContent, { items: (await rows()).map((row) => ({ shareId: row.id, artifactId, kind: 'email', value: row.value, createdAt: row.createdAt.toISOString() })) });
+
+    const unsharing = { requestId: randomUUID(), artifactId, shareId: ana!.id };
+    const unshared = await tool('artifacts_unshare', unsharing);
+    assert.equal(unshared.isError, undefined);
+    assert.deepEqual(unshared.structuredContent, { artifactId, shareId: ana!.id });
+    assert.deepEqual(await tool('artifacts_unshare', unsharing), unshared);
+    const gone = await tool('artifacts_unshare', { ...unsharing, requestId: randomUUID() });
+    assert.equal(gone.isError, true);
+    assert.deepEqual(gone.structuredContent, { error: 'not_found', message: 'Share not found' });
+    assert.deepEqual((await tool('artifacts_shares_list', { artifactId })).structuredContent.items.map((item: { value: string }) => item.value), ['bob@example.com', 'cara@example.com']);
+  } finally { await app.close(); }
+});
+
+test('MCP share tools require artifacts:publish and ownership, and reject an invalid email without writing', async () => {
+  const app = await artifactFixture();
+  try {
+    const owner = await grant(app, allScopes);
+    const tool = (token: string, name: string, input: unknown) => mcp(app.config.resource, token, 'tools/call', { name, arguments: input });
+    const { artifactId } = (await tool(owner.access_token, 'artifacts_create', createInput())).structuredContent;
+    const share = (await tool(owner.access_token, 'artifacts_share', { requestId: randomUUID(), artifactId, email: 'guest@example.test' })).structuredContent;
+    const values = async () => (await app.db.select({ value: artifactShare.value }).from(artifactShare).where(eq(artifactShare.artifactId, artifactId))).map((row) => row.value);
+    const calls = [
+      ['artifacts_share', { requestId: randomUUID(), artifactId, email: 'bob@example.com' }],
+      ['artifacts_unshare', { requestId: randomUUID(), artifactId, shareId: share.shareId }],
+      ['artifacts_shares_list', { artifactId }],
+    ] as const;
+
+    const writer = await grant(app, 'openid profile artifacts:read artifacts:write');
+    for (const [name, input] of calls) {
+      const denied = await tool(writer.access_token, name, input);
+      assert.equal(denied.isError, true, name);
+      assert.deepEqual(denied.structuredContent, { error: 'forbidden', message: 'The artifacts:publish scope is required', requiredScope: 'artifacts:publish' }, name);
+    }
+
+    const signedUp = await app.auth.api.signUpEmail({ body: { name: 'Shared guest', email: 'guest@example.test', password: app.password } });
+    await app.db.update(user).set({ emailVerified: true }).where(eq(user.id, signedUp.user.id));
+    const signIn = await app.auth.api.signInEmail({ body: { email: 'guest@example.test', password: app.password }, returnHeaders: true });
+    const guest = await grant({ ...app, cookie: signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ') }, allScopes);
+    for (const [name, input] of calls) {
+      const denied = await tool(guest.access_token, name, input);
+      assert.equal(denied.isError, true, name);
+      assert.deepEqual(denied.structuredContent, { error: 'not_found', message: 'Artifact not found' }, name);
+    }
+
+    const invalid = await tool(owner.access_token, 'artifacts_share', { requestId: randomUUID(), artifactId, email: 'not-an-email' });
+    assert.equal(invalid.isError, true);
+    assert.equal(invalid.structuredContent, undefined);
+    assert.match(invalid.content[0].text, /^Input validation error: Invalid arguments for tool artifacts_share/);
+    assert.deepEqual(await values(), ['guest@example.test']);
   } finally { await app.close(); }
 });
 

@@ -16,7 +16,7 @@ Exports are provider-neutral ZIPs containing the metadata/provenance manifest, c
 
 ## Publication boundary
 
-The publication Worker has only public origins and two publication secrets. It has no database credential. An encrypted transaction cookie binds the initial browser to artifact and state. The panel's live owner session issues a hashed short-lived grant. Exchange consumes that grant once and returns an artifact-scoped viewer, limited by its central session. Every subsequent document and file request rechecks the live central session, ownership, and current publication through a service-authenticated endpoint.
+The publication Worker has only public origins and two publication secrets. It has no database credential. An encrypted transaction cookie binds the initial browser to artifact and state. The panel's live session issues a hashed short-lived grant to a user with view access. The owner has view access, and so does a user whose verified email equals an email share of the artifact. Exchange consumes that grant once and returns an artifact-scoped viewer, limited by its central session. Every subsequent document and file request rechecks the live central session, view access, and current publication through a service-authenticated endpoint. A viewer who is not the owner receives the published revision without owner-only fields. [The sharing decision](sharing.md) records the matching rule and that reduced read.
 
 Both internal endpoints authenticate in their own handlers. Middleware also checks the service credential before exempting the exact internal routes from browser Origin policy. This redundancy closes framework route aliases, including trailing slashes, without treating Origin as authentication.
 
