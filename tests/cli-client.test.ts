@@ -291,7 +291,7 @@ test('CLI subprocesses retain exact operations and recover lost create, update, 
     assert.equal(publication.revisionId, updated.revision.id);
     const replay = await cli(['retry', 'cli-lost-create'], environment);
     assert.deepEqual(success(replay), created);
-    assert.match(replay.stderr, /retained receipt and may differ from current state/);
+    assert.match(replay.stderr, /original operation and does not establish current state/);
     assert.deepEqual(success(await cli(['history', created.artifactId, '--summary'], environment)).items.map((item: { sequence: number }) => item.sequence), [2, 1]);
     const out = join(directory, 'read.json');
     const current = success(await cli(['read', created.artifactId, '--out', out], environment));
@@ -566,5 +566,99 @@ test('CLI pins one verified credential across preparation, owner binding, and su
     assert.deepEqual(edited.revision.snapshot.files, snapshot.files);
     const outsider = createArtifactHttpClient({ resource: app.config.resource, accessToken: other.access_token });
     assert.deepEqual(await outsider.list(), { items: [], nextCursor: null });
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI sharing retains normalized commands, lists without retention, and revokes with empty stdout', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-sharing-'));
+  try {
+    const token = (await grant(app, fullScope)).access_token;
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: token });
+    const created = await client.create({ requestId: 'cli-sharing-create', snapshot });
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: token };
+    const share = success(await cli(['share', created.artifactId, '--email', ' ANA@Example.com ', '--request-id', 'cli-sharing-share'], environment));
+    assert.deepEqual(share, { shareId: share.shareId, artifactId: created.artifactId, kind: 'email', value: 'ana@example.com', createdAt: share.createdAt });
+    assert.equal(typeof share.shareId, 'string');
+    assert.deepEqual(JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-sharing-share'), 'utf8')), { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'share', command: { requestId: 'cli-sharing-share', artifactId: created.artifactId, email: 'ana@example.com' } });
+    assert.deepEqual(success(await cli(['shares', created.artifactId], environment)), { items: [share] });
+    assert.equal((await readdir(join(environment.ARTIFACTS_STATE_DIR, 'operations'))).length, 1);
+    const removed = await cli(['unshare', created.artifactId, share.shareId, '--request-id', 'cli-sharing-unshare'], environment);
+    assert.equal(removed.code, 0, removed.stderr);
+    assert.equal(removed.stdout, '');
+    assert.deepEqual(JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-sharing-unshare'), 'utf8')), { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'unshare', command: { requestId: 'cli-sharing-unshare', artifactId: created.artifactId, shareId: share.shareId } });
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [] });
+    const records = await readdir(join(environment.ARTIFACTS_STATE_DIR, 'operations'));
+    for (const record of records) assert.equal((await stat(join(environment.ARTIFACTS_STATE_DIR, 'operations', record))).mode & 0o777, 0o600);
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI sharing retries committed lost responses without changing later grants', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-sharing-retry-'));
+  try {
+    const token = (await grant(app, fullScope)).access_token;
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: token });
+    const created = await client.create({ requestId: 'cli-sharing-retry-create', snapshot });
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: token };
+    app.dropNextResourceResponse('POST');
+    failure(await cli(['share', created.artifactId, '--email', ' ANA@Example.com ', '--request-id', 'cli-sharing-lost-post'], environment), 'network_error');
+    const committed = await client.listShares({ artifactId: created.artifactId });
+    assert.equal(committed.items.length, 1);
+    assert.deepEqual(JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-sharing-lost-post'), 'utf8')), { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'share', command: { requestId: 'cli-sharing-lost-post', artifactId: created.artifactId, email: 'ana@example.com' } });
+    const share = committed.items[0];
+    assert.deepEqual(success(await cli(['retry', 'cli-sharing-lost-post'], environment)), share);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [share] });
+    app.dropNextResourceResponse('DELETE');
+    failure(await cli(['unshare', created.artifactId, share.shareId, '--request-id', 'cli-sharing-lost-delete'], environment), 'network_error');
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [] });
+    assert.deepEqual(JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-sharing-lost-delete'), 'utf8')), { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'unshare', command: { requestId: 'cli-sharing-lost-delete', artifactId: created.artifactId, shareId: share.shareId } });
+    const replay = await cli(['retry', 'cli-sharing-lost-delete'], environment);
+    assert.equal(replay.code, 0, replay.stderr);
+    assert.equal(replay.stdout, '');
+    assert.match(replay.stderr, /original operation.*does not establish current state/);
+    failure(await cli(['unshare', created.artifactId, share.shareId, '--request-id', 'cli-sharing-fresh-missing'], environment), 'not_found');
+    assert.deepEqual(success(await cli(['retry', 'cli-sharing-lost-post'], environment)), share);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [] });
+    const renewed = success(await cli(['share', created.artifactId, '--email', 'ana@example.com', '--request-id', 'cli-sharing-renew'], environment));
+    assert.notEqual(renewed.shareId, share.shareId);
+    const oldRemoval = await cli(['retry', 'cli-sharing-lost-delete'], environment);
+    assert.equal(oldRemoval.code, 0, oldRemoval.stderr);
+    assert.equal(oldRemoval.stdout, '');
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [renewed] });
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI sharing validates before identity or retention and documents logged-out commands', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-sharing-validation-'));
+  try {
+    let requests = 0;
+    app.setResourceHandler(async (request) => { requests++; return app.resourceHandler(request); });
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: 'unused' };
+    failure(await cli(['share', 'artifact', '--email', 'nope'], environment), 'invalid_input');
+    const invalid: [string[], string][] = [
+      [['share', 'artifact'], 'Specify --email'],
+      [['share', '--email', 'ana@example.com'], 'share requires one positional argument'],
+      [['share', 'artifact', 'extra', '--email', 'ana@example.com'], 'share requires one positional argument'],
+      [['shares'], 'shares requires one positional argument'],
+      [['shares', 'artifact', 'extra'], 'shares requires one positional argument'],
+      [['unshare', 'artifact'], 'unshare requires two positional arguments'],
+      [['unshare', 'artifact', 'share', 'extra'], 'unshare requires two positional arguments'],
+      [['share', 'artifact', '--email', 'a@example.com', '--email', 'b@example.com'], 'Option --email cannot be repeated'],
+      [['shares', 'artifact', '--request-id', 'foreign-option'], 'Option --request-id is not supported by shares'],
+      [['unshare', 'artifact', 'share', '--email', 'a@example.com'], 'Option --email is not supported by unshare'],
+      [['list', '--email', 'a@example.com'], 'Option --email is not supported by list'],
+    ];
+    for (const [args, message] of invalid) assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, message);
+    assert.equal(requests, 0);
+    await assert.rejects(stat(environment.ARTIFACTS_STATE_DIR), { code: 'ENOENT' });
+    const help = await cli(['--help']);
+    assert.equal(help.code, 0, help.stderr);
+    for (const usage of ['share ID --email EMAIL', 'shares ID', 'unshare ID SHARE_ID']) assert(help.stdout.includes(usage), usage);
+    const loggedOut = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: environment.ARTIFACTS_STATE_DIR };
+    assert.equal((await cli(['logout'], loggedOut)).code, 0);
+    assert.match(failure(await cli(['share', 'artifact', '--email', 'ana@example.com'], loggedOut), 'local_error').message, /login/);
+    assert.equal(requests, 0);
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });

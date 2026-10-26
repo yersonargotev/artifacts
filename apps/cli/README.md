@@ -124,6 +124,9 @@ artifacts publish [ID] --command FILE
 artifacts export ID --revision REV --out FILE
 artifacts move ID --project NAME [--request-id ID]
 artifacts move ID --no-project [--request-id ID]
+artifacts share ID --email EMAIL [--request-id ID]
+artifacts shares ID
+artifacts unshare ID SHARE_ID [--request-id ID]
 artifacts retry REQUEST_ID
 artifacts skills [list]
 artifacts skills get NAME [--full]
@@ -197,6 +200,23 @@ Every artifact read and list item includes `project`, a name or null. `projects`
 
 Version `0.1.0-beta.4` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
 
+## Share publication access
+
+These commands describe the current source and packages built from it. Check installed help for support. They are not part of the published `0.1.0-beta.5` release.
+
+```sh
+artifacts share ARTIFACT_ID --email ana@example.com --request-id share-ana-001
+artifacts shares ARTIFACT_ID
+artifacts unshare ARTIFACT_ID SHARE_ID --request-id unshare-ana-001
+artifacts retry share-ana-001
+```
+
+`share` trims and lowercases the email and prints one share as JSON with `shareId`, `artifactId`, `kind: "email"`, `value`, and `createdAt`. `shares` prints `{ "items": [...] }` with current grants and retains no operation. Take `SHARE_ID` from that output. `unshare` and a successful retry of an unshare exit zero with empty stdout. All three commands require the owner's `artifacts:publish` scope.
+
+A signed-in user whose verified email matches a share can view the published revision and its attachments. History, export, edits, and project moves remain owner-only. Shares created before first publication remain stored, but the URL opens only after publication. These commands do not send invitation emails or provide email-code sign-in.
+
+Share and unshare retain the complete normalized command before submission. Recover an uncertain result with `retry REQUEST_ID`. A replay confirms the original operation, so a historical share replay does not restore a revoked grant. An old unshare replay leaves a deliberate new share intact. Run `shares ARTIFACT_ID` to verify current grants.
+
 ## Complete commands and edits
 
 `--command FILE` accepts a complete create, update, or publish command. It cannot be combined with other mutation options. For update and publish, an optional positional artifact ID must equal the command's `artifactId`. Every field, including the omission of `response`, is retained.
@@ -228,7 +248,7 @@ Publish always selects an immutable revision. `--expected-version 0` expects no 
 
 Each invocation resolves one access token for its reads, owner check, and submission. A concurrent login cannot change the command owner between these requests. Every mutation verifies the owner and retains an exclusive private operation file before submission. Missing request IDs default to random UUIDs. The operation stores its exact command, owner, and resource. It contains no credentials. Existing operation files require explicit `retry` and are never replaced by another preparation.
 
-`retry REQUEST_ID` verifies the current resource and owner, then sends the unchanged command once. Retry does not read a new head, change expected versions, add a response projection, or rebase a conflict. Its diagnostic identifies the result as a retained receipt. A fresh `read` returns current state.
+`retry REQUEST_ID` verifies the current resource and owner, then sends the unchanged command once. Retry does not read a new head, change expected versions, add a response projection, or rebase a conflict. Its diagnostic identifies replay of the original operation and warns that replay does not establish current state. A fresh `read` or `shares` returns current state.
 
 If a response is lost after commit, retry recovers the original receipt. If a conflict occurs, the retained operation remains available for inspection. A new read and a deliberate new command with a new request ID are required to incorporate another writer's changes.
 

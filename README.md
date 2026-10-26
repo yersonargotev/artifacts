@@ -13,7 +13,7 @@ Create an artifact from Claude Code, Codex, the standalone CLI, or direct HTTP, 
 | Authorization | https://artifacts-auth.yersonargotev.workers.dev |
 | Publication | https://artifacts-view.yersonargotev.workers.dev |
 
-The publication Worker is separate from the panel. It receives no database or authoring credentials. Every document and attachment request checks the live central session and artifact owner through the authenticated internal service. Anonymous document requests redirect to login; anonymous attachments return 401. Revoked access returns 403. Backend failures return 503 without content.
+The publication Worker is separate from the panel. It receives no database or authoring credentials. For every document and attachment request, the authenticated internal service checks the live central session and authorizes the owner or a viewer whose verified email matches a current share. Anonymous document requests redirect to login; anonymous attachments return 401. Revoked access returns 403. Backend failures return 503 without content.
 
 ## Connect a client
 
@@ -48,6 +48,17 @@ The three packages share version `0.1.0-beta.5`. The [first beta release report]
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
 The [CLI reference](apps/cli/README.md) documents every command, private credentials, exact retries, and export. Packages built from the current source include the complete [artifacts-cli skill](skills/artifacts-cli/SKILL.md). `artifacts skills` lists bundled skills. `artifacts skills get artifacts-cli --full` prints its instructions and references offline. The CLI also bundles `artifacts-design`; full output lists its font files by size instead of printing their bytes. `artifacts skills install --global` installs a discovery skill under `~/.agents/skills` that loads those instructions through the installed CLI. Add `--agent claude` to use `~/.claude/skills`. The published `0.1.0-beta.1` package predates these commands. Check installed help before using them. The skill has no hosted default and does not require an MCP connection.
+
+Current source and packages built from it also provide publication sharing. Check installed help before use. These commands are not part of the published `0.1.0-beta.5` release.
+
+```sh
+artifacts share ARTIFACT_ID --email ana@example.com
+artifacts shares ARTIFACT_ID
+artifacts unshare ARTIFACT_ID SHARE_ID
+artifacts retry REQUEST_ID
+```
+
+Share prints the grant as JSON. Shares lists current grants. Unshare and its successful retry exit zero with empty stdout. A user with a matching verified email can view the published revision and attachments. Shares created before first publication wait for publication. Sharing does not send invitation emails or provide email-code sign-in. Retry confirms the original operation. Use `shares` to verify current access.
 
 Library consumers install `@yargote/artifacts-client@0.1.0-beta.5` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.5`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
@@ -97,6 +108,8 @@ Ask a client to call `artifacts_create` with a complete snapshot and a unique `r
 ```
 
 Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve artifacts. `artifacts_update` saves a complete snapshot with `expectedRevisionId`. `artifacts_publish` selects a retained `revisionId` with `expectedPublicationVersion`, using zero for the first publication. Its returned URL stays unchanged when you publish another revision. `artifacts_export` returns a deterministic ZIP for an explicit retained revision. `whoami` still returns the canonical account and session.
+
+`artifacts_share` grants publication access to an exact email, `artifacts_shares_list` lists current grants, and `artifacts_unshare` revokes an observed share. Only the owner manages shares under `artifacts:publish`. Email values are trimmed and lowercased. Guests need a matching verified email and receive only the published revision and attachments.
 
 Pass an optional `project` name to `artifacts_create` to group artifacts. A name that matches an existing project regardless of letter case joins it. `artifacts_list` accepts the same `project` filter, `projects_list` returns each project with its artifact count, and `artifacts_move` changes or clears the project without creating a revision. The panel sidebar lists the projects, and `Mover a proyecto` in an artifact's menu moves it to a project or removes it from one. [The projects decision](docs/decisions/projects.md) records the model.
 
@@ -173,7 +186,7 @@ See [deployment instructions](docs/deployment.md), [artifact architecture](docs/
 
 Open an artifact in the panel to see the selected, latest, and published revisions. The list identifies unpublished changes. Each selected revision has an attachment inventory and an escaped comparison of content, metadata, and changed files. History navigation keeps the selected revision and comparison.
 
-Choose **Publicar revisión** to publish the revision you reviewed. The form pins its revision, observed publication version, and request ID. A conflict requires another deliberate review. An uncertain result offers the same command for retry. The resulting page independently reads the publication and reports a concurrent replacement. Publication still requires the owner's Artifacts login.
+Choose **Publicar revisión** to publish the revision you reviewed. The form pins its revision, observed publication version, and request ID. A conflict requires another deliberate review. An uncertain result offers the same command for retry. The resulting page independently reads the publication and reports a concurrent replacement. Publishing a revision requires the owner's Artifacts login, and viewers can access the published revision when their verified email matches a current share.
 
 For client edits, use the [prepared editing helper](packages/artifacts/README.md#prepare-and-retry-an-edit) to preserve fields and attachment bytes you did not change. MCP responses remain complete by default. Optional compact responses and summarized history omit content and attachment payloads. A full read or export still verifies the retained bytes.
 

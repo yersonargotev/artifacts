@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { createSchema, moveSchema, publishSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
@@ -47,6 +47,9 @@ Commands:
   export ID --revision REV --out FILE
   move ID --project NAME [--request-id ID]
   move ID --no-project [--request-id ID]
+  share ID --email EMAIL [--request-id ID]
+  shares ID
+  unshare ID SHARE_ID [--request-id ID]
   retry REQUEST_ID
 
 Mutation command files contain the complete create, update, or publish JSON.
@@ -77,6 +80,7 @@ const commandOptions: Record<string, readonly string[]> = {
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
+  share: ['email', 'request-id'], shares: [], unshare: ['request-id'],
   export: ['revision', 'out'], move: ['project', 'no-project', 'request-id'], retry: [],
   skills: ['full', 'all', 'agent', 'global', 'force'],
 };
@@ -114,7 +118,7 @@ async function main(): Promise<unknown> {
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
       full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
       global: { type: 'boolean' }, force: { type: 'boolean' },
-      project: { type: 'string' }, 'no-project': { type: 'boolean' },
+      project: { type: 'string' }, 'no-project': { type: 'boolean' }, email: { type: 'string' },
     },
   });
   const seen = new Set<string>();
@@ -228,11 +232,17 @@ async function main(): Promise<unknown> {
       if ((values.project !== undefined) === (values['no-project'] ?? false)) throw new UsageError('Specify exactly one of --project NAME or --no-project');
       return mutate({ kind: 'move', command: moveSchema.parse({ artifactId, requestId: values['request-id'] ?? randomUUID(), project: values.project ?? null }) });
     }
+    case 'share': return mutate({ kind: 'share', command: shareSchema.parse({ artifactId: argument()!, requestId: values['request-id'] ?? randomUUID(), email: required('email') }) });
+    case 'shares': return client.listShares(listSharesSchema.parse({ artifactId: argument()! }));
+    case 'unshare': {
+      if (arguments_.length !== 2) throw new UsageError('unshare requires two positional arguments');
+      return mutate({ kind: 'unshare', command: unshareSchema.parse({ artifactId: arguments_[0], shareId: arguments_[1], requestId: values['request-id'] ?? randomUUID() }) });
+    }
     case 'retry': {
       const requestId = argument()!;
       const owner = await client.identity();
       const operation = await loadOperation(stateDir, requestId, resource, owner.userId);
-      process.stderr.write(`Replaying retained ${operation.kind} operation ${requestId}. The result is its retained receipt and may differ from current state.\n`);
+      process.stderr.write(`Replaying retained ${operation.kind} operation ${requestId}. Replay confirms the original operation and does not establish current state.\n`);
       return submitOperation(client, operation);
     }
   }

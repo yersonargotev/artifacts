@@ -158,6 +158,23 @@ The publication example applies only to an unpublished artifact. For an existing
 
 History returns `nextBeforeSequence`; pass it as `--before-sequence N` to continue. List returns `nextCursor`; pass it as `--cursor CURSOR`. Do not substitute an offset or assume that one page contains everything.
 
+## Share publication access
+
+Check installed help for these commands. They describe current source and built packages, not the published `0.1.0-beta.5` release.
+
+```sh
+artifacts share ARTIFACT_ID --email ana@example.com --request-id share-ana-001
+artifacts shares ARTIFACT_ID
+artifacts unshare ARTIFACT_ID SHARE_ID --request-id unshare-ana-001
+artifacts retry share-ana-001
+```
+
+Share requires the owner's `artifacts:publish` scope, trims and lowercases the email, and prints a share with `shareId`, `artifactId`, `kind: "email"`, `value`, and `createdAt`. `shares` requires the same scope and prints `{ "items": [...] }` with current grants without retaining a mutation. Use an observed `shareId` to unshare. Unshare requires the same scope. Unshare and its successful retry exit zero with empty stdout.
+
+The publication admits the owner and signed-in users whose verified email matches a current share. Guests see the published revision and attachments. History, export, editing, and project moves remain owner-only. Shares before first publication wait for publication. These commands do not send invitation emails or provide email-code sign-in.
+
+Share and unshare retain complete normalized commands. `retry REQUEST_ID` replays the original operation. A historical share replay does not regrant revoked access, and an old unshare replay leaves a deliberate new share intact. Verify current grants with `shares ARTIFACT_ID` after a replay.
+
 ## Retry and export
 
 ```sh
