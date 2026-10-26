@@ -64,7 +64,7 @@ artifacts export ARTIFACT_ID --revision REVISION_ID --out artifact.zip
 artifacts logout
 ```
 
-Publication URLs require authenticated owner access. A retained request ID appears on stderr before each mutation. If the response is lost, run `artifacts retry REQUEST_ID` with the same server and state directory. Keep that state directory when upgrading, reinstalling, or switching between global and one-off execution.
+A publication URL requires sign-in. It opens for the owner and for a user whose verified email equals an email share of the artifact. That user sees only the published revision and its attachments. A retained request ID appears on stderr before each mutation. If the response is lost, run `artifacts retry REQUEST_ID` with the same server and state directory. Keep that state directory when upgrading, reinstalling, or switching between global and one-off execution.
 
 ## Upgrade or uninstall
 

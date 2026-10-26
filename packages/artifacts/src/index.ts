@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
-import { artifact, artifactCommand, artifactPublication, artifactRevision, artifactShare, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
+import { artifact, artifactCommand, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
@@ -24,12 +24,23 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     return found;
   }
 
-  async function readOwned(connection: Connection, ownerId: string, artifactId: string, revisionId?: string): Promise<ArtifactRead> {
-    const found = await owned(connection, ownerId, artifactId);
-    const [row] = await connection.select().from(artifactRevision).where(and(eq(artifactRevision.artifactId, artifactId), eq(artifactRevision.id, revisionId ?? found.headRevisionId))).limit(1);
+  async function canView(connection: Connection, userId: string, artifactId: string) {
+    const sharedWithViewer = connection.select({ id: artifactShare.id }).from(artifactShare)
+      .innerJoin(user, and(eq(user.id, userId), eq(user.emailVerified, true)))
+      .where(and(eq(artifactShare.artifactId, artifact.id), eq(artifactShare.kind, 'email'), eq(artifactShare.value, sql`lower(${user.email})`)));
+    const [found] = await connection.select().from(artifact).where(and(eq(artifact.id, artifactId), or(eq(artifact.ownerId, userId), exists(sharedWithViewer)))).limit(1);
+    return found;
+  }
+
+  async function readArtifact(connection: Connection, found: typeof artifact.$inferSelect, revisionId = found.headRevisionId): Promise<ArtifactRead> {
+    const [row] = await connection.select().from(artifactRevision).where(and(eq(artifactRevision.artifactId, found.id), eq(artifactRevision.id, revisionId))).limit(1);
     if (!row) throw new ArtifactError('not_found', 'Revision not found');
-    const [selected] = await connection.select().from(artifactPublication).where(eq(artifactPublication.artifactId, artifactId)).limit(1);
-    return { artifactId, ownerId, headRevisionId: found.headRevisionId, project: found.project, publication: publication(artifactId, selected), revision: revision(row) };
+    const [selected] = await connection.select().from(artifactPublication).where(eq(artifactPublication.artifactId, found.id)).limit(1);
+    return { artifactId: found.id, ownerId: found.ownerId, headRevisionId: found.headRevisionId, project: found.project, publication: publication(found.id, selected), revision: revision(row) };
+  }
+
+  async function readOwned(connection: Connection, ownerId: string, artifactId: string, revisionId?: string): Promise<ArtifactRead> {
+    return readArtifact(connection, await owned(connection, ownerId, artifactId), revisionId);
   }
 
   const store = {
@@ -199,8 +210,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const codeHash = await sha256(code);
       return transaction(async (connection) => {
         const current = await authorize(connection, actor, 'artifacts:read');
-        const found = await readOwned(connection, actor.userId, input.artifactId);
-        if (!found.publication) throw new ArtifactError('not_found', 'Artifact is not published');
+        if (!await canView(connection, actor.userId, input.artifactId)) throw new ArtifactError('not_found', 'Artifact not found');
+        const [published] = await connection.select({ revisionId: artifactPublication.revisionId }).from(artifactPublication).where(eq(artifactPublication.artifactId, input.artifactId)).limit(1);
+        if (!published) throw new ArtifactError('not_found', 'Artifact is not published');
         const expiresAt = Math.min(Date.now() + 60_000, current.expiresAt.getTime());
         await connection.insert(publicationGrant).values({ codeHash, state: input.state, artifactId: input.artifactId, userId: actor.userId, sessionId: actor.sessionId, callback, expiresAt: new Date(expiresAt) });
         return { code, expiresAt };
@@ -212,25 +224,28 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const codeHash = await sha256(input.code);
       return transaction(async (connection) => {
         const [found] = await connection.select({ grant: publicationGrant, session }).from(publicationGrant).innerJoin(session, and(eq(session.id, publicationGrant.sessionId), eq(session.userId, publicationGrant.userId)))
-          .innerJoin(artifact, and(eq(artifact.id, publicationGrant.artifactId), eq(artifact.ownerId, publicationGrant.userId)))
           .where(and(eq(publicationGrant.codeHash, codeHash), eq(publicationGrant.state, input.state), eq(publicationGrant.artifactId, input.artifactId), eq(publicationGrant.callback, callback), gt(publicationGrant.expiresAt, new Date()), gt(session.expiresAt, new Date()))).limit(1);
-        if (!found) throw new ArtifactError('invalid_grant', 'Publication grant is invalid or expired');
+        if (!found || !await canView(connection, found.grant.userId, input.artifactId)) throw new ArtifactError('invalid_grant', 'Publication grant is invalid or expired');
         const consumed = await connection.delete(publicationGrant).where(eq(publicationGrant.codeHash, codeHash)).returning({ codeHash: publicationGrant.codeHash });
         if (consumed.length !== 1) throw new ArtifactError('invalid_grant', 'Publication grant was already consumed');
         return { artifactId: input.artifactId, userId: found.grant.userId, sessionId: found.grant.sessionId, expiresAt: Math.min(Date.now() + 60 * 60_000, found.session.expiresAt.getTime()) };
       });
     },
 
-    async readPublished(viewerValue: Viewer, value: z.input<typeof readSchema>): Promise<ArtifactRead> {
+    async readPublished(viewerValue: Viewer, value: z.input<typeof readSchema>): Promise<ArtifactRead | SharedRead> {
       const viewer = viewerSchema.parse(viewerValue);
       const input = readSchema.parse(value);
       if (viewer.artifactId !== input.artifactId || viewer.expiresAt <= Date.now()) throw new ArtifactError('forbidden', 'Publication viewer is invalid or expired');
       return transaction(async (connection) => {
         await liveSession(connection, viewer.userId, viewer.sessionId);
-        await owned(connection, viewer.userId, input.artifactId);
+        const found = await canView(connection, viewer.userId, input.artifactId);
+        if (!found) throw new ArtifactError('not_found', 'Artifact not found');
         const [selected] = await connection.select().from(artifactPublication).where(eq(artifactPublication.artifactId, input.artifactId)).limit(1);
-        if (!selected || (input.revisionId && input.revisionId !== selected.revisionId)) throw new ArtifactError('not_found', 'Published revision not found');
-        return readOwned(connection, viewer.userId, input.artifactId, selected.revisionId);
+        const published = publication(input.artifactId, selected);
+        if (!published || (input.revisionId && input.revisionId !== published.revisionId)) throw new ArtifactError('not_found', 'Published revision not found');
+        const read = await readArtifact(connection, found, published.revisionId);
+        if (found.ownerId === viewer.userId) return read;
+        return { artifactId: read.artifactId, publication: published, revision: { id: read.revision.id, createdAt: read.revision.createdAt, sha256: read.revision.sha256, snapshot: read.revision.snapshot } };
       });
     },
   };

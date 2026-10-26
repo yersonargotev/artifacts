@@ -1,13 +1,14 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
 import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
-import { artifactReadSchema, consumeGrantSchema, readSchema, viewerSchema } from '@artifacts/artifacts/contracts';
-import type { ArtifactRead, Viewer } from '@artifacts/artifacts/contracts';
+import { artifactReadSchema, consumeGrantSchema, readSchema, sharedReadSchema, viewerSchema } from '@artifacts/artifacts/contracts';
+import type { Viewer } from '@artifacts/artifacts/contracts';
 import { attachmentResponse, documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
 
 export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: string; PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 const transactionSchema = z.strictObject({ purpose: z.literal('transaction'), artifactId: z.string().min(1).max(128), state: z.string().min(32).max(128), expiresAt: z.number().int().positive() });
 const viewerCookieSchema = z.strictObject({ purpose: z.literal('viewer'), viewer: viewerSchema });
+const publishedReadSchema = z.union([artifactReadSchema, sharedReadSchema]);
 const transactionCookie = '__Host-artifacts-publication-transaction';
 const cookieName = (artifactId: string) => `__Host-artifacts-viewer-${base64url(new TextEncoder().encode(artifactId))}`;
 const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -91,8 +92,8 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       if (!viewer) return path || contentRequest ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
       const result = await backend('read', { viewer, artifactId, ...(revisionId ? { revisionId } : {}) });
       if ('denied' in result) return new Response('Tu sesión o esta publicación ya no están disponibles.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(cookieName(artifactId), '', 0) } });
-      const artifact: ArtifactRead = artifactReadSchema.parse(result.value);
-      if (artifact.artifactId !== artifactId || artifact.ownerId !== viewer.userId || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId || (revisionId && artifact.revision.id !== revisionId)) throw new Error('Invalid published artifact');
+      const artifact = publishedReadSchema.parse(result.value);
+      if (artifact.artifactId !== artifactId || ('ownerId' in artifact && artifact.ownerId !== viewer.userId) || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId || (revisionId && artifact.revision.id !== revisionId)) throw new Error('Invalid published artifact');
       if (path) {
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });

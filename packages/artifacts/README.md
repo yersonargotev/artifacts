@@ -81,11 +81,11 @@ While the artifact exists, the same committed request returns its original recei
 
 ## Publication admission
 
-`issuePublicationGrant(actor, { artifactId, state })` requires `artifacts:read`, ownership, and an existing publication. It returns a random code and expiration time. The database stores only the code hash, bound to the state, artifact, owner, central session, fixed `/callback` URL, and a deadline of at most 60 seconds.
+`issuePublicationGrant(actor, { artifactId, state })` requires `artifacts:read`, view access, and an existing publication. A user has view access when they own the artifact, or when their email is verified and equals an email share of the artifact. It returns a random code and expiration time. The database stores only the code hash, bound to the state, artifact, user, central session, fixed `/callback` URL, and a deadline of at most 60 seconds.
 
-`consumePublicationGrant({ code, state, artifactId })` checks those bindings and the live central session, then consumes the code atomically. It returns a viewer containing `artifactId`, `userId`, `sessionId`, and `expiresAt` in epoch milliseconds. The viewer expires within one hour and no later than the central session.
+`consumePublicationGrant({ code, state, artifactId })` checks those bindings, the live central session, and the user's view access, then consumes the code atomically. It returns a viewer containing `artifactId`, `userId`, `sessionId`, and `expiresAt` in epoch milliseconds. The viewer expires within one hour and no later than the central session.
 
-`readPublished(viewer, { artifactId, revisionId? })` checks the viewer's artifact and expiry, the live central session, canonical ownership, and the current publication in one transaction. A supplied revision must still be published. The publication adapter authenticates its viewer cookie and service request before calling this method. The Worker does not receive database credentials or authoring credentials.
+`readPublished(viewer, { artifactId, revisionId? })` checks the viewer's artifact and expiry, the live central session, view access, and the current publication in one transaction. A supplied revision must still be published. The owner receives the full artifact read. Any other viewer receives a shared read that contains only the artifact ID, the publication, and the published revision's ID, creation time, SHA-256, and snapshot. The publication adapter authenticates its viewer cookie and service request before calling this method. The Worker does not receive database credentials or authoring credentials.
 
 ## ZIP format
 

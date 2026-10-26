@@ -21,7 +21,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - Browser drives start at 1440x900. Mobile captures use 390x844. The `screens` drive captures every listed page at both widths.
 - Use exact ARIA names for Spanish interface controls. The disposable artifact title is `Verification artifact`; its document headings are `Verification revision 1` and `Verification revision 2`.
 - The HTML interaction button changes from `Try interaction` to `Interaction verified`. The attachment `notes.txt` contains `Revision 1 attachment.\n`, including its trailing newline, and is retained in revision 2.
-- Authenticated setup creates a disposable identity and OAuth client. Artifact setup inside drives must use public MCP tools; direct store or database insertion is not evidence of user authoring.
+- Authenticated setup creates a disposable identity and OAuth client. Artifact setup inside drives must use public MCP tools; direct store or database insertion is not evidence of user authoring. The `sharing` drive is the one exception: it shares through the supervisor's store fixture because no public share tool exists yet.
 - Always call `cleanup --run` for a failed or successful run. Cleanup removes owned instances and runtime secrets while preserving the proof artifacts in that run directory.
 
 ## Proof and skip reporting
@@ -45,6 +45,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - [Panel screen captures](./screens.md): `screens` seeds a repeatable library and captures the welcome, library, projects index, project, selected project, detail, move, and delete confirmation pages at 1440x900 and 390x844, with overflow, browser-error, and primary-action checks.
 - [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
+- [Shared publication viewers](./sharing.md): `sharing` creates a verified guest, shares through a store fixture until MCP sharing exists, and checks guest admission, the guest page without owner details, owner-only MCP denials, revocation, and the `account` command for later lanes.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.
 - [Historical export](./export.md): `export` covers selecting an old revision and comparing its browser ZIP download with the same MCP export.
 - [Exact retained artifact](./retained.md): `verify-retained.ts` and its callable library verify an existing selected revision, real policy, declarative content checks, mobile layout and complete attachment bytes without authoring or account mutation.
