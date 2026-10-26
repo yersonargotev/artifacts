@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, moveSchema, publishSchema, readSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
 import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
@@ -72,6 +72,18 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           title: 'Publish artifact revision', description: 'Select a retained revision at a stable protected URL. Requires artifacts:publish and the current expectedPublicationVersion, or zero if unpublished. Published HTML is self-contained with downloadable attachments. Retry with the same requestId and arguments.',
           inputSchema: publishSchema, annotations: mutation,
         }, async (input) => execute(() => artifacts.publish(principal, input)));
+        server.registerTool('artifacts_share', {
+          title: 'Share artifact', description: 'Let one person view the published revision of an owned artifact and its attachments at the publication URL. The person signs in with an Artifacts account whose verified email equals the shared address. The address is trimmed and stored in lowercase. Sharing an address that already has a share returns the existing share. On an unpublished artifact the share takes effect when a revision is published, and publishing another revision keeps every share. Viewers never get history, export, editing, or the project. Requires artifacts:publish. Retry with the same requestId and arguments.',
+          inputSchema: shareSchema, annotations: mutation,
+        }, async (input) => execute(() => artifacts.share(principal, input)));
+        server.registerTool('artifacts_unshare', {
+          title: 'Revoke artifact share', description: 'Remove one share of an owned artifact by the shareId from artifacts_share or artifacts_shares_list. The person loses access on their next request, including on an open publication page. Requires artifacts:publish. Retry with the same requestId and arguments. A new requestId for a share that is already removed fails with not_found.',
+          inputSchema: unshareSchema, annotations: { ...mutation, destructiveHint: true },
+        }, async (input) => execute(() => artifacts.unshare(principal, input)));
+        server.registerTool('artifacts_shares_list', {
+          title: 'List artifact shares', description: 'List the email shares of an owned artifact ordered by address, each with the shareId that artifacts_unshare takes. Requires artifacts:publish.',
+          inputSchema: listSharesSchema, annotations: readOnly,
+        }, async (input) => execute(() => artifacts.listShares(principal, input)));
         server.registerTool('artifacts_export', {
           title: 'Export artifact revision', description: 'Return a deterministic provider-neutral ZIP as base64, its filename, media type, and SHA-256. Includes artifact.json, content, and every attachment from the explicit retained revision.',
           inputSchema: exportSchema, annotations: readOnly,

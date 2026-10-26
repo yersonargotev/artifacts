@@ -1,11 +1,11 @@
 ---
 name: artifacts
-description: Create, revise, publish, inspect, or export retained artifacts through the Artifacts MCP. Use for requests to save content in Artifacts, explain a topic with a visual HTML artifact, or publish an artifact. Exclude generic build artifacts and unrelated file creation.
+description: Create, revise, publish, share, inspect, or export retained artifacts through the Artifacts MCP. Use for requests to save content in Artifacts, explain a topic with a visual HTML artifact, publish an artifact, or share it with a person by email. Exclude generic build artifacts and unrelated file creation.
 ---
 
 # Create and manage Artifacts
 
-Turn the user's content into a retained artifact through the connected MCP. Save a draft when the user asks to create or edit. Publish when the user requests publication or a shareable artifact URL. Published URLs require the owner's Artifacts login.
+Turn the user's content into a retained artifact through the connected MCP. Save a draft when the user asks to create or edit. Publish when the user requests publication or a shareable artifact URL. Published URLs require an Artifacts login by the owner or by a person the owner shared the artifact with.
 
 ## Select the connection
 
@@ -55,11 +55,21 @@ Read the artifact to obtain its current publication version. Call `artifacts_pub
 
 Use the saved revision selected by the user or returned by this operation. Publishing a historical revision does not move the draft head. Return the URL from the successful publication result. Do not describe that URL as anonymous or public access.
 
+## Share with a person
+
+To let a specific person view an artifact, call `artifacts_share` with a new `requestId`, the `artifactId`, and the email address the user gave. Never guess an address from a name. The result contains the `shareId` and the stored `value`, which is the address trimmed and in lowercase. Sharing an address that already has a share returns the existing share.
+
+The person opens the same publication URL and signs in with an Artifacts account whose email is verified and equals the shared address. They see the published revision and its attachments. They never see the history, export, draft head, project, or owner account. If the artifact is not published, they get a not-found page until it is. Publishing another revision keeps every share, so they see the new revision at the same URL.
+
+Call `artifacts_shares_list` with the `artifactId` to report who has access. To revoke access, call `artifacts_unshare` with a new `requestId`, the `artifactId`, and the `shareId` from the list. The person loses access on their next request. The three tools require `artifacts:publish` and work only on the user's own artifacts.
+
 ## Handle retries and conflicts
 
 Keep a mutation's `requestId` and exact arguments until its outcome is known. After an ambiguous transport failure, retry that exact call once. Never use a new ID to repeat an operation whose outcome is unknown. If the result remains unavailable, report the uncertainty.
 
 For changed arguments or a different command, generate a new `requestId`. A `request_conflict` means the ID was already used with different arguments. Do not disguise that failure as a successful retry.
+
+An `artifacts_unshare` that fails with `not_found` under a new `requestId` means the share is already gone. Confirm with `artifacts_shares_list` before you report it.
 
 On an update or publication `conflict`, read the current state. Report the concurrent change and leave the failed command stopped. Do not overwrite another revision or replace the expected version just to force success.
 
@@ -71,6 +81,8 @@ After a successful create or update, call `artifacts_read` with the returned `ar
 
 After publication, read the artifact and verify `publication.revisionId`, `publication.version`, and `publication.url` match the successful publication result. If a concurrent publication changed the result, report that difference.
 
+After a share or a revocation, call `artifacts_shares_list` and verify that the address is present or absent.
+
 For history, follow `nextBeforeSequence` when the user needs older revisions. For export, call `artifacts_export` with an explicit retained `revisionId`. Decode its base64 ZIP to the requested destination. Verify its SHA-256 before linking the local file. If the host cannot save files, report the export limitation without inventing a download URL.
 
-Report the title, saved revision, and draft or published status in the user's language. Include the returned publication URL when published, or the dashboard when saved as a draft. Link an exported file only after writing and verifying it. Distinguish successful persistence from any incomplete verification. Claim visual or browser checks only when you actually ran them.
+Report the title, saved revision, draft or published status, and any address you shared or revoked in the user's language. Include the returned publication URL when published, or the dashboard when saved as a draft. Link an exported file only after writing and verifying it. Distinguish successful persistence from any incomplete verification. Claim visual or browser checks only when you actually ran them.

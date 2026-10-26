@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from 'playwright';
-import { artifactReadSchema, publishResultSchema, type Share } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, shareResultSchema, unshareResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
 
 type Snapshot = ReturnType<typeof artifactReadSchema.parse>['revision']['snapshot'];
 export type Account = { userId: string; email: string; emailVerified: boolean; accessToken: string };
@@ -11,14 +11,13 @@ interface SharingDrive {
   firstSnapshot: Snapshot;
   checks: string[];
   call(name: string, input?: unknown, allowError?: boolean, accessToken?: string): Promise<Record<string, any>>;
-  control<T>(path: string, body: unknown): Promise<T>;
   account(email: string, verified: boolean): Promise<Account>;
   login(page: Page, fromPanel?: boolean, email?: string): Promise<void>;
   capture(page: Page, label: string): Promise<void>;
   record(action: string, result: unknown): Promise<void>;
 }
 
-export async function driveSharing({ page, browser, firstSnapshot, checks, call, control, account, login, capture, record }: SharingDrive) {
+export async function driveSharing({ page, browser, firstSnapshot, checks, call, account, login, capture, record }: SharingDrive) {
   const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot, project: 'Sharing proof' }));
   const { artifactId } = created;
   const published = publishResultSchema.parse(await call('artifacts_publish', { requestId: randomUUID(), artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 }));
@@ -44,9 +43,11 @@ export async function driveSharing({ page, browser, firstSnapshot, checks, call,
     await record('Guest open without a share', { status: denied.status(), origin: new URL(denied.url()).origin });
     await capture(guestPage, 'guest-before-share');
 
-    const share = await control<Share>('/share', { artifactId, email: 'GUEST@Example.TEST' });
-    assert.equal(share.value, guest.email, 'A mixed-case share matches the lowercase account email');
-    await record('Share through the store as the owner', share);
+    const sharing = { requestId: randomUUID(), artifactId, email: 'GUEST@Example.TEST' };
+    const share = shareResultSchema.parse(await call('artifacts_share', sharing));
+    assert.equal(share.value, guest.email, 'artifacts_share stores the mixed-case address in lowercase');
+    assert.deepEqual(await call('artifacts_share', sharing), share, 'A retry with the same requestId returns the same share');
+    assert.deepEqual(await call('artifacts_shares_list', { artifactId }), { items: [share] }, 'artifacts_shares_list returns the new share');
     await guestPage.goto(published.url);
     await admitted();
     assert.equal(await guestPage.locator('.project-navigation').count(), 0, 'Guest sees no owner project');
@@ -78,7 +79,8 @@ export async function driveSharing({ page, browser, firstSnapshot, checks, call,
 
     const [stale] = await viewerCookies();
     assert(stale, 'Guest holds a viewer cookie before revocation');
-    await record('Revoke the share as the owner', await control('/unshare', { artifactId, shareId: share.shareId }));
+    assert.deepEqual(unshareResultSchema.parse(await call('artifacts_unshare', { requestId: randomUUID(), artifactId, shareId: share.shareId })), { artifactId, shareId: share.shareId }, 'artifacts_unshare removes the share');
+    assert.deepEqual(await call('artifacts_shares_list', { artifactId }), { items: [] }, 'artifacts_shares_list is empty after revocation');
     const revoked = await guestPage.goto(published.url);
     assert.equal(revoked?.status(), 403, 'The first request after revocation returns 403');
     assert.deepEqual(await viewerCookies(), [], 'Revocation clears the viewer cookie');
@@ -89,18 +91,20 @@ export async function driveSharing({ page, browser, firstSnapshot, checks, call,
     assert(replay.headers.getSetCookie().some((value) => value.startsWith(`${stale.name}=;`) && value.includes('Max-Age=0')), 'The denial clears the stale viewer cookie');
     await record('Guest reload and stale cookie replay after revocation', { browserStatus: revoked?.status(), replayStatus: replay.status, viewerCookies: 0 });
 
-    await record('Share again so later lanes start from an admitted guest', await control<Share>('/share', { artifactId, email: guest.email }));
+    shareResultSchema.parse(await call('artifacts_share', { requestId: randomUUID(), artifactId, email: guest.email }));
     await guestPage.goto(published.url);
     await admitted();
     await capture(guestPage, 'guest-readmitted');
     checks.push(
       'Fresh open without a share ends at the panel 404 with the fixed body',
-      'Mixed-case share admits the verified guest to the published revision and attachment',
+      'artifacts_share with a mixed-case address admits the verified guest to the published revision and attachment',
+      'An artifacts_share retry with the same requestId returns the same share',
+      'artifacts_shares_list lists the share and is empty after artifacts_unshare',
       'Guest page omits the owner project, author client and revision sequence; no overflow at 390px',
       'Owner page keeps the project navigation',
       'Guest MCP read, history and export return not_found',
-      'Revocation returns 403 on the next request and clears the viewer cookie',
-      'Re-share admits the guest again',
+      'After artifacts_unshare the next guest request returns 403 and clears the viewer cookie',
+      'A new artifacts_share admits the guest again',
     );
   } finally { await context.close(); }
 }

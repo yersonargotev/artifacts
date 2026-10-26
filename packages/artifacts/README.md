@@ -21,14 +21,23 @@ Every method checks a live central session. An actor contains `userId`, `session
 | `projects` | None | `artifacts:read` | Project names and artifact counts |
 | `history` | `artifactId`, optional `limit` and `beforeSequence` | `artifacts:read` | Revisions and `nextBeforeSequence` |
 | `export` | `artifactId`, `revisionId` | `artifacts:read` | ZIP base64, filename, media type, and SHA-256 |
+| `share` | `requestId`, `artifactId`, `email` | `artifacts:publish` | Share ID, artifact ID, kind, lowercase value, and creation time |
+| `unshare` | `requestId`, `artifactId`, `shareId` | `artifacts:publish` | Artifact ID and share ID |
+| `listShares` | `artifactId` | `artifacts:publish` | `items` with the shares ordered by kind and value |
 
 Every artifact read and summary includes `project`, a name or null. A project is a label on the artifact, outside the immutable snapshot. It exists while at least one owned artifact carries it. Names are NFC-normalized, trimmed, 1 to 80 characters, and free of control characters. Create and move reuse an existing project name of the same owner regardless of letter case and keep its stored spelling. Otherwise they store the given name. The `project` filter of `list` and the panel library matches the same way. `projects` returns `{ items: [{ name, artifactCount }] }` ordered by name without regard to letter case. Moving never creates a revision or changes the publication, and moving to the current project succeeds without change.
 
 Lists default to 25 summaries and allow at most 100 per page. History defaults to 5 complete revisions and allows at most 10 per page. Callers use the returned cursor to request the next page.
 
-Creation, update, publication, and move store their result under an owner-scoped request ID in the same transaction as the change. Matching retries return the committed result after checking current authority. Changed arguments under that ID fail with `request_conflict`, except under the request IDs of a deleted artifact, which fail with `not_found` (see Permanent deletion). Updates compare the expected head. Publication compares the expected version before considering a same-revision no-op. Version zero means unpublished. Busy retries retain the caller's expected versions.
+Creation, update, publication, move, share, and unshare store their result under an owner-scoped request ID in the same transaction as the change. Matching retries return the committed result after checking current authority. Changed arguments under that ID fail with `request_conflict`, except under the request IDs of a deleted artifact, which fail with `not_found` (see Permanent deletion). Updates compare the expected head. Publication compares the expected version before considering a same-revision no-op. Version zero means unpublished. Busy retries retain the caller's expected versions.
 
 The publication URL is `${publishOrigin}/a/${artifactId}`. It remains stable when the selected revision changes. Publishing does not move the draft head. Composite foreign keys enforce revision membership for parents, heads, and publication pointers. The head membership constraint is deferred to commit so a new artifact and its first revision enter together. A database trigger rejects revision updates.
+
+## Shares
+
+A share lets one person view the published revision of an artifact and its attachments. `share` trims the email, stores it in lowercase, and returns the existing share when that address already has one. `unshare` removes one share by its ID and fails with `not_found` when the artifact has no share with that ID. A non-owner gets `not_found` from all three methods. [The sharing decision](../../docs/decisions/sharing.md) records the matching rules, the viewer's reduced read, and the lifecycle.
+
+The MCP tools `artifacts_share`, `artifacts_unshare`, and `artifacts_shares_list` call these methods with the same arguments and return the store result as structured content. A missing `artifacts:publish` scope returns `forbidden` with `requiredScope`. An invalid email fails the tool's input validation before the store runs.
 
 ## Compact MCP responses
 
