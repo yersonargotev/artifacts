@@ -20,6 +20,107 @@ const snapshot: Snapshot = {
   files: [{ path: 'assets/data.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAEC/w==' }],
 };
 
+test('typed client sharing uses strict wire projections and real REST receipts', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const token = (await grant(app, fullScope)).access_token;
+    const seen: { path: string; method: string; body: unknown }[] = [];
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: token });
+    const created = await client.create({ requestId: 'client-sharing-create', snapshot });
+    app.setResourceHandler(async (request) => {
+      seen.push({ path: new URL(request.url).pathname, method: request.method, body: request.body ? await request.clone().json() : null });
+      return app.resourceHandler(request);
+    });
+    const input = { requestId: 'client-sharing-share', artifactId: created.artifactId, email: ' ANA@Example.com ' };
+    const share = await client.share(input);
+    assert.equal(share.value, 'ana@example.com');
+    assert.equal(share.artifactId, created.artifactId);
+    assert.deepEqual(seen[0], { path: `/mcp/v1/artifacts/${created.artifactId}/shares`, method: 'POST', body: { requestId: input.requestId, email: 'ana@example.com' } });
+    assert.deepEqual(await client.share(input), share);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [share] });
+    assert.deepEqual(seen[2], { path: `/mcp/v1/artifacts/${created.artifactId}/shares`, method: 'GET', body: null });
+    const remove = { requestId: 'client-sharing-remove', artifactId: created.artifactId, shareId: share.shareId };
+    assert.equal(await client.unshare(remove), undefined);
+    assert.deepEqual(seen[3], { path: `/mcp/v1/artifacts/${created.artifactId}/shares/${share.shareId}`, method: 'DELETE', body: { requestId: remove.requestId } });
+    assert.equal(await client.unshare(remove), undefined);
+    await assert.rejects(client.unshare({ ...remove, requestId: 'client-sharing-missing' }), (error: unknown) => error instanceof HttpError && error.status === 404 && error.code === 'not_found');
+    await assert.rejects(client.share({ ...input, email: 'different@example.com' }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'request_conflict');
+    assert.deepEqual(await client.share(input), share);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [] });
+  } finally { await app.close(); }
+});
+
+test('typed client sharing recovers lost responses without automatic retries', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: (await grant(app, fullScope)).access_token });
+    const created = await client.create({ requestId: 'client-sharing-lost-create', snapshot });
+    const input = { requestId: 'client-sharing-lost-post', artifactId: created.artifactId, email: 'ana@example.com' };
+    app.dropNextResourceResponse('POST');
+    await assert.rejects(client.share(input), (error: unknown) => error instanceof HttpError && error.code === 'network_error');
+    const share = await client.share(input);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [share] });
+    const remove = { requestId: 'client-sharing-lost-delete', artifactId: created.artifactId, shareId: share.shareId };
+    app.dropNextResourceResponse('DELETE');
+    await assert.rejects(client.unshare(remove), (error: unknown) => error instanceof HttpError && error.code === 'network_error');
+    assert.equal(await client.unshare(remove), undefined);
+    assert.deepEqual(await client.listShares({ artifactId: created.artifactId }), { items: [] });
+  } finally { await app.close(); }
+});
+
+test('typed client sharing validates commands before fetch and encodes path-owned identifiers', async () => {
+  let requests = 0;
+  const client = createArtifactHttpClient({ resource: 'https://artifacts.example/mcp', accessToken: 'test-token', fetch: async (url, options) => {
+    requests++;
+    assert.equal(String(url), 'https://artifacts.example/mcp/v1/artifacts/artifact%2Fwith%20space/shares/share%2Fwith%20space');
+    assert.equal(options?.method, 'DELETE');
+    assert.equal(options?.body, JSON.stringify({ requestId: 'client-sharing-encoded' }));
+    return new Response(null, { status: 204 });
+  } });
+  assert.throws(() => client.share({ requestId: 'client-sharing-invalid', artifactId: 'artifact', email: 'invalid' }));
+  assert.throws(() => client.listShares({ artifactId: '' }));
+  assert.throws(() => client.unshare({ requestId: 'short', artifactId: 'artifact', shareId: 'share' }));
+  assert.equal(requests, 0);
+  assert.equal(await client.unshare({ requestId: 'client-sharing-encoded', artifactId: 'artifact/with space', shareId: 'share/with space' }), undefined);
+  assert.equal(requests, 1);
+});
+
+test('typed client sharing rejects malformed results and requires an empty 204 while preserving DELETE errors', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    let handler: () => Response = () => Response.json({ shareId: 'incomplete' }, { status: 201 });
+    app.setResourceHandler(async () => handler());
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: 'test-token' });
+    const input = { requestId: 'client-sharing-response', artifactId: 'artifact', email: 'ana@example.com' };
+    await assert.rejects(client.share(input), (error: unknown) => error instanceof HttpError && error.code === 'invalid_response');
+    handler = () => Response.json({ items: [{ shareId: 'incomplete' }] });
+    await assert.rejects(client.listShares({ artifactId: 'artifact' }), (error: unknown) => error instanceof HttpError && error.code === 'invalid_response');
+    handler = () => Response.json({ items: [], ownerId: 'private' });
+    await assert.rejects(client.listShares({ artifactId: 'artifact' }), (error: unknown) => error instanceof HttpError && error.code === 'invalid_response');
+    const remove = { requestId: 'client-sharing-delete-response', artifactId: 'artifact', shareId: 'share' };
+    handler = () => new Response(null, { status: 204 });
+    assert.equal(await client.unshare(remove), undefined);
+    for (const status of [200, 201, 202, 205]) {
+      handler = () => new Response(null, { status });
+      await assert.rejects(client.unshare(remove), (error: unknown) => error instanceof HttpError && error.status === status && error.code === 'invalid_response');
+    }
+    handler = () => Response.json({ error: { code: 'request_conflict', message: 'Changed command', details: { requestId: remove.requestId } } }, { status: 409 });
+    await assert.rejects(client.unshare(remove), (error: unknown) => {
+      assert(error instanceof HttpError);
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'request_conflict');
+      assert.deepEqual(error.details, { requestId: remove.requestId });
+      return true;
+    });
+    const malformed = createArtifactHttpClient({ resource: app.config.resource, accessToken: 'test-token', fetch: async () => {
+      const response = new Response('unexpected');
+      Object.defineProperty(response, 'status', { value: 204 });
+      return response;
+    } });
+    await assert.rejects(malformed.unshare(remove), (error: unknown) => error instanceof HttpError && error.status === 204 && error.code === 'invalid_response');
+  } finally { await app.close(); }
+});
+
 async function cli(args: string[], environment: Record<string, string> = {}) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith('ARTIFACTS_')) delete env[key];

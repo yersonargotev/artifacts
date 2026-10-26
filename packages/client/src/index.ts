@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, updateSchema, type ArtifactRead, type UpdateInput } from '@yargote/artifacts-contracts';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type UpdateInput } from '@yargote/artifacts-contracts';
 import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
-export type { ArtifactRead, Snapshot, UpdateInput } from '@yargote/artifacts-contracts';
+export type { ArtifactRead, Share, Snapshot, UpdateInput } from '@yargote/artifacts-contracts';
 export type { Identity } from '@yargote/artifacts-contracts/http';
 export type { CompactArtifactRead, RevisionSummary } from '@yargote/artifacts-contracts/workflow';
 export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
@@ -11,6 +11,10 @@ export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 export type CreateInput = z.input<typeof createSchema>;
 export type ReadInput = z.input<typeof readSchema>;
 export type PublishInput = z.input<typeof publishSchema>;
+export type ShareInput = z.input<typeof shareSchema>;
+export type UnshareInput = z.input<typeof unshareSchema>;
+export type ListSharesInput = z.input<typeof listSharesSchema>;
+export type ListSharesResult = { items: Share[] };
 export type ListInput = z.input<typeof listSchema>;
 export type MoveInput = z.input<typeof moveSchema>;
 export type MoveResult = z.infer<typeof moveResultSchema>;
@@ -52,12 +56,17 @@ export interface ArtifactHttpClient {
   history(input: HistoryInput & { response?: 'full' }): Promise<HistoryResult>;
   history(input: HistoryInput): Promise<HistoryResult | SummaryHistoryResult>;
   publish(input: PublishInput): Promise<z.infer<typeof publishResultSchema>>;
+  share(input: ShareInput): Promise<Share>;
+  unshare(input: UnshareInput): Promise<void>;
+  listShares(input: ListSharesInput): Promise<ListSharesResult>;
   move(input: MoveInput): Promise<MoveResult>;
   export(input: ExportInput): Promise<ArtifactArchive>;
 }
 
 const maxJsonBytes = 64 * 1024 * 1024;
 const maxArchiveBytes = 8 * 1024 * 1024;
+const listSharesResultSchema = z.strictObject({ items: z.array(shareResultSchema) });
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 async function boundedBytes(response: Response, maximum: number): Promise<Uint8Array> {
   const length = response.headers.get('content-length');
@@ -116,7 +125,7 @@ export function createArtifactHttpClient(options: {
   const timeoutMs = options.timeoutMs ?? 30_000;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) throw new TypeError('timeoutMs must be a positive integer no greater than 2147483647');
 
-  async function request<T>(path: string, method: string, parse: (response: Response, bytes: Uint8Array) => Promise<T> | T, input?: unknown, maximum = maxJsonBytes): Promise<T> {
+  async function request<T>(path: string, method: HttpMethod, expectedStatus: 200 | 201 | 204, parse: (response: Response, bytes: Uint8Array) => Promise<T> | T, input?: unknown, maximum = maxJsonBytes): Promise<T> {
     const token = typeof options.accessToken === 'string' ? options.accessToken : await options.accessToken();
     if (!token || /[\r\n]/.test(token)) throw new TypeError('A nonempty access token is required');
     const controller = new AbortController();
@@ -141,7 +150,6 @@ export function createArtifactHttpClient(options: {
         const { error } = parseResponse(httpErrorSchema, value, response.status);
         throw new HttpError(response.status, error.code, error.message, error.details);
       }
-      const expectedStatus = method === 'POST' ? 201 : 200;
       if (response.status !== expectedStatus) throw new HttpError(response.status, 'invalid_response', `The server returned status ${response.status}, expected ${expectedStatus}`);
       return await parse(response, bytes);
     } catch (error) {
@@ -153,8 +161,8 @@ export function createArtifactHttpClient(options: {
     }
   }
 
-  function json<S extends z.ZodType>(path: string, method: string, schema: S, input?: unknown): Promise<z.output<S>> {
-    return request(path, method, (response, bytes) => {
+  function json<S extends z.ZodType>(path: string, method: HttpMethod, schema: S, input?: unknown): Promise<z.output<S>> {
+    return request(path, method, method === 'POST' ? 201 : 200, (response, bytes) => {
       if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') throw new HttpError(response.status, 'invalid_response', 'The server did not return JSON');
       let value: unknown;
       try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
@@ -189,13 +197,27 @@ export function createArtifactHttpClient(options: {
       const input = publishSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(input.artifactId)}/publication`, 'PUT', publishResultSchema, input);
     },
+    share(value: ShareInput) {
+      const { artifactId, ...input } = shareSchema.parse(value);
+      return json(`/artifacts/${encodeURIComponent(artifactId)}/shares`, 'POST', shareResultSchema, input);
+    },
+    listShares(value: ListSharesInput) {
+      const { artifactId } = listSharesSchema.parse(value);
+      return json(`/artifacts/${encodeURIComponent(artifactId)}/shares`, 'GET', listSharesResultSchema);
+    },
+    unshare(value: UnshareInput) {
+      const { artifactId, shareId, ...input } = unshareSchema.parse(value);
+      return request(`/artifacts/${encodeURIComponent(artifactId)}/shares/${encodeURIComponent(shareId)}`, 'DELETE', 204, (response, bytes) => {
+        if (bytes.byteLength !== 0) throw new HttpError(response.status, 'invalid_response', 'The server returned a nonempty response');
+      }, input);
+    },
     move(value: MoveInput) {
       const input = moveSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(input.artifactId)}/project`, 'PUT', moveResultSchema, input);
     },
     export(value: ExportInput) {
       const input = exportSchema.parse(value);
-      return request(`/artifacts/${encodeURIComponent(input.artifactId)}/revisions/${encodeURIComponent(input.revisionId)}/export`, 'GET', async (response, bytes) => {
+      return request(`/artifacts/${encodeURIComponent(input.artifactId)}/revisions/${encodeURIComponent(input.revisionId)}/export`, 'GET', 200, async (response, bytes) => {
         const disposition = response.headers.get('content-disposition');
         const filename = /^attachment; filename="([A-Za-z0-9._-]+\.zip)"$/.exec(disposition ?? '')?.[1];
         const digest = response.headers.get('x-artifact-sha256');

@@ -5,7 +5,7 @@ import { unzipSync } from 'fflate';
 import { fixture, grant } from './helpers.ts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
 import { createArtifactStore, ArtifactError as StoreError } from '../packages/artifacts/src/index.ts';
-import { ArtifactError, type ArtifactRead, type Snapshot } from '../packages/contracts/src/index.ts';
+import { ArtifactError, type ArtifactRead, type Share, type Snapshot } from '../packages/contracts/src/index.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 
 const snapshot: Snapshot = { metadata: { title: 'HTTP retained artifact', description: 'A complete REST snapshot', custom: { preserved: ['one', 2] } }, content: { kind: 'html', text: '<h1>REST first revision</h1>' }, files: [{ path: 'data/raw.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAEC/w==' }] };
@@ -28,6 +28,139 @@ async function mcp(app: Awaited<ReturnType<typeof fixture>>, token: string, name
   const value = JSON.parse(text.startsWith('event:') ? text.split('\n').find((line) => line.startsWith('data: '))!.slice(6) : text) as { result: { structuredContent: unknown; isError?: boolean } };
   return value.result;
 }
+
+test('REST sharing normalizes, lists, replays across transports, and never restores a revoked share', async () => {
+  const app = await fixture({ transport: 'combined' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const created = await (await call('/artifacts', 'POST', { requestId: 'sharing-rest-create', snapshot })).json() as ArtifactRead;
+    const path = `/artifacts/${created.artifactId}/shares`;
+    const command = { requestId: 'sharing-rest-normalize', email: ' Ana@Example.com ' };
+    const response = await call(path, 'POST', command);
+    assert.equal(response.status, 201);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const share = await response.json() as Share;
+    assert.deepEqual(share, { shareId: share.shareId, artifactId: created.artifactId, kind: 'email', value: 'ana@example.com', createdAt: share.createdAt });
+    assert.equal(typeof share.shareId, 'string');
+    assert.equal(Number.isNaN(Date.parse(share.createdAt)), false);
+    assert.deepEqual(await (await call(path, 'POST', { ...command, email: 'ana@example.com' })).json(), share);
+    assert.deepEqual(await (await call(path, 'POST', { requestId: 'sharing-rest-duplicate', email: 'ANA@example.com' })).json(), share);
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_share', { ...command, artifactId: created.artifactId })).structuredContent, share);
+    const listing = await call(path);
+    assert.equal(listing.status, 200);
+    assert.equal(listing.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await listing.json(), { items: [share] });
+    await error(await call(path, 'POST', { ...command, email: 'other@example.com' }), 409, 'request_conflict');
+    const remove = { requestId: 'sharing-rest-remove' };
+    for (let retry = 0; retry < 2; retry++) {
+      const removed = await call(`${path}/${share.shareId}`, 'DELETE', remove);
+      assert.equal(removed.status, 204);
+      assert.equal(removed.headers.get('cache-control'), 'no-store');
+      assert.equal(removed.headers.has('content-type'), false);
+      assert.equal((await removed.arrayBuffer()).byteLength, 0);
+    }
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_unshare', { ...remove, artifactId: created.artifactId, shareId: share.shareId })).structuredContent, { artifactId: created.artifactId, shareId: share.shareId });
+    await error(await call(`${path}/${share.shareId}`, 'DELETE', { requestId: 'sharing-rest-missing' }), 404, 'not_found');
+    await error(await call(`${path}/different`, 'DELETE', remove), 409, 'request_conflict');
+    assert.deepEqual(await (await call(path, 'POST', command)).json(), share);
+    assert.deepEqual(await (await call(path)).json(), { items: [] });
+  } finally { await app.close(); }
+});
+
+test('REST sharing validates strict path-owned commands, queries, methods, media types, and Origin', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const call = api(app, (await grant(app, fullScope)).access_token);
+    const created = await (await call('/artifacts', 'POST', { requestId: 'sharing-boundaries-create', snapshot })).json() as ArtifactRead;
+    const path = `/artifacts/${created.artifactId}/shares`;
+    const command = { requestId: 'sharing-boundaries-share', email: 'ana@example.com' };
+    const wrongMethod = await call(path, 'PUT', command);
+    await error(wrongMethod, 405, 'method_not_allowed');
+    assert.equal(wrongMethod.headers.get('allow'), 'GET, POST');
+    const wrongItemMethod = await call(`${path}/share`);
+    await error(wrongItemMethod, 405, 'method_not_allowed');
+    assert.equal(wrongItemMethod.headers.get('allow'), 'DELETE');
+    for (const suffix of ['/', '/share/extra']) await error(await call(`${path}${suffix}`), 404, 'not_found');
+    for (const [method, suffix, body] of [['GET', '', undefined], ['POST', '', command], ['DELETE', '/share', { requestId: 'sharing-boundaries-delete' }]] as const) {
+      await error(await call(`${path}${suffix}?unknown=1`, method, body), 400, 'invalid_input');
+    }
+    for (const body of [{ ...command, artifactId: created.artifactId }, { ...command, shareId: 'share' }, { ...command, email: 'not-an-email' }, { email: 'ana@example.com' }]) await error(await call(path, 'POST', body), 400, 'invalid_input');
+    for (const body of [{}, { requestId: 'short' }, { requestId: 'sharing-boundaries-delete', artifactId: created.artifactId }, { requestId: 'sharing-boundaries-delete', shareId: 'share' }]) await error(await call(`${path}/share`, 'DELETE', body), 400, 'invalid_input');
+    const token = (await grant(app, fullScope)).access_token;
+    for (const [method, suffix] of [['POST', ''], ['DELETE', '/share']] as const) {
+      const url = `${restBase(app.config.resource)}${path}${suffix}`;
+      await error(await fetch(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'text/plain' }, body: '{}' }), 415, 'unsupported_media_type');
+      await error(await fetch(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{' }), 400, 'invalid_input');
+      await error(await fetch(url, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', origin: 'https://foreign.example' }, body: JSON.stringify(command) }), 403, 'forbidden');
+    }
+    await error(await call(`${path}/share`, 'DELETE'), 415, 'unsupported_media_type');
+    assert.deepEqual(await (await call(path)).json(), { items: [] });
+  } finally { await app.close(); }
+});
+
+test('REST sharing enforces publish-only authority, ownership, artifact binding, and revocation before replay', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const owner = api(app, (await grant(app, fullScope)).access_token);
+    const first = await (await owner('/artifacts', 'POST', { requestId: 'sharing-authority-first', snapshot })).json() as ArtifactRead;
+    const second = await (await owner('/artifacts', 'POST', { requestId: 'sharing-authority-second', snapshot })).json() as ArtifactRead;
+    const path = `/artifacts/${first.artifactId}/shares`;
+    const command = { requestId: 'sharing-authority-command', email: 'ana@example.com' };
+    const publisherToken = (await grant(app, 'openid profile offline_access artifacts:publish')).access_token;
+    const publisher = api(app, publisherToken);
+    const shared = await publisher(path, 'POST', command);
+    assert.equal(shared.status, 201);
+    const share = await shared.json() as Share;
+    assert.deepEqual(await (await publisher(path)).json(), { items: [share] });
+    for (const scope of ['artifacts:read', 'artifacts:write']) {
+      const limited = api(app, (await grant(app, `openid profile offline_access ${scope}`)).access_token);
+      for (const [suffix, method, body] of [['', 'GET', undefined], ['', 'POST', command], [`/${share.shareId}`, 'DELETE', { requestId: 'sharing-authority-remove' }]] as const) {
+        const response = await limited(`${path}${suffix}`, method, body);
+        const result = await error(response, 403, 'forbidden');
+        assert.deepEqual(result.details, { requiredScopes: ['artifacts:publish'] });
+        assert.match(response.headers.get('www-authenticate')!, /insufficient_scope/);
+      }
+    }
+    await error(await publisher(`/artifacts/${second.artifactId}/shares/${share.shareId}`, 'DELETE', { requestId: 'sharing-authority-wrong-artifact' }), 404, 'not_found');
+    assert.deepEqual(await (await publisher(path)).json(), { items: [share] });
+    await app.auth.api.signUpEmail({ body: { name: 'Guest', email: 'sharing-guest@example.test', password: app.password } });
+    const signIn = await app.auth.api.signInEmail({ body: { email: 'sharing-guest@example.test', password: app.password }, returnHeaders: true });
+    const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
+    const guest = api(app, (await grant({ ...app, cookie }, fullScope)).access_token);
+    for (const [suffix, method, body] of [['', 'GET', undefined], ['', 'POST', command], [`/${share.shareId}`, 'DELETE', { requestId: 'sharing-guest-remove' }]] as const) await error(await guest(`${path}${suffix}`, method, body), 404, 'not_found');
+    const remove = { requestId: 'sharing-authority-remove' };
+    assert.equal((await publisher(`${path}/${share.shareId}`, 'DELETE', remove)).status, 204);
+    const revoked = await fetch(`${app.config.origin}/revoke-all`, { method: 'POST', headers: { cookie: app.cookie, origin: app.config.origin }, redirect: 'manual' });
+    assert.equal(revoked.status, 303);
+    await error(await publisher(path, 'POST', command), 401, 'unauthenticated');
+    await error(await publisher(`${path}/${share.shareId}`, 'DELETE', remove), 401, 'unauthenticated');
+    await error(await publisher(path), 401, 'unauthenticated');
+  } finally { await app.close(); }
+});
+
+test('REST sharing recovers lost committed POST and DELETE responses with the same commands', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const call = api(app, (await grant(app, fullScope)).access_token);
+    const created = await (await call('/artifacts', 'POST', { requestId: 'sharing-lost-create', snapshot })).json() as ArtifactRead;
+    const path = `/artifacts/${created.artifactId}/shares`;
+    const command = { requestId: 'sharing-lost-post', email: 'ana@example.com' };
+    app.dropNextResourceResponse('POST');
+    await assert.rejects(call(path, 'POST', command), /fetch failed/);
+    const retried = await call(path, 'POST', command);
+    assert.equal(retried.status, 201);
+    const share = await retried.json() as Share;
+    assert.deepEqual(await (await call(path)).json(), { items: [share] });
+    const remove = { requestId: 'sharing-lost-delete' };
+    app.dropNextResourceResponse('DELETE');
+    await assert.rejects(call(`${path}/${share.shareId}`, 'DELETE', remove), /fetch failed/);
+    const removed = await call(`${path}/${share.shareId}`, 'DELETE', remove);
+    assert.equal(removed.status, 204);
+    assert.equal(await removed.text(), '');
+    assert.deepEqual(await (await call(path)).json(), { items: [] });
+  } finally { await app.close(); }
+});
 
 test('REST-only HTTP creates, reads, edits, publishes, paginates and exports exact retained bytes', async () => {
   const app = await fixture({ transport: 'rest' });
