@@ -41,7 +41,15 @@ Use `move ID --project NAME` to file an existing artifact under a project and `m
 
 Publish when the user requests publication, a shareable artifact URL, or a change to the live artifact. Use the exact saved revision selected by the user or returned by the edit. Read the current publication version before preparing publication. Use zero only when the artifact is unpublished.
 
-A published URL still requires its owner's Artifacts login. Publishing a historical revision leaves the draft head unchanged. Report the returned protected URL only after the publication succeeds and its current state is verified.
+A published URL requires sign-in by the owner or a user whose verified email matches a current share. Publishing a historical revision leaves the draft head unchanged. Report the returned protected URL only after the publication succeeds and its current state is verified.
+
+## Share publication access
+
+Check installed help for `share`, `shares`, and `unshare` support. These commands describe current source and built packages, not the published `0.1.0-beta.5` release. Share only when the user requests access for an exact email. Use `share ARTIFACT_ID --email EMAIL`, then verify the normalized email with `shares ARTIFACT_ID`. Use the observed `shareId` with `unshare ARTIFACT_ID SHARE_ID` to revoke it. Unshare and its successful retry exit zero with empty stdout.
+
+A matching signed-in user must have a verified email. Access covers the published revision and its attachments. History, export, editing, and project moves stay owner-only. A share before first publication remains stored and waits for publication. Sharing does not send invitation emails or provide email-code sign-in.
+
+Recover uncertain share or unshare results with `retry REQUEST_ID`. Replay confirms the original operation and does not establish current grants. An old share replay does not restore revoked access. An old unshare replay does not remove a deliberate new share. Verify current grants with `shares ARTIFACT_ID`.
 
 ## Recover an uncertain write
 
