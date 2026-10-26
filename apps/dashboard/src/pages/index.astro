@@ -8,9 +8,10 @@ import LibraryHeading from '../components/library/LibraryHeading.astro';
 import StatusTabs from '../components/library/StatusTabs.astro';
 import ProjectFilter from '../components/library/ProjectFilter.astro';
 import ArtifactGrid from '../components/library/ArtifactGrid.astro';
+import SharedWithMe from '../components/library/SharedWithMe.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
-const { panel } = await getRuntime();
+const { panel, artifacts } = await getRuntime();
 const failed = Astro.url.searchParams.get('login') === 'failed';
 const revoked = Astro.url.searchParams.has('revoked');
 let query;
@@ -18,6 +19,8 @@ try { query = readLibraryUrl(Astro.url); }
 catch (error) { return artifactErrorResponse(error); }
 const snapshot = identity ? await panel.library(panelActor(identity), query).catch(artifactErrorResponse) : undefined;
 if (snapshot instanceof Response) return snapshot;
+const shared = identity && query.scope.kind === 'all' && !query.q && query.status === 'all' && !query.cursor ? await artifacts.listSharedWithMe(panelActor(identity)).catch(artifactErrorResponse) : { items: [] };
+if (shared instanceof Response) return shared;
 const scope = snapshot?.page.scope;
 const project = scope?.kind === 'project' ? scope.project.name : scope?.kind === 'vanishedProject' ? scope.name : undefined;
 const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
@@ -25,7 +28,10 @@ const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Bibliotec
 <Panel share move title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={snapshot ? searchFor(snapshot.page) : undefined}>
   {snapshot ? <>
     <LibraryHeading workspace={snapshot.workspace} scope={snapshot.page.scope} />
-    <div class="library-controls"><StatusTabs page={snapshot.page} /><ProjectFilter workspace={snapshot.workspace} page={snapshot.page} /></div>
-    <ArtifactGrid page={snapshot.page} workspaceCount={snapshot.workspace.total.count} now={new Date()} />
+    <SharedWithMe items={shared.items} />
+    {(snapshot.workspace.total.count > 0 || shared.items.length === 0) && <>
+      <div class="library-controls"><StatusTabs page={snapshot.page} /><ProjectFilter workspace={snapshot.workspace} page={snapshot.page} /></div>
+      <ArtifactGrid page={snapshot.page} workspaceCount={snapshot.workspace.total.count} now={new Date()} />
+    </>}
   </> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>

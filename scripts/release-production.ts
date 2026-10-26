@@ -12,7 +12,7 @@ import panel from '../apps/dashboard/cloudflare.config.ts';
 import view from '../apps/publication/cloudflare.config.ts';
 import { workerOrigins } from './cloudflare.ts';
 
-const services = { auth, mcp, panel, view };
+const services = { auth, mcp, view, panel };
 type Service = keyof typeof services;
 const releaseOrder = Object.keys(services) as Service[];
 type RuntimeSecrets = Record<string, string>;

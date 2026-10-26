@@ -13,6 +13,8 @@ const args = process.argv.slice(2);
 const parent = args.includes('--parent');
 const headed = args.includes('--headed');
 const providedRun = args.includes('--run');
+const sharedMode = args.includes('--shared-with-me');
+const sharedParent = args.includes('--s9-parent');
 const run = resolve(providedRun ? args[args.indexOf('--run') + 1]! : `.test-artifacts/verify-artifacts/panel-share-${randomUUID()}`);
 const control = (command: string[]) => execute(process.execPath, ['--import', 'tsx', '.agents/skills/verify-artifacts/scripts/control.ts', ...command]);
 if (!providedRun) await control(['launch', '--run', run]);
@@ -32,9 +34,9 @@ const posts: string[] = [];
 let status = 'ISSUES';
 let active: Page | undefined;
 const pass = (lane: number | string, observed: unknown) => { const result = { lane, status: 'PASS', observed }; results.push(result); console.log(JSON.stringify(result)); };
-async function create(title: string) {
+async function create(title: string, accessToken = credentials.accessToken) {
   const input = { requestId: randomUUID(), snapshot: { metadata: { title, description: 'Public share route proof' }, content: { kind: 'text', text: `Published ${title}` }, files: [] } };
-  const response = await fetch(instance.mcp, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${credentials.accessToken}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'artifacts_create', arguments: input } }) });
+  const response = await fetch(instance.mcp, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${accessToken}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'artifacts_create', arguments: input } }) });
   assert.equal(response.status, 200);
   const text = await response.text();
   const payload = JSON.parse(text.startsWith('event:') ? text.split('\n').find((line) => line.startsWith('data:'))!.slice(5) : text);
@@ -82,8 +84,154 @@ async function add(page: Page, email: string) {
 async function current(id: string) { return (await client.listShares({ artifactId: id })).items; }
 async function clear(id: string) { for (const share of await current(id)) await client.unshare({ artifactId: id, shareId: share.shareId, requestId: randomUUID() }); }
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; };
+async function sharedWithMe() {
+  const title = 'Plan compartido para la próxima entrega y sus decisiones de producto';
+  const artifact = await create(title);
+  const unpublished = await create('Invitación pendiente de publicación');
+  const published = await client.publish({ requestId: randomUUID(), artifactId: artifact.artifactId, revisionId: artifact.revision.id, expectedPublicationVersion: 0 });
+  await client.update({ requestId: randomUUID(), artifactId: artifact.artifactId, expectedRevisionId: artifact.revision.id, snapshot: { metadata: { title: 'Private draft title', description: '' }, content: { kind: 'text', text: 'Private draft content' }, files: [] } });
+  let shared = await client.share({ requestId: randomUUID(), artifactId: artifact.artifactId, email: 'GUEST@Example.TEST' });
+  await control(['account', '--email', 'guest@example.test', '--run', run]);
+  await control(['account', '--email', 'empty@example.test', '--run', run]);
+  const owner = await context();
+  const ownerPage = await owner.newPage(); active = ownerPage;
+  await login(ownerPage);
+  assert.equal(await ownerPage.locator('#shared-with-me').count(), 0);
+  await capture(ownerPage, sharedParent ? 's9-library-trunk' : 's9-library-head');
+  pass('S9-7', 'Owner library has no shared section and retains its owned collection');
+  const guestSetup = await context();
+  await login(await guestSetup.newPage(), 'guest@example.test');
+  const guest = await context({ storageState: await guestSetup.storageState(), javaScriptEnabled: false, ...(headed ? { recordVideo: { dir: join(directory, 's9-video'), size: { width: 1440, height: 900 } } } : {}) });
+  const page = await guest.newPage(); active = page;
+  const video = page.video();
+  const videoStart = Date.now();
+  const sharedSection = page.locator('#shared-with-me');
+  const checkLibrary = async (count: number) => {
+    const response = await page.goto(instance.panel);
+    assert.equal(response?.status(), 200);
+    assert.equal(new URL(page.url()).pathname, '/');
+    assert.equal(await sharedSection.locator('li').count(), count);
+    const html = await response!.text();
+    for (const value of ['Private draft title', 'Private draft content', artifact.ownerId, 'owner@example.test', 'Private project']) assert(!html.includes(value), value);
+    return html;
+  };
+  const shot = async (slug: string, reviewSlug?: string) => {
+    await capture(page, `s9-${slug}`);
+    if (reviewSlug) await copyFile(join(directory, `s9-${slug}.png`), join(review, `S9-review-${reviewSlug}.png`));
+  };
+  const record = async (action: string, perform: () => Promise<void>) => {
+    const started = Date.now();
+    if (headed) await page.bringToFront();
+    await perform();
+    if (headed) {
+      await page.waitForTimeout(Math.max(0, 8500 - (Date.now() - started)));
+      segments.push({ source: 's9-guest.webm', start: (started - videoStart) / 1000, duration: (Date.now() - started) / 1000, action });
+    }
+  };
+  await record('Read the actual guest library with JavaScript disabled', async () => {
+    await checkLibrary(1);
+    assert.equal(await sharedSection.getByRole('heading', { name: 'Compartidos conmigo', exact: true }).count(), 1);
+    assert.equal(await sharedSection.getByRole('link', { name: title, exact: true }).getAttribute('href'), published.url);
+    assert.equal(await sharedSection.getByText('Compartido por Test owner', { exact: true }).count(), 1);
+    assert.equal(await sharedSection.locator('button,input,form,[role="menu"]').count(), 0);
+    assert.equal(await page.locator('.library-controls,.library-collection').count(), 0);
+    assert.equal(await page.getByRole('link', { name: 'Conectar herramientas', exact: true }).count(), 1);
+    await shot('shared-section', 'shared-section');
+    pass('S9-2', 'Verified guest sees the published title, owner name, and native publication link without owner controls');
+    pass('S9-1', 'Owner collection remains separate; guest discovery uses the current published title');
+  });
+  await record('Open the publication through its native shared card and read attribution', async () => {
+    const response = page.waitForResponse((response) => response.url() === published.url && response.status() === 200 && response.request().isNavigationRequest());
+    await sharedSection.getByRole('link', { name: title, exact: true }).click();
+    assert.equal((await response).status(), 200);
+    await page.frameLocator('iframe').getByText(`Published ${title}`, { exact: true }).waitFor();
+    assert.equal(await page.getByText('Compartido por Test owner', { exact: true }).count(), 1);
+    assert.equal(await page.getByRole('link', { name: 'Volver a la biblioteca', exact: true }).getAttribute('href'), `${instance.panel}/#shared-with-me`);
+    const html = await page.content();
+    for (const value of ['Private draft title', artifact.ownerId, 'owner@example.test', 'Private project', 'Cliente autor', 'Compartir', 'Eliminar', 'Exportar']) assert(!html.includes(value), value);
+    await shot('header', 'header');
+    pass('S9-3', 'The guest opens the actual protected publication without JavaScript');
+    pass('S9-4', 'Publication header shows the owner display name and returns to the shared section');
+  });
+  await record('Return to the real shared library on mobile', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('link', { name: 'Volver a la biblioteca', exact: true }).click();
+    assert.equal(new URL(page.url()).hash, '#shared-with-me');
+    assert.equal(await sharedSection.locator('li').count(), 1);
+    const link = sharedSection.getByRole('link', { name: title, exact: true });
+    await link.focus();
+    const box = await link.boundingBox();
+    assert(box && box.height >= 44 && box.x >= 0 && box.x + box.width <= 390);
+    assert.equal(await link.evaluate((element) => getComputedStyle(element).outlineStyle), 'solid');
+    await shot('mobile-library', 'mobile-library');
+  });
+  await record('Read actual mobile publication attribution', async () => {
+    await sharedSection.getByRole('link', { name: title, exact: true }).click();
+    await page.getByText('Compartido por Test owner', { exact: true }).waitFor();
+    await shot('mobile-header', 'mobile-header');
+    pass('S9-9', 'Guest library and publication fit 390px with a visible focus outline and at least 44px publication target');
+  });
+  await client.unshare({ requestId: randomUUID(), artifactId: artifact.artifactId, shareId: shared.shareId });
+  assert.equal((await page.reload())?.status(), 403);
+  await checkLibrary(0); await shot('revoked-library');
+  pass('S9-5', 'Revocation denies the established viewer and removes the card on the next library load');
+  shared = await client.share({ requestId: randomUUID(), artifactId: artifact.artifactId, email: 'guest@example.test' });
+  await client.share({ requestId: randomUUID(), artifactId: unpublished.artifactId, email: 'guest@example.test' });
+  await checkLibrary(1); await shot('unpublished-library');
+  await client.publish({ requestId: randomUUID(), artifactId: unpublished.artifactId, revisionId: unpublished.revision.id, expectedPublicationVersion: 0 });
+  await checkLibrary(2);
+  assert.equal(await sharedSection.getByRole('link', { name: 'Invitación pendiente de publicación', exact: true }).count(), 1);
+  pass('S9-6', 'An unpublished invitation is hidden until the actual publication exists');
+  for (const suffix of ['?q=Plan', '?status=published', '?unfiled=1', '?project=Missing']) {
+    assert.equal((await page.goto(`${instance.panel}/${suffix}`))?.status(), 200);
+    assert.equal(await sharedSection.count(), 0);
+  }
+  await checkLibrary(2);
+  await sharedSection.getByRole('link', { name: title, exact: true }).click();
+  await control(['account', '--email', 'guest@example.test', '--unverified', '--run', run]);
+  assert.equal((await page.reload())?.status(), 403);
+  await checkLibrary(0);
+  await control(['account', '--email', 'guest@example.test', '--run', run]);
+  await checkLibrary(2);
+  pass('S9-current-verification', 'Revoking email verification stops both listing and established publication viewing; verification restores discovery');
+  const empty = await context();
+  const emptyPage = await empty.newPage(); active = emptyPage;
+  await login(emptyPage, 'empty@example.test');
+  assert.equal(await emptyPage.locator('#shared-with-me').count(), 0);
+  await emptyPage.getByRole('heading', { name: 'Tu próximo proyecto empieza aquí', exact: true }).waitFor();
+  await capture(emptyPage, 's9-empty');
+  await copyFile(join(directory, 's9-empty.png'), join(review, 'S9-review-empty.png'));
+  pass('S9-8', 'An account without shares retains the exact owned welcome state');
+  const guestCredentials = JSON.parse(await readFile(join(run, 'runtime/accounts/guest@example.test.json'), 'utf8')) as { userId: string; accessToken: string };
+  assert.notEqual(guestCredentials.userId, artifact.ownerId);
+  const guestOwn = await create('Guest authored through HTTP MCP', guestCredentials.accessToken);
+  assert.equal(guestOwn.ownerId, guestCredentials.userId);
+  active = page;
+  await checkLibrary(2);
+  assert.equal(await sharedSection.getByRole('link', { name: 'Guest authored through HTTP MCP', exact: true }).count(), 0);
+  assert.equal(await page.locator('.artifact-card').filter({ has: page.getByRole('heading', { name: 'Guest authored through HTTP MCP', exact: true }) }).count(), 1);
+  await shot('guest-own');
+  pass('S9-10', { transport: 'Actual public HTTP MCP artifacts_create using the guest-issued access token', owner: 'Guest ownership matches the separately issued account', sharedCards: 2, ownedCards: 1 });
+  await client.unshare({ requestId: randomUUID(), artifactId: artifact.artifactId, shareId: shared.shareId });
+  if (headed) {
+    await guest.close();
+    assert(video);
+    await video.saveAs(join(directory, 's9-guest.webm'));
+    const cuts = segments.filter(({ source }) => source === 's9-guest.webm');
+    await writeFile(join(directory, 's9-video-segments.json'), JSON.stringify({ method: 'Chronological cuts of one actual headed guest run at original speed', segments: cuts }, null, 2));
+    for (const [index, item] of cuts.entries()) await execute('ffmpeg', ['-y', '-ss', String(item.start), '-i', join(directory, item.source), '-t', String(item.duration), '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', join(directory, `s9-segment-${index}.mp4`)]);
+    await writeFile(join(directory, 's9-concat.txt'), cuts.map((_, index) => `file 's9-segment-${index}.mp4'`).join('\n'));
+    await execute('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', join(directory, 's9-concat.txt'), '-c', 'copy', '-movflags', '+faststart', join(review, 'S9-review.mp4')]);
+    pass('S9-media', { durationSeconds: cuts.reduce((total, item) => total + item.duration, 0), method: 'Actual chronological cuts at original speed', provenance: directory });
+  }
+}
 try {
   await control(['doctor', '--run', run]);
+  if (sharedMode) {
+    await sharedWithMe();
+    assert.deepEqual(errors, []);
+    status = 'PASS';
+  } else {
   const artifact = await create('Sharing proof');
   const unpublished = await create('Unpublished sharing proof');
   const published = await client.publish({ artifactId: artifact.artifactId, revisionId: artifact.headRevisionId, expectedPublicationVersion: 0, requestId: randomUUID() });
@@ -504,8 +652,10 @@ try {
     await expiredPage.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
     assert.equal((await live.request.post(`${instance.panel}${path}`, { headers, data: body })).status(), 401);
     pass('expired-session', 'Actual panel logout invalidates the old authenticated share POST');
+    await sharedWithMe();
     assert.deepEqual(errors, []);
     status = 'PASS';
+  }
   }
 } catch (error) {
   if (active && !active.isClosed()) await capture(active, 'failure').catch(() => {});
