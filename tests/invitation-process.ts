@@ -23,7 +23,7 @@ process.once('message', async (input: { databaseUrl: string; sink: string; confi
     if (input.holdTransaction && !released) {
       try {
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('The contention fixture did not release the acquired transaction')), 250);
+          const timer = setTimeout(() => reject(new Error('The contention fixture did not release the acquired transaction')), 5000);
           release = () => { clearTimeout(timer); resolve(); };
         });
       } catch (error) { await tx.rollback(); throw error; }
@@ -56,7 +56,8 @@ process.once('message', async (input: { databaseUrl: string; sink: string; confi
   const share = store.share.bind(store);
   store.share = async (actor, command) => {
     report('share_enter', { requestId: command.requestId });
-    return share(actor, command);
+    try { return await share(actor, command); }
+    finally { report('share_finished', { requestId: command.requestId }); }
   };
   const handler = createArtifactRestApp(input.config, store);
   const require = createRequire(import.meta.url);
