@@ -5,15 +5,14 @@ export type EmailSender = (message: EmailMessage) => Promise<void>;
 export type EmailTransportConfiguration =
   | { transport: 'disabled' }
   | { transport: 'file'; path: string }
-  | { transport: 'cloudflare'; from: string; accountId: string; apiToken: string };
+  | { transport: 'resend'; from: string; apiKey: string };
 export type EmailConfiguration = { transport: 'disabled' } | (Exclude<EmailTransportConfiguration, { transport: 'disabled' }> & { ownerEmail: string });
 export type EmailEnvironment = {
   EMAIL_TRANSPORT?: string;
   OWNER_EMAIL?: string;
   EMAIL_FROM?: string;
   EMAIL_FILE_PATH?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_EMAIL_API_TOKEN?: string;
+  RESEND_API_KEY?: string;
 };
 
 export function emailTransportConfiguration(env: Environment, origin: string): EmailTransportConfiguration {
@@ -22,14 +21,14 @@ export function emailTransportConfiguration(env: Environment, origin: string): E
     if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(origin).hostname)) throw new Error('File email delivery requires a loopback AUTH_URL');
     return { transport: 'file', path: required('EMAIL_FILE_PATH', env) };
   }
-  if (env.EMAIL_TRANSPORT === 'cloudflare') {
+  if (env.EMAIL_TRANSPORT === 'resend') {
     const from = required('EMAIL_FROM', env).trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) throw new Error('EMAIL_FROM must be an email address');
-    const accountId = required('CLOUDFLARE_ACCOUNT_ID', env);
-    if (!/^[a-f\d]{32}$/i.test(accountId)) throw new Error('CLOUDFLARE_ACCOUNT_ID must be a 32-character hexadecimal ID');
-    return { transport: 'cloudflare', from, accountId, apiToken: required('CLOUDFLARE_EMAIL_API_TOKEN', env) };
+    const apiKey = required('RESEND_API_KEY', env);
+    if (/[\s\x00-\x1f\x7f]/.test(apiKey)) throw new Error('RESEND_API_KEY must not contain whitespace or control characters');
+    return { transport: 'resend', from, apiKey };
   }
-  throw new Error('EMAIL_TRANSPORT must be cloudflare or file');
+  throw new Error('EMAIL_TRANSPORT must be resend or file');
 }
 
 export function emailConfiguration(env: Environment, origin: string): EmailConfiguration {
@@ -40,21 +39,20 @@ export function emailConfiguration(env: Environment, origin: string): EmailConfi
   return transport.transport === 'disabled' ? transport : { ...transport, ownerEmail };
 }
 
-export function cloudflareEmailSender(config: Extract<EmailTransportConfiguration, { transport: 'cloudflare' }>, fetcher: typeof fetch = fetch): EmailSender {
+export function resendEmailSender(config: Extract<EmailTransportConfiguration, { transport: 'resend' }>, fetcher: typeof fetch = fetch): EmailSender {
   return async (message) => {
-    const response = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/email/sending/send`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${config.apiToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ ...message, from: config.from }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) throw new Error('Email provider request failed');
-    const body: unknown = await response.json();
-    if (!body || typeof body !== 'object' || !('success' in body) || body.success !== true || !('errors' in body) || !Array.isArray(body.errors) || body.errors.length || !('result' in body) || !body.result || typeof body.result !== 'object') throw new Error('Email provider response is invalid');
-    const result = body.result;
-    const addresses = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
-    if (!('delivered' in result) || !addresses(result.delivered) || !('queued' in result) || !addresses(result.queued) || !('permanent_bounces' in result) || !addresses(result.permanent_bounces) || ('suppressed_recipients' in result && !addresses(result.suppressed_recipients))) throw new Error('Email provider delivery result is invalid');
-    const matches = (email: string) => email.toLowerCase() === message.to.toLowerCase();
-    if (result.permanent_bounces.some(matches) || ('suppressed_recipients' in result && (result.suppressed_recipients as string[]).some(matches)) || ![...result.delivered, ...result.queued].some(matches)) throw new Error('Email provider did not accept the recipient');
+    try {
+      const response = await fetcher('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${config.apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...message, from: config.from }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error('Email provider request failed');
+      const body: unknown = await response.json();
+      if (!body || typeof body !== 'object' || !('id' in body) || typeof body.id !== 'string' || !body.id.trim()) throw new Error('Email provider response is invalid');
+    } catch {
+      throw new Error('Email provider request failed');
+    }
   };
 }

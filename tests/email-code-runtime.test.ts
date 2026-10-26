@@ -4,8 +4,8 @@ import { createAuth } from '../apps/auth/src/auth.ts';
 import { createAuthApp } from '../apps/auth/src/http.ts';
 import { fixture } from './helpers.ts';
 
-const providerConfig = { transport: 'cloudflare' as const, ownerEmail: 'owner@example.test', from: 'codes@example.test', accountId: 'a'.repeat(32), apiToken: 'disposable-token' };
-const accepted = { success: true, errors: [], result: { delivered: ['owner@example.test'], queued: [], permanent_bounces: [] } };
+const providerConfig = { transport: 'resend' as const, ownerEmail: 'owner@example.test', from: 'codes@example.test', apiKey: 'disposable-token' };
+const accepted = { id: 'accepted-message' };
 
 function request(origin: string, email = 'owner@example.test') {
   return new Request(`${origin}/api/auth/email-otp/send-verification-otp`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.40', 'x-artifacts-client-ip': '198.51.100.1' }, body: JSON.stringify({ email, type: 'sign-in' }) });
@@ -20,7 +20,7 @@ test('Node HTTP returns before provider delivery and drains accepted sends befor
   let handler: ReturnType<typeof createAuthApp> | undefined;
   try {
     globalThis.fetch = async (url, init) => {
-      assert.equal(String(url), `https://api.cloudflare.com/client/v4/accounts/${'a'.repeat(32)}/email/sending/send`);
+      assert.equal(String(url), 'https://api.resend.com/emails');
       assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer disposable-token');
       const body = JSON.parse(String(init?.body));
       assert.equal(body.to, 'owner@example.test');
@@ -57,7 +57,7 @@ test('direct API awaits sender and provider failures preserve the public code re
   const logs: unknown[][] = [];
   try {
     console.error = (...values) => { logs.push(values); };
-    for (const outcome of [accepted, { ...accepted, result: { delivered: [], queued: ['owner@example.test'], permanent_bounces: [] } }, { success: false, errors: [{ code: 1, message: 'sensitive' }], result: null }, { ...accepted, result: { delivered: [], queued: [], permanent_bounces: ['owner@example.test'] } }, { ...accepted, result: { delivered: ['owner@example.test'], queued: [], permanent_bounces: [], suppressed_recipients: ['owner@example.test'] } }, { ...accepted, result: { delivered: 'owner@example.test', queued: [], permanent_bounces: [] } }, { ...accepted, result: { delivered: [], queued: [], permanent_bounces: [] } }, 'http-error', 'invalid-json', 'rejection']) {
+    for (const outcome of [accepted, { id: '' }, { id: '   ' }, { id: 12 }, {}, 'quota-error', 'http-error', 'invalid-json', 'rejection']) {
       const app = await fixture();
       try {
         let complete = false;
@@ -65,6 +65,7 @@ test('direct API awaits sender and provider failures preserve the public code re
           await new Promise((resolve) => setTimeout(resolve, 10));
           complete = true;
           if (outcome === 'rejection') throw new Error('sensitive recipient code');
+          if (outcome === 'quota-error') return Response.json({ message: 'sensitive quota message' }, { status: 429 });
           if (outcome === 'http-error') return new Response('sensitive provider message', { status: 503 });
           if (outcome === 'invalid-json') return new Response('not-json');
           return Response.json(outcome);

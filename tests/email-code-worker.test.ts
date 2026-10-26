@@ -16,7 +16,7 @@ test('cached Worker runtime binds overlapping sends to current waitUntil and req
       globalThis.fetch = async () => {
         calls++;
         await release.promise;
-        return Response.json({ success: true, errors: [], result: { delivered: ['owner@example.test'], queued: [], permanent_bounces: [] } });
+        return Response.json({ id: 'accepted-message' });
       };
       const request = (ip) => new Request(env.AUTH_URL + '/api/auth/email-otp/send-verification-otp', { method: 'POST', headers: { origin: env.AUTH_URL, 'content-type': 'application/json', 'cf-connecting-ip': ip, 'x-forwarded-for': '192.0.2.99', 'x-artifacts-client-ip': '192.0.2.88' }, body: JSON.stringify({ email: 'owner@example.test', type: 'sign-in' }) });
       const first = [];
@@ -40,7 +40,7 @@ test('cached Worker runtime binds overlapping sends to current waitUntil and req
     `;
     const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source], {
       cwd: new URL('..', import.meta.url), timeout: 15_000,
-      env: { PATH: process.env.PATH, EMAIL_WORKER_FIXTURE: JSON.stringify({ DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret, EMAIL_TRANSPORT: 'cloudflare', OWNER_EMAIL: 'owner@example.test', EMAIL_FROM: 'codes@example.test', CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_EMAIL_API_TOKEN: 'fixture-token' }) },
+      env: { PATH: process.env.PATH, EMAIL_WORKER_FIXTURE: JSON.stringify({ DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: 'owner@example.test', EMAIL_FROM: 'codes@example.test', RESEND_API_KEY: 'fixture-token' }) },
     });
     assert.match(result.stdout, /Worker request contexts passed/);
     const counters = await app.client.execute("SELECT identifier FROM verification WHERE id LIKE 'artifacts:email-code:send-ip:%' ORDER BY identifier");

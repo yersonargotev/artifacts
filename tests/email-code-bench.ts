@@ -53,14 +53,13 @@ try {
       try {
         if (transport !== 'file') {
           globalThis.fetch = async (url, init) => {
-            if (!String(url).startsWith('https://api.cloudflare.com/client/v4/')) return nativeFetch(url, init);
+            if (String(url) !== 'https://api.resend.com/emails') return nativeFetch(url, init);
             providerCalls++;
-            const recipient = JSON.parse(String(init?.body)).to;
             await delay(100);
             if (transport === 'rejecting') throw new Error('Injected provider rejection');
-            return Response.json({ success: true, errors: [], result: { delivered: [recipient], queued: [], permanent_bounces: [] } });
+            return Response.json({ id: 'accepted-message' });
           };
-          runtime = createAuthApp(app.db, { ...app.config, email: { transport: 'cloudflare', ownerEmail: 'owner@example.test', from: 'codes@example.test', accountId: 'a'.repeat(32), apiToken: 'fixture-token' } });
+          runtime = createAuthApp(app.db, { ...app.config, email: { transport: 'resend', ownerEmail: 'owner@example.test', from: 'codes@example.test', apiKey: 'fixture-token' } });
           app.setAuthHandler(runtime);
         }
         const current = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });

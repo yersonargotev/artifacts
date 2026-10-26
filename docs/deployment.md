@@ -59,23 +59,23 @@ gh secret set --env production ARTIFACTS_RUNTIME_SECRETS < /absolute/private/run
 
 The [CI/CD release contract](ci-cd.md) describes artifact integrity, current-main skips, retries, partial-release behavior, and manual database operations. Manual workflow dispatch runs validation without deploying production.
 
-## Enable Cloudflare invitation delivery
+## Enable Resend delivery
 
-The production configurations enable Cloudflare Email Sending for auth, MCP, and panel. Put `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_EMAIL_API_TOKEN` in each service's private secret file. Auth alone also requires `OWNER_EMAIL`. The viewer receives none of these bindings. Use an Email Sending token for the selected account. Do not substitute the deployment token.
+The production configurations select Resend for sign-in codes and invitations. Auth, MCP, and panel require `EMAIL_FROM` and `RESEND_API_KEY`. Auth alone also requires `OWNER_EMAIL`. The viewer receives no email bindings. Cloudflare account credentials remain separate deployment inputs.
 
-Before deploying S10, apply the reviewed `0004_sweet_the_anarchist.sql` migration to the intended database. It adds an owner budget with no recipient or artifact data. CI does not run migrations. Deploy in the order auth, MCP, view, panel.
+Before deploying the S10 code and this provider replacement, apply the reviewed `0004_sweet_the_anarchist.sql` migration to the intended database. It adds an owner budget with no recipient or artifact data. CI does not run migrations. Deploy in the order auth, MCP, view, panel.
 
-Onboard the sending domain through Cloudflare Email Service, Email Sending. Cloudflare manages Sending SPF on `cf-bounce` and DKIM on `cf-bounce._domainkey`. The DKIM public key must come from the selected account's domain settings. Email Routing uses different records. See [Cloudflare domain configuration](https://developers.cloudflare.com/email-service/configuration/domains/).
+Configure the sender in your Resend account with this procedure:
 
-Set `SENDING_DOMAIN` to the operator-selected domain, then inspect the actual records.
+1. Select the Free plan in the intended account and check its current restrictions on [Resend pricing](https://resend.com/pricing). The advertised allowance is 3,000 emails per month and 100 per day. Sign-in codes and invitations share that account allowance. Artifacts' application limits do not guarantee provider capacity. HTTP 429 can indicate a daily, monthly, or rate limit.
+2. Add a sending subdomain under `sparkydevs.com` in the Resend dashboard. `mail.sparkydevs.com` is a proposed example, not a configured or verified hostname. Use the exact subdomain you choose in the account. Resend [recommends sending subdomains](https://resend.com/docs/dashboard/domains/introduction) to isolate sending reputation.
+3. Copy the exact record names, types, priorities, and values that Resend gives your account into the authoritative DNS service. Preserve the existing SpaceMail MX records and SPF record at the root `sparkydevs.com`. Keep receiving disabled in Resend. Add the account-provided verification and sending records at their specified subdomain names. If a proposed record conflicts with SpaceMail, resolve the name or subdomain choice before changing DNS. Do not copy example DKIM keys or invent SPF values.
+4. Inspect each account-provided record with `dig` using its exact name and type. Compare the full response with the Resend dashboard. Ask Resend to verify the sending domain and retain the DNS responses and verified dashboard state as operator evidence. No DNS values or verified domain state are supplied by this repository.
+5. Create a [Resend API key](https://resend.com/docs/dashboard/api-keys/introduction) with sending permission. Restrict the key to the verified sending domain where available. Save it in your secret manager when Resend displays it, because the dashboard shows the secret only at creation.
+6. Choose a bare sender address on that verified subdomain for `EMAIL_FROM`. Do not use a display-name form. Set `RESEND_API_KEY` and `EMAIL_FROM` in the private runtime secret files for auth, MCP, and panel. Set `OWNER_EMAIL` only for auth. For GitHub releases, update the exact runtime binding union in `ARTIFACTS_RUNTIME_SECRETS` as described in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Remove the obsolete Cloudflare email token and the runtime copy of the Cloudflare account ID. Keep the separate deployment account ID and deployment API token.
+7. After deployment is separately authorized, verify one sign-in code and one disposable invitation with controlled recipients. Record provider acceptance separately from inbox delivery. A successful API response does not establish delivery.
 
-```sh
-read -r SENDING_DOMAIN
-dig +short TXT "cf-bounce.${SENDING_DOMAIN}"
-dig +short TXT "cf-bounce._domainkey.${SENDING_DOMAIN}"
-```
-
-The Sending SPF value is `v=spf1 include:_spf.mx.cloudflare.net ~all`. Compare the complete DKIM TXT value with the account-specific value from Cloudflare, including its public key. Do not copy an example key. Record both DNS responses and the matching account settings before accepting the DNS gate. No account-specific domain or key is supplied by this repository.
+The sender makes one bounded request and does not retry provider failures. Resend quota rejection preserves the uniform sign-in response and the committed invitation receipt. Replaying a share receipt does not attempt another email. Account readiness, sender verification, DNS changes, deployment, and production delivery remain unverified by local tests. This provider follow-up does not change the historical S10 evidence.
 
 ## Verify a disposable deployed share
 

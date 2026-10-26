@@ -278,7 +278,13 @@ test('email configuration is explicit and validates only the selected transport'
   assert.deepEqual(authConfig(env).email, { transport: 'disabled' });
   assert.deepEqual(authConfig({ ...env, OWNER_EMAIL: 'not-an-email' }).email, { transport: 'disabled' });
   assert.throws(() => authConfig({ ...env, EMAIL_TRANSPORT: 'file' }), /OWNER_EMAIL/);
-  assert.throws(() => authConfig({ ...env, EMAIL_TRANSPORT: 'cloudflare', OWNER_EMAIL: 'owner@example.test' }), /EMAIL_FROM/);
+  assert.throws(() => authConfig({ ...env, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: 'owner@example.test' }), /EMAIL_FROM/);
+  const resend = { ...env, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: ' OWNER@EXAMPLE.TEST ', EMAIL_FROM: ' codes@example.test ', RESEND_API_KEY: 'disposable-key' };
+  assert.deepEqual(authConfig(resend).email, { transport: 'resend', ownerEmail: 'owner@example.test', from: 'codes@example.test', apiKey: 'disposable-key' });
+  assert.throws(() => authConfig({ ...resend, RESEND_API_KEY: undefined }), /RESEND_API_KEY/);
+  for (const apiKey of [' ', 'invalid key', 'invalid\nkey', 'invalid\x7fkey']) assert.throws(() => authConfig({ ...resend, RESEND_API_KEY: apiKey }), /RESEND_API_KEY/);
+  assert.throws(() => authConfig({ ...resend, EMAIL_FROM: 'not-an-address' }), /EMAIL_FROM/);
+  assert.throws(() => authConfig({ ...resend, EMAIL_TRANSPORT: 'cloudflare' }), /EMAIL_TRANSPORT must be resend or file/);
   assert.throws(() => authConfig({ ...env, AUTH_URL: 'https://auth.example.test', EMAIL_TRANSPORT: 'file', OWNER_EMAIL: 'owner@example.test', EMAIL_FILE_PATH: '/tmp/email.jsonl' }), /loopback/);
   assert.deepEqual(authConfig({ ...env, EMAIL_TRANSPORT: 'file', OWNER_EMAIL: ' OWNER@EXAMPLE.TEST ', EMAIL_FILE_PATH: '/tmp/email.jsonl' }).email, { transport: 'file', ownerEmail: 'owner@example.test', path: '/tmp/email.jsonl' });
 });
