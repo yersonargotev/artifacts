@@ -124,7 +124,7 @@ artifacts publish [ID] --command FILE
 artifacts export ID --revision REV --out FILE
 artifacts move ID --project NAME [--request-id ID]
 artifacts move ID --no-project [--request-id ID]
-artifacts share ID --email EMAIL [--request-id ID]
+artifacts share ID --email EMAIL [--notify] [--request-id ID]
 artifacts shares ID
 artifacts unshare ID SHARE_ID [--request-id ID]
 artifacts retry REQUEST_ID
@@ -213,9 +213,13 @@ artifacts retry share-ana-001
 
 `share` trims and lowercases the email and prints one share as JSON with `shareId`, `artifactId`, `kind: "email"`, `value`, and `createdAt`. `shares` prints `{ "items": [...] }` with current grants and retains no operation. Take `SHARE_ID` from that output. `unshare` and a successful retry of an unshare exit zero with empty stdout. All three commands require the owner's `artifacts:publish` scope.
 
-A signed-in user whose verified email matches a share can view the published revision and its attachments. History, export, edits, and project moves remain owner-only. Shares created before first publication remain stored, but the URL opens only after publication. These commands do not send invitation emails or provide email-code sign-in.
+A signed-in user whose verified email matches a share can view the published revision and its attachments. History, export, edits, and project moves remain owner-only. Shares created before first publication remain stored, but the URL opens only after publication. Add `--notify` to request one invitation email. Invited people can sign in with an email code when the server enables email.
 
 Share and unshare retain the complete normalized command before submission. Recover an uncertain result with `retry REQUEST_ID`. A replay confirms the original operation, so a historical share replay does not restore a revoked grant. An old unshare replay leaves a deliberate new share intact. Run `shares ARTIFACT_ID` to verify current grants.
+
+Share with `--notify` to request one email attempt. Access succeeds when mail is disabled or the owner has used the daily allowance. The JSON result adds `notification.status` as `requested` or `skipped`, with `disabled` or `rate_limited` as the skip reason. `requested` does not confirm delivery. A crash after commit can lose the message. An exact retry preserves the captured flag and never sends a second email. Use a new deliberate command to request another attempt for existing access.
+
+Owners can reserve 100 invitations per UTC day. Revoke, deletion, and failed delivery do not refund reservations. New access is limited to 100 people per artifact and 1000 grants per owner. Existing access remains listable and revocable.
 
 ## Complete commands and edits
 

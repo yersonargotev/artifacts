@@ -32,7 +32,7 @@ Production installs frozen dependencies without a package cache. Only the releas
 | `CLOUDFLARE_ACCOUNT_ID` | Variable | The selected account's 32-character hexadecimal ID. |
 | `ARTIFACTS_RUNTIME_SECRETS` | Secret | A JSON object containing exactly the union of declared runtime secret bindings. Every value is a nonempty string. |
 
-The runtime bindings come from the [auth](../apps/auth/cloudflare.config.ts), [MCP](../apps/mcp/cloudflare.config.ts), [panel](../apps/dashboard/cloudflare.config.ts), and [viewer](../apps/publication/cloudflare.config.ts) configurations. The current union has nine keys. This command lists the declarations.
+The runtime bindings come from the [auth](../apps/auth/cloudflare.config.ts), [MCP](../apps/mcp/cloudflare.config.ts), [panel](../apps/dashboard/cloudflare.config.ts), and [viewer](../apps/publication/cloudflare.config.ts) configurations. This command lists the declarations.
 
 ```sh
 rg "type: 'secret'" apps/{auth,mcp,dashboard,publication}/cloudflare.config.ts
@@ -48,7 +48,7 @@ The release command validates all inputs and all four downloaded configurations 
 
 All four `deploy:worker --dry-run` commands must succeed before the first deployment. Dry runs validate the local bundles but do not validate Cloudflare API authorization. Immediately before deployment, the release command reads the current `main` SHA through GitHub. A superseded revision logs a successful skip and deploys no Workers.
 
-The command deploys `auth`, `mcp`, `panel`, and `view` in that order through the existing `pnpm deploy:worker` command. Once deployment starts, it completes that quartet without checking `main` again. A newer eligible release waits for the running release to finish.
+The command deploys `auth`, `mcp`, `view`, and `panel` in that order through the existing `pnpm deploy:worker` command. Once deployment starts, it completes that quartet without checking `main` again. A newer eligible release waits for the running release to finish.
 
 The four deployments are separate Cloudflare operations. A failure after an earlier service succeeds leaves a partial release. The command stops and reports the failed service. It does not roll back. A retry reruns preflight, all dry runs, and the quartet while the revision remains current `main`. An older revision skips after `main` advances. A failed current release can be retried through the original push run; manual dispatch remains validation-only.
 
@@ -64,4 +64,18 @@ The smoke performs no login, authoring, grant consumption, or production data mu
 
 ## Manual database operations
 
-This change requires no database migration. Ordinary releases never run `db:migrate`, `identity:bootstrap`, or `identity:migrate`. Future production schema changes require a separately reviewed manual migration against the intended production database before deploying dependent code. The operator owns migration timing and compatibility with the currently deployed services. CI does not acknowledge or apply a production schema revision.
+S10 adds migration `0004_sweet_the_anarchist.sql` for the owner invitation budget. Apply the reviewed migration before deploying S10. Ordinary releases never run `db:migrate`, `identity:bootstrap`, or `identity:migrate`. Future production schema changes require a separately reviewed manual migration against the intended production database before deploying dependent code. The operator owns migration timing and compatibility with the currently deployed services. CI does not acknowledge or apply a production schema revision.
+
+## Production email bindings
+
+Auth, MCP, and panel explicitly declare `EMAIL_TRANSPORT=cloudflare`. Their runtime secret projection requires `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_EMAIL_API_TOKEN`. Only auth also receives `OWNER_EMAIL` for admission policy. The viewer receives no email bindings. `OWNER_PASSWORD` and bootstrap credentials are not runtime bindings and remain rejected.
+
+`EMAIL_FROM` and `OWNER_EMAIL` must be email addresses. The account ID contains 32 hexadecimal characters. The email API token authorizes Cloudflare Email Sending for that account. It is separate from `CLOUDFLARE_API_TOKEN`, which authorizes deployment. Release preflight combines each service's declared text bindings and projected secrets before validating configuration. Missing or malformed sender fields stop the release before any deployment callback. Local Node processes without `EMAIL_TRANSPORT` keep email disabled.
+
+## Native producer and package proofs
+
+The checks, browser, Workers, and production jobs prepare the pinned native package before dependency installation. The npm beta preparation job does the same because its checks and first-use proof load the workspace database. Preparation owns its CMake environment and Cargo output. The existing job budgets remain unchanged.
+
+The checks job also runs `pnpm test:packages:native` on Linux x64 with glibc. This verifies the actual private native bundle through ordinary external npm installation, strict native controls, encryption compatibility, and installed auth/REST contention and recovery. The default portable seven-package build and three-package public allowlist remain unchanged.
+
+The npm publish and public registry-verification jobs do not load the workspace database. A frozen install with the generated link absent succeeds, and any attempted native SDK load fails without registry fallback. Those jobs inspect and exercise the public packages, so they do not compile a private native binary. The CLI credential database uses Node's built-in SQLite.

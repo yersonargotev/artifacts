@@ -47,9 +47,11 @@ A published URL requires sign-in by the owner or a user whose verified email mat
 
 Check installed help for `share`, `shares`, and `unshare` support. These commands describe current source and built packages, not the published `0.1.0-beta.5` release. Share only when the user requests access for an exact email. Use `share ARTIFACT_ID --email EMAIL`, then verify the normalized email with `shares ARTIFACT_ID`. Use the observed `shareId` with `unshare ARTIFACT_ID SHARE_ID` to revoke it. Unshare and its successful retry exit zero with empty stdout.
 
-A matching signed-in user must have a verified email. Access covers the published revision and its attachments. History, export, editing, and project moves stay owner-only. A share before first publication remains stored and waits for publication. Sharing does not send invitation emails or provide email-code sign-in.
+A matching signed-in user must have a verified email. Access covers the published revision and its attachments. History, export, editing, and project moves stay owner-only. A share before first publication remains stored and waits for publication. Add `--notify` when the user asks for an invitation email. Invited people can sign in with an email code when the server enables email.
 
 Recover uncertain share or unshare results with `retry REQUEST_ID`. Replay confirms the original operation and does not establish current grants. An old share replay does not restore revoked access. An old unshare replay does not remove a deliberate new share. Verify current grants with `shares ARTIFACT_ID`.
+
+When the user asks to notify an invited person, add `--notify` to `artifacts share`. Preserve that flag in the retained command and use `artifacts retry` after an uncertain response. Report `requested` as an invitation request, never as confirmed delivery. A skipped notification still grants access. A new deliberate share command can request another attempt for existing access, subject to the owner's daily allowance.
 
 ## Recover an uncertain write
 

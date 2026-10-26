@@ -47,7 +47,7 @@ Commands:
   export ID --revision REV --out FILE
   move ID --project NAME [--request-id ID]
   move ID --no-project [--request-id ID]
-  share ID --email EMAIL [--request-id ID]
+  share ID --email EMAIL [--notify] [--request-id ID]
   shares ID
   unshare ID SHARE_ID [--request-id ID]
   retry REQUEST_ID
@@ -80,7 +80,7 @@ const commandOptions: Record<string, readonly string[]> = {
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
-  share: ['email', 'request-id'], shares: [], unshare: ['request-id'],
+  share: ['email', 'notify', 'request-id'], shares: [], unshare: ['request-id'],
   export: ['revision', 'out'], move: ['project', 'no-project', 'request-id'], retry: [],
   skills: ['full', 'all', 'agent', 'global', 'force'],
 };
@@ -118,7 +118,7 @@ async function main(): Promise<unknown> {
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
       full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
       global: { type: 'boolean' }, force: { type: 'boolean' },
-      project: { type: 'string' }, 'no-project': { type: 'boolean' }, email: { type: 'string' },
+      project: { type: 'string' }, 'no-project': { type: 'boolean' }, email: { type: 'string' }, notify: { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -232,7 +232,7 @@ async function main(): Promise<unknown> {
       if ((values.project !== undefined) === (values['no-project'] ?? false)) throw new UsageError('Specify exactly one of --project NAME or --no-project');
       return mutate({ kind: 'move', command: moveSchema.parse({ artifactId, requestId: values['request-id'] ?? randomUUID(), project: values.project ?? null }) });
     }
-    case 'share': return mutate({ kind: 'share', command: shareSchema.parse({ artifactId: argument()!, requestId: values['request-id'] ?? randomUUID(), email: required('email') }) });
+    case 'share': return mutate({ kind: 'share', command: shareSchema.parse({ artifactId: argument()!, requestId: values['request-id'] ?? randomUUID(), email: required('email'), ...(values.notify === undefined ? {} : { notify: values.notify }) }) });
     case 'shares': return client.listShares(listSharesSchema.parse({ artifactId: argument()! }));
     case 'unshare': {
       if (arguments_.length !== 2) throw new UsageError('unshare requires two positional arguments');

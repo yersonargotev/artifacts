@@ -43,7 +43,7 @@ Every method makes one HTTP request. The client does not retry, follow redirects
 | `update(command)` | `requestId`, `artifactId`, `expectedRevisionId`, complete `snapshot`, optional `response` | Artifact receipt |
 | `history(query)` | `artifactId`, optional `limit`, `beforeSequence`, and `response` | Revisions and `nextBeforeSequence` |
 | `publish(command)` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | Publication receipt |
-| `share(command)` | `requestId`, `artifactId`, `email` | Share receipt with `shareId`, `artifactId`, `kind`, `value`, and `createdAt` |
+| `share(command)` | `requestId`, `artifactId`, `email`, optional `notify` and `requireNew: true` | Share receipt with optional notification disposition |
 | `listShares(query)` | `artifactId` | `{ items: Share[] }` |
 | `unshare(command)` | `requestId`, `artifactId`, `shareId` | `void` after an empty HTTP 204 |
 | `move(command)` | `requestId`, `artifactId`, `project` name or null | `{ artifactId, project }` |
@@ -53,7 +53,7 @@ Create, read, and update accept `response: 'compact'`. The returned revision con
 
 All commands and JSON responses pass the strict domain schemas. An omitted mutation `response` remains omitted in the transmitted command. JSON responses are bounded at 64 MiB, which accommodates ten maximum-size revisions with JSON escaping. Archives are bounded at 8 MiB. Export verifies the binary bytes against `X-Artifact-SHA256` and returns the bytes without rebuilding the ZIP.
 
-All sharing methods require `artifacts:publish` and artifact ownership. `share` trims and lowercases the email. The client places identifiers in encoded URL segments and sends only `{ requestId, email }` for share or `{ requestId }` for unshare. `unshare` resolves with `undefined` and requires no JSON content type on its empty response.
+All sharing methods require `artifacts:publish` and artifact ownership. `share` trims and lowercases the email. The client places identifiers in encoded URL segments and sends `{ requestId, email }` plus any explicitly supplied `notify` or `requireNew` for share or `{ requestId }` for unshare. `unshare` resolves with `undefined` and requires no JSON content type on its empty response.
 
 Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.4` and earlier reject responses from such a server with `invalid_response`.
 
@@ -74,3 +74,5 @@ The registry package contains compiled ESM JavaScript and declarations. Consumer
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.
 
 Permanent deletion from the panel invalidates historical content-bearing receipts. An exact create, update, publish or move retry for a deleted artifact returns `not_found`; request identity remains reserved, so a changed command still returns `request_conflict` and an old create cannot recreate it. Live-session and scope checks still precede replay. This package exposes no deletion operation.
+
+`notify: true` requests one invitation attempt. The result adds `notification` with `status: "requested"`, or `status: "skipped"` and `reason: "disabled"` or `"rate_limited"`. A rate-limited result includes the next UTC day in `retryAt`. Access succeeds in each case. `requested` does not confirm delivery. Exact retries never send again. A fresh request can notify existing access. `requireNew: true` atomically rejects existing access with `conflict` and `details.reason: "share_exists"`. Plain and explicit-false results keep the five grant fields.

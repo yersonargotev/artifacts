@@ -10,7 +10,7 @@ import { serve } from '@hono/node-server';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { fixture } from './helpers.ts';
 
-export async function restCliFixture(options: { directory?: string } = {}) {
+export async function restCliFixture(options: { directory?: string; emailCode?: boolean; invitations?: boolean } = {}) {
   const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
   const reservation = createServer().listen(0, '127.0.0.1');
   await once(reservation, 'listening');
@@ -35,7 +35,7 @@ export async function restCliFixture(options: { directory?: string } = {}) {
     if (panelDirectory) await rm(panelDirectory, { recursive: true, force: true });
   };
   try {
-    app = await fixture({ transport: 'combined', dashboard, publishOrigin });
+    app = await fixture({ transport: 'combined', dashboard, publishOrigin, emailCode: options.emailCode, invitations: options.invitations });
     const serviceSecret = randomBytes(32).toString('hex');
     publication = createPublicationApp({ DASHBOARD_URL: dashboard, PUBLISH_URL: publishOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: randomBytes(32).toString('hex') });
     const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'REST CLI proof panel', application_type: 'native', redirect_uris: [`${dashboard}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
@@ -45,7 +45,7 @@ export async function restCliFixture(options: { directory?: string } = {}) {
     panelDirectory = await mkdtemp(join(directory, 'rest-cli-panel-'));
     await cp(join(sourceRoot, 'apps/dashboard/dist'), panelDirectory, { recursive: true });
     await symlink(resolve(sourceRoot, 'apps/dashboard/node_modules'), join(panelDirectory, 'node_modules'));
-    panel = spawn(process.execPath, [join(panelDirectory, 'server/entry.mjs')], { cwd: panelDirectory, env: { PATH: process.env.PATH, DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publishOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    panel = spawn(process.execPath, [join(panelDirectory, 'server/entry.mjs')], { cwd: panelDirectory, env: { PATH: process.env.PATH, ...(options.invitations && app.emailSink ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: app.emailSink } : {}), DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publishOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' }, stdio: ['ignore', 'pipe', 'pipe'] });
     let startup = '';
     panel.stderr!.on('data', (value: Buffer) => { startup += value.toString(); });
     let ready = false;

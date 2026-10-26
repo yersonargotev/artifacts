@@ -50,7 +50,7 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
     }
   }
 
-  async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
+  async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<{ result: T; fresh: boolean }> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
     return transaction(async (connection) => {
       await authorize(connection, actor, scope);
@@ -59,21 +59,21 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
         const result: unknown = JSON.parse(receipt.result);
         if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
         if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
-        return output.parse(result);
+        return { result: output.parse(result), fresh: false };
       }
       const result = await work(connection);
       await connection.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson(result), createdAt: new Date() });
-      return result;
+      return { result, fresh: true };
     });
   }
 
   function command<T extends { artifactId: string }>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
-    return receipt(actor, scope, kind, input, output, work);
+    return receipt(actor, scope, kind, input, output, work).then(({ result }) => result);
   }
 
   function panelMove(actor: Actor, input: PanelMoveInput, output: z.ZodType<PanelMoveResult>, work: (connection: Connection) => Promise<PanelMoveResult>): Promise<PanelMoveResult> {
-    return receipt(actor, 'artifacts:write', 'panel_move', input, output, work);
+    return receipt(actor, 'artifacts:write', 'panel_move', input, output, work).then(({ result }) => result);
   }
 
-  return { transaction, authorize, liveSession, command, panelMove, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
+  return { transaction, authorize, liveSession, command, receipt, panelMove, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
 }

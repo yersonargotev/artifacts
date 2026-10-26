@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { authConfig, dashboardConfig, mcpConfig, publicationConfig, type Environment } from '../packages/config/src/index.ts';
+import { emailTransportConfiguration } from '../packages/config/src/email.ts';
 import auth from '../apps/auth/cloudflare.config.ts';
 import mcp from '../apps/mcp/cloudflare.config.ts';
 import panel from '../apps/dashboard/cloudflare.config.ts';
@@ -42,16 +43,18 @@ export function projectRuntimeSecrets(environment: Environment): Record<Service,
     if (typeof values[name] !== 'string' || !values[name].trim() || /[\x00-\x1f\x7f]/.test(values[name])) throw new Error(`${name} must be a nonempty string without control characters`);
   }
   const secrets = values as RuntimeSecrets;
-  const runtime = { ...workerOrigins, ...secrets };
-  authConfig(runtime);
-  mcpConfig(runtime);
-  dashboardConfig(runtime);
-  publicationConfig(runtime);
+  const projected = Object.fromEntries(releaseOrder.map((service) => [service, Object.fromEntries(bindings[service].map((name) => [name, secrets[name]!]))])) as Record<Service, RuntimeSecrets>;
+  const effective = (service: Service) => ({ ...Object.fromEntries(Object.entries(services[service].worker.env).flatMap(([name, binding]) => binding.type === 'text' ? [[name, binding.value]] : [])), ...projected[service] });
+  authConfig(effective('auth'));
+  mcpConfig(effective('mcp'));
+  dashboardConfig(effective('panel'));
+  publicationConfig(effective('view'));
+  for (const service of ['mcp', 'panel'] as const) emailTransportConfiguration(effective(service), workerOrigins.AUTH_URL);
   let database: URL;
   try { database = new URL(secrets.DATABASE_URL!); }
   catch { throw new Error('DATABASE_URL must be a remote libSQL URL'); }
   if (!['libsql:', 'https:'].includes(database.protocol) || !database.hostname || database.username || database.password || database.search || database.hash) throw new Error('DATABASE_URL must be a remote libSQL URL without credentials, query, or fragment');
-  return Object.fromEntries(releaseOrder.map((service) => [service, Object.fromEntries(bindings[service].map((name) => [name, secrets[name]!]))])) as Record<Service, RuntimeSecrets>;
+  return projected;
 }
 
 function cloudflareCredentials(environment: Environment) {

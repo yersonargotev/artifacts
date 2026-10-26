@@ -11,3 +11,5 @@ The root export contains domain schemas and types. `/workflow` contains `prepare
 The existing `@artifacts/artifacts` root, `/contracts`, and `/workflow` exports re-export these implementations. Store and REST packages share one `ArtifactError` runtime.
 
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.
+
+`shareSchema` accepts optional `notify` and `requireNew: true` without defaults. `shareResultSchema` remains the strict five-field grant shape used by lists. `shareCommandResultSchema` adds an optional immutable notification disposition for commands. Plain and explicit-false requests return the original grant shape. An absent flag and an explicit false remain distinct receipt arguments.

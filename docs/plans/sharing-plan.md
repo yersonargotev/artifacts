@@ -565,7 +565,7 @@ Technical verification passed at `3fd5f00` on PR45, including fresh independent 
 
 **Depends on.** S8.
 
-S9 is in implementation after operator continuation approval of S8. Focused owner unit tests pass36of36 and the actual focused S9 browser proof passes all ten lanes, with full verification and independent review still pending. Evidence is `/tmp/artifacts-sharing-codex/s9-owner/green-unit.log` and `green-browser-v2.log`. Design contract is `/tmp/artifacts-sharing-codex/s9-synthesis.md`, selected from two candidates and an independent cross-judge. Only the owner display name extends the guest projection. Viewer-first release and strict missing-name compatibility prevent rolling-update errors.
+Technical verification passed at `93e0aca` on ready PR46, based on verified S8. All212unit tests, package/Workers builds, the13-entrypoint browser chain, REST/CLI and first-use proofs pass. The independent reviewer reran live behavior, preserved owner publication bytes and killed ten production mutations. Exact CI40189592936 succeeded with production skipped. Local30/30/30 samples pass unchanged budgets, owner34.85to36.20ms and guest with50shares11.05ms. Current owner report is `/tmp/artifacts-sharing-codex/s9-owner-report.md`; independent final PASS report is `/tmp/artifacts-sharing-codex/s9-review-report.md`. Actual34.04second video and five PNGs are in `/tmp/artifacts-sharing-codex/s9-worktree/.test-artifacts/review/`. The operator reviewed the actual media and explicitly answered "Aprobar S9 y continuar con S10". S9 is clean at this exact head and S10 is authorized. Design and bounded scope are recorded in `/tmp/artifacts-sharing-codex/s9-synthesis.md`.
 
 **Files.**
 
@@ -575,7 +575,7 @@ S9 is in implementation after operator continuation approval of S8. Focused owne
 - [x] Create `apps/dashboard/src/components/library/SharedWithMe.astro`.
 - [x] Edit `tests/library.test.ts`.
 - [x] Edit `tests/panel-share.browser.proof.ts`.
-- [ ] Edit `package.json` only if the focused S9 proof needs explicit inclusion in the existing browser CI chain.
+- [x] Skip the conditional `package.json` edit. The default committed browser proof executes inherited S8 and S9 in the existing CI chain.
 - [x] Edit `packages/contracts/src/index.ts` for the shared summary and strict owner-name contract.
 - [x] Edit `apps/dashboard/src/runtime.ts` to expose the new store read.
 - [x] Edit `tests/sharing.test.ts` for raw projection, compatibility and privacy.
@@ -591,110 +591,131 @@ S9 is in implementation after operator continuation approval of S8. Focused owne
 
 **You see.**
 
-- [ ] The guest's library shows **Compartidos conmigo** with the shared artifact. The publication header reads `Compartido por <owner name>`.
+- [x] The guest's library shows **Compartidos conmigo** with the shared artifact. The publication header reads `Compartido por <owner name>`.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/library.test.ts` covers a shared artifact listed, a revoked one gone, a never-published one hidden, and the owner's own artifacts excluded. Run `node --import tsx --test tests/library.test.ts`.
-- [ ] `tests/panel-share.browser.proof.ts` gains the guest's library and header. Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts`.
+- [x] `tests/library.test.ts` covers a shared artifact listed, a revoked one gone, a never-published one hidden, and the owner's own artifacts excluded. Run `node --import tsx --test tests/library.test.ts`.
+- [x] `tests/panel-share.browser.proof.ts` gains the guest's library and header. Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Open the owner's library at trunk and head. Trunk lacks the section, so record that and gate the guest's **Compartidos conmigo** list at head. Save `library-trunk.png`, `library-head.png`, and `guest-library.png`. Pass when the owner's library matches and the guest's list shows the artifact.
-- [ ] Lane 2. Sign in as the guest. Save `shared-section.png`. Pass when **Compartidos conmigo** lists the shared artifact.
-- [ ] Lane 3. Click the shared artifact. Save `opened.png`. Pass when the publication opens.
-- [ ] Lane 4. Read the publication header. Save `header.png`. Pass when it reads `Compartido por` and the owner's name.
-- [ ] Lane 5. Revoke as the owner and reload the guest's library. Save `revoked-library.png`. Pass when the item is gone.
-- [ ] Lane 6. Share a never-published artifact and reload the guest's library, then publish it and reload again. Save `unpublished-library.png`. Pass when the item is hidden first and listed after publishing.
-- [ ] Lane 7. Open the owner's library. Save `owner-library.png`. Pass when **Compartidos conmigo** is absent.
-- [ ] Lane 8. Sign in as an account with no shares. Save `empty.png`. Pass when the section is absent and the welcome state shows.
-- [ ] Lane 9. Run lanes 2 and 4 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
-- [ ] Lane 10. Create an artifact as the guest through MCP. Save `guest-own.png`. Pass when it appears in the guest's own list and not under **Compartidos conmigo**.
+- [x] Lane 1. Regression lane against trunk. Open the owner's library at trunk and head. Trunk lacks the section, so record that and gate the guest's **Compartidos conmigo** list at head. Save `library-trunk.png`, `library-head.png`, and `guest-library.png`. Pass when the owner's library matches and the guest's list shows the artifact.
+- [x] Lane 2. Sign in as the guest. Save `shared-section.png`. Pass when **Compartidos conmigo** lists the shared artifact.
+- [x] Lane 3. Click the shared artifact. Save `opened.png`. Pass when the publication opens.
+- [x] Lane 4. Read the publication header. Save `header.png`. Pass when it reads `Compartido por` and the owner's name.
+- [x] Lane 5. Revoke as the owner and reload the guest's library. Save `revoked-library.png`. Pass when the item is gone.
+- [x] Lane 6. Share a never-published artifact and reload the guest's library, then publish it and reload again. Save `unpublished-library.png`. Pass when the item is hidden first and listed after publishing.
+- [x] Lane 7. Open the owner's library. Save `owner-library.png`. Pass when **Compartidos conmigo** is absent.
+- [x] Lane 8. Sign in as an account with no shares. Save `empty.png`. Pass when the section is absent and the welcome state shows.
+- [x] Lane 9. Run lanes 2 and 4 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
+- [x] Lane 10. Create an artifact as the guest through MCP. Save `guest-own.png`. Pass when it appears in the guest's own list and not under **Compartidos conmigo**.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The library page's load-event time for the owner at trunk and head. Trunk lacks the section, so also measure the guest's library load time with 50 shares at head.
-- [ ] Probe. Load the owner's library 30 times with Playwright, alternating between the trunk run and the head run. Load the guest's library 30 times at head.
-- [ ] Baseline. Record the trunk owner median first.
-- [ ] Rule. Fail when the head owner median exceeds trunk by more than 10 percent and 20 ms. Fail when the guest median exceeds the head owner median by more than 100 ms.
+- [x] Metric. The library page's load-event time for the owner at trunk and head. Trunk lacks the section, so also measure the guest's library load time with 50 shares at head.
+- [x] Probe. Load the owner's library 30 times with Playwright, alternating between the trunk run and the head run. Load the guest's library 30 times at head.
+- [x] Baseline. Record the trunk owner median first.
+- [x] Rule. Fail when the head owner median exceeds trunk by more than 10 percent and 20 ms. Fail when the guest median exceeds the head owner median by more than 100 ms.
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Copy lane 2, 4, 8, and 9 screenshots into `.test-artifacts/review/S9-review-<slug>.png`.
-- [ ] Record a 30 to 60 second video of the guest's library and publication on a lane run. Save it as `.test-artifacts/review/S9-review.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
+- [x] Copy lane 2, 4, 8, and 9 screenshots into `.test-artifacts/review/S9-review-<slug>.png`.
+- [x] Record a 30 to 60 second video of the guest's library and publication on a lane run. Save it as `.test-artifacts/review/S9-review.mp4`.
+- [x] Post the screenshots and the video in chat. The operator explicitly approved S9 and continuation to S10.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at exact `93e0aca1e42b270dcbe15794c008a828afd6323a`, with operator visual approval.
+- [x] Bugbot triage done. Root read issue comments, reviews and inline threads at the final head; all are empty.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S9 to the chain. The operator lands it bottom-up.
+
 
 
 ## Send invitation emails and verify the deployment (S10)
 
 **Depends on.** S9.
 
+S9 is clean and explicitly operator-approved at `93e0aca`. S10's bounded implementation contract is `/tmp/artifacts-sharing-codex/s10-synthesis.md`, based on two independent candidates, two adversarial judgments and a disposable runtime/freshness prototype. Invitations use an immutable requested or skipped result and one postcommit attempt. A crash before the attempt may lose the message. Limits are 100 invitation reservations per owner per UTC day, 100 active shares per artifact and 1000 per owner. Existing rows remain fully listable and revocable. A `requireNew` creation precondition protects the verifier from revoking concurrent existing access.
+
+The first SDK-only patch corrected internal controls, but a later real auth SELECT exposed another retained native statement. Root withdrew broad convergence acceptance. The independent census and both failed backend alternatives are retained. A source-pinned current-version native error reset now has a passing feasibility prototype, including unchanged SDK/errors and encrypted data in both directions. It is not delivery acceptance. The authoritative bounded integration contract is `/tmp/artifacts-sharing-codex/s10-native-integration.md`.
+
+Keep the existing portable seven-package distribution unchanged. Add an opt-in target-qualified native-fixed private server profile, source-pinned host preparation and normal workspace resolution. Both ordinary installations and selected-graph regression proofs passed. The obsolete SDK patch was removed only after that proof. Root countersigned the complementary real authenticated quota and auth503 identical-request recovery proofs at source `0c89987` after fresh independent installed/workspace evidence and an actual rebuilt native-removal semantic failure. Gate A retains first201/201 under observed writer contention with exact quota, receipts and one sink message. Gate B retains actual precommand503 with zero effects, then one identical-request201 on the same live clients after the holder closes. These proofs preserve the existing S9 unavailable contract and do not promise zero transient authentication failures. Native Worker runtime acceptance remains unproven. Operator deployment and DNS lanes 9 and 10 remain blocked.
+
+Local owner and fresh independent verification passed on `0c89987`, with261unit tests, all ten semantic mutations killed/restored, installed native/API/encryption proofs, complete local browser/CLI/skill gates, four guarded Worker builds and fresh32.88second media. Exact Linux CI40209329855 passed all three verification jobs within unchanged budgets, with production skipped. Isolated timing and root raw-state reconciliation pass the original budgets. The150successful samples match150receipts/current grants and50message projections; parent/head plain p95 are5.133125/4.443459ms and head notify p95 is5.133042ms. Five blocks and the excluded profile remain retained. The first aggregate-only passing run is retained with its evidence limitation; the single corrected pass adds post-run state projections without changing timed work. No speedup is claimed. Reports are `/tmp/artifacts-sharing-codex/s10-integration-owner-report.md` and `/tmp/artifacts-sharing-codex/s10-review-report.md`. Root recomputation is `/tmp/artifacts-sharing-codex/s10-perf-root-recompute.json`. Complete native Worker runtime remains an explicit unproven dimension; final bundles and dry runs do not replace production lane9. Production/DNS and named operator visual approval remain unmet.
+
 **Files.**
 
-- [ ] Edit `packages/artifacts/src/index.ts`.
-- [ ] Edit `packages/config/src/email.ts`.
-- [ ] Edit `apps/mcp/src/http.ts`.
-- [ ] Edit `packages/rest/src/index.ts`.
-- [ ] Edit `packages/client/src/index.ts`.
-- [ ] Edit `apps/cli/src/index.ts`.
-- [ ] Edit `apps/dashboard/src/components/share/ShareForm.tsx`.
-- [ ] Edit `docs/deployment.md`.
-- [ ] Edit `.agents/skills/verify-artifacts/features/sharing.md`.
-- [ ] Create `scripts/verify-deployed-sharing.ts`.
-- [ ] Edit `tests/sharing.test.ts`.
+- [x] Edit `packages/artifacts/src/index.ts`.
+- [x] Edit `packages/config/src/email.ts`.
+- [x] Edit `apps/mcp/src/http.ts`.
+- [x] Verify the existing generic share route in `packages/rest/src/index.ts` forwards the new command/result without a transport-specific branch.
+- [x] Edit `packages/client/src/index.ts`.
+- [x] Edit `apps/cli/src/index.ts`.
+- [x] Edit `apps/dashboard/src/components/share/ShareForm.tsx`.
+- [x] Edit `docs/deployment.md`.
+- [x] Edit `.agents/skills/verify-artifacts/features/sharing.md`.
+- [x] Create `scripts/verify-deployed-sharing.ts`.
+- [x] Add focused invitation and contention tests while retaining the existing `tests/sharing.test.ts` regressions.
+- [x] Integrate the source-pinned current-version native statement-error reset, host preparation/provenance, normal resolution and strict ESM/CJS/Config/data regressions. Remove the insufficient SDK-only patch after proof. Preserve journal and retry budgets.
+- [x] Preserve portable package output and add an opt-in native-fixed private server profile with installed-server proofs. Keep seven package identities and public release eligibility unchanged.
+- [x] Prove native Linux CI, actual private-profile selection and the two complementary real API gates before root countersign. No runtime hook, consumer compiler, silent fallback or native publication service.
+- [x] Edit canonical contracts for notify, requireNew, separate share command result and immutable notification union.
+- [x] Edit access receipt metadata and add a pure invitation renderer.
+- [x] Add owner-only invitation budget schema and generated0004migration/meta.
+- [x] Add conditional Node/Worker email sender entries and exact runtime/fixture wiring, including standalone REST.
+- [x] Edit progressive share parsing/dialog/native outcome handling while preserving plain legacy behavior.
+- [x] Edit auth/MCP/panel email bindings and release preflight to validate effective declared text plus secrets.
+- [x] Extend `scripts/build-workers.ts` to reject the Node file-email adapter and `node:fs` imports in final Worker bundles. Preserve existing network/database guards and prove the dynamic-import regression is rejected.
+- [x] Update the CI secret contract, affected API/client/CLI README and bundled CLI skill/reference.
+- [x] Add real local deployed-verifier, concurrency, quota, transport, browser and packed retry proofs.
 
 **Build.**
 
-- [ ] Add an optional `notify` flag to `share`. When set, send an invitation with the publication URL. Rate-limit invitations per owner.
-- [ ] Expose `notify` in `artifacts_share`, the REST body, the client, `pnpm artifacts share --notify`, and a **Avisar por correo** checkbox in `ShareForm`.
-- [ ] Add the sender secrets, SPF, and DKIM records to `docs/deployment.md`.
-- [ ] Write `scripts/verify-deployed-sharing.ts`. It takes two stored browser states, shares, opens as the guest, revokes, and checks the guest's next request returns 403.
+- [x] Add an optional `notify` flag to `share`. When set, send an invitation with the publication URL. Rate-limit invitations per owner.
+- [x] Expose `notify` in `artifacts_share`, the REST body, the client, `pnpm artifacts share --notify`, and a **Avisar por correo** checkbox in `ShareForm`.
+- [x] Add the sender secrets, SPF, and DKIM records to `docs/deployment.md`.
+- [x] Write `scripts/verify-deployed-sharing.ts`. It takes two stored browser states, shares, opens as the guest, revokes, and checks the guest's next request returns 403.
 
 **You see.**
 
-- [ ] Sharing with **Avisar por correo** checked puts one invitation in the sink with the publication URL.
+- [x] Sharing with **Avisar por correo** checked puts one invitation in the sink with the publication URL.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/sharing.test.ts` gains `notify` sending one message, no message without `notify`, a retry sending no second message, and the per-owner limit. Run `node --import tsx --test tests/sharing.test.ts`.
+- [x] Focused `tests/invitations.test.ts` and `tests/invitation-concurrency.test.ts` cover `notify` sending one message, no message without `notify`, exact retries sending no second message, the per-owner allowance, caps and actual process races. Keep `tests/sharing.test.ts` unchanged as a compatibility regression. Run `node --import tsx --test tests/sharing.test.ts tests/invitations.test.ts tests/invitation-concurrency.test.ts`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes at the PR head, per the boot recipe. The configured owner is gpt-6-astra and the fresh independent reviewer is gpt-6.1-sol; production and DNS lanes remain operator-blocked.
 
-- [ ] Lane 1. Regression lane against trunk. Share without `notify` at trunk and head. Trunk lacks invitations, so record that and gate a `notify` share whose emailed link leads the guest to the publication at head. Save `share-trunk.png`, `share-head.png`, and `invite-flow.png`. Pass when both plain shares behave the same and the guest reaches the revision from the email.
-- [ ] Lane 2. Share from the panel with **Avisar por correo** checked. Save `invite-sink.png`. Pass when the sink holds one invitation with the publication URL.
-- [ ] Lane 3. Open the emailed link as a signed-out guest and sign in by code. Save `invite-signin.png`. Pass when the guest lands on the publication.
-- [ ] Lane 4. Send invitations past the per-owner limit. Save `invite-limit.png`. Pass when the share succeeds and the over-limit invitation is skipped with a visible notice.
-- [ ] Lane 5. Call `artifacts_share` with `notify: true`. Save `mcp-notify.png`. Pass when the sink holds one invitation.
-- [ ] Lane 6. Run `pnpm artifacts share <id> --email <guest> --notify`. Save `cli-notify.png`. Pass when the sink holds one invitation.
-- [ ] Lane 7. Retry a `notify` share with the same `requestId`. Save `notify-retry.png`. Pass when the sink still holds one invitation.
-- [ ] Lane 8. Render the invitation HTML in a browser at 390 and 1440 pixels. Save `invite-390.png` and `invite-1440.png`. Pass when the link and the owner's name are visible without overflow.
+- [x] Lane 1. Regression lane against trunk. Share without `notify` at trunk and head. Trunk lacks invitations, so record that and gate a `notify` share whose emailed link leads the guest to the publication at head. Save `share-trunk.png`, `share-head.png`, and `invite-flow.png`. Pass when both plain shares behave the same and the guest reaches the revision from the email.
+- [x] Lane 2. Share from the panel with **Avisar por correo** checked. Save `invite-sink.png`. Pass when the sink holds one invitation with the publication URL.
+- [x] Lane 3. Open the emailed link as a signed-out guest and sign in by code. Save `invite-signin.png`. Pass when the guest lands on the publication.
+- [x] Lane 4. Send invitations past the per-owner limit. Save `invite-limit.png`. Pass when the share succeeds and the over-limit invitation is skipped with a visible notice.
+- [x] Lane 5. Call `artifacts_share` with `notify: true`. Save `mcp-notify.png`. Pass when the sink holds one invitation.
+- [x] Lane 6. Run `pnpm artifacts share <id> --email <guest> --notify`. Save `cli-notify.png`. Pass when the sink holds one invitation.
+- [x] Lane 7. Retry a `notify` share with the same `requestId`. Save `notify-retry.png`. Pass when the sink still holds one invitation.
+- [x] Lane 8. Render the invitation HTML in a browser at 390 and 1440 pixels. Save `invite-390.png` and `invite-1440.png`. Pass when the link and the owner's name are visible without overflow.
 - [ ] Lane 9. After the operator deploys, run `scripts/verify-deployed-sharing.ts` against production with two operator-supplied states. Save `deployed.png`. Pass when share, open, and revoke all pass. Mark the lane blocked until the operator deploys.
 - [ ] Lane 10. Run `dig TXT` for the SPF and DKIM names in `docs/deployment.md`. Save `dns.png`. Pass when both records match the document. Mark the lane blocked until the operator adds the records.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The p95 latency of a share without `notify` at trunk and head. Trunk lacks invitations, so also measure the p95 of a `notify` share with the file sink at head.
-- [ ] Probe. Run 50 plain shares alternating between the trunk run and the head run. Run 50 `notify` shares at head under the limit.
-- [ ] Baseline. Record the trunk plain-share p95 first.
-- [ ] Rule. Fail when head plain-share p95 exceeds trunk by more than 10 percent and 3 ms. Fail when the `notify` p95 exceeds 300 ms locally.
+- [x] Metric. The p95 latency of a share without `notify` at trunk and head. Trunk lacks invitations, so also measure the p95 of a `notify` share with the file sink at head.
+- [x] Probe. Run 50 plain shares alternating between the trunk run and the head run. Run 50 `notify` shares at head under the limit.
+- [x] Baseline. Record the trunk plain-share p95 first.
+- [x] Rule. Fail when head plain-share p95 exceeds trunk by more than 10 percent and 3 ms. Fail when the `notify` p95 exceeds 300 ms locally.
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Copy lane 2, 3, and 8 screenshots into `.test-artifacts/review/S10-review-<slug>.png`.
-- [ ] Record a 30 to 60 second video of a `notify` share from the panel through the guest's sign-in on a lane run. Save it as `.test-artifacts/review/S10-review.mp4`.
+- [x] Copy lane 2, 3, and 8 screenshots into `.test-artifacts/review/S10-review-<slug>.png`.
+- [x] Record a 30 to 60 second video of a `notify` share from the panel through the guest's sign-in on a lane run. Save it as `.test-artifacts/review/S10-review.mp4`.
 - [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
 
 **Merge.**
 
 - [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Bugbot triage done. Root read all comments, reviews and inline threads at `0c89987`; all are empty.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S10 to the chain. The operator lands it bottom-up and deploys.
 

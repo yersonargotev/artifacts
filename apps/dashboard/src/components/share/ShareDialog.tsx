@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { ShareCommand, ShareOutcome, ShareView } from '../../share.ts';
+import { encodeShareCommand, type ShareCommand, type ShareSubmission, type ShareView } from '../../share.ts';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog.tsx';
 import { ShareForm } from './ShareForm.tsx';
 
 type Pending = { command: ShareCommand; status: 'submitting' | 'uncertain' };
-type Opening = { id: number; artifactId: string; href: string; trigger: HTMLElement; fallback: HTMLElement | null; read: number; view?: ShareView; outcome?: ShareOutcome; error?: 'unavailable' | 'denied' };
+type Opening = { id: number; artifactId: string; href: string; trigger: HTMLElement; fallback: HTMLElement | null; read: number; view?: ShareView; submission?: ShareSubmission; error?: 'unavailable' | 'denied' };
 type Display = Opening & { pending?: Pending };
 
 export default function ShareDialog() {
@@ -44,23 +44,24 @@ export default function ShareDialog() {
     const pending: Pending = { command: existing?.command ?? Object.freeze({ ...command }), status: 'submitting' };
     commands.current.set(artifactId, pending);
     ++opening.read;
-    opening.outcome = undefined;
+    opening.submission = undefined;
     show(opening);
-    let outcome: ShareOutcome = 'uncertain';
+    let submission: ShareSubmission = { outcome: 'uncertain' };
     let denied = false;
     try {
-      const response = await fetch(opening.href, { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(pending.command) });
+      const response = await fetch(opening.href, { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' }, body: encodeShareCommand(pending.command) });
       if ([401, 403, 404].includes(response.status)) denied = true;
       else {
         const result = await response.json();
-        if ((response.status === 200 && result.outcome === 'confirmed') || (response.status === 400 && result.outcome === 'invalid') || (response.status === 409 && result.outcome === 'conflict')) outcome = result.outcome;
+        if ((response.status === 200 && result.outcome === 'confirmed') || (response.status === 400 && result.outcome === 'invalid') || (response.status === 409 && (result.outcome === 'conflict' || result.outcome === 'share_limit'))) submission = result;
       }
     } catch {}
+    const outcome = submission.outcome;
     if (outcome === 'uncertain' && !denied) pending.status = 'uncertain';
     else commands.current.delete(artifactId);
     const current = active.current;
     if (!current || current.artifactId !== artifactId) return;
-    current.outcome = denied ? undefined : outcome;
+    current.submission = denied ? undefined : submission;
     if (denied) {
       ++current.read;
       current.error = 'denied';
@@ -108,7 +109,7 @@ export default function ShareDialog() {
     }}>
       <DialogTitle>Compartir</DialogTitle>
       <DialogDescription>{display?.view?.title ?? 'Administra quién puede abrir la publicación.'}</DialogDescription>
-      {display?.error === 'denied' ? <p role="alert">No se puede abrir este artefacto.</p> : display?.view ? <ShareForm key={display.id} view={display.view} outcome={display.pending?.status === 'uncertain' ? 'uncertain' : display.outcome} command={display.pending?.command} busy={display.pending?.status === 'submitting'} onSubmit={(command) => { void submit(command); }} onRefresh={() => { if (active.current) void load(active.current); }} /> : display?.error ? <div role="alert"><p>No pudimos cargar el acceso actual.</p><button className="secondary" onClick={() => { if (active.current) void load(active.current); }}>Reintentar</button><a href={display.href}>Abrir página de compartir</a></div> : <p role="status">Cargando acceso…</p>}
+      {display?.error === 'denied' ? <p role="alert">No se puede abrir este artefacto.</p> : display?.view ? <ShareForm key={display.id} view={display.view} submission={display.pending?.status === 'uncertain' ? { outcome: 'uncertain' } : display.submission} command={display.pending?.command} busy={display.pending?.status === 'submitting'} onSubmit={(command) => { void submit(command); }} onRefresh={() => { if (active.current) void load(active.current); }} /> : display?.error ? <div role="alert"><p>No pudimos cargar el acceso actual.</p><button className="secondary" onClick={() => { if (active.current) void load(active.current); }}>Reintentar</button><a href={display.href}>Abrir página de compartir</a></div> : <p role="status">Cargando acceso…</p>}
       <DialogClose type="button" className="secondary share-close">Cerrar</DialogClose>
     </DialogContent>
   </Dialog>;

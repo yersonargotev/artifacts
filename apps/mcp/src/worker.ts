@@ -1,3 +1,4 @@
+import { createEmailSender } from '@artifacts/config/email-sender';
 import { mcpConfig, required, serviceUrl, type McpWorkerEnvironment } from '@artifacts/config';
 import { openDatabase } from '@artifacts/db';
 import { createArtifactStore } from '@artifacts/artifacts';
@@ -8,7 +9,7 @@ const runtimes = new WeakMap<McpWorkerEnvironment, Promise<ReturnType<typeof cre
 async function createRuntime(env: McpWorkerEnvironment) {
   const config = mcpConfig(env);
   const { db } = await openDatabase({ url: required('DATABASE_URL', env), authToken: env.DATABASE_AUTH_TOKEN });
-  return createResourceApp(config, createArtifactStore(db, { publishOrigin: serviceUrl('PUBLISH_URL', env) }));
+  return createResourceApp(config, createArtifactStore(db, { publishOrigin: serviceUrl('PUBLISH_URL', env), sendInvitation: createEmailSender(env, serviceUrl('MCP_URL', env)) }));
 }
 
 export default {

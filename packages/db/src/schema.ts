@@ -76,6 +76,12 @@ export const artifactCommand = sqliteTable('artifact_command', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [primaryKey({ columns: [table.ownerId, table.requestId] })]);
 
+export const artifactInvitationBudget = sqliteTable('artifact_invitation_budget', {
+  ownerId: text('owner_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  day: text('day').notNull(),
+  used: integer('used').notNull(),
+});
+
 export const publicationGrant = sqliteTable('publication_grant', {
   codeHash: text('code_hash').primaryKey(),
   state: text('state').notNull(),

@@ -629,6 +629,34 @@ test('CLI sharing retries committed lost responses without changing later grants
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test('CLI notification retries preserve the captured flag and a literal legacy operation stays valid', async () => {
+  const app = await fixture({ transport: 'rest', invitations: true });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-invitation-'));
+  try {
+    const token = (await grant(app, fullScope)).access_token;
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: token });
+    const created = await client.create({ requestId: 'cli-invitation-create', snapshot });
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: token };
+    app.dropNextResourceResponse('POST');
+    failure(await cli(['share', created.artifactId, '--email', ' Guest@Example.test ', '--notify', '--request-id', 'cli-invitation-lost'], environment), 'network_error');
+    const path = operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-invitation-lost');
+    const retained = JSON.parse(await readFile(path, 'utf8'));
+    assert.deepEqual(retained.command, { requestId: 'cli-invitation-lost', artifactId: created.artifactId, email: 'guest@example.test', notify: true });
+    const result = success(await cli(['retry', 'cli-invitation-lost'], environment));
+    assert.deepEqual(result.notification, { status: 'requested' });
+    assert.deepEqual(success(await cli(['retry', 'cli-invitation-lost'], environment)), result);
+    const messages = (await readFile(app.emailSink!, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].to, 'guest@example.test');
+    const legacy = { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'share', command: { requestId: 'literal-pre-s10-operation', artifactId: created.artifactId, email: 'legacy@example.test' } };
+    await writeFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, legacy.command.requestId), JSON.stringify(legacy), { mode: 0o600 });
+    const old = success(await cli(['retry', legacy.command.requestId], environment));
+    assert.deepEqual(Object.keys(old).sort(), ['artifactId', 'createdAt', 'kind', 'shareId', 'value']);
+    assert.equal(old.value, 'legacy@example.test');
+    assert.equal((await readFile(app.emailSink!, 'utf8')).trim().split('\n').length, 1);
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test('CLI sharing validates before identity or retention and documents logged-out commands', async () => {
   const app = await fixture({ transport: 'rest' });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-sharing-validation-'));

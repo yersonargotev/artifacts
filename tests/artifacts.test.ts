@@ -241,7 +241,7 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     const annotations = (name: string) => listed(name).annotations;
     assert.deepEqual(annotations('artifacts_move'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
     assert.deepEqual(annotations('projects_list'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
-    assert.deepEqual(annotations('artifacts_share'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+    assert.deepEqual(annotations('artifacts_share'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true });
     assert.deepEqual(annotations('artifacts_unshare'), { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false });
     assert.deepEqual(annotations('artifacts_shares_list'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
     assert.deepEqual(listed('artifacts_share').inputSchema.required.sort(), ['artifactId', 'email', 'requestId']);

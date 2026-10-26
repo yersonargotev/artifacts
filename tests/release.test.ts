@@ -21,6 +21,9 @@ const sha = 'a'.repeat(40);
 function environment() {
   const secrets = Object.fromEntries(Object.values(services).flatMap(({ worker }) => Object.entries(worker.env).filter(([, binding]) => binding.type === 'secret').map(([name]) => [name, `${name}-${'x'.repeat(40)}`])));
   secrets.DATABASE_URL = 'libsql://database.example.test';
+  secrets.OWNER_EMAIL = 'owner@example.test';
+  secrets.EMAIL_FROM = 'invitations@example.test';
+  secrets.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
   return {
     CLOUDFLARE_API_TOKEN: 't'.repeat(40), CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), ARTIFACTS_RUNTIME_SECRETS: JSON.stringify(secrets),
     GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: sha, GITHUB_REPOSITORY: 'owner/artifacts', GITHUB_TOKEN: 'test-token',
@@ -57,9 +60,9 @@ test('runtime secret projection follows the service declarations and keeps the v
   const secrets = JSON.parse(config.ARTIFACTS_RUNTIME_SECRETS);
   const projected = projectRuntimeSecrets(config);
   assert.deepEqual(projected.view, { PUBLICATION_SERVICE_SECRET: secrets.PUBLICATION_SERVICE_SECRET, PUBLICATION_COOKIE_SECRET: secrets.PUBLICATION_COOKIE_SECRET });
-  assert.deepEqual(Object.keys(projected.auth).sort(), ['BETTER_AUTH_SECRET', 'DATABASE_AUTH_TOKEN', 'DATABASE_URL']);
-  assert.deepEqual(Object.keys(projected.mcp).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'MCP_INTROSPECTION_CLIENT_ID', 'MCP_INTROSPECTION_CLIENT_SECRET']);
-  assert.deepEqual(Object.keys(projected.panel).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'PANEL_CLIENT_ID', 'PANEL_CLIENT_SECRET', 'PUBLICATION_SERVICE_SECRET']);
+  assert.deepEqual(Object.keys(projected.auth).sort(), ['BETTER_AUTH_SECRET', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_EMAIL_API_TOKEN', 'DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'OWNER_EMAIL']);
+  assert.deepEqual(Object.keys(projected.mcp).sort(), ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_EMAIL_API_TOKEN', 'DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'MCP_INTROSPECTION_CLIENT_ID', 'MCP_INTROSPECTION_CLIENT_SECRET']);
+  assert.deepEqual(Object.keys(projected.panel).sort(), ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_EMAIL_API_TOKEN', 'DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'PANEL_CLIENT_ID', 'PANEL_CLIENT_SECRET', 'PUBLICATION_SERVICE_SECRET']);
 });
 
 test('missing and malformed deployment inputs fail before temporary secret files or Worker commands', async () => {
@@ -85,6 +88,27 @@ test('missing and malformed deployment inputs fail before temporary secret files
       assert.deepEqual(await readdir(app.temporaryRoot), []);
     }
     assert.equal(commands, 0);
+  } finally { await app.close(); }
+});
+
+test('production email is mandatory and effective text bindings validate sender fields before deployment', async () => {
+  const app = await releaseFixture();
+  let commands = 0;
+  try {
+    const valid = environment();
+    const secrets = JSON.parse(valid.ARTIFACTS_RUNTIME_SECRETS);
+    const omitted = { ...secrets };
+    for (const name of ['OWNER_EMAIL', 'EMAIL_FROM', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_EMAIL_API_TOKEN']) delete omitted[name];
+    const invalid = [omitted, ...['OWNER_EMAIL', 'EMAIL_FROM', 'CLOUDFLARE_ACCOUNT_ID'].map((name) => ({ ...secrets, [name]: 'malformed' }))];
+    for (const input of invalid) await assert.rejects(releaseProduction({ ...app, environment: { ...valid, ARTIFACTS_RUNTIME_SECRETS: JSON.stringify(input) }, deployWorker: async () => { commands++; } }));
+    assert.equal(commands, 0);
+    const projected = projectRuntimeSecrets(valid);
+    assert.equal(projected.auth.OWNER_EMAIL, 'owner@example.test');
+    for (const service of ['mcp', 'panel'] as const) {
+      assert.equal(projected[service].EMAIL_FROM, 'invitations@example.test');
+      assert.equal(projected[service].OWNER_EMAIL, undefined);
+    }
+    assert.equal(projected.view.CLOUDFLARE_EMAIL_API_TOKEN, undefined);
   } finally { await app.close(); }
 });
 

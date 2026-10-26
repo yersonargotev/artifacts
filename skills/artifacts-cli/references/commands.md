@@ -171,9 +171,13 @@ artifacts retry share-ana-001
 
 Share requires the owner's `artifacts:publish` scope, trims and lowercases the email, and prints a share with `shareId`, `artifactId`, `kind: "email"`, `value`, and `createdAt`. `shares` requires the same scope and prints `{ "items": [...] }` with current grants without retaining a mutation. Use an observed `shareId` to unshare. Unshare requires the same scope. Unshare and its successful retry exit zero with empty stdout.
 
-The publication admits the owner and signed-in users whose verified email matches a current share. Guests see the published revision and attachments. History, export, editing, and project moves remain owner-only. Shares before first publication wait for publication. These commands do not send invitation emails or provide email-code sign-in.
+The publication admits the owner and signed-in users whose verified email matches a current share. Guests see the published revision and attachments. History, export, editing, and project moves remain owner-only. Shares before first publication wait for publication. Add `--notify` to request one invitation email. Invited people can sign in with an email code when the server enables email.
 
 Share and unshare retain complete normalized commands. `retry REQUEST_ID` replays the original operation. A historical share replay does not regrant revoked access, and an old unshare replay leaves a deliberate new share intact. Verify current grants with `shares ARTIFACT_ID` after a replay.
+
+Share with `--notify` to request one email attempt. Access succeeds when mail is disabled or the owner has used the daily allowance. The JSON result adds `notification.status` as `requested` or `skipped`, with `disabled` or `rate_limited` as the skip reason. `requested` does not confirm delivery. A crash after commit can lose the message. An exact retry preserves the captured flag and never sends a second email. Use a new deliberate command to request another attempt for existing access.
+
+Owners can reserve 100 invitations per UTC day. Revoke, deletion, and failed delivery do not refund reservations. New access is limited to 100 people per artifact and 1000 grants per owner. Existing access remains listable and revocable.
 
 ## Retry and export
 

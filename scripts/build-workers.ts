@@ -16,7 +16,13 @@ const selected = process.argv.slice(2);
 if (selected.some((name) => !(name in services))) throw new Error('Select auth, mcp, panel, or view');
 const names = selected.length ? selected : Object.keys(services);
 
-for (const name of names) {
+export function assertWorkerDependencies(name: string, inputs: string[], imports: { path: string }[]) {
+  if (inputs.some((path) => /(?:^|\/)(?:libsql@|(?:\.native|node_modules)\/libsql\/)|(?:^|\/)@libsql\/(?:darwin|linux|win32)|\.(?:node|dylib|so|dll)$|(?:^|\/)email-(?:sender-)?node[._-]/.test(path)) || imports.some((item) => /^node:(dns|https|fs)(\/|$)/.test(item.path))) {
+    throw new Error(`${name} included a Node-only network, database, or file dependency`);
+  }
+}
+
+if (import.meta.main) for (const name of names) {
   if (!(name === 'auth' || name === 'mcp' || name === 'panel' || name === 'view')) throw new Error('Unknown Worker');
   const { worker } = services[name];
   const directory = resolve(root, directories[name]);
@@ -64,9 +70,7 @@ for (const name of names) {
   if (!result.metafile) throw new Error('Worker bundle evidence is missing');
   const inputs = Object.keys(result.metafile.inputs);
   const imports = Object.values(result.metafile.outputs).flatMap((file) => file.imports);
-  if (inputs.some((path) => /\/libsql@/.test(path)) || imports.some((item) => /^node:(dns|https)(\/|$)/.test(item.path))) {
-    throw new Error(`${name} included a Node-only network or database dependency`);
-  }
+  assertWorkerDependencies(name, inputs, imports);
   const { entrypoint: _entrypoint, ...configuration } = worker;
   await writeFile(join(workerOutput, 'worker.config.json'), JSON.stringify({
     ...configuration,

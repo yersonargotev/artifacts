@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type UpdateInput } from '@yargote/artifacts-contracts';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
 import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
@@ -56,7 +56,7 @@ export interface ArtifactHttpClient {
   history(input: HistoryInput & { response?: 'full' }): Promise<HistoryResult>;
   history(input: HistoryInput): Promise<HistoryResult | SummaryHistoryResult>;
   publish(input: PublishInput): Promise<z.infer<typeof publishResultSchema>>;
-  share(input: ShareInput): Promise<Share>;
+  share(input: ShareInput): Promise<ShareResult>;
   unshare(input: UnshareInput): Promise<void>;
   listShares(input: ListSharesInput): Promise<ListSharesResult>;
   move(input: MoveInput): Promise<MoveResult>;
@@ -199,7 +199,7 @@ export function createArtifactHttpClient(options: {
     },
     share(value: ShareInput) {
       const { artifactId, ...input } = shareSchema.parse(value);
-      return json(`/artifacts/${encodeURIComponent(artifactId)}/shares`, 'POST', shareResultSchema, input);
+      return json(`/artifacts/${encodeURIComponent(artifactId)}/shares`, 'POST', shareCommandResultSchema, input);
     },
     listShares(value: ListSharesInput) {
       const { artifactId } = listSharesSchema.parse(value);
