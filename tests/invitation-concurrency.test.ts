@@ -63,25 +63,24 @@ async function race(scenario: Scenario) {
       return Promise.race([ready, once(child, 'exit').then(() => { throw new Error('API child exited before readiness'); })]);
     }
     const processes = await Promise.all([start(scenario === 'crash'), start()]);
-    if (scenario === 'quota' || scenario === 'auth-recovery') {
+    const authBarrier = ['quota', 'same-request', 'artifact-cap', 'owner-cap', 'require-new'].includes(scenario);
+    if (authBarrier || scenario === 'auth-recovery') {
       for (const child of processes) assert.equal((await fetch(`http://127.0.0.1:${child.port}/mcp/v1/identity`, { headers })).status, 200);
     }
-    let authBarrier = scenario === 'quota';
     const pendingAuth: (() => void)[] = [];
     app.setAuthHandler(async (request, bindings) => {
       const response = await app.authHandler(request, bindings);
       if (!authBarrier || !new URL(request.url).pathname.endsWith('/oauth2/introspect')) return response;
       const bytes = await response.arrayBuffer();
-      assert.equal(response.status, 200, 'The quota barrier holds only real successful auth responses');
+      assert.equal(response.status, 200, 'The command barrier holds only real successful auth responses');
       assert.equal(JSON.parse(Buffer.from(bytes).toString()).active, true);
       report('auth_body_completed', { status: response.status, sha256: createHash('sha256').update(Buffer.from(bytes)).digest('hex') });
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('The authentic introspection barrier did not fill')), 2000);
         pendingAuth.push(() => { clearTimeout(timer); resolve(); });
         if (pendingAuth.length === 2) {
-          authBarrier = false;
           report('auth_responses_released');
-          for (const release of pendingAuth) release();
+          for (const release of pendingAuth.splice(0)) release();
         }
       });
       return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
@@ -162,11 +161,11 @@ async function race(scenario: Scenario) {
         report('natural_race_diagnostic', { firstResponses: results, classification: results.map((result, index) => ({ actor: processes[index]!.child.pid, stage: result.status === 201 ? 'success' : events.some((event) => event.actor === processes[index]!.child.pid && event.event === 'introspection_response' && event.detail.status === 500) ? 'precommand_auth' : events.some((event) => event.actor === processes[index]!.child.pid && event.event === 'share_enter') ? 'command' : 'unclassified' })), sinkMessages: (await messages()).length });
         return;
       }
+      assert.equal(events.filter((event) => event.event === 'auth_body_completed').length, 2);
       if (scenario === 'quota' || scenario === 'same-request') {
         assert.deepEqual(results.map((result) => result.status), [201, 201], JSON.stringify(results));
         if (scenario === 'quota') {
           assert.equal(contended, true, 'The quota race must observe a competing BEGIN failure');
-          assert.equal(events.filter((event) => event.event === 'auth_body_completed').length, 2);
           const contention = events.findIndex((event) => event.event === 'contention_observed');
           assert.ok(contention >= 0 && contention < events.findIndex((event) => event.event === 'commit_ok'));
           assert.deepEqual(results.map((result) => result.body.notification.status).sort(), ['requested', 'skipped']);
@@ -177,6 +176,7 @@ async function race(scenario: Scenario) {
         } else assert.deepEqual(results[0], results[1]);
         for (let index = 0; index < results.length; index++) await receipt(index, results[index]!.body);
         assert.deepEqual(await Promise.all([share(0), share(1)]), results);
+        assert.equal(events.filter((event) => event.event === 'auth_body_completed').length, 4);
       } else {
         assert.deepEqual(results.map((result) => result.status).sort(), [201, 409]);
         assert.equal(results.find((result) => result.status === 409)!.body.error.details.reason, scenario === 'require-new' ? 'share_exists' : 'share_limit');
