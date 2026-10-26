@@ -56,6 +56,18 @@ export const artifactPublication = sqliteTable('artifact_publication', {
   version: integer('version').notNull(),
 }, (table) => [foreignKey({ columns: [table.artifactId, table.revisionId], foreignColumns: [artifactRevision.artifactId, artifactRevision.id], name: 'artifact_publication_membership_fk' })]);
 
+export const artifactShare = sqliteTable('artifact_share', {
+  id: text('id').primaryKey(),
+  artifactId: text('artifact_id').notNull().references(() => artifact.id, { onDelete: 'cascade' }),
+  kind: text('kind', { enum: ['email'] }).notNull(),
+  value: text('value').notNull(),
+  createdBy: text('created_by').notNull().references(() => user.id),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('artifact_share_value_idx').on(table.artifactId, table.kind, table.value),
+  index('artifact_share_recipient_idx').on(table.kind, table.value),
+]);
+
 export const artifactCommand = sqliteTable('artifact_command', {
   ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   requestId: text('request_id').notNull(),

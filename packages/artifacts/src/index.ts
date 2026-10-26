@@ -2,8 +2,8 @@ import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
-import { artifact, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type UpdateInput, type Viewer } from './contracts.ts';
+import { artifact, artifactCommand, artifactPublication, artifactRevision, artifactShare, publicationGrant, session } from '@artifacts/db/schema';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
@@ -16,6 +16,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
   const { transaction, authorize, liveSession, command, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
+  const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
 
   async function owned(connection: Connection, ownerId: string, artifactId: string) {
     const [found] = await connection.select().from(artifact).where(and(eq(artifact.id, artifactId), eq(artifact.ownerId, ownerId))).limit(1);
@@ -87,6 +88,36 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       });
     },
 
+    async share(actor: Actor, value: z.input<typeof shareSchema>): Promise<Share> {
+      const input = shareSchema.parse(value);
+      return command(actor, 'artifacts:publish', 'share', input, shareResultSchema, async (connection) => {
+        await owned(connection, actor.userId, input.artifactId);
+        await connection.insert(artifactShare).values({ id: crypto.randomUUID(), artifactId: input.artifactId, kind: 'email', value: input.email, createdBy: actor.userId, createdAt: new Date() }).onConflictDoNothing();
+        const [row] = await connection.select().from(artifactShare).where(and(eq(artifactShare.artifactId, input.artifactId), eq(artifactShare.kind, 'email'), eq(artifactShare.value, input.email))).limit(1);
+        return shareOf(row!);
+      });
+    },
+
+    async unshare(actor: Actor, value: z.input<typeof unshareSchema>): Promise<UnshareResult> {
+      const input = unshareSchema.parse(value);
+      return command(actor, 'artifacts:publish', 'unshare', input, unshareResultSchema, async (connection) => {
+        await owned(connection, actor.userId, input.artifactId);
+        const removed = await connection.delete(artifactShare).where(and(eq(artifactShare.id, input.shareId), eq(artifactShare.artifactId, input.artifactId))).returning({ shareId: artifactShare.id });
+        if (removed.length !== 1) throw new ArtifactError('not_found', 'Share not found');
+        return { artifactId: input.artifactId, shareId: input.shareId };
+      });
+    },
+
+    async listShares(actor: Actor, value: z.input<typeof listSharesSchema>): Promise<{ items: Share[] }> {
+      const input = listSharesSchema.parse(value);
+      return transaction(async (connection) => {
+        await authorize(connection, actor, 'artifacts:publish');
+        await owned(connection, actor.userId, input.artifactId);
+        const rows = await connection.select().from(artifactShare).where(eq(artifactShare.artifactId, input.artifactId)).orderBy(asc(artifactShare.kind), asc(artifactShare.value));
+        return { items: rows.map(shareOf) };
+      });
+    },
+
     async delete(actor: Actor, value: z.input<typeof deleteSchema>) {
       const input = deleteSchema.parse(value);
       return command(actor, 'artifacts:write', 'delete', input, deleteResultSchema, async (connection) => {
@@ -95,7 +126,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           throw new ArtifactError('conflict', 'Artifact changed since confirmation', { currentRevisionId: current.headRevisionId, currentPublicationVersion: current.publication?.version ?? 0 });
         }
         const matching = and(eq(artifactCommand.ownerId, actor.userId), sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`);
-        await connection.update(artifactCommand).set({ result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
+        await connection.update(artifactCommand).set({ payloadHash: '', result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
         const removed = await connection.delete(artifact).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId))).returning({ artifactId: artifact.id });
         if (removed.length !== 1) throw new ArtifactError('not_found', 'Artifact not found');
         return { artifactId: input.artifactId };

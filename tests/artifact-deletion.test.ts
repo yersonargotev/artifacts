@@ -41,13 +41,13 @@ test('deletion cascades revisions, older publication and grants, erases receipts
     for (const previous of before) {
       const receipt = receipts.find((row) => row.requestId === previous.requestId)!;
       assert.deepEqual(JSON.parse(receipt.result), { kind: 'artifact_deleted', artifactId: first.artifactId });
-      assert.equal(receipt.payloadHash, previous.payloadHash);
+      assert.equal(receipt.payloadHash, '');
       assert.deepEqual(receipt.createdAt, previous.createdAt);
     }
     assert(!JSON.stringify(receipts).includes('private'));
     for (const retry of [() => app.store.create(app.actor, create), () => app.store.update(app.actor, update), () => app.store.publish(app.actor, publish), () => app.store.delete(app.actor, deletion(second)), () => app.store.readPublished(viewer, { artifactId: first.artifactId })]) await assert.rejects(retry(), { code: 'not_found' });
     await assert.rejects(app.store.consumePublicationGrant({ artifactId: first.artifactId, state, code: pending.code }), { code: 'invalid_grant' });
-    await assert.rejects(app.store.create(app.actor, { ...create, snapshot: { ...snapshot, files: [] } }), { code: 'request_conflict' });
+    await assert.rejects(app.store.create(app.actor, { ...create, snapshot: { ...snapshot, files: [] } }), { code: 'not_found' });
     assert.deepEqual(await app.db.select().from(artifact), []);
   } finally { await app.close(); }
 });

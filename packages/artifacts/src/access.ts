@@ -50,14 +50,16 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
     }
   }
 
-  async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, decode: (result: unknown) => T, work: (connection: Connection) => Promise<T>): Promise<T> {
+  async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
     return transaction(async (connection) => {
       await authorize(connection, actor, scope);
       const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, actor.userId), eq(artifactCommand.requestId, input.requestId))).limit(1);
       if (receipt) {
+        const result: unknown = JSON.parse(receipt.result);
+        if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
         if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
-        return decode(JSON.parse(receipt.result));
+        return output.parse(result);
       }
       const result = await work(connection);
       await connection.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson(result), createdAt: new Date() });
@@ -66,14 +68,11 @@ export function createAccess(db: Database, options: { publishOrigin: string }) {
   }
 
   function command<T extends { artifactId: string }>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<T> {
-    return receipt(actor, scope, kind, input, (result) => {
-      if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
-      return output.parse(result);
-    }, work);
+    return receipt(actor, scope, kind, input, output, work);
   }
 
   function panelMove(actor: Actor, input: PanelMoveInput, output: z.ZodType<PanelMoveResult>, work: (connection: Connection) => Promise<PanelMoveResult>): Promise<PanelMoveResult> {
-    return receipt(actor, 'artifacts:write', 'panel_move', input, (result) => output.parse(result), work);
+    return receipt(actor, 'artifacts:write', 'panel_move', input, output, work);
   }
 
   return { transaction, authorize, liveSession, command, panelMove, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
