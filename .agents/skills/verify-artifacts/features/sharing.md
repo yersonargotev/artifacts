@@ -13,7 +13,7 @@ An owner shares a published artifact with an exact email address through the MCP
 
 ## How to get to it (user POV)
 
-- The owner publishes an artifact and shares it by calling the MCP tool `artifacts_share` with the guest's email. MCP is the only entry point that manages shares. REST, the CLI, and the panel have no share entry point.
+- The owner publishes an artifact and shares it by calling the MCP tool `artifacts_share` with the guest's email. The owner can also manage shares through REST or the typed client's `share`, `listShares`, and `unshare` methods. The CLI and the panel have no share entry point.
 - The guest opens the owner's publication URL and signs in with `Correo electrónico` and `Contraseña`.
 - The guest page shows the frame titled `Contenido del artefacto` and the title menu with `Información` and `Archivos`. It shows no `Volver al proyecto` link, no `Revisión N` label, and no `Cliente autor` row.
 

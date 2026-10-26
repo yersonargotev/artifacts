@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, moveSchema, publishSchema, readSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
@@ -9,6 +9,23 @@ import { createBearerAuthorizer, type BearerConfig } from './identity.ts';
 export { createBearerAuthorizer, type AccessDecision, type BearerConfig, type Principal } from './identity.ts';
 
 const bodyLimit = 8_388_608;
+const shareBodySchema = shareSchema.omit({ artifactId: true });
+const unshareBodySchema = unshareSchema.pick({ requestId: true });
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type Scope = 'artifacts:read' | 'artifacts:write' | 'artifacts:publish';
+const routePolicies = {
+  identity: { GET: 'artifacts:read' },
+  projects: { GET: 'artifacts:read' },
+  collection: { GET: 'artifacts:read', POST: 'artifacts:write' },
+  artifact: { GET: 'artifacts:read', PUT: 'artifacts:write' },
+  history: { GET: 'artifacts:read' },
+  publication: { PUT: 'artifacts:publish' },
+  project: { PUT: 'artifacts:write' },
+  export: { GET: 'artifacts:read' },
+  shares: { GET: 'artifacts:publish', POST: 'artifacts:publish' },
+  share: { DELETE: 'artifacts:publish' },
+} as const satisfies Record<string, Partial<Record<HttpMethod, Scope>>>;
+type RouteName = keyof typeof routePolicies;
 class HttpFailure extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly details: Record<string, unknown> = {}) { super(message); }
 }
@@ -77,8 +94,8 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       let segments: string[];
       try { segments = url.pathname.slice(base.length + 1).split('/').map(decodeURIComponent); }
       catch { return failure(400, 'invalid_input', 'Malformed route identifier'); }
-      const [collection, artifactId, section, revisionId, action] = segments;
-      const route = collection === 'identity' && segments.length === 1 ? 'identity'
+      const [collection, artifactId, section, itemId, action] = segments;
+      const route: RouteName | null = collection === 'identity' && segments.length === 1 ? 'identity'
         : collection === 'projects' && segments.length === 1 ? 'projects'
         : collection !== 'artifacts' ? null
         : segments.length === 1 ? 'collection'
@@ -86,11 +103,13 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         : segments.length === 3 && artifactId && section === 'history' ? 'history'
         : segments.length === 3 && artifactId && section === 'publication' ? 'publication'
         : segments.length === 3 && artifactId && section === 'project' ? 'project'
-        : segments.length === 5 && artifactId && section === 'revisions' && revisionId && action === 'export' ? 'export' : null;
+        : segments.length === 3 && artifactId && section === 'shares' ? 'shares'
+        : segments.length === 4 && artifactId && section === 'shares' && itemId ? 'share'
+        : segments.length === 5 && artifactId && section === 'revisions' && itemId && action === 'export' ? 'export' : null;
       if (!route) return failure(404, 'not_found', 'Route not found');
-      const allowed = route === 'collection' ? ['GET', 'POST'] : route === 'artifact' ? ['GET', 'PUT'] : route === 'publication' || route === 'project' ? ['PUT'] : ['GET'];
-      if (!allowed.includes(request.method)) return failure(405, 'method_not_allowed', 'Unsupported method', {}, { allow: allowed.join(', ') });
-      const scope = route === 'publication' ? 'artifacts:publish' : request.method === 'PUT' || request.method === 'POST' ? 'artifacts:write' : 'artifacts:read';
+      const policy = Object.entries(routePolicies[route]);
+      const scope = policy.find(([method]) => method === request.method)?.[1];
+      if (!scope) return failure(405, 'method_not_allowed', 'Unsupported method', {}, { allow: policy.map(([method]) => method).join(', ') });
       const decision = await authorize(request, [scope]);
       if (decision.kind !== 'authorized') {
         if (decision.kind === 'unavailable') return failure(503, 'unavailable', 'Identity service unavailable');
@@ -116,7 +135,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       query(url, []);
       if (route === 'projects') return json(await artifacts.projects(actor));
       if (route === 'export') {
-        const result = await artifacts.export(actor, exportSchema.parse({ artifactId, revisionId }));
+        const result = await artifacts.export(actor, exportSchema.parse({ artifactId, revisionId: itemId }));
         return new Response(Buffer.from(result.base64, 'base64'), { headers: { 'cache-control': 'no-store', 'content-type': result.mediaType, 'content-disposition': `attachment; filename="${result.filename}"`, 'x-artifact-sha256': result.sha256, 'x-content-type-options': 'nosniff' } });
       }
       if (route === 'collection') {
@@ -135,9 +154,22 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');
         return json(await artifacts.move(actor, input));
       }
-      const input = publishSchema.parse(await body(request));
-      if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');
-      return json(await artifacts.publish(actor, input));
+      if (route === 'shares') {
+        if (request.method === 'GET') return json(await artifacts.listShares(actor, listSharesSchema.parse({ artifactId })));
+        const input = shareSchema.parse({ artifactId, ...shareBodySchema.parse(await body(request)) });
+        return json(await artifacts.share(actor, input), 201);
+      }
+      if (route === 'share') {
+        const input = unshareSchema.parse({ artifactId, shareId: itemId, ...unshareBodySchema.parse(await body(request)) });
+        await artifacts.unshare(actor, input);
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+      }
+      if (route === 'publication') {
+        const input = publishSchema.parse(await body(request));
+        if (input.artifactId !== artifactId) throw new HttpFailure(400, 'invalid_input', 'Route and command artifact IDs must match');
+        return json(await artifacts.publish(actor, input));
+      }
+      return failure(404, 'not_found', 'Route not found');
     } catch (error) {
       if (error instanceof HttpFailure) return failure(error.status, error.code, error.message, error.details);
       if (error instanceof z.ZodError) return failure(400, 'invalid_input', 'Input does not match the command schema', { issues: error.issues.map(({ code, path, message }) => ({ code, path, message })) });
