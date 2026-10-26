@@ -12,9 +12,9 @@ An email share matches when the viewer's email is verified and equals the share 
 
 ## What a viewer sees
 
-A viewer sees the published revision and its attachments, and nothing else. History, export, editing, project moves, and the owner's account details stay owner-only.
+A viewer sees the published revision, its attachments, and the owner's display name. The display name is the only owner account detail in the guest projection. History, export, editing, project moves, owner IDs, email, and other account details stay owner-only.
 
-`readPublished` returns a `SharedRead` to a viewer who is not the owner. It contains the artifact ID, the publication (revision ID, version, and URL), and the published revision's ID, creation time, SHA-256, and snapshot. The store builds it from an allow-list, so a field added to `ArtifactRead` later does not reach viewers by default. It leaves out these fields:
+`readPublished` returns a `SharedRead` to a viewer who is not the owner. It contains the artifact ID, `ownerName`, the publication (revision ID, version, and URL), and the published revision's ID, creation time, SHA-256, and snapshot. The store builds it from an allow-list, so a field added to `ArtifactRead` later does not reach viewers by default. It leaves out these fields:
 
 - `ownerId` and the revision's `authorUserId`, which both identify the owner's account.
 - `headRevisionId`, which would reveal unpublished work.
@@ -25,6 +25,8 @@ A viewer sees the published revision and its attachments, and nothing else. Hist
 The snapshot stays whole, including `metadata.custom`, because it is what the owner published. The publication version stays because it tells the owner and the viewer which publication they are discussing.
 
 The owner keeps receiving the full `ArtifactRead`, unchanged in content and key order. The publication page renders the project link, the `Revisión N` label, and the `Cliente autor` row only for that shape.
+
+`listSharedWithMe` returns separate `SharedArtifactSummary` values with only artifact ID, published title, normalized owner display name, and publication URL. It authorizes `artifacts:read` and the live session, then joins current verified email shares to current publications and their actual revisions. It excludes self-owned artifacts, including self-shares, and orders all results by newest share then artifact ID. The query uses the recipient index and never selects the private draft title, owner ID, email, project, or share roster. The panel renders this separate collection only on the unfiltered root first page. Owner filters and counts keep describing owned artifacts.
 
 ## Viewer authorization
 
@@ -79,6 +81,8 @@ Migration `0003` creates `artifact_share` with two indexes and changes no existi
 
 The share schemas, `sharedReadSchema`, and the `Share` and `SharedRead` types live in `@yargote/artifacts-contracts` with the other domain schemas, next to `artifactReadSchema` and `viewerSchema`. They are additive exports.
 
-The panel deploys before the publication Worker, and the Worker parses the panel's internal read strictly. The owner's response did not change, so owners see no error while the two deploys run. Only the new Worker accepts the shared shape, and guests cannot sign in before S6, so no viewer reaches the old Worker. A later field added to the shared shape, such as an owner name, must ship to the Worker first or in two steps, because the old Worker rejects any unknown key with a `503`.
+The publication Worker parses the panel's internal read strictly. Shared reads include the owner's display name. A blank stored name becomes `Usuario de Artifacts`; the owner's email never becomes attribution. The strict reader accepts a missing legacy name with the same generic label and still rejects unknown fields. The store always emits the actual normalized name. Owner reads and owner document output remain unchanged.
+
+Release services run in the declared order `auth`, `mcp`, `view`, `panel`. The viewer deploys first because an old viewer rejects the added name with `503`. A new viewer accepts the old panel's missing name during the forward rollout. A failed viewer deployment stops before the panel. Rollback is coordinated and restores the panel before the viewer. Arbitrary independent component rollback is not supported. This contract needs no representation version header.
 
 Every store call runs in a write transaction, because the libSQL driver opens `BEGIN IMMEDIATE`. Each viewer's document, content, and file request therefore waits for concurrent writers, as the owner's requests already did. Viewers multiply those reads. A read-mode transaction for `readPublished` is the fix if contention appears.

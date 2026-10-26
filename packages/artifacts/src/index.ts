@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, exists, gt, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
@@ -7,6 +8,7 @@ import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, de
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
+import type { SharedArtifactSummary } from './contracts.ts';
 
 export * from './contracts.ts';
 
@@ -17,6 +19,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
   const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
+  const displayName = (name: string) => name.trim() || 'Usuario de Artifacts';
 
   async function owned(connection: Connection, ownerId: string, artifactId: string) {
     const [found] = await connection.select().from(artifact).where(and(eq(artifact.id, artifactId), eq(artifact.ownerId, ownerId))).limit(1);
@@ -126,6 +129,23 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         await owned(connection, actor.userId, input.artifactId);
         const rows = await connection.select().from(artifactShare).where(eq(artifactShare.artifactId, input.artifactId)).orderBy(asc(artifactShare.kind), asc(artifactShare.value));
         return { items: rows.map(shareOf) };
+      });
+    },
+
+    async listSharedWithMe(actor: Actor): Promise<{ items: SharedArtifactSummary[] }> {
+      return transaction(async (connection) => {
+        await authorize(connection, actor, 'artifacts:read');
+        const viewer = alias(user, 'viewer');
+        const owner = alias(user, 'owner');
+        const rows = await connection.select({ artifactId: artifact.id, title: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String), ownerName: owner.name }).from(artifactShare)
+          .innerJoin(viewer, and(eq(viewer.id, actor.userId), eq(viewer.emailVerified, true), eq(artifactShare.value, sql`lower(${viewer.email})`)))
+          .innerJoin(artifact, eq(artifact.id, artifactShare.artifactId))
+          .innerJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
+          .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifactPublication.revisionId)))
+          .innerJoin(owner, eq(owner.id, artifact.ownerId))
+          .where(and(eq(artifactShare.kind, 'email'), ne(artifact.ownerId, actor.userId)))
+          .orderBy(desc(artifactShare.createdAt), asc(artifact.id));
+        return { items: rows.map((row) => ({ ...row, ownerName: displayName(row.ownerName), url: urlFor(row.artifactId) })) };
       });
     },
 
@@ -245,7 +265,8 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         if (!published || (input.revisionId && input.revisionId !== published.revisionId)) throw new ArtifactError('not_found', 'Published revision not found');
         const read = await readArtifact(connection, found, published.revisionId);
         if (found.ownerId === viewer.userId) return read;
-        return { artifactId: read.artifactId, publication: published, revision: { id: read.revision.id, createdAt: read.revision.createdAt, sha256: read.revision.sha256, snapshot: read.revision.snapshot } };
+        const [owner] = await connection.select({ name: user.name }).from(user).where(eq(user.id, found.ownerId)).limit(1);
+        return { artifactId: read.artifactId, ownerName: displayName(owner!.name), publication: published, revision: { id: read.revision.id, createdAt: read.revision.createdAt, sha256: read.revision.sha256, snapshot: read.revision.snapshot } };
       });
     },
   };

@@ -104,7 +104,7 @@ test('every bundle and every dry run must pass before the first deployment, and 
     assert.deepEqual(commands, []);
     await writeFile(bundle, 'export default {};');
     await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker }), /Dry run failed/);
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry']);
     assert.deepEqual(await readdir(app.temporaryRoot), []);
   } finally { await app.close(); }
 });
@@ -131,13 +131,13 @@ test('dry-run mode needs no Cloudflare token and superseded releases skip after 
     const currentMain = async () => { commands.push('main'); return 'b'.repeat(40); };
     const smoke = async () => { commands.push('smoke'); };
     await releaseProduction({ ...app, environment: { ...environment(), CLOUDFLARE_API_TOKEN: '' }, dryRun: true, deployWorker, currentMain, smoke });
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry']);
     commands.length = 0;
     await releaseProduction({ ...app, environment: environment(), deployWorker, currentMain, smoke });
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry', 'main']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main']);
     commands.length = 0;
     await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker, currentMain: async () => '', smoke }), /Could not verify current main/);
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry']);
     assert.deepEqual(await readdir(app.temporaryRoot), []);
   } finally { await app.close(); }
 });
@@ -171,13 +171,19 @@ test('a current release finishes its serial quartet before smoke and a partial r
     const currentMain = async () => { commands.push('main'); return sha; };
     const smoke = async (secret: string) => { assert.equal(secret, projectRuntimeSecrets(environment()).view.PUBLICATION_SERVICE_SECRET); commands.push('smoke'); };
     await releaseProduction({ ...app, environment: environment(), deployWorker, currentMain, smoke });
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry', 'main', 'auth:deploy', 'mcp:deploy', 'panel:deploy', 'view:deploy', 'smoke']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main', 'auth:deploy', 'mcp:deploy', 'view:deploy', 'panel:deploy', 'smoke']);
     commands.length = 0;
     await assert.rejects(releaseProduction({ ...app, environment: environment(), currentMain, smoke, deployWorker: async (service, file, dryRun) => {
       await deployWorker(service, file, dryRun);
       if (service === 'mcp' && !dryRun) throw new Error('Cloudflare unavailable');
     } }), /Cloudflare unavailable/);
-    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'panel:dry', 'view:dry', 'main', 'auth:deploy', 'mcp:deploy']);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main', 'auth:deploy', 'mcp:deploy']);
+    commands.length = 0;
+    await assert.rejects(releaseProduction({ ...app, environment: environment(), currentMain, smoke, deployWorker: async (service, file, dryRun) => {
+      await deployWorker(service, file, dryRun);
+      if (service === 'view' && !dryRun) throw new Error('Viewer deployment failed');
+    } }), /Viewer deployment failed/);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main', 'auth:deploy', 'mcp:deploy', 'view:deploy']);
     assert.deepEqual(await readdir(app.temporaryRoot), []);
   } finally { await app.close(); }
 });

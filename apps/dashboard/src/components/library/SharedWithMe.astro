@@ -1,0 +1,30 @@
+---
+import type { SharedArtifactSummary } from '@artifacts/artifacts/contracts';
+import Icon from '../Icon.astro';
+interface Props { items: SharedArtifactSummary[] }
+const { items } = Astro.props;
+---
+{items.length > 0 && <section id="shared-with-me" aria-labelledby="shared-with-me-heading">
+  <h2 id="shared-with-me-heading">Compartidos conmigo</h2>
+  <ul>{items.map((item) => <li>
+    <a href={item.url} aria-label={item.title}>
+      <span class="shared-icon" aria-hidden="true"><Icon name="file-text" size={22} /></span>
+      <span class="shared-copy"><h3>{item.title}</h3><span>Compartido por {item.ownerName}</span></span>
+      <span class="shared-open" aria-hidden="true"><Icon name="external-link" size={18} /></span>
+    </a>
+  </li>)}</ul>
+</section>}
+<style>
+  section { margin: 0 0 28px; scroll-margin-top: 20px; }
+  h2 { margin: 0 0 14px; font-size: 17px; font-weight: 600; }
+  ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+  li { min-width: 0; }
+  a { display: flex; align-items: flex-start; gap: 12px; min-height: 88px; height: 100%; padding: 18px; border: 1px solid var(--divider); border-radius: 12px; color: var(--foreground); background: var(--mantle); text-decoration: none; }
+  a:hover { border-color: var(--blue); background: var(--canvas); }
+  a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .shared-icon, .shared-open { flex: none; color: var(--blue); }
+  .shared-open { margin-left: auto; }
+  .shared-copy { min-width: 0; overflow-wrap: anywhere; }
+  h3 { margin: 0 0 6px; font-size: 15px; line-height: 1.45; font-weight: 600; }
+  .shared-copy > span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+</style>

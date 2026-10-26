@@ -15,7 +15,7 @@ The plan is `docs/plans/sharing-plan.md`. The decision trail is `docs/plans/shar
 | S5 [#42](https://github.com/yersonargotev/artifacts/pull/42) | `feat/sharing-s5-cli` | `f537c64` | Clean, base S4 |
 | S6 [#43](https://github.com/yersonargotev/artifacts/pull/43) | `feat/sharing-s6-email-otp` | `c5cc8da` | Clean, base S5 |
 | S7 [#44](https://github.com/yersonargotev/artifacts/pull/44) | `feat/sharing-s7-signin-form` | `323d1f8` | Clean after operator media approval, base S6 |
-| S8 [#45](https://github.com/yersonargotev/artifacts/pull/45) | `feat/sharing-s8-share-dialog` | Pending | Fix required at `e3b6ccb`, base S7 |
+| S8 [#45](https://github.com/yersonargotev/artifacts/pull/45) | `feat/sharing-s8-share-dialog` | `3fd5f00` | Clean after operator continuation approval, base S7 |
 
 Start S4 from `f36cd07819eafaee7c04cd7c808cf5bb9087e995`. Each later PR branches from the previous PR's verified head and targets that branch.
 
@@ -153,6 +153,8 @@ Report PASS or ISSUES. Each issue needs a file and line, a concrete scenario, an
 - Riskiest lanes for the reviewer: 5, 6, and 10.
 
 ## S9. Invited person's views
+
+S9 is authorized after S8 media continuation approval. The implementation contract is `/tmp/artifacts-sharing-codex/s9-synthesis.md`. It adds only the owner display name to SharedRead, a separate published-only summary, viewer-first release with strict missing-name compatibility, and concrete scope extensions recorded in the canonical plan. Owner focused units and ten live lanes have passed; full gates and independent review remain pending.
 
 - Plan heading: "Show invited people what was shared with them (S9)".
 - Parent: `feat/sharing-s8-share-dialog`. Branch `feat/sharing-s9-shared-with-me`.

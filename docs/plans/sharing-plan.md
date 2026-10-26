@@ -2,7 +2,7 @@
 
 An owner grants view access to a published artifact for an exact email address. The invited person signs in with a one-time email code and opens the existing publication URL. Revoking a share takes effect on the next request.
 
-The rule is that a viewer sees the published revision and its attachments, and nothing else. History, export, editing, project moves, and owner details stay owner-only.
+The rule is that a viewer sees the published revision and its attachments, and nothing else. History, export, editing, project moves, and owner account details stay owner-only. S9 exposes only the owner display name for attribution.
 
 The program lands ten PRs in this order. S1 adds the share table. S2 authorizes viewers. S3 adds MCP tools. S4 adds REST and client methods. S5 adds CLI commands. S6 adds email-code sign-in. S7 adds the sign-in form. S8 adds the panel share dialog. S9 adds the invited person's views. S10 adds invitation emails and the deployed check.
 
@@ -488,74 +488,76 @@ Technical verification passed at `323d1f8` on PR44. Owner and independent eviden
 
 **Depends on.** S7.
 
+Technical verification passed at `3fd5f00` on PR45, including fresh independent review and exact-head CI40162987967 with production skipped. Owner and review reports are `/tmp/artifacts-sharing-codex/s8-denial-fix-report.md` and `s8-fix-review-report.md`. Fresh final-head timing and media replace the historical e3 evidence. The operator approved continuation in chat with "continua" after the media handoff. Root inspected the five PNGs and video frames and accepted S8 at this exact head. S9 is authorized; landing remains with the operator.
+
 **Files.**
 
-- [ ] Edit `apps/dashboard/src/components/ArtifactMenu.tsx`.
-- [ ] Edit `apps/dashboard/src/components/detail/DetailHeader.astro`.
-- [ ] Create `apps/dashboard/src/components/share/ShareDialog.tsx`.
-- [ ] Create `apps/dashboard/src/components/share/ShareForm.tsx`.
-- [ ] Create `apps/dashboard/src/share.ts`.
-- [ ] Create `apps/dashboard/src/pages/artifacts/[artifactId]/share.astro`.
-- [ ] Create `tests/share-form.test.ts`.
-- [ ] Create `tests/panel-share.browser.proof.ts`.
-- [ ] Edit `package.json`.
-- [ ] Edit `apps/dashboard/src/runtime.ts` to expose the existing sharing store operations to the panel.
-- [ ] Edit `apps/dashboard/src/layouts/Panel.astro` to mount one explicitly enabled dialog.
-- [ ] Edit `apps/dashboard/src/pages/index.astro` and `apps/dashboard/src/pages/artifacts/[artifactId].astro` to enable that capability.
-- [ ] Edit `apps/dashboard/src/components/library/ArtifactCard.astro` to provide the menu action and native link.
-- [ ] Edit `apps/dashboard/src/components/detail/PublicationCard.astro` to correct both owner-only access claims.
-- [ ] Edit `apps/dashboard/src/styles/panel.css` with scoped sharing styles.
-- [ ] Edit `apps/dashboard/src/urls.ts` for the canonical share URL.
-- [ ] Edit `.agents/skills/verify-artifacts/features/sharing.md` to describe the real panel entry points and committed browser proof.
-- [ ] Edit `tests/artifact-browser.proof.ts` so its publication notice assertion matches the corrected owner/invited-reader access copy.
-- [ ] Edit `tests/panel-library.browser.proof.ts` to cover the new Compartir keyboard stop while preserving download focus, URL and byte checks.
+- [x] Edit `apps/dashboard/src/components/ArtifactMenu.tsx`.
+- [x] Edit `apps/dashboard/src/components/detail/DetailHeader.astro`.
+- [x] Create `apps/dashboard/src/components/share/ShareDialog.tsx`.
+- [x] Create `apps/dashboard/src/components/share/ShareForm.tsx`.
+- [x] Create `apps/dashboard/src/share.ts`.
+- [x] Create `apps/dashboard/src/pages/artifacts/[artifactId]/share.astro`.
+- [x] Create `tests/share-form.test.ts`.
+- [x] Create `tests/panel-share.browser.proof.ts`.
+- [x] Edit `package.json`.
+- [x] Edit `apps/dashboard/src/runtime.ts` to expose the existing sharing store operations to the panel.
+- [x] Edit `apps/dashboard/src/layouts/Panel.astro` to mount one explicitly enabled dialog.
+- [x] Edit `apps/dashboard/src/pages/index.astro` and `apps/dashboard/src/pages/artifacts/[artifactId].astro` to enable that capability.
+- [x] Edit `apps/dashboard/src/components/library/ArtifactCard.astro` to provide the menu action and native link.
+- [x] Edit `apps/dashboard/src/components/detail/PublicationCard.astro` to correct both owner-only access claims.
+- [x] Edit `apps/dashboard/src/styles/panel.css` with scoped sharing styles.
+- [x] Edit `apps/dashboard/src/urls.ts` for the canonical share URL.
+- [x] Edit `.agents/skills/verify-artifacts/features/sharing.md` to describe the real panel entry points and committed browser proof.
+- [x] Edit `tests/artifact-browser.proof.ts` so its publication notice assertion matches the corrected owner/invited-reader access copy.
+- [x] Edit `tests/panel-library.browser.proof.ts` to cover the new Compartir keyboard stop while preserving download focus, URL and byte checks.
 
 **Build.**
 
-- [ ] Add a **Compartir** item to `ArtifactMenu` and to `DetailHeader`. It opens `ShareDialog`, which follows the progressive pattern of `MoveDialog` and falls back to the `share.astro` page without JavaScript.
-- [ ] Let the dialog add an email, list current shares, and revoke one. Each action posts through `share.ts` with a `requestId`.
-- [ ] When the artifact is not published, show `Las personas invitadas podrán verlo cuando lo publiques.`
-- [ ] Change the panel's publication card text `Solo tú puedes abrir el enlace` so it is true when shares exist, for example by naming how many people can open it.
+- [x] Add a **Compartir** item to `ArtifactMenu` and to `DetailHeader`. It opens `ShareDialog`, which follows the progressive pattern of `MoveDialog` and falls back to the `share.astro` page without JavaScript.
+- [x] Let the dialog add an email, list current shares, and revoke one. Each action posts through `share.ts` with a `requestId`.
+- [x] When the artifact is not published, show `Las personas invitadas podrán verlo cuando lo publiques.`
+- [x] Change the panel's publication card text `Solo tú puedes abrir el enlace` so it is true when shares exist, for example by naming how many people can open it.
 
 **You see.**
 
-- [ ] The owner opens **Compartir**, adds `ana@example.com`, and sees it in the list with a **Quitar** button.
+- [x] The owner opens **Compartir**, adds `ana@example.com`, and sees it in the list with a **Quitar** button.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/share-form.test.ts` covers parsing the form, an invalid email, and a revoke request. Run `node --import tsx --test tests/share-form.test.ts`.
-- [ ] `tests/panel-share.browser.proof.ts` shares with the guest, opens the publication in a second browser context, revokes, and asserts the guest's next request returns 403. Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts`.
+- [x] `tests/share-form.test.ts` covers parsing the form, an invalid email, and a revoke request. Run `node --import tsx --test tests/share-form.test.ts`.
+- [x] `tests/panel-share.browser.proof.ts` shares with the guest, opens the publication in a second browser context, revokes, and asserts the guest's next request returns 403. Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Open the detail page and the **Mover a proyecto** dialog at trunk and head. Trunk lacks **Compartir**, so record that and gate sharing from the dialog followed by the guest opening the publication at head. Save `detail-trunk.png`, `detail-head.png`, and `dialog-share.png`. Pass when the move dialog behaves the same and the guest sees the revision.
-- [ ] Lane 2. Open **Compartir** from a library card's menu. Save `menu-open.png`. Pass when the dialog opens with the email field focused.
-- [ ] Lane 3. Open **Compartir** from the detail header. Save `header-open.png`. Pass when the same dialog opens.
-- [ ] Lane 4. Add the guest's email. Save `added.png`. Pass when the list shows the email in lowercase.
-- [ ] Lane 5. Open the publication as the guest in a second context. Save `guest-open.png`. Pass when the guest sees the revision.
-- [ ] Lane 6. Click **Quitar** and reload as the guest. Save `revoked.png`. Pass when the share leaves the list and the reload returns 403.
-- [ ] Lane 7. Open **Compartir** on an unpublished artifact. Save `unpublished.png`. Pass when the unpublished notice shows.
-- [ ] Lane 8. Submit `nope`. Save `invalid.png`. Pass when a Spanish inline error shows and no row is written.
-- [ ] Lane 9. Run lanes 2 and 4 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
-- [ ] Lane 10. Open the dialog, press Escape, and disable JavaScript to use `share.astro`. Save `escape.png` and `no-js.png`. Pass when focus returns to the trigger and the page shares without JavaScript.
+- [x] Lane 1. Regression lane against trunk. Open the detail page and the **Mover a proyecto** dialog at trunk and head. Trunk lacks **Compartir**, so record that and gate sharing from the dialog followed by the guest opening the publication at head. Save `detail-trunk.png`, `detail-head.png`, and `dialog-share.png`. Pass when the move dialog behaves the same and the guest sees the revision.
+- [x] Lane 2. Open **Compartir** from a library card's menu. Save `menu-open.png`. Pass when the dialog opens with the email field focused.
+- [x] Lane 3. Open **Compartir** from the detail header. Save `header-open.png`. Pass when the same dialog opens.
+- [x] Lane 4. Add the guest's email. Save `added.png`. Pass when the list shows the email in lowercase.
+- [x] Lane 5. Open the publication as the guest in a second context. Save `guest-open.png`. Pass when the guest sees the revision.
+- [x] Lane 6. Click **Quitar** and reload as the guest. Save `revoked.png`. Pass when the share leaves the list and the reload returns 403.
+- [x] Lane 7. Open **Compartir** on an unpublished artifact. Save `unpublished.png`. Pass when the unpublished notice shows.
+- [x] Lane 8. Submit `nope`. Save `invalid.png`. Pass when a Spanish inline error shows and no row is written.
+- [x] Lane 9. Run lanes 2 and 4 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
+- [x] Lane 10. Open the dialog, press Escape, and disable JavaScript to use `share.astro`. Save `escape.png` and `no-js.png`. Pass when focus returns to the trigger and the page shares without JavaScript.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The detail page's load-event time at trunk and head. Trunk lacks the dialog, so also measure the time from clicking **Compartir** to the share list rendering at head.
-- [ ] Probe. Load the detail page 30 times with Playwright, alternating between the trunk run and the head run. Open the dialog 30 times at head with 20 shares.
-- [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Fail when the head median exceeds trunk by more than 10 percent and 20 ms. Fail when the dialog median exceeds 300 ms.
+- [x] Metric. The detail page's load-event time at trunk and head. Trunk lacks the dialog, so also measure the time from clicking **Compartir** to the share list rendering at head.
+- [x] Probe. Load the detail page 30 times with Playwright, alternating between the trunk run and the head run. Open the dialog 30 times at head with 20 shares.
+- [x] Baseline. Record the trunk median first.
+- [x] Rule. Fail when the head median exceeds trunk by more than 10 percent and 20 ms. Fail when the dialog median exceeds 300 ms.
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Copy lane 2, 4, 6, 7, and 9 screenshots into `.test-artifacts/review/S8-review-<slug>.png`.
-- [ ] Record a 30 to 60 second video of share, guest open, and revoke on a lane run. Save it as `.test-artifacts/review/S8-review.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
+- [x] Copy lane 2, 4, 6, 7, and 9 screenshots into `.test-artifacts/review/S8-review-<slug>.png`.
+- [x] Record a 30 to 60 second video of share, guest open, and revoke on a lane run. Save it as `.test-artifacts/review/S8-review.mp4`.
+- [x] Post the screenshots and the video in chat. The operator approved continuation to S9 with "continua".
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at the exact head SHA `3fd5f0069de0f72ae7226b8188707f94f2c43655`, after operator continuation approval.
+- [x] Bugbot triage done. Issue comments, reviews and inline review comments are empty at the final root inspection.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S8 to the chain. The operator lands it bottom-up.
 
@@ -563,20 +565,29 @@ Technical verification passed at `323d1f8` on PR44. Owner and independent eviden
 
 **Depends on.** S8.
 
+S9 is in implementation after operator continuation approval of S8. Focused owner unit tests pass36of36 and the actual focused S9 browser proof passes all ten lanes, with full verification and independent review still pending. Evidence is `/tmp/artifacts-sharing-codex/s9-owner/green-unit.log` and `green-browser-v2.log`. Design contract is `/tmp/artifacts-sharing-codex/s9-synthesis.md`, selected from two candidates and an independent cross-judge. Only the owner display name extends the guest projection. Viewer-first release and strict missing-name compatibility prevent rolling-update errors.
+
 **Files.**
 
-- [ ] Edit `packages/artifacts/src/index.ts`.
-- [ ] Edit `apps/publication/src/document.ts`.
-- [ ] Edit `apps/dashboard/src/pages/index.astro`.
-- [ ] Create `apps/dashboard/src/components/library/SharedWithMe.astro`.
-- [ ] Edit `tests/library.test.ts`.
-- [ ] Edit `tests/panel-share.browser.proof.ts`.
+- [x] Edit `packages/artifacts/src/index.ts`.
+- [x] Edit `apps/publication/src/document.ts`.
+- [x] Edit `apps/dashboard/src/pages/index.astro`.
+- [x] Create `apps/dashboard/src/components/library/SharedWithMe.astro`.
+- [x] Edit `tests/library.test.ts`.
+- [x] Edit `tests/panel-share.browser.proof.ts`.
+- [ ] Edit `package.json` only if the focused S9 proof needs explicit inclusion in the existing browser CI chain.
+- [x] Edit `packages/contracts/src/index.ts` for the shared summary and strict owner-name contract.
+- [x] Edit `apps/dashboard/src/runtime.ts` to expose the new store read.
+- [x] Edit `tests/sharing.test.ts` for raw projection, compatibility and privacy.
+- [x] Edit `scripts/release-production.ts` and `tests/release.test.ts` for viewer-first deployment and stop-on-failure.
+- [x] Edit `docs/decisions/sharing.md` for the rollout contract.
+- [x] Edit `.agents/skills/verify-artifacts/features/sharing.md` for the new verified paths.
 
 **Build.**
 
-- [ ] Add store method `listSharedWithMe`. It returns published artifacts the viewer can open through a share, with the owner's display name.
-- [ ] Add a **Compartidos conmigo** section to the panel library. Hide it when the list is empty.
-- [ ] Show `Compartido por <name>` in the publication header in `publicationDocument` when the viewer is not the owner.
+- [x] Add store method `listSharedWithMe`. It returns published artifacts the viewer can open through a share, with the owner's display name.
+- [x] Add a **Compartidos conmigo** section to the panel library. Hide it when the list is empty.
+- [x] Show `Compartido por <name>` in the publication header in `publicationDocument` when the viewer is not the owner.
 
 **You see.**
 
@@ -619,6 +630,7 @@ Technical verification passed at `323d1f8` on PR44. Owner and independent eviden
 - [ ] Bugbot triage done.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S9 to the chain. The operator lands it bottom-up.
+
 
 ## Send invitation emails and verify the deployment (S10)
 

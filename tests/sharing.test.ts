@@ -181,6 +181,7 @@ test('a guest whose verified email matches a share reads the published revision 
     assert.deepEqual(viewer, { artifactId: first.artifactId, userId: app.guest.userId, sessionId: app.guest.sessionId, expiresAt: viewer.expiresAt });
     const expected = {
       artifactId: first.artifactId,
+      ownerName: 'Test owner',
       publication: { revisionId: first.revision.id, version: 1, url: `${publishOrigin}/a/${first.artifactId}` },
       revision: { id: first.revision.id, createdAt: first.revision.createdAt, sha256: first.revision.sha256, snapshot: publishedSnapshot },
     };
@@ -372,6 +373,7 @@ test('the publication Worker fails closed on a guest-shaped response with owner 
     'owner shape for the viewer': [owned, 200],
     'guest shape with ownerId': [{ ...shared, ownerId: 'owner-a' }, 503],
     'guest shape with project': [{ ...shared, project: 'Clientes' }, 503],
+    'guest shape with email': [{ ...shared, email: 'owner@example.test' }, 503],
     'guest shape with authorUserId': [{ ...shared, revision: { ...shared.revision, authorUserId: 'owner-a' } }, 503],
     'owner shape for another user': [{ ...owned, ownerId: 'owner-b' }, 503],
   } as const;
@@ -381,6 +383,36 @@ test('the publication Worker fails closed on a guest-shaped response with owner 
     assert.equal(response.status, status, name);
     if (status === 503) assert(!(await response.text()).includes('Quarterly plan'), name);
   }
+});
+
+test('the real publication Worker accepts a missing legacy name and escapes the current guest attribution', async () => {
+  const shared = { artifactId: 'artifact-a', publication: { revisionId: 'revision-1', version: 1, url: 'https://publication.example.test/a/artifact-a' }, revision: { id: 'revision-1', createdAt: '2026-01-01T00:00:00.000Z', sha256: 'a'.repeat(64), snapshot: publishedSnapshot } };
+  for (const [body, name] of [[shared, 'Usuario de Artifacts'], [{ ...shared, ownerName: '<script>bad</script> & Ana' }, '&lt;script&gt;bad&lt;/script&gt; &amp; Ana']] as const) {
+    const { worker, open } = stubbedWorker(async () => Response.json(body));
+    const response = await worker(new Request('https://publication.example.test/a/artifact-a', { headers: { cookie: await open() } }));
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert(html.includes(`Compartido por ${name}`));
+    assert(html.includes('href="https://panel.example.test/#shared-with-me"'));
+    assert(!html.includes('<script>bad</script>'));
+  }
+});
+
+test('raw guest publication output always contains the current normalized owner name and rechecks email changes', async () => {
+  const app = await setup();
+  try {
+    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot });
+    await app.publish(first.artifactId, first.revision.id);
+    await app.share(app.owner, first.artifactId, 'guest@example.test');
+    const viewer = await app.admit(app.guest, first.artifactId);
+    for (const [stored, expected] of [['  Ana <Equipo>  ', 'Ana <Equipo>'], ['  ', 'Usuario de Artifacts']]) {
+      await app.db.update(user).set({ name: stored }).where(eq(user.id, app.ownerId));
+      const read = await app.store.readPublished(viewer, { artifactId: first.artifactId });
+      assert.deepEqual(read, { artifactId: first.artifactId, ownerName: expected, publication: { revisionId: first.revision.id, version: 1, url: `${publishOrigin}/a/${first.artifactId}` }, revision: { id: first.revision.id, createdAt: first.revision.createdAt, sha256: first.revision.sha256, snapshot: publishedSnapshot } });
+    }
+    await app.db.update(user).set({ email: 'changed@example.test' }).where(eq(user.id, app.guest.userId));
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'not_found' });
+  } finally { await app.close(); }
 });
 
 test('the publication Worker admits a shared guest without owner details and clears the viewer cookie after revocation', async () => {
