@@ -1,21 +1,22 @@
-import { and, asc, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { Database } from '@artifacts/db';
-import { artifact, artifactCommand, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
+import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type ShareResult, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
+import { invitation, type InvitationSender } from './invitation.ts';
 import type { SharedArtifactSummary } from './contracts.ts';
 
 export * from './contracts.ts';
 
 const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null) });
 
-export function createArtifactStore(db: Database, options: { publishOrigin: string }) {
-  const { transaction, authorize, liveSession, command, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);
+export function createArtifactStore(db: Database, options: { publishOrigin: string; sendInvitation?: InvitationSender }) {
+  const { transaction, authorize, liveSession, command, receipt, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
   const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
@@ -102,14 +103,51 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       });
     },
 
-    async share(actor: Actor, value: z.input<typeof shareSchema>): Promise<Share> {
+    async share(actor: Actor, value: z.input<typeof shareSchema>): Promise<ShareResult> {
       const input = shareSchema.parse(value);
-      return command(actor, 'artifacts:publish', 'share', input, shareResultSchema, async (connection) => {
+      const committed = await receipt(actor, 'artifacts:publish', 'share', input, shareCommandResultSchema, async (connection) => {
         await owned(connection, actor.userId, input.artifactId);
-        await connection.insert(artifactShare).values({ id: crypto.randomUUID(), artifactId: input.artifactId, kind: 'email', value: input.email, createdBy: actor.userId, createdAt: new Date() }).onConflictDoNothing();
-        const [row] = await connection.select().from(artifactShare).where(and(eq(artifactShare.artifactId, input.artifactId), eq(artifactShare.kind, 'email'), eq(artifactShare.value, input.email))).limit(1);
-        return shareOf(row!);
+        let [row] = await connection.select().from(artifactShare).where(and(eq(artifactShare.artifactId, input.artifactId), eq(artifactShare.kind, 'email'), eq(artifactShare.value, input.email))).limit(1);
+        if (row && input.requireNew) throw new ArtifactError('conflict', 'Access already exists', { reason: 'share_exists' });
+        if (!row) {
+          const [artifactCount] = await connection.select({ total: count() }).from(artifactShare).where(eq(artifactShare.artifactId, input.artifactId));
+          if (artifactCount!.total >= 100) throw new ArtifactError('conflict', 'Artifact share limit reached', { reason: 'share_limit', scope: 'artifact', limit: 100 });
+          const [ownerCount] = await connection.select({ total: count() }).from(artifactShare).innerJoin(artifact, eq(artifact.id, artifactShare.artifactId)).where(eq(artifact.ownerId, actor.userId));
+          if (ownerCount!.total >= 1000) throw new ArtifactError('conflict', 'Owner share limit reached', { reason: 'share_limit', scope: 'owner', limit: 1000 });
+          row = { id: crypto.randomUUID(), artifactId: input.artifactId, kind: 'email', value: input.email, createdBy: actor.userId, createdAt: new Date() };
+          await connection.insert(artifactShare).values(row);
+        }
+        const result: ShareResult = shareOf(row);
+        if (!input.notify) return result;
+        if (!options.sendInvitation) return { ...result, notification: { status: 'skipped' as const, reason: 'disabled' as const } };
+        const [clock] = await connection.select({ day: sql<string>`date('now')`, retryAt: sql<string>`strftime('%Y-%m-%dT00:00:00.000Z', 'now', '+1 day')` }).from(artifact).where(eq(artifact.id, input.artifactId));
+        const [budget] = await connection.select().from(artifactInvitationBudget).where(eq(artifactInvitationBudget.ownerId, actor.userId));
+        const used = budget?.day === clock!.day ? budget.used : 0;
+        if (used >= 100) return { ...result, notification: { status: 'skipped' as const, reason: 'rate_limited' as const, retryAt: clock!.retryAt } };
+        const values = { ownerId: actor.userId, day: clock!.day, used: used + 1 };
+        if (budget) await connection.update(artifactInvitationBudget).set(values).where(eq(artifactInvitationBudget.ownerId, actor.userId));
+        else await connection.insert(artifactInvitationBudget).values(values);
+        return { ...result, notification: { status: 'requested' as const } };
       });
+      if (committed.fresh && committed.result.notification?.status === 'requested') {
+        const deadline = new AbortController();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            (async () => {
+              const [current] = await db.select({ recipient: artifactShare.value, ownerName: user.name }).from(artifactShare)
+                .innerJoin(artifact, and(eq(artifact.id, artifactShare.artifactId), eq(artifact.ownerId, actor.userId)))
+                .innerJoin(user, eq(user.id, artifact.ownerId))
+                .where(and(eq(artifactShare.id, committed.result.shareId), eq(artifactShare.artifactId, input.artifactId), eq(artifactShare.kind, 'email'), eq(artifactShare.value, input.email))).limit(1);
+              deadline.signal.throwIfAborted();
+              if (current) await options.sendInvitation!(invitation(current.recipient, current.ownerName, urlFor(input.artifactId)));
+            })(),
+            new Promise<never>((_, reject) => { timer = setTimeout(() => { deadline.abort(); reject(new Error('Invitation attempt timed out')); }, 10_000); }),
+          ]);
+        } catch { console.error('Artifact invitation attempt failed'); }
+        finally { clearTimeout(timer); }
+      }
+      return committed.result;
     },
 
     async unshare(actor: Actor, value: z.input<typeof unshareSchema>): Promise<UnshareResult> {

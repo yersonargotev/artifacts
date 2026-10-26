@@ -1,0 +1,110 @@
+diff --git a/src/statement.rs b/src/statement.rs
+index 10214ca..50a3f48 100644
+--- a/src/statement.rs
++++ b/src/statement.rs
+@@ -88,8 +88,10 @@ impl Statement {
+ 
+         let initial = Instant::now();
+ 
+-        rt.block_on(fut)
+-            .or_else(|err| throw_libsql_error(&mut cx, err))?;
++        rt.block_on(fut).or_else(|err| {
++            raw_stmt.reset();
++            throw_libsql_error(&mut cx, err)
++        })?;
+ 
+         let duration = Instant::now() - initial;
+ 
+@@ -137,13 +139,17 @@ impl Statement {
+         let fut = raw_stmt.query(params);
+         let rt = runtime(&mut cx)?;
+         let result = rt.block_on(fut);
+-        let mut rows = result.or_else(|err| throw_libsql_error(&mut cx, err))?;
++        let mut rows = result.or_else(|err| {
++            raw_stmt.reset();
++            throw_libsql_error(&mut cx, err)
++        })?;
+ 
+         let initial = Instant::now();
+ 
+-        let result = rt
+-            .block_on(rows.next())
+-            .or_else(|err| throw_libsql_error(&mut cx, err))?;
++        let result = rt.block_on(rows.next()).or_else(|err| {
++            raw_stmt.reset();
++            throw_libsql_error(&mut cx, err)
++        })?;
+ 
+         let duration = Instant::now() - initial;
+ 
+@@ -180,10 +186,15 @@ impl Statement {
+         let result = rt.block_on(async move {
+             let mut raw_stmt = stmt.stmt.lock().await;
+             raw_stmt.reset();
+-            raw_stmt.query(params).await
++            let result = raw_stmt.query(params).await;
++            if result.is_err() {
++                raw_stmt.reset();
++            }
++            result
+         });
+         let rows = result.or_else(|err| throw_libsql_error(&mut cx, err))?;
+         let rows = Rows {
++            stmt: stmt.stmt.clone(),
+             rows: RefCell::new(rows),
+             raw: *stmt.raw.borrow(),
+             safe_ints: *stmt.safe_ints.borrow(),
+@@ -208,12 +219,17 @@ impl Statement {
+         rt.spawn(async move {
+             let result = {
+                 let mut raw_stmt = raw_stmt.lock().await;
+-                raw_stmt.query(params).await
++                let result = raw_stmt.query(params).await;
++                if result.is_err() {
++                    raw_stmt.reset();
++                }
++                result
+             };
+             match result {
+                 Ok(rows) => {
+                     deferred.settle_with(&channel, move |mut cx| {
+                         let rows = Rows {
++                            stmt: raw_stmt,
+                             rows: RefCell::new(rows),
+                             raw,
+                             safe_ints,
+@@ -286,6 +302,7 @@ impl Statement {
+ }
+ 
+ pub(crate) struct Rows {
++    stmt: Arc<Mutex<libsql::Statement>>,
+     rows: RefCell<libsql::Rows>,
+     raw: bool,
+     safe_ints: bool,
+@@ -299,11 +316,12 @@ impl Rows {
+         let rows: Handle<'_, JsBox<Rows>> = cx.this()?;
+         let raw = rows.raw;
+         let safe_ints = rows.safe_ints;
++        let raw_stmt = rows.stmt.clone();
+         let mut rows = rows.rows.borrow_mut();
+         let rt = runtime(&mut cx)?;
+         let count = result_arr.len(&mut cx);
+         let res = cx.null();
+-        rt.block_on(async move {
++        let result = rt.block_on(async move {
+             let mut keys = Vec::<Handle<JsString>>::with_capacity(rows.column_count() as usize);
+             for idx in 0..rows.column_count() {
+                 let column_name = rows.column_name(idx).unwrap();
+@@ -352,7 +370,11 @@ impl Rows {
+                 };
+             }
+             Ok(())
+-        })?;
++        });
++        if result.is_err() {
++            raw_stmt.blocking_lock().reset();
++        }
++        result?;
+         Ok(res)
+     }
+ }

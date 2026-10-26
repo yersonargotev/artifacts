@@ -7,3 +7,4 @@ allowBuilds:
   workerd: true
 overrides:
   '@astrojs/react>@vitejs/plugin-react': 6.1.1
+  libsql: link:./.native/libsql

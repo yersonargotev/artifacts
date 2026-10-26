@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { createArtifactStore, ArtifactError, type Actor } from '../packages/artifacts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
-import { loadShareView, parseShareForm, submitShare, type ShareCommand } from '../apps/dashboard/src/share.ts';
+import { loadShareView, parseShareForm, submitShare, encodeShareCommand, type ShareCommand } from '../apps/dashboard/src/share.ts';
 import { fixture } from './helpers.ts';
 
 const request = (body: string | Uint8Array, contentType = 'application/x-www-form-urlencoded') => new Request('https://panel.example.test/artifacts/artifact/share', { method: 'POST', headers: { 'content-type': contentType }, body: body as BodyInit });
-const encode = (command: ShareCommand) => new URLSearchParams(command).toString();
+const encode = (command: ShareCommand) => encodeShareCommand(command).toString();
 const command: ShareCommand = { intent: 'share', requestId: 'share-request-one', email: ' Guest@Example.TEST ' };
 
 test('share forms retain the exact submitted payload and parse a revoke without an email', async () => {
@@ -45,7 +45,7 @@ async function setup() {
 test('actual commands normalize, deduplicate, revoke and reconcile historical receipts from the current list', async () => {
   const { app, actor, store, panel, artifactId } = await setup();
   try {
-    assert.equal(await submitShare(store, actor, artifactId, command), 'confirmed');
+    assert.deepEqual(await submitShare(store, actor, artifactId, command), { outcome: 'confirmed' });
     let view = (await loadShareView(panel, store, actor, artifactId)).view;
     assert.equal(view.title, 'Shared document');
     assert.equal(view.published, false);
@@ -53,14 +53,14 @@ test('actual commands normalize, deduplicate, revoke and reconcile historical re
     assert(view.shares.kind === 'ready');
     assert.deepEqual(view.shares.items.map(({ value }) => value), ['guest@example.test']);
     const shareId = view.shares.items[0].shareId;
-    assert.equal(await submitShare(store, actor, artifactId, { ...command, requestId: randomUUID() }), 'confirmed');
+    assert.deepEqual(await submitShare(store, actor, artifactId, { ...command, requestId: randomUUID() }), { outcome: 'confirmed' });
     assert.equal((await store.listShares(actor, { artifactId })).items.length, 1);
     const revoke: ShareCommand = { intent: 'unshare', requestId: randomUUID(), shareId };
-    assert.equal(await submitShare(store, actor, artifactId, revoke), 'confirmed');
-    assert.equal(await submitShare(store, actor, artifactId, command), 'confirmed');
+    assert.deepEqual(await submitShare(store, actor, artifactId, revoke), { outcome: 'confirmed' });
+    assert.deepEqual(await submitShare(store, actor, artifactId, command), { outcome: 'confirmed' });
     assert.deepEqual((await loadShareView(panel, store, actor, artifactId)).view.shares, { kind: 'ready', items: [] });
-    assert.equal(await submitShare(store, actor, artifactId, { ...command, requestId: randomUUID() }), 'confirmed');
-    assert.equal(await submitShare(store, actor, artifactId, revoke), 'confirmed');
+    assert.deepEqual(await submitShare(store, actor, artifactId, { ...command, requestId: randomUUID() }), { outcome: 'confirmed' });
+    assert.deepEqual(await submitShare(store, actor, artifactId, revoke), { outcome: 'confirmed' });
     view = (await loadShareView(panel, store, actor, artifactId)).view;
     assert(view.shares.kind === 'ready');
     assert.equal(view.shares.items.length, 1);
@@ -72,7 +72,7 @@ test('ownership precedes semantic email validation and store authority remains l
   const { app, actor, store, artifactId } = await setup();
   try {
     const invalid: ShareCommand = { ...command, email: 'nope' };
-    assert.equal(await submitShare(store, actor, artifactId, invalid), 'invalid');
+    assert.deepEqual(await submitShare(store, actor, artifactId, invalid), { outcome: 'invalid' });
     assert.deepEqual((await store.listShares(actor, { artifactId })).items, []);
     for (const id of ['missing-artifact', artifactId]) await assert.rejects(submitShare(store, { ...actor, userId: 'foreign-owner' }, id, invalid), (error: unknown) => error instanceof ArtifactError);
     await assert.rejects(submitShare(store, actor, 'missing-artifact', invalid), (error: unknown) => error instanceof ArtifactError && error.code === 'not_found');
@@ -85,12 +85,12 @@ test('lost committed results retain a retry while list failures cannot undo conf
   const { app, actor, store, panel, artifactId } = await setup();
   try {
     const lost = { ...store, async share(...args: Parameters<typeof store.share>) { await store.share(...args); throw new Error('Injected lost response after actual store commit'); } };
-    assert.equal(await submitShare(lost, actor, artifactId, command), 'uncertain');
+    assert.deepEqual(await submitShare(lost, actor, artifactId, command), { outcome: 'uncertain' });
     assert.equal((await store.listShares(actor, { artifactId })).items.length, 1);
-    assert.equal(await submitShare(store, actor, artifactId, command), 'confirmed');
+    assert.deepEqual(await submitShare(store, actor, artifactId, command), { outcome: 'confirmed' });
     const unavailable = { ...store, async listShares() { throw new Error('Injected list outage'); } };
     assert.deepEqual((await loadShareView(panel, unavailable, actor, artifactId)).view.shares, { kind: 'unavailable' });
     for (const code of ['forbidden', 'not_found'] as const) await assert.rejects(loadShareView(panel, { ...store, async listShares() { throw new ArtifactError(code, 'Denied'); } }, actor, artifactId), (error: unknown) => error instanceof ArtifactError && error.code === code);
-    assert.equal(await submitShare(store, actor, artifactId, { ...command, email: 'other@example.test' }), 'conflict');
+    assert.deepEqual(await submitShare(store, actor, artifactId, { ...command, email: 'other@example.test' }), { outcome: 'conflict' });
   } finally { await app.close(); }
 });

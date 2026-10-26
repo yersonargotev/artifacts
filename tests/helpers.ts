@@ -12,9 +12,10 @@ import { createAuthApp } from '../apps/auth/src/http.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
+import { createEmailSender } from '../packages/config/src/email-sender-node.ts';
 import { createResourceApp } from '../apps/mcp/src/app.ts';
 
-export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean; invitations?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
@@ -34,8 +35,8 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   assert(authAddress && typeof authAddress === 'object');
   assert(mcpAddress && typeof mcpAddress === 'object');
   const origin = `http://127.0.0.1:${authAddress.port}`;
-  const emailSink = options.emailCode ? join(directory, 'email.jsonl') : undefined;
-  const config = { ...(emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
+  const emailSink = options.emailCode || options.invitations ? join(directory, 'email.jsonl') : undefined;
+  const config = { ...(options.emailCode && emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
   const auth = createAuth(connection.db, config, true);
   const password = randomBytes(24).toString('base64url');
   const owner = await auth.api.signUpEmail({ body: { name: 'Test owner', email: 'owner@example.test', password } });
@@ -48,12 +49,12 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   const authApp = createAuthApp(connection.db, config);
   authHandler = authApp;
   const createResource = options.transport === 'rest' ? createArtifactRestApp : options.transport === 'combined' ? createResourceApp : createMcpApp;
-  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test' }));
+  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test', sendInvitation: createEmailSender(emailSink && options.invitations ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: emailSink } : {}, origin) }));
   return {
     ...connection, emailSink, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
     setResourceHandler(handler: typeof mcpHandler) { mcpHandler = handler; },
-    resourceHandler: mcpHandler,
+    resourceHandler: mcpHandler, authHandler: authApp,
     dropNextResourceResponse(method: string) { dropMethod = method; },
     async close() {
       if ('closeAllConnections' in authServer) authServer.closeAllConnections();

@@ -27,10 +27,13 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
+      - run: rustup toolchain install 1.93.0 --profile minimal
+      - run: node scripts/prepare-native.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
       - run: pnpm test:packages
+      - run: pnpm test:packages:native
 
   browser:
     name: Chrome proofs
@@ -45,6 +48,8 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
+      - run: rustup toolchain install 1.93.0 --profile minimal
+      - run: node scripts/prepare-native.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chrome
       - run: pnpm test:browser
@@ -79,6 +84,8 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
+      - run: rustup toolchain install 1.93.0 --profile minimal
+      - run: node scripts/prepare-native.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:workers
       - run: |
@@ -117,6 +124,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - run: rustup toolchain install 1.93.0 --profile minimal
+      - run: node scripts/prepare-native.mjs
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:

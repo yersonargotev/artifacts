@@ -1,1 +1,16 @@
-{"name":"@artifacts/config","private":true,"type":"module","exports":{".":"./src/index.ts","./email":"./src/email.ts","./email-node":"./src/email-node.ts"}}
+{
+  "name": "@artifacts/config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./email": "./src/email.ts",
+    "./email-node": "./src/email-node.ts",
+    "./email-sender": {
+      "workerd": "./src/email-sender-worker.ts",
+      "browser": "./src/email-sender-worker.ts",
+      "node": "./src/email-sender-node.ts",
+      "default": "./src/email-sender-worker.ts"
+    }
+  }
+}

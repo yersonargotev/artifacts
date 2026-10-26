@@ -1,0 +1,20 @@
+{
+  "version": "0.5.29",
+  "source": {
+    "commit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+    "url": "https://codeload.github.com/tursodatabase/libsql-js/tar.gz/55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+    "sha256": "bdd4720f4b8394cd7e1ba27404916e00ed05a50bf7b19f2a0fbaac3709913499"
+  },
+  "wrapper": {
+    "url": "https://registry.npmjs.org/libsql/-/libsql-0.5.29.tgz",
+    "sha256": "d544d35b43bf1f4fecc4607656faab9735273554d244f4ec7cdf473bcc449ffe"
+  },
+  "cargoLockSha256": "897f93398893ce805b389b482ddf7555b75365a5f48a2e345703f21c1c58d74e",
+  "cargoManifestSha256": "cf729f40413e3131258e98579ab760b2e75238255cd56729ebb65b4f410ea953",
+  "patchSha256": "312d235d904b0eed9906f1467ca2f5b88392a1f878c9c2b18c6efa70dc9f6d5b",
+  "rustToolchain": "1.93.0",
+  "cmakeVersion": "3.31.6",
+  "napi": 6,
+  "macosDeploymentTarget": "11.0",
+  "patchedStatementSha256": "689a2bd298016af3a784b4fdd56d699267e5731e0d3e3a83964ae3bb6f4c474c"
+}

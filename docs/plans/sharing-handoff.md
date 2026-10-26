@@ -16,6 +16,8 @@ The plan is `docs/plans/sharing-plan.md`. The decision trail is `docs/plans/shar
 | S6 [#43](https://github.com/yersonargotev/artifacts/pull/43) | `feat/sharing-s6-email-otp` | `c5cc8da` | Clean, base S5 |
 | S7 [#44](https://github.com/yersonargotev/artifacts/pull/44) | `feat/sharing-s7-signin-form` | `323d1f8` | Clean after operator media approval, base S6 |
 | S8 [#45](https://github.com/yersonargotev/artifacts/pull/45) | `feat/sharing-s8-share-dialog` | `3fd5f00` | Clean after operator continuation approval, base S7 |
+| S9 [#46](https://github.com/yersonargotev/artifacts/pull/46) | `feat/sharing-s9-shared-with-me` | `93e0aca` | Clean after explicit operator visual approval, base S8 |
+| S10 [#47](https://github.com/yersonargotev/artifacts/pull/47) | `feat/sharing-s10-invitations` | Source `0c89987` | Local verification and exact-head CI pass, base S9; operator visual, production and DNS gates pending; no CLEAN verdict |
 
 Start S4 from `f36cd07819eafaee7c04cd7c808cf5bb9087e995`. Each later PR branches from the previous PR's verified head and targets that branch.
 
@@ -154,7 +156,7 @@ Report PASS or ISSUES. Each issue needs a file and line, a concrete scenario, an
 
 ## S9. Invited person's views
 
-S9 is authorized after S8 media continuation approval. The implementation contract is `/tmp/artifacts-sharing-codex/s9-synthesis.md`. It adds only the owner display name to SharedRead, a separate published-only summary, viewer-first release with strict missing-name compatibility, and concrete scope extensions recorded in the canonical plan. Owner focused units and ten live lanes have passed; full gates and independent review remain pending.
+S9 is authorized after S8 media continuation approval. The implementation contract is `/tmp/artifacts-sharing-codex/s9-synthesis.md`. It adds only the owner display name to SharedRead, a separate published-only summary, viewer-first release with strict missing-name compatibility, and concrete scope extensions recorded in the canonical plan. Full owner gates and independent technical verification passed at `93e0aca`, including ten mutation kills, all ten live lanes, exact-head successful CI and unchanged local performance budgets. The operator approved the actual S9 media and explicitly authorized S10.
 
 - Plan heading: "Show invited people what was shared with them (S9)".
 - Parent: `feat/sharing-s8-share-dialog`. Branch `feat/sharing-s9-shared-with-me`.
@@ -165,6 +167,8 @@ S9 is authorized after S8 media continuation approval. The implementation contra
 - Riskiest lanes for the reviewer: 2, 5, and 7.
 
 ## S10. Invitations and deployed check
+
+The operator explicitly approved S9 and continuation to S10. The implementation contracts are `/tmp/artifacts-sharing-codex/s10-synthesis.md` and its authoritative native delivery update `/tmp/artifacts-sharing-codex/s10-native-integration.md`. A fresh configured gpt-6-astra owner preserves the coupled feature from exact `93e0aca`; a fresh gpt-6.1-sol reviewer independently verified the frozen production source. The first SDK-only correction was insufficient for a later real auth SELECT failure, so root withdrew broad convergence acceptance. The selected current-version native source patch resets failed statements, preserves the original SDK and encryption, and has independently reproduced red/green native controls. Source-pinned host preparation and an additive target-qualified private native-fixed profile preserve the existing portable distribution. Producer selection, ordinary installed native/API/crypto proofs, complete local browser/CLI gates and fresh independent ten-mutation review pass at source `0c89987`. Root countersigned complementary API criteria and the precise Worker path correction. Exact Linux CI40209329855 passes all three verification jobs with production skipped, and the isolated150-operation measured-state proof passes the unchanged local budgets. Root matched all150responses to actual receipts/grants and50messages; no speedup is claimed. Complete native Worker runtime remains unproven, distinct from successful final bundle guards and dry runs. Fresh32.88second media is ready for the later named operator review. The final Worker guard also rejects the Node file-email adapter. S10 has no clean verdict until the required production and DNS gates pass.
 
 - Plan heading: "Send invitation emails and verify the deployment (S10)".
 - Parent: `feat/sharing-s9-shared-with-me`. Branch `feat/sharing-s10-invitations`.

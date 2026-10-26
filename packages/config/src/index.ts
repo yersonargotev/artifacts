@@ -1,14 +1,15 @@
-import { emailConfiguration, type EmailConfiguration } from './email.ts';
+import { emailConfiguration, type EmailConfiguration, type EmailEnvironment } from './email.ts';
 
 export const scopes = ['openid', 'profile', 'offline_access', 'artifacts:read', 'artifacts:write', 'artifacts:publish'] as const;
 export const identityScope = 'artifacts:read';
 
 export type Environment = Readonly<Record<string, string | undefined>>;
 type DatabaseEnvironment = { DATABASE_URL: string; DATABASE_AUTH_TOKEN?: string };
+type SenderEnvironment = Pick<EmailEnvironment, 'EMAIL_TRANSPORT' | 'EMAIL_FROM' | 'CLOUDFLARE_ACCOUNT_ID' | 'CLOUDFLARE_EMAIL_API_TOKEN'>;
 type PublicOrigins = { AUTH_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
-export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & { BETTER_AUTH_SECRET: string };
-export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
-export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
+export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & { OWNER_EMAIL: string; BETTER_AUTH_SECRET: string };
+export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
+export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
 export type PublicationWorkerEnvironment = Pick<PublicOrigins, 'DASHBOARD_URL' | 'PUBLISH_URL'> & { PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 
 export function required(name: string, env: Environment = process.env): string {

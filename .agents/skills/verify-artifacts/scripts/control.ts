@@ -114,14 +114,14 @@ async function supervisor() {
     const view = serve({ fetch: (request) => viewHandler(request), hostname: '::1', port: 0 });
     servers.push(view);
     const viewOrigin = `http://[::1]:${await listen(view)}`;
-    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin, emailCode: args.includes('--email-code') });
+    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin, emailCode: args.includes('--email-code'), invitations: args.includes('--invitations') });
     const serviceSecret = randomBytes(32).toString('hex');
     const cookieSecret = randomBytes(32).toString('hex');
     viewHandler = createPublicationApp({ DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
     const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Verification panel', application_type: 'native', redirect_uris: [`${panelOrigin}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
     assert(client.client_secret);
     const log = await open(join(run, 'panel.log'), 'a', 0o600);
-    panel = spawn(process.execPath, [entry], { cwd: root, env: { PATH: process.env.PATH, DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: new URL(panelOrigin).port, HOST: '127.0.0.1' }, stdio: ['ignore', log.fd, log.fd] });
+    panel = spawn(process.execPath, [entry], { cwd: root, env: { PATH: process.env.PATH, ...(args.includes('--invitations') && app.emailSink ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: app.emailSink } : {}), DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: new URL(panelOrigin).port, HOST: '127.0.0.1' }, stdio: ['ignore', log.fd, log.fd] });
     await log.close();
     panel.once('error', requestStop);
     panel.once('exit', () => { if (!shuttingDown) requestStop(); });
@@ -186,7 +186,7 @@ async function launch() {
   await mkdir(run, { mode: 0o700 });
   await mkdir(runtime, { mode: 0o700 });
   const log = await open(join(run, 'supervisor.log'), 'a', 0o600);
-  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run, ...(args.includes('--email-code') ? ['--email-code'] : [])], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
+  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run, ...['--email-code', '--invitations'].filter((flag) => args.includes(flag))], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
   await log.close();
   child.unref();
   try {
@@ -715,7 +715,7 @@ if (process.argv[1] && resolve(process.argv[1]) === script) try {
     const { accessToken: _accessToken, ...created } = await account(email, !args.includes('--unverified'));
     console.log(JSON.stringify({ ...created, credentials: accountFile(created.email) }));
   }
-  else throw new Error('Usage: control.ts launch [--email-code] [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
+  else throw new Error('Usage: control.ts launch [--email-code] [--invitations] [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

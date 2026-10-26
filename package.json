@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "prepare:native": "node scripts/prepare-native.mjs",
     "check": "tsc --noEmit && pnpm --filter @artifacts/dashboard check",
     "build": "pnpm --filter @artifacts/dashboard build",
     "test": "node --import tsx --test tests/*.test.ts",
@@ -17,7 +18,7 @@
     "dev:auth": "tsx apps/auth/src/server.ts",
     "dev:mcp": "tsx apps/mcp/src/server.ts",
     "dev:dashboard": "tsx scripts/dashboard.ts",
-    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/sign-in-code.browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/artifact-deletion.browser.proof.ts && node --import tsx tests/publication-network.proof.ts && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts && node --import tsx tests/panel-detail.browser.proof.ts && node --import tsx tests/panel-library.browser.proof.ts && node --import tsx tests/panel-move.browser.proof.ts && node --import tsx tests/panel-selection.browser.proof.ts && node --import tsx tests/panel-dialog.browser.proof.ts && node --import tsx tests/panel-share.browser.proof.ts",
+    "test:browser": "pnpm build && node --import tsx tests/browser.proof.ts && node --import tsx tests/sign-in-code.browser.proof.ts && node --import tsx tests/artifact-browser.proof.ts && node --import tsx tests/artifact-deletion.browser.proof.ts && node --import tsx tests/publication-network.proof.ts && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts && node --import tsx tests/panel-detail.browser.proof.ts && node --import tsx tests/panel-library.browser.proof.ts && node --import tsx tests/panel-move.browser.proof.ts && node --import tsx tests/panel-selection.browser.proof.ts && node --import tsx tests/panel-dialog.browser.proof.ts && node --import tsx tests/panel-share.browser.proof.ts && node --import tsx tests/invitations.browser.proof.ts",
     "verify:turso": "tsx scripts/verify-turso.ts",
     "dev": "tsx scripts/dev.ts",
     "build:workers": "tsx scripts/build-workers.ts",
@@ -32,6 +33,8 @@
     "artifacts": "tsx apps/cli/src/index.ts",
     "dev:rest": "tsx apps/rest/src/server.ts",
     "build:packages": "tsx scripts/build-packages.ts",
+    "build:packages:native": "tsx scripts/build-packages.ts --native-fixed",
+    "test:packages:native": "pnpm build:packages && pnpm build:packages:native && tsx tests/packages.proof.ts --native-fixed",
     "test:packages": "pnpm build:packages && tsx tests/release-npm.proof.ts && tsx tests/cli-skills.proof.ts && tsx tests/packages.proof.ts",
     "test:cli-skills": "pnpm build:packages && tsx tests/cli-skills.proof.ts",
     "test:rest-cli": "node --import tsx --test tests/rest.test.ts tests/cli-auth*.test.ts tests/cli-client*.test.ts",
@@ -51,6 +54,7 @@
     "esbuild": "0.27.4",
     "jose": "6.2.12",
     "lightningcss": "1.32.0",
+    "libsql": "0.5.29",
     "playwright": "1.64.0",
     "tsx": "4.21.0",
     "typescript": "6.0.3",

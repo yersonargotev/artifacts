@@ -58,9 +58,13 @@ artifacts unshare ARTIFACT_ID SHARE_ID
 artifacts retry REQUEST_ID
 ```
 
-Share prints the grant as JSON. Shares lists current grants. Unshare and its successful retry exit zero with empty stdout. A user with a matching verified email can view the published revision and attachments. Shares created before first publication wait for publication. Sharing does not send invitation emails or provide email-code sign-in. Retry confirms the original operation. Use `shares` to verify current access.
+Share prints the grant as JSON. Shares lists current grants. Unshare and its successful retry exit zero with empty stdout. A user with a matching verified email can view the published revision and attachments. Shares created before first publication wait for publication. Invited people can sign in with an email code when the server enables email. Retry confirms the original operation. Use `shares` to verify current access.
 
-Library consumers install `@yargote/artifacts-client@0.1.0-beta.5` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.5`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
+Share with `--notify` to request one email attempt. Access succeeds when mail is disabled or the owner has used the daily allowance. The JSON result adds `notification.status` as `requested` or `skipped`, with `disabled` or `rate_limited` as the skip reason. `requested` does not confirm delivery. A crash after commit can lose the message. An exact retry preserves the captured flag and never sends a second email. Use a new deliberate command to request another attempt for existing access.
+
+Owners can reserve 100 invitations per UTC day. Revoke, deletion, and failed delivery do not refund reservations. New access is limited to 100 people per artifact and 1000 grants per owner. Existing access remains listable and revocable.
+
+Library consumers install `@yargote/artifacts-client@0.1.0-beta.5` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.5`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. The default portable graph retains its known native statement-retention defect. `pnpm build:packages:native` adds a target-qualified private server distribution in `dist/packages-native-fixed`; its DB tarball bundles the corrected native graph for ordinary `npm install --ignore-scripts`. See the [native guide](native/libsql/README.md) for build requirements and unverified targets. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
 ## Install the Artifacts skill
 
@@ -121,9 +125,10 @@ Interactive HTML runs in an opaque sandbox with no parent access, cookies, stora
 
 ## Run locally
 
-Use Node 24 or newer and pnpm 12.8.1.
+Use Node 24 or newer and pnpm 12.8.1. The [native preparation guide](native/libsql/README.md) lists the required Rust, clang, and Python tools for macOS arm64 and Linux x64 with glibc.
 
 ```sh
+node scripts/prepare-native.mjs
 pnpm install --frozen-lockfile
 pnpm configure
 pnpm db:migrate

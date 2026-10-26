@@ -30,6 +30,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - run: rustup toolchain install 1.93.0 --profile minimal
+      - run: node scripts/prepare-native.mjs
       - run: pnpm install --frozen-lockfile
       - name: Match the requested version to committed manifests
         env:

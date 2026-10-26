@@ -35,12 +35,20 @@ export type DeleteResult = z.infer<typeof deleteResultSchema>;
 export const moveSchema = z.strictObject({ requestId, artifactId: identifier, project: projectNameSchema.nullable() });
 export const moveResultSchema = z.strictObject({ artifactId: identifier, project: z.string().nullable() });
 export type MoveResult = z.infer<typeof moveResultSchema>;
-export const shareSchema = z.strictObject({ requestId, artifactId: identifier, email: z.string().trim().toLowerCase().pipe(z.email().max(254)).meta({ format: 'email', description: 'Email address, trimmed and lowercased; at most 254 characters after trimming' }) });
+export const shareSchema = z.strictObject({ requestId, artifactId: identifier, email: z.string().trim().toLowerCase().pipe(z.email().max(254)).meta({ format: 'email', description: 'Email address, trimmed and lowercased; at most 254 characters after trimming' }), notify: z.boolean().optional(), requireNew: z.literal(true).optional() });
 export const unshareSchema = z.strictObject({ requestId, artifactId: identifier, shareId: identifier });
 export const listSharesSchema = z.strictObject({ artifactId: identifier });
 export const shareResultSchema = z.strictObject({ shareId: identifier, artifactId: identifier, kind: z.literal('email'), value: z.email(), createdAt: z.iso.datetime() });
+export const notificationSchema = z.union([
+  z.strictObject({ status: z.literal('requested') }),
+  z.strictObject({ status: z.literal('skipped'), reason: z.literal('disabled') }),
+  z.strictObject({ status: z.literal('skipped'), reason: z.literal('rate_limited'), retryAt: z.iso.datetime() }),
+]);
+export const shareCommandResultSchema = shareResultSchema.extend({ notification: notificationSchema.optional() });
 export const unshareResultSchema = z.strictObject({ artifactId: identifier, shareId: identifier });
 export type Share = z.infer<typeof shareResultSchema>;
+export type ShareResult = z.infer<typeof shareCommandResultSchema>;
+export type Notification = z.infer<typeof notificationSchema>;
 export type UnshareResult = z.infer<typeof unshareResultSchema>;
 export const exportSchema = z.strictObject({ artifactId: identifier, revisionId: identifier });
 export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional(), project: projectNameSchema.optional() });

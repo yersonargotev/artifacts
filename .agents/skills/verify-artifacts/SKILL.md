@@ -31,7 +31,7 @@ Run the pure config/archive tests with `node --import tsx --test tests/retained-
 
 ## Launch
 
-Run from the repository root with Node 24+, pnpm 12.8.1, installed workspace dependencies, and actual Chrome 152+ for interactive HTML. If dependencies are missing, use `pnpm install --frozen-lockfile`.
+Run from the repository root with Node 24+, pnpm 12.8.1, installed workspace dependencies, and actual Chrome 152+ for interactive HTML. Before the first dependency installation, run `node scripts/prepare-native.mjs`, then `pnpm install --frozen-lockfile`. The [native preparation guide](../../../native/libsql/README.md) lists the required host tools and targets.
 
 ```sh
 pnpm build

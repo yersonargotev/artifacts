@@ -1,10 +1,11 @@
 import { useId, useLayoutEffect, useRef, type SubmitEvent } from 'react';
-import type { ShareCommand, ShareOutcome, ShareView } from '../../share.ts';
+import { shareNotices, type ShareCommand, type ShareSubmission, type ShareView } from '../../share.ts';
 import { Input } from '../ui/input.tsx';
 
-type Props = { view: ShareView; outcome?: ShareOutcome; command?: ShareCommand; busy?: boolean; onSubmit?: (command: ShareCommand) => void; onRefresh?: () => void };
+type Props = { view: ShareView; submission?: ShareSubmission; command?: ShareCommand; busy?: boolean; onSubmit?: (command: ShareCommand) => void; onRefresh?: () => void };
 
-export function ShareForm({ view, outcome, command, busy = false, onSubmit, onRefresh }: Props) {
+export function ShareForm({ view, submission, command, busy = false, onSubmit, onRefresh }: Props) {
+  const outcome = submission?.outcome;
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const uncertain = outcome === 'uncertain';
@@ -17,7 +18,7 @@ export function ShareForm({ view, outcome, command, busy = false, onSubmit, onRe
     input.current?.focus();
     const fields = new FormData(event.currentTarget);
     const requestId = String(fields.get('requestId'));
-    onSubmit(fields.get('intent') === 'share' ? { intent: 'share', requestId, email: String(fields.get('email')) } : { intent: 'unshare', requestId, shareId: String(fields.get('shareId')) });
+    onSubmit(fields.get('intent') === 'share' ? { intent: 'share', requestId, email: String(fields.get('email')), ...(fields.get('notify') === 'true' ? { notify: true } : {}), ...(fields.get('requireNew') === 'true' ? { requireNew: true } : {}) } : { intent: 'unshare', requestId, shareId: String(fields.get('shareId')) });
   };
   return <div className="share-form" data-share-state={busy ? 'submitting' : outcome ?? 'ready'}>
     {!view.published && <p className="share-notice">Las personas invitadas podrán verlo cuando lo publiques.</p>}
@@ -29,14 +30,16 @@ export function ShareForm({ view, outcome, command, busy = false, onSubmit, onRe
         <Input ref={input} id={id} type="email" name="email" defaultValue={command?.intent === 'share' ? command.email : ''} autoComplete="email" readOnly={disabled} aria-invalid={outcome === 'invalid' || undefined} aria-describedby={`${id}-help`} autoFocus={outcome === 'invalid'} />
         <button type="submit" data-variant="primary" disabled={disabled}>Dar acceso</button>
       </div>
+      <label><input type="checkbox" name="notify" value="true" defaultChecked={command?.intent === 'share' && command.notify === true} disabled={disabled} /> Avisar por correo</label>
       <p id={`${id}-help`} className={outcome === 'invalid' ? 'field-error' : 'field-help'} role={outcome === 'invalid' ? 'alert' : undefined}>{outcome === 'invalid' ? 'Escribe un correo electrónico válido.' : 'Podrá abrir la publicación después de iniciar sesión con este correo.'}</p>
     </form>
-    {outcome === 'confirmed' && <p role="status">Acceso actualizado.</p>}
+    {submission?.outcome === 'confirmed' && <p role="status">{submission.notice ? shareNotices[submission.notice] : 'Acceso actualizado.'}</p>}
+    {submission?.outcome === 'share_limit' && <p role="alert">{submission.scope === 'artifact' ? 'Este artefacto alcanzó el límite de 100 personas con acceso.' : 'Alcanzaste el límite de 1000 accesos compartidos en tu cuenta.'} Quita un acceso antes de añadir otro.</p>}
     {outcome === 'conflict' && <p role="alert">Esta solicitud ya se usó para otro cambio. Revisa el acceso actual antes de intentarlo de nuevo.</p>}
     {uncertain && command && <div className="share-retry">
       <p role="alert">No pudimos confirmar el cambio. Reintenta la misma acción para comprobar el resultado.</p>
       <form method="post" action={action} onSubmit={submit}>
-        {Object.entries(command).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+        {Object.entries(command).map(([name, value]) => <input key={name} type="hidden" name={name} value={String(value)} />)}
         <button type="submit" className="secondary" disabled={busy}>Reintentar cambio</button>
       </form>
     </div>}

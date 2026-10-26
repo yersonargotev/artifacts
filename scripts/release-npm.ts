@@ -39,6 +39,7 @@ function targets(value: unknown): string[] {
   return Object.values(value).flatMap(targets);
 }
 export async function verifyRelease(inventory: PackageInventory, output = packageOutput): Promise<void> {
+  assert.equal(inventory.profile, undefined, 'Native-fixed inventories are private and cannot be published');
   assert.equal(inventory.packages.length, packageDefinitions.length, 'Inventory must contain the complete package catalog');
   assert.deepEqual(inventory.packages.map((item) => item.directory).sort(), packageDefinitions.map((item) => item.directory).sort());
   const published = inventory.packages.filter((item) => item.public);
