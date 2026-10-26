@@ -382,7 +382,7 @@ try {
     comparisons: await panel.locator('.content-comparison').count(),
     emptyState: await panel.getByText('No hay otra revisión disponible para comparar.', { exact: true }).count(),
     selfLinks: await panel.getByRole('link', { name: 'Comparar con revisión 1', exact: true }).count(),
-    publicationNotice: await panel.getByText('Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. Solo la cuenta propietaria autenticada puede abrirlo.', { exact: true }).count(),
+    publicationNotice: await panel.getByText('Publicar crea un enlace protegido a la revisión seleccionada y sus archivos. El acceso requiere iniciar sesión como propietario o con un correo al que hayas dado acceso.', { exact: true }).count(),
   };
   await panel.screenshot({ path: '.test-artifacts/artifact-comparison-single.png', fullPage: true });
   const unpublishedOne = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: reviewOne.revision.snapshot });
@@ -696,7 +696,7 @@ try {
   publicationHandler = createPublicationApp({ DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret }, async () => { throw new Error('Backend disconnected'); });
   assert.equal((await fetch(secondPublication.url, { headers: { cookie: viewerHeader }, redirect: 'manual' })).status, 503);
   publicationHandler = beforeOutage;
-  console.log('Artifact browser proof passed. Owner-only publication wording, single-revision comparison empty state, distinct unpublished comparison defaults and cleared self-comparisons, exact markers, bounded retained history, escaped revision comparisons and inventory, native pinned publication, unchanged retries, conflicts and independent read-back, stable publication, clean one-use handoff, sandbox isolation, exact historical export, revision-bound attachments, mobile layout, anonymous denial, central revocation and backend outage.');
+  console.log('Artifact browser proof passed. Owner and invited-reader publication wording, single-revision comparison empty state, distinct unpublished comparison defaults and cleared self-comparisons, exact markers, bounded retained history, escaped revision comparisons and inventory, native pinned publication, unchanged retries, conflicts and independent read-back, stable publication, clean one-use handoff, sandbox isolation, exact historical export, revision-bound attachments, mobile layout, anonymous denial, central revocation and backend outage.');
 } catch (error) {
   await mkdir('.test-artifacts/artifact-browser-failure', { recursive: true });
   for (const [index, page] of (browser?.contexts().flatMap((context) => context.pages()) ?? []).entries()) {

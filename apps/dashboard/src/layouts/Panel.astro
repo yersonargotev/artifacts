@@ -3,14 +3,15 @@ import '../styles/tokens.css';
 import '../styles/panel.css';
 import '../styles/effects.css';
 import type { LibraryQuery, Workspace } from '@artifacts/artifacts/panel/model';
+import ShareDialog from '../components/share/ShareDialog.tsx';
 import MoveDialog from '../components/move/MoveDialog.tsx';
 import Sidebar from '../components/shell/Sidebar.astro';
 import Breadcrumb from '../components/shell/Breadcrumb.astro';
 import SearchForm from '../components/shell/SearchForm.astro';
 import { scopeOf, type NavLocation } from '../presentation.ts';
 import { getRuntime } from '../runtime.ts';
-interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryQuery; detail?: boolean; move?: boolean }
-const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, detail = false, move = false } = Astro.props;
+interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryQuery; detail?: boolean; move?: boolean; share?: boolean }
+const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, detail = false, move = false, share = false } = Astro.props;
 const identity = Astro.locals.identity;
 const authUrl = identity ? (await getRuntime()).config.auth : '';
 const query = search ?? { scope: scopeOf(location), q: '', status: 'all' };
@@ -26,6 +27,7 @@ const query = search ?? { scope: scopeOf(location), q: '', status: 'all' };
       <slot name="header" />
       <main class="panel-main" id="main-content"><slot /></main>
     </div>
+    {share && <ShareDialog client:load />}
     {move && workspace && <MoveDialog projects={JSON.stringify(workspace.projects.map(({ name }) => name))} client:load />}
   </body>
 </html>

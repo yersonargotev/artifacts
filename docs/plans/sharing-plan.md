@@ -429,56 +429,58 @@ Verified at `c5cc8da` with exact-head CI and a fresh independent PASS. Evidence 
 
 **Depends on.** S6.
 
+Technical verification passed at `323d1f8` on PR44. Owner and independent evidence are in `/tmp/artifacts-sharing-codex/s7-owner-report.md` and `s7-review-report.md`. The independent run passed all ten lanes and eight source mutations. Exact final CI passed and the operator explicitly approved the actual screenshots and video with “Sí, continuar con S8”. Media is in `/tmp/artifacts-sharing-codex/s7-worktree/.test-artifacts/review/`; S8 has not started.
+
 **Files.**
 
-- [ ] Edit `apps/auth/src/pages.ts`.
-- [ ] Edit `apps/auth/src/http-core.ts` only to pass the server-known email-code capability to the renderer.
-- [ ] Create `tests/sign-in-code.browser.proof.ts`.
-- [ ] Edit `package.json`.
+- [x] Edit `apps/auth/src/pages.ts`.
+- [x] Edit `apps/auth/src/http-core.ts` only to pass the server-known email-code capability to the renderer.
+- [x] Create `tests/sign-in-code.browser.proof.ts`.
+- [x] Edit `package.json`.
 
 **Build.**
 
-- [ ] Add a **Recibir código** form to the sign-in page in `apps/auth/src/pages.ts`. After the request, show a code field. Continue the OAuth flow the same way password sign-in does.
-- [ ] Add `tests/sign-in-code.browser.proof.ts` to the `test:browser` script.
+- [x] Add a **Recibir código** form to the sign-in page in `apps/auth/src/pages.ts`. After the request, show a code field. Continue the OAuth flow the same way password sign-in does.
+- [x] Add `tests/sign-in-code.browser.proof.ts` to the `test:browser` script.
 
 **You see.**
 
-- [ ] The sign-in page shows **Recibir código** under the password form. Submitting it shows `Te enviamos un código` and a code field.
+- [x] The sign-in page shows **Recibir código** under the password form. Submitting it shows `Te enviamos un código` and a code field.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/sign-in-code.browser.proof.ts` signs a guest in by code and lands in the panel. Run `pnpm build && node --import tsx tests/sign-in-code.browser.proof.ts`.
+- [x] `tests/sign-in-code.browser.proof.ts` signs a guest in by code and lands in the panel. Run `pnpm build && node --import tsx tests/sign-in-code.browser.proof.ts`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Sign in with a password at trunk and head. Trunk lacks the form, so record that and gate a guest signing in by code and landing in the panel at head. Save `password-trunk.png`, `password-head.png`, and `code-head.png`. Pass when both password runs land in the panel and the code sign-in does too.
-- [ ] Lane 2. Click **Recibir código** with an invited email. Save `code-sent.png`. Pass when `Te enviamos un código` and the code field show.
-- [ ] Lane 3. Enter the code from the sink. Save `code-landed.png`. Pass when the guest lands in the panel library.
-- [ ] Lane 4. Run `pnpm artifacts login` as the guest and finish it with a code. Save `cli-login.png`. Pass when `pnpm artifacts whoami` returns the guest.
-- [ ] Lane 5. Enter a wrong code. Save `wrong-code.png`. Pass when a Spanish error shows next to the field and focus moves to it.
-- [ ] Lane 6. Request a code for an uninvited email. Save `uninvited-form.png`. Pass when the page looks the same as lane 2.
-- [ ] Lane 7. Run lanes 2 and 3 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
-- [ ] Lane 8. Complete the flow with the keyboard only. Save `keyboard.png`. Pass when every control is reachable by Tab and the focus ring is visible.
-- [ ] Lane 9. Hit the per-email limit from the form. Save `limited.png`. Pass when the page shows a Spanish wait message.
-- [ ] Lane 10. From the code step, go back to the password form. Save `back.png`. Pass when the password form shows with the email kept.
+- [x] Lane 1. Regression lane against trunk. Sign in with a password at trunk and head. Trunk lacks the form, so record that and gate a guest signing in by code and landing in the panel at head. Save `password-trunk.png`, `password-head.png`, and `code-head.png`. Pass when both password runs land in the panel and the code sign-in does too.
+- [x] Lane 2. Click **Recibir código** with an invited email. Save `code-sent.png`. Pass when `Te enviamos un código` and the code field show.
+- [x] Lane 3. Enter the code from the sink. Save `code-landed.png`. Pass when the guest lands in the panel library.
+- [x] Lane 4. Run `pnpm artifacts login` as the guest and finish it with a code. Save `cli-login.png`. Pass when `pnpm artifacts whoami` returns the guest.
+- [x] Lane 5. Enter a wrong code. Save `wrong-code.png`. Pass when a Spanish error shows next to the field and focus moves to it.
+- [x] Lane 6. Request a code for an uninvited email. Save `uninvited-form.png`. Pass when the page looks the same as lane 2.
+- [x] Lane 7. Run lanes 2 and 3 at 390 pixels wide. Save `mobile.png`. Pass when nothing overflows.
+- [x] Lane 8. Complete the flow with the keyboard only. Save `keyboard.png`. Pass when every control is reachable by Tab and the focus ring is visible.
+- [x] Lane 9. Hit the per-email limit from the form. Save `limited.png`. Pass when the page shows a Spanish wait message.
+- [x] Lane 10. From the code step, go back to the password form. Save `back.png`. Pass when the password form shows with the email kept.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The time from navigation to the sign-in page's load event at trunk and head.
-- [ ] Probe. Load the sign-in page 30 times with Playwright, alternating between the trunk run and the head run.
-- [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Fail when the head median exceeds trunk by more than 10 percent and 20 ms.
+- [x] Metric. The time from navigation to the sign-in page's load event at trunk and head.
+- [x] Probe. Load the sign-in page 30 times with Playwright, alternating between the trunk run and the head run.
+- [x] Baseline. Record the trunk median first.
+- [x] Rule. Fail when the head median exceeds trunk by more than 10 percent and 20 ms.
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Copy lane 2, 3, 5, and 7 screenshots into `.test-artifacts/review/S7-review-<slug>.png`.
-- [ ] Launch the email-code runtime with `control.ts launch --email-code`, then record a 30 to 60 second video with the committed S7 proof in `--run PATH --headed` mode on those same live services. This substitutes for a control recipe that does not exist and avoids duplicating the lane. Save it as `.test-artifacts/review/S7-review.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
+- [x] Copy lane 2, 3, 5, and 7 screenshots into `.test-artifacts/review/S7-review-<slug>.png`.
+- [x] Launch the email-code runtime with `control.ts launch --email-code`, then record a 30 to 60 second video with the committed S7 proof in `--run PATH --headed` mode on those same live services. This substitutes for a control recipe that does not exist and avoids duplicating the lane. Save it as `.test-artifacts/review/S7-review.mp4`.
+- [x] Post the screenshots and the video in chat. Operator approved the actual media for `323d1f8` and authorized S8.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at the exact head SHA.
+- [x] Bugbot triage done. No issue comments, review records or inline comments at the final root inspection.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S7 to the chain. The operator lands it bottom-up.
 
@@ -497,6 +499,16 @@ Verified at `c5cc8da` with exact-head CI and a fresh independent PASS. Evidence 
 - [ ] Create `tests/share-form.test.ts`.
 - [ ] Create `tests/panel-share.browser.proof.ts`.
 - [ ] Edit `package.json`.
+- [ ] Edit `apps/dashboard/src/runtime.ts` to expose the existing sharing store operations to the panel.
+- [ ] Edit `apps/dashboard/src/layouts/Panel.astro` to mount one explicitly enabled dialog.
+- [ ] Edit `apps/dashboard/src/pages/index.astro` and `apps/dashboard/src/pages/artifacts/[artifactId].astro` to enable that capability.
+- [ ] Edit `apps/dashboard/src/components/library/ArtifactCard.astro` to provide the menu action and native link.
+- [ ] Edit `apps/dashboard/src/components/detail/PublicationCard.astro` to correct both owner-only access claims.
+- [ ] Edit `apps/dashboard/src/styles/panel.css` with scoped sharing styles.
+- [ ] Edit `apps/dashboard/src/urls.ts` for the canonical share URL.
+- [ ] Edit `.agents/skills/verify-artifacts/features/sharing.md` to describe the real panel entry points and committed browser proof.
+- [ ] Edit `tests/artifact-browser.proof.ts` so its publication notice assertion matches the corrected owner/invited-reader access copy.
+- [ ] Edit `tests/panel-library.browser.proof.ts` to cover the new Compartir keyboard stop while preserving download focus, URL and byte checks.
 
 **Build.**
 

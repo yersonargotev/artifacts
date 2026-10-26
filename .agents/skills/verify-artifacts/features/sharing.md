@@ -13,7 +13,7 @@ An owner shares a published artifact with an exact email address through the MCP
 
 ## How to get to it (user POV)
 
-- The owner publishes an artifact and shares it by calling the MCP tool `artifacts_share` with the guest's email. The owner can also manage shares through REST or the typed client's `share`, `listShares`, and `unshare` methods. The CLI provides `share ID --email EMAIL`, `shares ID`, and `unshare ID SHARE_ID`. The panel has no share entry point.
+- The owner publishes an artifact and shares it by calling the MCP tool `artifacts_share` with the guest's email. The owner can also manage shares through REST or the typed client's `share`, `listShares`, and `unshare` methods. The CLI provides `share ID --email EMAIL`, `shares ID`, and `unshare ID SHARE_ID`. The panel exposes **Compartir** from each library card menu and the detail header. The native `/artifacts/:artifactId/share` page supports the same add, list, and revoke forms without JavaScript. Granting access does not send an invitation email.
 - The guest opens the owner's publication URL and signs in with `Correo electrónico` and `Contraseña`.
 - The guest page shows the frame titled `Contenido del artefacto` and the title menu with `Información` and `Archivos`. It shows no `Volver al proyecto` link, no `Revisión N` label, and no `Cliente autor` row.
 
@@ -67,3 +67,13 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts account --e
 - Better Auth stores every account email in lowercase, so live runs cannot exercise a mixed-case account email. `tests/sharing.test.ts` covers it with a direct row update.
 - The guest sees `metadata.custom`, the title, the description, the revision ID, its creation time, its SHA-256, and the publication version, because they describe the published revision.
 - Run one drive per fresh run. The drive takes the run's `drive.lock`.
+
+## Panel share proof
+
+After `pnpm build`, run `node --import tsx tests/panel-share.browser.proof.ts`. The proof launches a disposable control instance, authors through HTTP MCP, grants and revokes access through the real panel, and cleans up its instance on success or failure. It uses a second authenticated guest browser context and asserts that an established publication viewer receives HTTP 403 after revocation.
+
+To capture review media on an existing disposable instance, run `node --import tsx tests/panel-share.browser.proof.ts --run <absolute-run-path> --headed`. The proof also cleans up this supplied instance. Run no other drive against it. The headed recording uses chronological cuts from the actual owner and guest page videos in that same run, at their original speed. Source recordings and segment timestamps remain in `<run>/panel-share/`. The output is `.test-artifacts/review/S8-review.mp4`.
+
+The proof covers both entry points, focused Spanish validation, lowercase email, unpublished copy, mobile long emails, Escape focus, native invalid/add/list/revoke, delayed hydration, modified clicks, request parsing and origin checks, non-owner and expired-session denial, synchronous double submission, reversed reads, and artifact switches with a pending POST. It deliberately delays responses and injects GET failures. Lost-response tests first send the POST to the actual application and store, then hide its committed response. Historical add and revoke retries must render only the current access list. These injections test recovery behavior and do not claim a real backend outage.
+
+The proof writes screenshots, accessible snapshots, request bodies without authentication data, and `result.json` under `<run>/panel-share/`. Required review captures are copied to `.test-artifacts/review/`. The original `control.ts drive sharing` recipe above still verifies MCP sharing and publication authorization. It does not exercise these panel forms.

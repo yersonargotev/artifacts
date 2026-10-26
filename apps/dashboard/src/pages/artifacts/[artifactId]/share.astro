@@ -1,0 +1,40 @@
+---
+import Panel from '../../../layouts/Panel.astro';
+import ShareForm from '../../../components/share/ShareForm.tsx';
+import { getRuntime } from '../../../runtime.ts';
+import { artifactErrorResponse, panelActor } from '../../../publication.ts';
+import { loadShareView, parseShareForm, submitShare, type ShareCommand, type ShareOutcome } from '../../../share.ts';
+import { shareHref } from '../../../urls.ts';
+import { shareSchema } from '@artifacts/artifacts/contracts';
+if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
+if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
+const { panel, artifacts } = await getRuntime();
+const actor = panelActor(Astro.locals.identity);
+const enhanced = Astro.request.headers.get('accept') === 'application/json';
+const result = await (async () => {
+  const artifactId = shareSchema.shape.artifactId.parse(Astro.params.artifactId);
+  let command: ShareCommand | undefined;
+  let outcome: ShareOutcome | undefined;
+  if (Astro.request.method === 'POST') {
+    command = await parseShareForm(Astro.request);
+    outcome = await submitShare(artifacts, actor, artifactId, command);
+    const status = { confirmed: 200, invalid: 400, conflict: 409, uncertain: 503 }[outcome];
+    if (enhanced) return Response.json({ outcome }, { status });
+    if (outcome === 'confirmed') return Astro.redirect(shareHref(artifactId), 303);
+    Astro.response.status = status;
+  }
+  const page = await loadShareView(panel, artifacts, actor, artifactId);
+  if (enhanced) return Response.json(page.view);
+  return { ...page, command, outcome };
+})().catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
+if (result instanceof Response) return result;
+const { view, workspace, command, outcome } = result;
+---
+<Panel title={`Compartir ${view.title}`} workspace={workspace}>
+  <section class="share-card">
+    <h1>Compartir</h1>
+    <p class="share-title">{view.title}</p>
+    <ShareForm view={view} command={command} outcome={outcome} client:load />
+    <a class="button secondary share-close" href={`/artifacts/${encodeURIComponent(view.artifactId)}`}>Volver al artefacto</a>
+  </section>
+</Panel>

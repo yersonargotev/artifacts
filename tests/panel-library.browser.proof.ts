@@ -143,6 +143,9 @@ try {
   await trigger.press('Space');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Ver artefacto');
   await page.keyboard.press('ArrowDown');
+  const shareItem = page.getByRole('menuitem', { name: 'Compartir', exact: true });
+  assert.equal(await shareItem.evaluate((item) => item === document.activeElement), true);
+  await page.keyboard.press('ArrowDown');
   const downloadItem = page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true });
   assert.equal(await downloadItem.evaluate((item) => item === document.activeElement), true);
   assert.equal(new URL((await downloadItem.getAttribute('href'))!, app.dashboard).searchParams.get('revisionId'), seeded[1]!.headRevisionId);
