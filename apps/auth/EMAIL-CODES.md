@@ -1,0 +1,27 @@
+# Email-code sign-in
+
+Email codes are disabled until `EMAIL_TRANSPORT` is selected. Legacy password and OAuth startup needs no new settings. The existing Worker deployment preset and release secret projection remain unchanged. Enabling deployed delivery requires the separate deployment configuration step.
+
+For local Node runs, select `EMAIL_TRANSPORT=file`, set `EMAIL_FILE_PATH` to a private file in an existing directory, and set `OWNER_EMAIL`. File delivery requires a loopback auth origin. The sink contains codes and must be removed after verification. The Node server and disposable fixture drain accepted sends before closing their database.
+
+For Cloudflare Email Service, select `EMAIL_TRANSPORT=cloudflare` and set `OWNER_EMAIL`, `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_EMAIL_API_TOKEN`. The sender uses the [REST sending API](https://developers.cloudflare.com/email-service/api/send-emails/rest-api/) and validates its [recipient outcomes](https://developers.cloudflare.com/api/resources/email_sending/methods/send/). Requests time out after ten seconds. Delivery failures log a fixed message without recipients, codes, or provider responses. Local tests inject responses and send no external email.
+
+Only `POST /api/auth/email-otp/send-verification-otp` with `type: "sign-in"` and `POST /api/auth/sign-in/email-otp` are enabled. Request bodies follow Better Auth's pinned 1.7.7 email OTP contract. Other OTP helpers and server API methods are omitted. Disabled paths return 404. Password signup stays disabled outside the bootstrap constructor.
+
+An address qualifies if it equals normalized `OWNER_EMAIL`, has a current email share, or belongs to a user who owns an artifact. An account alone never qualifies. Both delivery and redemption check current admission. A share on an unpublished artifact allows login without granting publication access. Former invitees retain login while owning an artifact.
+
+Requests reserve at most three sends per normalized email and ten per trusted IP. Redemption has a separate allowance of thirty per IP. Each allowance resets sixty seconds after the last accepted reservation. Denials do not extend the window. The two dimensions reserve independently, so an email denial can consume an IP allowance. Direct API calls without a request context share a conservative IP bucket. Worker ingress and Node sockets supply trusted addresses. Better Auth's parser groups IPv6 addresses by /64. Public forwarding headers cannot choose these counters.
+
+Counters use atomic parameterized SQL against a deterministic primary key in the existing verification table. Counts are converted numerically. Database time decides acceptance. The physical expiry is seven days after the latest accepted reservation, separate from the sixty-second logical window. Normal verification cleanup can reclaim retained rows. No schema migration or separate process-local limiter is required.
+
+Failed code authentication returns HTTP 400 with `{"code":"INVALID_OTP","message":"Invalid OTP"}` for malformed input, ineligible addresses, missing codes, wrong codes, expired codes, and exhausted attempts. Direct API calls throw the same status and body. The selected endpoint's `onAPIError` callback normalizes proof failures before dispatch captures the HTTP status. Rate limits retain 429 and `X-Retry-After`. Origin, protocol, and infrastructure errors retain their own responses.
+
+Better Auth owns OTP hashing, expiry, attempt limits, consumption, and sessions. Three wrong submissions exhaust a code. A deliberate new code request is required before sign-in can succeed. Better Auth's post-proof cleanup retains only the configured owner's matching password credential with a nonempty hash. It still deletes other account links and revokes old sessions. This exception does not prove historical bootstrap provenance because the schema has no bootstrap marker. A session hook rejects OTP session creation until the stored user is verified, closing the pinned cleanup-lock contention case. Ordinary password and OAuth session creation bypass that OTP-only hook.
+
+## Lowercase write census
+
+The pinned Better Auth internal adapter lowercases `createUser`, `createOAuthUser`, `updateUser`, and `updateUserByEmail`. Bootstrap also lowercases its address. Password signup and OTP signup use these adapter methods. Returning OTP users only change verification state. The application has no raw production user writes.
+
+`/update-user` rejects email changes and filters `emailVerified` from user input. Core change-email is disabled by the current configuration. OTP change-email, verification, and password-reset endpoints are omitted. Core verification and password-reset paths use the same internal adapter. No social provider is configured. Direct SQL fixture writes are outside production auth and do not establish a production normalizer.
+
+`tests/email-code.test.ts` verifies mixed-case OTP input persists exactly `ana@example.com` and a lowercase sign-in resolves to the same user ID. It also covers forged valid rows, revocation, owner password survival, non-owner cleanup, contention, attempts, persistent limits, the dashboard callback, and guest MCP OAuth. Runtime tests separately cover Node task drainage and cached Worker request scopes under local Node execution. Worker compilation is distinct from deployed delivery, which remains unverified until deployment is explicitly enabled.

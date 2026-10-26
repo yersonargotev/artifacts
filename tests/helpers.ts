@@ -14,15 +14,15 @@ import { createMcpApp } from '../apps/mcp/src/http.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 import { createResourceApp } from '../apps/mcp/src/app.ts';
 
-export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
   const connection = await openDatabase({ url });
-  let authHandler: (request: Request) => Promise<Response> = async () => new Response(null, { status: 503 });
+  let authHandler: (request: Request, bindings?: { incoming: { socket: { remoteAddress?: string } } }) => Promise<Response> = async () => new Response(null, { status: 503 });
   let mcpHandler = authHandler;
   let dropMethod: string | undefined;
-  const authServer = serve({ fetch: (request) => authHandler(request), hostname: '127.0.0.1', port: 0 });
+  const authServer = serve({ fetch: (request, bindings) => authHandler(request, bindings), hostname: '127.0.0.1', port: 0 });
   const mcpServer = serve({ fetch: async (request, bindings) => {
     const response = await mcpHandler(request);
     if (request.method === dropMethod && response.ok) { dropMethod = undefined; bindings.outgoing.destroy(); }
@@ -34,7 +34,8 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   assert(authAddress && typeof authAddress === 'object');
   assert(mcpAddress && typeof mcpAddress === 'object');
   const origin = `http://127.0.0.1:${authAddress.port}`;
-  const config = { origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
+  const emailSink = options.emailCode ? join(directory, 'email.jsonl') : undefined;
+  const config = { ...(emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
   const auth = createAuth(connection.db, config, true);
   const password = randomBytes(24).toString('base64url');
   const owner = await auth.api.signUpEmail({ body: { name: 'Test owner', email: 'owner@example.test', password } });
@@ -44,11 +45,12 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   const resourceClient = await auth.api.adminCreateOAuthClient({ headers, body: { client_name: 'Resource introspection', application_type: 'native', redirect_uris: ['http://127.0.0.1/unused'], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile' } });
   assert(resourceClient.client_secret);
   const mcpOptions = { issuer: config.issuer, resource: config.resource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
-  authHandler = createAuthApp(connection.db, config);
+  const authApp = createAuthApp(connection.db, config);
+  authHandler = authApp;
   const createResource = options.transport === 'rest' ? createArtifactRestApp : options.transport === 'combined' ? createResourceApp : createMcpApp;
   mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test' }));
   return {
-    ...connection, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
+    ...connection, emailSink, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
     setResourceHandler(handler: typeof mcpHandler) { mcpHandler = handler; },
     resourceHandler: mcpHandler,
@@ -57,13 +59,15 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
       if ('closeAllConnections' in authServer) authServer.closeAllConnections();
       if ('closeAllConnections' in mcpServer) mcpServer.closeAllConnections();
       await Promise.all([new Promise<void>((resolve) => authServer.close(() => resolve())), new Promise<void>((resolve) => mcpServer.close(() => resolve()))]);
+      await authApp.drain();
+      if ('drain' in authHandler && typeof authHandler.drain === 'function') await authHandler.drain();
       connection.client.close();
       await rm(directory, { recursive: true, force: true });
     },
   };
 }
 
-export async function grant(app: Awaited<ReturnType<typeof fixture>>, scope = 'openid profile offline_access artifacts:read') {
+export async function grant(app: { config: { origin: string; issuer: string; resource: string }; cookie: string }, scope = 'openid profile offline_access artifacts:read') {
   const registration = await fetch(`${app.config.issuer}/oauth2/register`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'Identity integration', redirect_uris: ['http://127.0.0.1:49999/callback'], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] }),
