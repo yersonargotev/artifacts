@@ -21,7 +21,7 @@ export function createAuthHandler(db: Database, config: ReturnType<typeof authCo
     if (['/', '/sign-in', '/consent', '/revoke-all'].includes(url.pathname) && request.method === 'GET') {
       const current = await auth.api.getSession({ headers: request.headers });
       if (url.pathname === '/revoke-all' && !current) return Response.redirect(`${config.origin}/sign-in`, 303);
-      return authPage(url, config.dashboard, current?.user.name);
+      return authPage(url, config.dashboard, current?.user.name, Boolean(config.email && config.email.transport !== 'disabled'));
     }
     if (url.pathname === '/api/auth/oauth2/register' && request.method === 'POST') {
       const body: unknown = await request.clone().json().catch(() => null);

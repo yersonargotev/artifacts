@@ -252,113 +252,117 @@ Each live lane runs in an available isolated environment at the PR head; separat
 
 ## Expose sharing through REST and the typed client (S4)
 
+Verified at `8cf6433` with exact-head CI. Runtime and performance receipts are at source head `739ade0`; the final change only strengthens a test and corrects verification documentation. Local evidence is in `/tmp/artifacts-sharing-codex/s4-owner-report.md`, `s4-review-report.md`, and `s4-test-fix-report.md`. API-only lanes use structured response receipts; browser lanes retain actual screenshots.
+
 **Depends on.** S3.
 
 **Files.**
 
-- [ ] Edit `packages/rest/src/index.ts`.
-- [ ] Edit `packages/client/src/index.ts`.
-- [ ] Edit `packages/rest/README.md`.
-- [ ] Edit `packages/client/README.md` so the shipped methods and retry reference includes sharing.
-- [ ] Edit `tests/rest.test.ts`.
-- [ ] Edit `tests/cli-client.test.ts`.
+- [x] Edit `packages/rest/src/index.ts`.
+- [x] Edit `packages/client/src/index.ts`.
+- [x] Edit `packages/rest/README.md`.
+- [x] Edit `packages/client/README.md` so the shipped methods and retry reference includes sharing.
+- [x] Edit `tests/rest.test.ts`.
+- [x] Edit `tests/cli-client.test.ts`.
 
 **Build.**
 
-- [ ] Add `GET /v1/artifacts/{id}/shares`, `POST /v1/artifacts/{id}/shares`, and `DELETE /v1/artifacts/{id}/shares/{shareId}` to `packages/rest/src/index.ts` under `artifacts:publish`.
-- [ ] Add `share`, `unshare`, and `listShares` to the client interface and implementation in `packages/client/src/index.ts`.
+- [x] Add `GET /v1/artifacts/{id}/shares`, `POST /v1/artifacts/{id}/shares`, and `DELETE /v1/artifacts/{id}/shares/{shareId}` to `packages/rest/src/index.ts` under `artifacts:publish`.
+- [x] Add `share`, `unshare`, and `listShares` to the client interface and implementation in `packages/client/src/index.ts`.
 
 **You see.**
 
-- [ ] `POST /v1/artifacts/{id}/shares` with `{"email":"ana@example.com","requestId":"..."}` returns 201 and the share.
+- [x] `POST /v1/artifacts/{id}/shares` with `{"email":"ana@example.com","requestId":"..."}` returns 201 and the share.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/rest.test.ts` gains each route, a retry, scope enforcement, a wrong content type, and a non-owner. `tests/cli-client.test.ts` gains the three client methods. Run `pnpm test:rest-cli`.
+- [x] `tests/rest.test.ts` gains each route, a retry, scope enforcement, a wrong content type, and a non-owner. `tests/cli-client.test.ts` gains the three client methods. Run `pnpm test:rest-cli`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Run `control.ts drive cli` at trunk and head. Trunk lacks share routes, so record that and gate `POST` followed by the guest opening the publication at head. Save `cli-trunk.png` and `rest-share-head.png`. Pass when both CLI runs pass and the guest sees the revision.
-- [ ] Lane 2. `POST` a share. Save `post.png`. Pass when the status is 201 and the guest is admitted.
-- [ ] Lane 3. `GET` the shares. Save `get.png`. Pass when the body lists the share from lane 2.
-- [ ] Lane 4. `DELETE` the share and reload as the guest. Save `delete.png`. Pass when the status is 204 and the reload returns 403.
-- [ ] Lane 5. `POST` twice with the same `requestId`. Save `rest-retry.png`. Pass when both bodies are identical and one row exists.
-- [ ] Lane 6. `POST` with a token that lacks `artifacts:publish`. Save `rest-scope.png`. Pass when the status is 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`.
-- [ ] Lane 7. `POST` with a foreign `Origin` header. Save `origin.png`. Pass when the status is 403 with `forbidden`.
-- [ ] Lane 8. `POST` with `content-type: text/plain`. Save `media-type.png`. Pass when the status is 415.
-- [ ] Lane 9. `POST` with the guest's token on the owner's artifact. Save `rest-non-owner.png`. Pass when the status is 404.
-- [ ] Lane 10. Run a script that calls the typed client's `share`, `listShares`, and `unshare` against the run. Save `client.png`. Pass when each call returns the typed result and the guest's access follows each step.
+- [x] Lane 1. Regression lane against trunk. Run `control.ts drive cli` at trunk and head. Trunk lacks share routes, so record that and gate `POST` followed by the guest opening the publication at head. Save `cli-trunk.png` and `rest-share-head.png`. Pass when both CLI runs pass and the guest sees the revision.
+- [x] Lane 2. `POST` a share. Save `post.png`. Pass when the status is 201 and the guest is admitted.
+- [x] Lane 3. `GET` the shares. Save `get.png`. Pass when the body lists the share from lane 2.
+- [x] Lane 4. `DELETE` the share and reload as the guest. Save `delete.png`. Pass when the status is 204 and the reload returns 403.
+- [x] Lane 5. `POST` twice with the same `requestId`. Save `rest-retry.png`. Pass when both bodies are identical and one row exists.
+- [x] Lane 6. `POST` with a token that lacks `artifacts:publish`. Save `rest-scope.png`. Pass when the status is 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`.
+- [x] Lane 7. `POST` with a foreign `Origin` header. Save `origin.png`. Pass when the status is 403 with `forbidden`.
+- [x] Lane 8. `POST` with `content-type: text/plain`. Save `media-type.png`. Pass when the status is 415.
+- [x] Lane 9. `POST` with the guest's token on the owner's artifact. Save `rest-non-owner.png`. Pass when the status is 404.
+- [x] Lane 10. Run a script that calls the typed client's `share`, `listShares`, and `unshare` against the run. Save `client.png`. Pass when each call returns the typed result and the guest's access follows each step.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The p95 latency of `GET /v1/artifacts` at trunk and head. Trunk lacks share routes, so also measure the p95 of `GET /v1/artifacts/{id}/shares` at head.
-- [ ] Probe. Run 100 `GET /v1/artifacts` requests alternating between the trunk run and the head run. Run 100 share-list requests at head.
-- [ ] Baseline. Record the trunk `GET /v1/artifacts` p95 first.
-- [ ] Rule. Fail when head p95 exceeds trunk by more than 10 percent and 3 ms. Fail when the share-list p95 exceeds 100 ms locally.
+- [x] Metric. The p95 latency of `GET /v1/artifacts` at trunk and head. Trunk lacks share routes, so also measure the p95 of `GET /v1/artifacts/{id}/shares` at head.
+- [x] Probe. Run 100 `GET /v1/artifacts` requests alternating between the trunk run and the head run. Run 100 share-list requests at head.
+- [x] Baseline. Record the trunk `GET /v1/artifacts` p95 first.
+- [x] Rule. Fail when head p95 exceeds trunk by more than 10 percent and 3 ms. Fail when the share-list p95 exceeds 100 ms locally.
 
 **Review gate.** None. S4 is not review-gated.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at the exact head SHA.
+- [x] Bugbot triage done. No reviews, issue comments, or inline review comments at the root inspection recorded in `/tmp/artifacts-sharing-codex/root-pr-review-state.json`.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S4 to the chain. The operator lands it bottom-up.
 
 ## Add CLI share commands (S5)
 
+Verified at `f537c64` with exact-head CI. Runtime and performance receipts are at source head `447d7b5`; the final change only corrects two README sentences. Local evidence is in `/tmp/artifacts-sharing-codex/s5-owner-report.md`, `s5-review-report.md`, and `s5-doc-fix-report.md`. API/CLI-only lanes use structured response receipts; browser lanes retain actual screenshots.
+
 **Depends on.** S4.
 
 **Files.**
 
-- [ ] Edit `apps/cli/src/index.ts`.
-- [ ] Edit `apps/cli/src/operations.ts`.
-- [ ] Edit `apps/cli/README.md`.
-- [ ] Edit `skills/artifacts-cli/SKILL.md`.
-- [ ] Edit `skills/artifacts-cli/references/commands.md` so the bundled reference matches the commands.
-- [ ] Edit `README.md` so its tool and command lists include the MCP sharing tools from S3 and the CLI commands from S5.
-- [ ] Edit `tests/cli-client.test.ts`.
+- [x] Edit `apps/cli/src/index.ts`.
+- [x] Edit `apps/cli/src/operations.ts`.
+- [x] Edit `apps/cli/README.md`.
+- [x] Edit `skills/artifacts-cli/SKILL.md`.
+- [x] Edit `skills/artifacts-cli/references/commands.md` so the bundled reference matches the commands.
+- [x] Edit `README.md` so its tool and command lists include the MCP sharing tools from S3 and the CLI commands from S5.
+- [x] Edit `tests/cli-client.test.ts`.
 
 **Build.**
 
-- [ ] Add the cases `share <id> --email <email>`, `unshare <id> <shareId>`, and `shares <id>` to the command switch in `apps/cli/src/index.ts`. Route `share` and `unshare` through the existing retry receipts so `artifacts retry` replays them.
-- [ ] Document the commands in `apps/cli/README.md` and `skills/artifacts-cli/SKILL.md`. The npm release stays a separate step.
+- [x] Add the cases `share <id> --email <email>`, `unshare <id> <shareId>`, and `shares <id>` to the command switch in `apps/cli/src/index.ts`. Route `share` and `unshare` through the existing retry receipts so `artifacts retry` replays them.
+- [x] Document the commands in `apps/cli/README.md` and `skills/artifacts-cli/SKILL.md`. The npm release stays a separate step.
 
 **You see.**
 
-- [ ] `pnpm artifacts share <id> --email ana@example.com` prints the share as JSON and exits 0.
+- [x] `pnpm artifacts share <id> --email ana@example.com` prints the share as JSON and exits 0.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/cli-client.test.ts` gains each command, `retry` of a share, and an invalid email exiting non-zero. Run `pnpm test:rest-cli`.
-- [ ] Run `pnpm test:cli-skills` and check that the skill proof passes.
+- [x] `tests/cli-client.test.ts` gains each command, `retry` of a share, and an invalid email exiting non-zero. Run `pnpm test:rest-cli`.
+- [x] Run `pnpm test:cli-skills` and check that the skill proof passes.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Run `control.ts drive cli` at trunk and head. Trunk lacks the commands, so record that and gate `share` followed by the guest opening the publication at head. Save `cli-trunk.png` and `cli-share-head.png`. Pass when both CLI runs pass and the guest sees the revision.
-- [ ] Lane 2. Run `pnpm artifacts share <id> --email <guest>`. Save `share.png`. Pass when it exits 0 and the guest is admitted.
-- [ ] Lane 3. Run `pnpm artifacts shares <id>`. Save `shares.png`. Pass when the output lists the guest's email.
-- [ ] Lane 4. Run `pnpm artifacts unshare <id> <shareId>` and reload as the guest. Save `unshare.png`. Pass when it exits 0 and the reload returns 403.
-- [ ] Lane 5. Interrupt a `share` after the request leaves, then run `pnpm artifacts retry`. Save `retry.png`. Pass when the retry returns the same share and one row exists.
-- [ ] Lane 6. Run `share` with `--email nope`. Save `invalid.png`. Pass when it exits non-zero with a validation message and writes no row.
-- [ ] Lane 7. Run `pnpm artifacts --help`. Save `help.png`. Pass when the help lists `share`, `unshare`, and `shares`.
-- [ ] Lane 8. Run `share` after `pnpm artifacts logout`. Save `logged-out.png`. Pass when it exits non-zero and asks for `login`.
-- [ ] Lane 9. Run `pnpm build:packages`, install the packed CLI in a temp directory, and run `share`. Save `packed.png`. Pass when the packed CLI shares and the guest is admitted.
-- [ ] Lane 10. Run `pnpm artifacts list` and `pnpm artifacts publish` as on trunk. Save `existing.png`. Pass when the output matches the trunk format.
+- [x] Lane 1. Regression lane against trunk. Run `control.ts drive cli` at trunk and head. Trunk lacks the commands, so record that and gate `share` followed by the guest opening the publication at head. Save `cli-trunk.png` and `cli-share-head.png`. Pass when both CLI runs pass and the guest sees the revision.
+- [x] Lane 2. Run `pnpm artifacts share <id> --email <guest>`. Save `share.png`. Pass when it exits 0 and the guest is admitted.
+- [x] Lane 3. Run `pnpm artifacts shares <id>`. Save `shares.png`. Pass when the output lists the guest's email.
+- [x] Lane 4. Run `pnpm artifacts unshare <id> <shareId>` and reload as the guest. Save `unshare.png`. Pass when it exits 0 and the reload returns 403.
+- [x] Lane 5. Interrupt a `share` after the request leaves, then run `pnpm artifacts retry`. Save `retry.png`. Pass when the retry returns the same share and one row exists.
+- [x] Lane 6. Run `share` with `--email nope`. Save `invalid.png`. Pass when it exits non-zero with a validation message and writes no row.
+- [x] Lane 7. Run `pnpm artifacts --help`. Save `help.png`. Pass when the help lists `share`, `unshare`, and `shares`.
+- [x] Lane 8. Run `share` after `pnpm artifacts logout`. Save `logged-out.png`. Pass when it exits non-zero and asks for `login`.
+- [x] Lane 9. Run `pnpm build:packages`, install the packed CLI in a temp directory, and run `share`. Save `packed.png`. Pass when the packed CLI shares and the guest is admitted.
+- [x] Lane 10. Run `pnpm artifacts list` and `pnpm artifacts publish` as on trunk. Save `existing.png`. Pass when the output matches the trunk format.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The wall time of `pnpm artifacts list` at trunk and head. Trunk lacks share commands, so also measure the wall time of `pnpm artifacts shares <id>` at head.
-- [ ] Probe. Run `list` 20 times, alternating between trunk and head worktrees against their runs. Run `shares` 20 times at head.
-- [ ] Baseline. Record the trunk `list` median first.
-- [ ] Rule. Fail when the head `list` median exceeds trunk by more than 10 percent. Fail when the `shares` median exceeds the head `list` median by more than 100 ms.
+- [x] Metric. The wall time of `pnpm artifacts list` at trunk and head. Trunk lacks share commands, so also measure the wall time of `pnpm artifacts shares <id>` at head.
+- [x] Probe. Run `list` 20 times, alternating between trunk and head worktrees against their runs. Run `shares` 20 times at head.
+- [x] Baseline. Record the trunk `list` median first.
+- [x] Rule. Fail when the head `list` median exceeds trunk by more than 10 percent. Fail when the `shares` median exceeds the head `list` median by more than 100 ms.
 
 **Review gate.** None. S5 is not review-gated.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at the exact head SHA.
+- [x] Bugbot triage done. No reviews, issue comments, or inline review comments at the root inspection recorded in `/tmp/artifacts-sharing-codex/root-pr-review-state.json`.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S5 to the chain. The operator lands it bottom-up.
 
@@ -366,56 +370,58 @@ Each live lane runs in an available isolated environment at the PR head; separat
 
 **Depends on.** S5.
 
+Verified at `c5cc8da` with exact-head CI and a fresh independent PASS. Evidence is in `/tmp/artifacts-sharing-codex/s6-redemption-fix-report.md` and `s6-redemption-review-report.md`. Original runtime/performance evidence at `ef5a2b9` is carried only for unchanged password/send paths. The final head reran all ten browser lanes and an independent 96-outcome failure matrix. API-only lanes retain structured receipts. Deployed provider delivery remains an S10 gate.
+
 **Files.**
 
-- [ ] Edit `apps/auth/src/auth-core.ts`.
-- [ ] Edit `packages/config/src/index.ts`.
-- [ ] Create `packages/config/src/email.ts`.
-- [ ] Edit `packages/db/src/auth-schema.ts` only if the `emailOTP` plugin needs columns that `verification` lacks.
-- [ ] Edit `tests/oauth.test.ts`.
+- [x] Edit `apps/auth/src/auth-core.ts`.
+- [x] Edit `packages/config/src/index.ts`.
+- [x] Create `packages/config/src/email.ts`.
+- [x] Skip: no schema edit is needed; the existing verification table suffices.
+- [x] Use focused `tests/email-code.test.ts`, `tests/email-code-runtime.test.ts`, and `tests/email-code-worker.test.ts` for the new behavior, including actual OAuth callbacks. Existing OAuth tests remain unchanged and pass.
 
 **Build.**
 
 - [x] Prove the spike in Appendix A first. Commit its result to the decision trail before any other box. Evidence is local prototype `d253377` on verified S5, its 21-case root repeat, and the canonical prototype row.
-- [ ] Add a sender type in `packages/config/src/email.ts` with a Cloudflare Email Service provider and a file sink for local runs and tests.
-- [ ] Enable `emailOTP` in `createAuth` in `apps/auth/src/auth-core.ts`. Keep `disableSignUp` for passwords.
-- [ ] Prove that every path that creates or updates a `user` row stores the email in lowercase, including `emailOTP` sign-in. `canView` compares the share with `lower(user.email)` while the unique index on `user.email` is case-sensitive, so two accounts that differ only in case would both match one share. Add a test that signs in by code as `Ana@Example.com` and asserts the stored email is `ana@example.com`.
-- [ ] Send a code only to normalized `OWNER_EMAIL`, an email covered by an active share, or an existing user who owns at least one artifact. A former invitee retains code sign-in while owning artifacts. An existing user alone does not qualify. Return the same response for every email. Rate-limit code requests per email and per IP.
+- [x] Add a sender type in `packages/config/src/email.ts` with a Cloudflare Email Service provider and a file sink for local runs and tests.
+- [x] Enable `emailOTP` in `createAuth` in `apps/auth/src/auth-core.ts`. Keep `disableSignUp` for passwords.
+- [x] Prove that every path that creates or updates a `user` row stores the email in lowercase, including `emailOTP` sign-in. `canView` compares the share with `lower(user.email)` while the unique index on `user.email` is case-sensitive, so two accounts that differ only in case would both match one share. Add a test that signs in by code as `Ana@Example.com` and asserts the stored email is `ana@example.com`.
+- [x] Send a code only to normalized `OWNER_EMAIL`, an email covered by an active share, or an existing user who owns at least one artifact. A former invitee retains code sign-in while owning artifacts. An existing user alone does not qualify. Return the same response for every email. Rate-limit code requests per email and per IP.
 
 **You see.**
 
-- [ ] An invited email requests a code, the file sink records it, and signing in with it creates the account and returns a session.
+- [x] An invited email requests a code, the file sink records it, and signing in with it creates the account and returns a session.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/oauth.test.ts` gains an invited email that receives a code, signs in, and passes the dashboard callback. It also gains an uninvited email that gets the same response and no code, the per-email and per-IP limits, and password sign-up still rejected. Run `node --import tsx --test tests/oauth.test.ts`.
+- [x] The focused email-code suites cover an invited email receiving a code, sign-in and the dashboard callback, uninvited equal responses without delivery, per-email and per-IP limits, and rejected password signup. All 26 focused tests and all 201 full-suite tests pass. Four final redemption regressions fail on the preceding head and pass on the final head.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Run `control.ts drive identity` at trunk and head. Trunk lacks email codes, so record that and gate an invited guest signing in by code and opening the publication at head. Save `identity-trunk.png`, `identity-head.png`, and `otp-guest.png`. Pass when both identity runs pass and the guest sees the revision.
-- [ ] Lane 2. Request a code for an invited email through the auth API. Save `sink.png` of the file sink. Pass when the sink holds one code for that email.
-- [ ] Lane 3. Request a code for an uninvited email. Save `uninvited.png`. Pass when the response body equals lane 2's and the sink holds no code.
-- [ ] Lane 4. Request a code for the owner and sign in with it. Save `owner-otp.png`. Pass when the owner reaches the panel library.
-- [ ] Lane 5. Request codes for one email past the per-email limit. Save `email-limit.png`. Pass when the request over the limit gets 429.
-- [ ] Lane 6. Request codes for many emails from one IP past the per-IP limit. Save `ip-limit.png`. Pass when the request over the limit gets 429.
-- [ ] Lane 7. Submit wrong codes until the plugin's attempt limit. Save `attempts.png`. Pass when the correct code no longer works after the limit.
-- [ ] Lane 8. `POST` to the password sign-up endpoint. Save `signup.png`. Pass when the status is 4xx and no user row appears.
-- [ ] Lane 9. Revoke the guest's share and request a code. Save `revoked-otp.png`. Pass when the sink holds no new code.
-- [ ] Lane 10. Complete an MCP OAuth authorization as the guest using a code. Save `guest-oauth.png`. Pass when `whoami` returns the guest.
+- [x] Lane 1. Regression lane against trunk. Run `control.ts drive identity` at trunk and head. Trunk lacks email codes, so record that and gate an invited guest signing in by code and opening the publication at head. Save `identity-trunk.png`, `identity-head.png`, and `otp-guest.png`. Pass when both identity runs pass and the guest sees the revision.
+- [x] Lane 2. Request a code for an invited email through the auth API. Save `sink.png` of the file sink. Pass when the sink holds one code for that email.
+- [x] Lane 3. Request a code for an uninvited email. Save `uninvited.png`. Pass when the response body equals lane 2's and the sink holds no code.
+- [x] Lane 4. Request a code for the owner and sign in with it. Save `owner-otp.png`. Pass when the owner reaches the panel library.
+- [x] Lane 5. Request codes for one email past the per-email limit. Save `email-limit.png`. Pass when the request over the limit gets 429.
+- [x] Lane 6. Request codes for many emails from one IP past the per-IP limit. Save `ip-limit.png`. Pass when the request over the limit gets 429.
+- [x] Lane 7. Submit wrong codes until the plugin's attempt limit. Save `attempts.png`. Pass when the correct code no longer works after the limit.
+- [x] Lane 8. `POST` to the password sign-up endpoint. Save `signup.png`. Pass when the status is 4xx and no user row appears.
+- [x] Lane 9. Revoke the guest's share and request a code. Save `revoked-otp.png`. Pass when the sink holds no new code.
+- [x] Lane 10. Complete an MCP OAuth authorization as the guest using a code. Save `guest-oauth.png`. Pass when `whoami` returns the guest.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. The p95 latency of password sign-in at trunk and head. Trunk lacks email codes, so also measure the p95 of a code request with the file sink at head.
-- [ ] Probe. Run 50 password sign-ins alternating between the trunk run and the head run. Run 50 code requests at head under the rate limit.
-- [ ] Baseline. Record the trunk sign-in p95 first.
-- [ ] Rule. Fail when head sign-in p95 exceeds trunk by more than 10 percent and 5 ms. Fail when the code request p95 exceeds 200 ms locally.
+- [x] Metric. The p95 latency of password sign-in at trunk and head. Trunk lacks email codes, so also measure the p95 of a code request with the file sink at head.
+- [x] Probe. Run 50 password sign-ins alternating between the trunk run and the head run. Run 50 code requests at head under the rate limit.
+- [x] Baseline. Record the trunk sign-in p95 first.
+- [x] Rule. Fail when head sign-in p95 exceeds trunk by more than 10 percent and 5 ms. Fail when the code request p95 exceeds 200 ms locally.
 
 **Review gate.** None. S6 is not review-gated.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
+- [x] Root's clean verdict at the exact head SHA.
+- [x] Bugbot triage done. No reviews or comments at the root inspection recorded in `/tmp/artifacts-sharing-codex/root-pr-review-state.json`.
 - [ ] Chain rebased by the root after the verdict, patch-id unchanged.
 - [ ] The root appends S6 to the chain. The operator lands it bottom-up.
 
@@ -466,7 +472,7 @@ Each live lane runs in an available isolated environment at the PR head; separat
 **Review gate.** The operator reviews before merge.
 
 - [ ] Copy lane 2, 3, 5, and 7 screenshots into `.test-artifacts/review/S7-review-<slug>.png`.
-- [ ] Record a 30 to 60 second video of the code sign-in on a lane run with `control.ts` `--headed`. Save it as `.test-artifacts/review/S7-review.mp4`.
+- [ ] Launch the email-code runtime with `control.ts launch --email-code`, then record a 30 to 60 second video with the committed S7 proof in `--run PATH --headed` mode on those same live services. This substitutes for a control recipe that does not exist and avoids duplicating the lane. Save it as `.test-artifacts/review/S7-review.mp4`.
 - [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
 
 **Merge.**
