@@ -73,6 +73,7 @@ export type Viewer = z.infer<typeof viewerSchema>;
 export type Publication = z.infer<typeof publicationSchema>;
 export type Revision = z.infer<typeof revisionSchema>;
 export type ArtifactRead = z.infer<typeof artifactReadSchema>;
+export type SharedRead = z.infer<typeof sharedReadSchema>;
 export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; project: string | null; publication: Publication | null };
 export type ProjectSummary = { name: string; artifactCount: number };
 export type ArtifactLibraryQuery = z.infer<typeof libraryQuerySchema>;
@@ -100,4 +101,5 @@ export function decodeFile(file: { encoding: 'utf8' | 'base64'; data: string }):
 export const publicationSchema = z.strictObject({ revisionId: identifier, version: z.number().int().positive(), url: z.url() });
 export const revisionSchema = z.strictObject({ id: identifier, parentRevisionId: identifier.nullable(), sequence: z.number().int().positive(), authorUserId: identifier, authorClientId: identifier, createdAt: z.iso.datetime(), sha256: z.string().regex(/^[a-f0-9]{64}$/), snapshot: snapshotSchema });
 export const artifactReadSchema = z.strictObject({ artifactId: identifier, ownerId: identifier, headRevisionId: identifier, project: z.string().nullable(), publication: publicationSchema.nullable(), revision: revisionSchema });
+export const sharedReadSchema = z.strictObject({ artifactId: identifier, publication: publicationSchema, revision: revisionSchema.pick({ id: true, createdAt: true, sha256: true, snapshot: true }) });
 export const publishResultSchema = publicationSchema.extend({ artifactId: identifier });

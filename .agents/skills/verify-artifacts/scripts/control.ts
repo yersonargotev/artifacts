@@ -9,16 +9,21 @@ import { resolve, join } from 'node:path';
 import { serve } from '@hono/node-server';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { unzipSync, strFromU8 } from 'fflate';
+import { eq } from 'drizzle-orm';
 import { driveProjects } from './projects.ts';
+import { driveSharing, type Account } from './sharing.ts';
 import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
 import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
-import { artifactReadSchema, publishResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { createArtifactStore } from '../../../../packages/artifacts/src/index.ts';
+import { user } from '../../../../packages/db/src/schema.ts';
+import { artifactReadSchema, publishResultSchema, shareSchema, unshareSchema } from '../../../../packages/artifacts/src/contracts.ts';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'cli', 'projects', 'screens', 'preview', 'publication', 'export'] as const;
+const features = ['identity', 'authoring', 'cli', 'projects', 'screens', 'preview', 'publication', 'export', 'sharing'] as const;
+const scopes = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
 type Credentials = { controlToken: string; accessToken: string; password: string };
@@ -56,6 +61,22 @@ async function ownedInstance(): Promise<{ instance: Instance; credentials: Crede
   assert.equal(current.pid, instance.pid, 'Supervisor PID matches');
   assert.equal(current.panelPid, instance.panelPid, 'Owned panel PID matches');
   return { instance, credentials };
+}
+
+async function control<T>(path: string, body: unknown): Promise<T> {
+  const { instance, credentials } = await ownedInstance();
+  const response = await fetch(new URL(path, instance.control), { method: 'POST', headers: { authorization: `Bearer ${credentials.controlToken}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+  const result = await response.json() as T;
+  assert.equal(response.status, 200, `Supervisor ${path}: ${JSON.stringify(result)}`);
+  return result;
+}
+
+const accountFile = (email: string) => join(runtime, 'accounts', `${email}.json`);
+async function account(email: string, verified: boolean) {
+  const created = await control<Account>('/account', { email, verified });
+  await mkdir(join(runtime, 'accounts'), { recursive: true, mode: 0o700 });
+  await json(accountFile(created.email), created);
+  return created;
 }
 
 async function doctor() {
@@ -113,12 +134,41 @@ async function supervisor() {
       await delay(100);
     }
     assert(ready, 'Built panel is ready');
-    const tokens = await grant(app, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
+    const tokens = await grant(app, scopes);
+    const fixtureApp = app;
+    const store = createArtifactStore(app.db, { publishOrigin: viewOrigin });
+    const ownerSession = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
+    assert(ownerSession, 'Disposable owner has a central session');
+    const owner = { userId: app.ownerId, sessionId: ownerSession.session.id, clientId: 'verification-supervisor', scopes: ['artifacts:publish'] };
+    async function ensureAccount(email: string, verified: boolean): Promise<Account> {
+      const find = async () => (await fixtureApp.db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1))[0];
+      if (!await find()) await fixtureApp.auth.api.signUpEmail({ body: { name: `Disposable ${email}`, email, password: fixtureApp.password } });
+      const found = await find();
+      assert(found, `Disposable account ${email} exists`);
+      await fixtureApp.db.update(user).set({ emailVerified: verified }).where(eq(user.id, found.id));
+      const signIn = await fixtureApp.auth.api.signInEmail({ body: { email, password: fixtureApp.password }, returnHeaders: true });
+      const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
+      return { userId: found.id, email, emailVerified: verified, accessToken: (await grant({ ...fixtureApp, cookie }, scopes)).access_token };
+    }
+    const controlRoutes: Record<string, (body: unknown) => Promise<unknown>> = {
+      'POST /account': (body) => {
+        const { email, verified } = body as { email?: unknown; verified?: unknown };
+        assert(typeof verified === 'boolean', 'verified must be a boolean');
+        return ensureAccount(shareSchema.shape.email.parse(email), verified);
+      },
+      'POST /share': (body) => store.share(owner, { requestId: randomUUID(), ...shareSchema.omit({ requestId: true }).parse(body) }),
+      'POST /unshare': (body) => store.unshare(owner, { requestId: randomUUID(), ...unshareSchema.omit({ requestId: true }).parse(body) }),
+    };
     const controlToken = randomBytes(32).toString('hex');
     const id = randomUUID();
     const control = serve({ hostname: '127.0.0.1', port: 0, fetch: async (request) => {
-      if (request.method !== 'GET' || new URL(request.url).pathname !== '/doctor' || request.headers.get('authorization') !== `Bearer ${controlToken}`) return new Response('Denied', { status: 403 });
-      return Response.json({ id, pid: process.pid, panelPid: panel?.pid }, { headers: { 'cache-control': 'no-store' } });
+      if (request.headers.get('authorization') !== `Bearer ${controlToken}`) return new Response('Denied', { status: 403 });
+      const route = `${request.method} ${new URL(request.url).pathname}`;
+      if (route === 'GET /doctor') return Response.json({ id, pid: process.pid, panelPid: panel?.pid }, { headers: { 'cache-control': 'no-store' } });
+      const action = controlRoutes[route];
+      if (!action) return new Response('Denied', { status: 403 });
+      try { return Response.json(await action(await request.json()), { headers: { 'cache-control': 'no-store' } }); }
+      catch (error) { return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     } });
     servers.push(control);
     const instance: Instance = { id, pid: process.pid, panelPid: panel.pid!, build: hash(await readFile(entry)), ownerId: app.ownerId, auth: app.config.origin, mcp: app.config.resource, panel: panelOrigin, view: viewOrigin, control: `http://127.0.0.1:${await listen(control)}/doctor`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
@@ -208,8 +258,8 @@ async function drive(feature: Feature) {
   await mkdir(directory, { mode: 0o700 });
   const checks: string[] = [];
   const record = (action: string, result: unknown) => appendFile(join(directory, 'actions.jsonl'), `${JSON.stringify({ time: new Date().toISOString(), action, result })}\n`, { mode: 0o600 });
-  async function call(name: string, input: unknown = {}, allowError = false) {
-    const response = await tool(instance, credentials, name, input);
+  async function call(name: string, input: unknown = {}, allowError = false, accessToken = credentials.accessToken) {
+    const response = await tool(instance, { ...credentials, accessToken }, name, input);
     await record(`MCP ${name}`, { input, ...response });
     assert.equal(response.status, 200, `${name} HTTP result`);
     assert(response.result, `${name} tool response`);
@@ -238,15 +288,15 @@ async function drive(feature: Feature) {
     await writeFile(join(directory, `${label}.aria.yml`), await page.locator('body').ariaSnapshot(), { mode: 0o600 });
     await record(`Capture ${label}`, { url: page.url(), screenshot: `${label}.png`, aria: `${label}.aria.yml` });
   }
-  async function login(page: Page, fromPanel = true) {
+  async function login(page: Page, fromPanel = true, email = 'owner@example.test') {
     if (fromPanel) {
       await record('Open panel and choose Iniciar sesión', { url: instance.panel });
       await page.goto(instance.panel);
       await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
     }
-    await page.getByLabel('Correo electrónico').fill('owner@example.test');
+    await page.getByLabel('Correo electrónico').fill(email);
     await page.getByLabel('Contraseña').fill(credentials.password);
-    await record('Submit Iniciar sesión', { email: 'owner@example.test', password: 'omitted' });
+    await record('Submit Iniciar sesión', { email, password: 'omitted' });
     await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
   }
   let status = 'failed';
@@ -426,6 +476,8 @@ async function drive(feature: Feature) {
         checks.push('Browser login owner matches MCP owner', 'Mobile native navigation and account disclosure without overflow', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
       } else if (feature === 'projects') {
         await driveProjects({ page, browser, context, instance, directory, root, cliEnv: { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken }, firstSnapshot, secondSnapshot, recordVideo: args.includes('--record-video'), checks, call, ok, login, capture, checkScreen, record, json });
+      } else if (feature === 'sharing') {
+        await driveSharing({ page, browser, firstSnapshot, checks, call, control, account, login, capture, record });
       } else {
         const created = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: firstSnapshot }));
         let libraryDemo: { artifact: ReturnType<typeof artifactReadSchema.parse>; publication: ReturnType<typeof publishResultSchema.parse> } | undefined;
@@ -663,7 +715,13 @@ if (process.argv[1] && resolve(process.argv[1]) === script) try {
   else if (command === 'doctor') { const { proof } = await doctor(); console.log(JSON.stringify(proof)); }
   else if (command === 'cleanup') await cleanup();
   else if (command === 'drive') { const feature = args[1]; assert(features.includes(feature as Feature), `Choose drive ${features.join('|')}`); await drive(feature as Feature); }
-  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | cleanup --run PATH');
+  else if (command === 'account') {
+    const email = args[args.indexOf('--email') + 1];
+    assert(args.includes('--email') && email, 'Pass --email ADDRESS');
+    const { accessToken: _accessToken, ...created } = await account(email, !args.includes('--unverified'));
+    console.log(JSON.stringify({ ...created, credentials: accountFile(created.email) }));
+  }
+  else throw new Error('Usage: control.ts launch [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
