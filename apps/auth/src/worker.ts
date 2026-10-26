@@ -1,5 +1,5 @@
 import { authConfig, type AuthWorkerEnvironment } from '@artifacts/config';
-import { cloudflareEmailSender, type EmailEnvironment } from '@artifacts/config/email';
+import { resendEmailSender, type EmailEnvironment } from '@artifacts/config/email';
 import { withEmailCodeRequest } from './email-code-context.ts';
 import { openDatabase } from '@artifacts/db';
 import { createAuth } from './auth-core.ts';
@@ -13,7 +13,7 @@ async function createRuntime(env: AuthRuntimeEnvironment) {
   const config = authConfig(env);
   if (config.email?.transport === 'file') throw new Error('File email delivery is only available in Node');
   const { db } = await openDatabase({ url: env.DATABASE_URL, authToken: env.DATABASE_AUTH_TOKEN });
-  const sender = config.email?.transport === 'cloudflare' ? cloudflareEmailSender(config.email) : undefined;
+  const sender = config.email?.transport === 'resend' ? resendEmailSender(config.email) : undefined;
   const auth = createAuth(db, config, { fetchClientMetadataResource, isMetadataDocumentUrlAllowed }, false, sender);
   await auth.$context;
   return { handler: createAuthHandler(db, config, auth), emailEnabled: Boolean(sender) };

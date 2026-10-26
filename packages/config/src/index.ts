@@ -5,7 +5,7 @@ export const identityScope = 'artifacts:read';
 
 export type Environment = Readonly<Record<string, string | undefined>>;
 type DatabaseEnvironment = { DATABASE_URL: string; DATABASE_AUTH_TOKEN?: string };
-type SenderEnvironment = Pick<EmailEnvironment, 'EMAIL_TRANSPORT' | 'EMAIL_FROM' | 'CLOUDFLARE_ACCOUNT_ID' | 'CLOUDFLARE_EMAIL_API_TOKEN'>;
+type SenderEnvironment = Pick<EmailEnvironment, 'EMAIL_TRANSPORT' | 'EMAIL_FROM' | 'RESEND_API_KEY'>;
 type PublicOrigins = { AUTH_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
 export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & { OWNER_EMAIL: string; BETTER_AUTH_SECRET: string };
 export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };

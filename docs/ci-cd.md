@@ -68,9 +68,11 @@ S10 adds migration `0004_sweet_the_anarchist.sql` for the owner invitation budge
 
 ## Production email bindings
 
-Auth, MCP, and panel explicitly declare `EMAIL_TRANSPORT=cloudflare`. Their runtime secret projection requires `EMAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_EMAIL_API_TOKEN`. Only auth also receives `OWNER_EMAIL` for admission policy. The viewer receives no email bindings. `OWNER_PASSWORD` and bootstrap credentials are not runtime bindings and remain rejected.
+Auth, MCP, and panel explicitly declare `EMAIL_TRANSPORT=resend`. Their runtime secret projection requires `EMAIL_FROM` and `RESEND_API_KEY`. Only auth also receives `OWNER_EMAIL` for admission policy. The viewer receives no email bindings. `OWNER_PASSWORD` and bootstrap credentials are not runtime bindings and remain rejected.
 
-`EMAIL_FROM` and `OWNER_EMAIL` must be email addresses. The account ID contains 32 hexadecimal characters. The email API token authorizes Cloudflare Email Sending for that account. It is separate from `CLOUDFLARE_API_TOKEN`, which authorizes deployment. Release preflight combines each service's declared text bindings and projected secrets before validating configuration. Missing or malformed sender fields stop the release before any deployment callback. Local Node processes without `EMAIL_TRANSPORT` keep email disabled.
+`EMAIL_FROM` and `OWNER_EMAIL` must be email addresses. `EMAIL_FROM` is a bare address on the Resend-verified sending subdomain. `RESEND_API_KEY` must be nonempty and contain no whitespace or control characters. Release preflight does not test the key against Resend or establish domain readiness. Follow [Enable Resend delivery](deployment.md#enable-resend-delivery) for the account and DNS procedure.
+
+Keep `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as separate deployment credentials. The runtime JSON rejects both the obsolete `CLOUDFLARE_EMAIL_API_TOKEN` and the former runtime `CLOUDFLARE_ACCOUNT_ID` as undeclared keys. Release preflight combines each service's declared text bindings and projected secrets before validating configuration. Missing keys or malformed sender fields stop the release before any deployment callback. Local Node processes without `EMAIL_TRANSPORT` keep email disabled.
 
 ## Native producer and package proofs
 

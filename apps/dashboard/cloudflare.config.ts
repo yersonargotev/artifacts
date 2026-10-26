@@ -7,10 +7,9 @@ export default {
     ...workerCompatibility,
     entrypoint: '@astrojs/cloudflare/entrypoints/server',
     env: {
-      EMAIL_TRANSPORT: { type: 'text', value: 'cloudflare' },
+      EMAIL_TRANSPORT: { type: 'text', value: 'resend' },
       EMAIL_FROM: { type: 'secret' },
-      CLOUDFLARE_ACCOUNT_ID: { type: 'secret' },
-      CLOUDFLARE_EMAIL_API_TOKEN: { type: 'secret' },
+      RESEND_API_KEY: { type: 'secret' },
       AUTH_URL: { type: 'text', value: workerOrigins.AUTH_URL },
       MCP_URL: { type: 'text', value: workerOrigins.MCP_URL },
       DASHBOARD_URL: { type: 'text', value: workerOrigins.DASHBOARD_URL },
