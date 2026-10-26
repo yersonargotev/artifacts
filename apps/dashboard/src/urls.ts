@@ -64,3 +64,5 @@ export function readMoveUrl(url: URL): string[] {
   z.array(z.string()).max(25).parse(ids);
   return panelMoveIdsSchema.parse(ids);
 }
+
+export const shareHref = (artifactId: string) => `/artifacts/${encodeURIComponent(artifactId)}/share`;

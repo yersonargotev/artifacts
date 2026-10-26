@@ -506,7 +506,7 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .detail-header { gap: 14px; }
   .detail-heading { flex-basis: 100%; }
   .detail-title h1 { font-size: 24px; }
-  .detail-actions { gap: 6px; }
+  .detail-actions { gap: 4px; }
   .detail-actions > .button, .detail-actions .publish-form button { padding: 8px 10px; font-size: 12px; }
   .detail-selection { gap: 8px; }
   .detail-selection .revision-select { width: 100%; }
@@ -549,3 +549,24 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .dialog-content .move-actions { gap: 10px; }
   .dialog-content .move-remove { flex-basis: 100%; text-align: left; }
 }
+
+.share-card { max-width: 660px; margin: 32px auto; padding: clamp(20px, 4vw, 36px); border: 1px solid var(--divider); border-radius: 12px; background: var(--mantle); }
+.share-title { color: var(--muted); overflow-wrap: anywhere; }
+.share-form label { display: block; margin: 20px 0 8px; font-weight: 600; }
+.share-add { display: flex; gap: 10px; align-items: start; }
+.share-add [data-slot=input] { border-color: var(--border-control); background: var(--crust); font-size: 16px; flex: 1; }
+.share-add [aria-invalid=true] { border-color: var(--red); }
+.share-add button { flex: none; }
+.share-notice { color: var(--yellow); background: var(--warning-surface); border: 1px solid var(--warning-border); border-radius: 8px; padding: 12px; }
+.share-form h3 { margin: 28px 0 12px; font-size: 15px; }
+.share-list { list-style: none; padding: 0; margin: 0; }
+.share-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--divider); }
+.share-list li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.share-list form { flex: none; }
+.share-list button { padding: 8px 12px; }
+.share-close { margin-top: 24px; }
+.share-retry { color: var(--yellow); }
+.native-share-link { font-size: 13px; }
+@media (max-width: 480px) { .share-add { flex-wrap: wrap; } .share-add [data-slot=input] { flex-basis: 100%; } }
+
+.artifact-card-heading > astro-island:not([ssr]) + .native-share-link { display: none; }

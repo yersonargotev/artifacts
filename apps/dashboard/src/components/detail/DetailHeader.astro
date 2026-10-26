@@ -2,7 +2,7 @@
 import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
 import { isPending, isSelectedPublished } from '@artifacts/artifacts/panel/model';
 import { contentLabels, revisionLabel } from '../../presentation.ts';
-import { moveHref, exportHref, type DetailUrl } from '../../urls.ts';
+import { moveHref, shareHref, exportHref, type DetailUrl } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 import PublicationForm from '../PublicationForm.astro';
 import Icon from '../Icon.astro';
@@ -34,6 +34,7 @@ const command = { artifactId: detail.artifactId, revisionId: revision.id, expect
       { label: 'Mover a proyecto', href: moveHref([detail.artifactId]), moveItems: JSON.stringify([{ artifactId: detail.artifactId, title: revision.snapshot.metadata.title, project: detail.project }]) },
     ])} deleteUrl={`${path}/delete`} client:load />
     <noscript><a class="native-move-link" href={moveHref([detail.artifactId])}>Mover a proyecto</a></noscript>
+    <a class="button secondary" href={shareHref(detail.artifactId)} data-share-trigger>Compartir</a>
     <a class="button secondary" href={exportHref(detail.artifactId, revision.id)}><Icon name="download" size={16} />Exportar</a>
     {isSelectedPublished(detail) ? <a class="button" data-variant="primary" href={detail.publication!.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}
   </div>

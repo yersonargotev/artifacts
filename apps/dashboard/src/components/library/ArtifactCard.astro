@@ -1,7 +1,7 @@
 ---
 import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
-import { moveHref, exportHref, scopeHref } from '../../urls.ts';
+import { moveHref, shareHref, exportHref, scopeHref } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 interface Props { card: Card; now: Date; selectable: boolean }
 const { card, now, selectable } = Astro.props;
@@ -15,10 +15,12 @@ const status = publicationStates[card.publication.state];
     <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>
     <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={JSON.stringify([
       { label: 'Ver artefacto', href: detailUrl },
+      { label: 'Compartir', href: shareHref(card.artifactId), share: true },
       { label: 'Descargar revisión más reciente', href: exportHref(card.artifactId, card.head.revisionId) },
       ...(publication ? [{ label: 'Abrir publicación', href: publication.url }] : []),
       { label: 'Mover a proyecto', href: moveHref([card.artifactId]), moveItems: JSON.stringify([{ artifactId: card.artifactId, title: card.title, project: card.project }]) },
     ])} deleteUrl={`${detailUrl}/delete`} client:load />
+    <a class="native-share-link" href={shareHref(card.artifactId)} data-share-trigger>Compartir</a>
     <noscript><a class="native-move-link" href={moveHref([card.artifactId])}>Mover a proyecto</a></noscript>
   </div>
   <p class="artifact-description">{card.description}</p>
