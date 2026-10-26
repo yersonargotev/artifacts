@@ -11,6 +11,9 @@ The plan is `docs/plans/sharing-plan.md`. The decision trail is `docs/plans/shar
 | S1 [#38](https://github.com/yersonargotev/artifacts/pull/38) | `feat/sharing-s1-share-table` | `278ea9c` | Clean, base `main` |
 | S2 [#39](https://github.com/yersonargotev/artifacts/pull/39) | `feat/sharing-s2-viewer-authorization` | `43eb363` | Clean, base S1 |
 | S3 [#40](https://github.com/yersonargotev/artifacts/pull/40) | `feat/sharing-s3-mcp-tools` | `f36cd07` | Clean, base S2 |
+| S4 [#41](https://github.com/yersonargotev/artifacts/pull/41) | `feat/sharing-s4-rest-client` | `8cf6433` | Clean, base S3 |
+| S5 [#42](https://github.com/yersonargotev/artifacts/pull/42) | `feat/sharing-s5-cli` | `f537c64` | Clean, base S4 |
+| S6 [#43](https://github.com/yersonargotev/artifacts/pull/43) | `feat/sharing-s6-email-otp` | `c5cc8da` | Clean, base S5 |
 
 Start S4 from `f36cd07819eafaee7c04cd7c808cf5bb9087e995`. Each later PR branches from the previous PR's verified head and targets that branch.
 
