@@ -160,7 +160,7 @@ History returns `nextBeforeSequence`; pass it as `--before-sequence N` to contin
 
 ## Share publication access
 
-Check installed help for these commands. They describe current source and built packages, not the published `0.1.0-beta.5` release.
+Check installed help for these commands. They are available from `0.1.0-beta.6`.
 
 ```sh
 artifacts share ARTIFACT_ID --email ana@example.com --request-id share-ana-001

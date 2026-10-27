@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -17,6 +18,8 @@ const packages = publicNames.map((name) => {
 const cli = packages.find((item) => item.name === '@yargote/artifacts-cli')!;
 const spec = `${cli.name}@${cli.version}`;
 const temporary = await mkdtemp(join(tmpdir(), 'artifacts-npm-registry-'));
+// pnpm/action-setup installs pnpm under a node_modules/.bin directory, so keep it when isolating PATH.
+const pnpmDirectory = (process.env.PATH ?? '').split(':').find((entry) => entry && !entry.startsWith(root) && existsSync(join(entry, 'pnpm')));
 const evidence: { version: string; platform: string; node: string; npm?: string; pnpm?: string; status?: 'passed' | 'failed'; failure?: string; cases: { mode: string; version: string; help: boolean; command: string[] }[]; dependencies: { name: string; version: string; resolved: string; integrity: string }[]; registry: { name: string; version: string; beta: string; latest: string | null; integrity: string }[]; binary?: string; directory?: string } = { version: cli.version, platform: process.platform, node: process.version, cases: [], dependencies: [], registry: [] };
 async function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolvePromise, reject) => {
@@ -38,7 +41,7 @@ async function environment(name: string) {
   const config = join(directory, 'npmrc');
   const globalConfig = join(directory, 'global-npmrc');
   await Promise.all([config, globalConfig].map((path) => writeFile(path, '')));
-  const path = (process.env.PATH ?? '').split(':').filter((entry) => entry && !entry.includes('node_modules') && !entry.startsWith(root));
+  const path = (process.env.PATH ?? '').split(':').filter((entry) => entry === pnpmDirectory || (entry && !entry.includes('node_modules') && !entry.startsWith(root)));
   const env: NodeJS.ProcessEnv = {
     PATH: [join(prefix, 'bin'), join(pnpmHome, 'bin'), pnpmHome, dirname(process.execPath), ...path].join(':'), HOME: home,
     TMPDIR: directory, LANG: 'en_US.UTF-8', CI: 'true',
