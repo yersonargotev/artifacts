@@ -45,7 +45,7 @@ A published URL requires sign-in by the owner or a user whose verified email mat
 
 ## Share publication access
 
-Check installed help for `share`, `shares`, and `unshare` support. These commands describe current source and built packages, not the published `0.1.0-beta.5` release. Share only when the user requests access for an exact email. Use `share ARTIFACT_ID --email EMAIL`, then verify the normalized email with `shares ARTIFACT_ID`. Use the observed `shareId` with `unshare ARTIFACT_ID SHARE_ID` to revoke it. Unshare and its successful retry exit zero with empty stdout.
+Check installed help for `share`, `shares`, and `unshare` support. These commands are available from `0.1.0-beta.6`. Share only when the user requests access for an exact email. Use `share ARTIFACT_ID --email EMAIL`, then verify the normalized email with `shares ARTIFACT_ID`. Use the observed `shareId` with `unshare ARTIFACT_ID SHARE_ID` to revoke it. Unshare and its successful retry exit zero with empty stdout.
 
 A matching signed-in user must have a verified email. Access covers the published revision and its attachments. History, export, editing, and project moves stay owner-only. A share before first publication remains stored and waits for publication. Add `--notify` when the user asks for an invitation email. Invited people can sign in with an email code when the server enables email.
 

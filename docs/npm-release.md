@@ -26,7 +26,7 @@ The package build is the only tarball producer. `dist/packages/manifest.json` re
 	  --binary /absolute/consumer/node_modules/.bin/artifacts \
 	  --server https://artifacts-mcp.yersonargotev.workers.dev/mcp \
 	  --env-file /private/path/account.env \
-	  --expected-version 0.1.0-beta.5 \
+	  --expected-version 0.1.0-beta.6 \
 	  --report .test-artifacts/npm-beta/first-use-local.json
 ```
 
