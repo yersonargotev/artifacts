@@ -13,8 +13,7 @@ import { eq } from 'drizzle-orm';
 import { driveProjects } from './projects.ts';
 import { driveSharing, type Account } from './sharing.ts';
 import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
-import { fixture, grant, historicalSignIn } from '../../../../tests/helpers.ts';
-import { createAdmission } from '../../../../packages/db/src/admission.ts';
+import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createArtifactStore } from '../../../../packages/artifacts/src/index.ts';
 import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
 import { session, user } from '../../../../packages/db/src/schema.ts';
@@ -137,6 +136,7 @@ async function supervisor() {
     assert(ready, 'Built panel is ready');
     const tokens = await grant(app, scopes);
     const fixtureApp = app;
+    const admittedAccounts = new Set<string>();
     async function ensureAccount(email: string, verified: boolean): Promise<Account> {
       const find = async () => (await fixtureApp.db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1))[0];
       if (!await find()) await fixtureApp.auth.api.signUpEmail({ body: { name: `Disposable ${email}`, email, password: fixtureApp.password } });
@@ -144,12 +144,16 @@ async function supervisor() {
       assert(found, `Disposable account ${email} exists`);
       await fixtureApp.db.update(user).set({ emailVerified: verified }).where(eq(user.id, found.id));
       assert(fixtureApp.config.access.allowGuests || email === fixtureApp.config.access.ownerEmail, 'Launch with --allow-guests before creating disposable guest accounts');
-      const signIn = await historicalSignIn(fixtureApp, email);
-      if (!await createAdmission(fixtureApp.db, fixtureApp.config.access).user(found.id)) {
-        const central = await fixtureApp.db.select({ id: session.id }).from(session).where(eq(session.token, signIn.response.token)).get();
+      if (email !== fixtureApp.config.access.ownerEmail && !admittedAccounts.has(email)) {
+        const central = await fixtureApp.db.select({ id: session.id }).from(session).where(eq(session.userId, fixtureApp.ownerId)).get();
         assert(central);
-        await createArtifactStore(fixtureApp.db, { publishOrigin: viewOrigin, access: { ownerEmail: email, allowGuests: false } }).create({ userId: found.id, sessionId: central.id, clientId: 'verification-account-setup', scopes: ['artifacts:read', 'artifacts:write'] }, { requestId: randomUUID(), snapshot: { metadata: { title: 'Disposable account admission', description: '' }, content: { kind: 'text', text: 'Fixture-owned artifact for existing-account admission.' }, files: [] } });
+        const store = createArtifactStore(fixtureApp.db, { publishOrigin: viewOrigin, access: fixtureApp.config.access });
+        const actor = { userId: fixtureApp.ownerId, sessionId: central.id, clientId: 'verification-account-setup', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
+        const admission = await store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'Disposable account admission', description: '' }, content: { kind: 'text', text: 'Unpublished invitation for disposable account admission.' }, files: [] } });
+        await store.share(actor, { requestId: randomUUID(), artifactId: admission.artifactId, email });
+        admittedAccounts.add(email);
       }
+      const signIn = await fixtureApp.auth.api.signInEmail({ body: { email, password: fixtureApp.password }, returnHeaders: true });
       const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
       return { userId: found.id, email, emailVerified: verified, accessToken: (await grant({ ...fixtureApp, cookie }, scopes)).access_token };
     }

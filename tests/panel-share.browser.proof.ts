@@ -25,7 +25,7 @@ await mkdir(review, { recursive: true });
 const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { panel: string; mcp: string };
 const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { password: string; accessToken: string };
 const client = createArtifactHttpClient({ resource: instance.mcp, accessToken: credentials.accessToken });
-const browser = await chromium.launch({ channel: 'chrome', headless: !headed });
+const browser = await chromium.launch({ ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' }), headless: !headed });
 const results: { lane: number | string; status: string; observed: unknown }[] = [];
 const contexts: BrowserContext[] = [];
 const errors: string[] = [];
@@ -201,7 +201,7 @@ async function sharedWithMe() {
   await emptyPage.getByRole('heading', { name: 'Tu próximo proyecto empieza aquí', exact: true }).waitFor();
   await capture(emptyPage, 's9-empty');
   await copyFile(join(directory, 's9-empty.png'), join(review, 'S9-review-empty.png'));
-  pass('S9-8', 'An account without shares retains the exact owned welcome state');
+  pass('S9-8', 'An account without published shares retains the exact owned welcome state');
   const guestCredentials = JSON.parse(await readFile(join(run, 'runtime/accounts/guest@example.test.json'), 'utf8')) as { userId: string; accessToken: string };
   assert.notEqual(guestCredentials.userId, artifact.ownerId);
   const guestOwn = await create('Guest authored through HTTP MCP', guestCredentials.accessToken);
@@ -652,7 +652,6 @@ try {
     await expiredPage.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
     assert.equal((await live.request.post(`${instance.panel}${path}`, { headers, data: body })).status(), 401);
     pass('expired-session', 'Actual panel logout invalidates the old authenticated share POST');
-    await sharedWithMe();
     assert.deepEqual(errors, []);
     status = 'PASS';
   }
@@ -665,4 +664,8 @@ try {
   for (const item of contexts) await item.close().catch(() => {});
   await browser.close();
   await control(['cleanup', '--run', run]);
+}
+if (!parent && !sharedMode) {
+  const shared = await execute(process.execPath, ['--import', 'tsx', import.meta.filename, '--shared-with-me', ...(headed ? ['--headed'] : [])]);
+  process.stdout.write(shared.stdout);
 }
