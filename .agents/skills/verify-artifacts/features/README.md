@@ -8,6 +8,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 - Run `pnpm build` before the first launch so the helper can start the built Astro panel. Complete builds while no verification instance is active.
 - Start a disposable instance with `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch`. Read the JSON output for its run path and service URLs. A new run owns its database, credentials, processes, and ephemeral ports.
 - Pass that same run path to `doctor`, `drive`, and `cleanup`. Require `doctor` to pass before driving. Never substitute the normal `.env`, an existing account, or a deployed service.
+- Add `--allow-guests` when launching the sharing or invited email-code recipes. The server otherwise admits only the disposable owner.
 - Run exactly one feature drive per fresh run. Identity verification revokes all sessions for the disposable account. Most other drives create an artifact with the same fixed title. `projects` creates several project and bulk-selection fixtures, and `screens` creates 12.
 - The feature files show explicit run paths for reproducibility. `launch --run` requires the path to be absent. Use a new path for subsequent runs; keep completed evidence.
 - The local authorization, panel, and publication hosts are deliberately distinct. Preserve the URLs from the run rather than replacing them with the normal development ports.

@@ -5,17 +5,17 @@ import { eq } from 'drizzle-orm';
 import { artifactShare, session, user } from '../packages/db/src/schema.ts';
 import { createArtifactStore, libraryQuerySchema, listSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
-import { fixture } from './helpers.ts';
+import { fixture, historicalSignIn } from './helpers.ts';
 
 const snapshot = (title: string): Snapshot => ({ metadata: { title, description: '' }, content: { kind: 'text', text: title }, files: [] });
 
 test('panel library searches the whole scope literally before status filtering and cursor pagination', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
     assert(signedIn);
     const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'library-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-    const options = { publishOrigin: 'https://published.example.test' };
+    const options = { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://published.example.test' };
     const store = createArtifactStore(app.db, options);
     const panel = createPanel(app.db, options);
     const created = [];
@@ -77,17 +77,17 @@ test('published library query exports and public MCP list validation stay unchan
 });
 
 async function sharedLibrary() {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
   const owner: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'library-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
   const created = await app.auth.api.signUpEmail({ body: { name: 'Guest', email: 'guest@example.test', password: app.password } });
-  await app.auth.api.signInEmail({ body: { email: 'guest@example.test', password: app.password } });
+  await historicalSignIn(app, 'guest@example.test');
   const [guestSession] = await app.db.select().from(session).where(eq(session.userId, created.user.id));
   const guest = { ...owner, userId: created.user.id, sessionId: guestSession.id };
   await app.db.update(user).set({ email: 'GUEST@Example.TEST', emailVerified: true }).where(eq(user.id, guest.userId));
   await app.db.update(user).set({ name: '  Ana <Equipo>  ' }).where(eq(user.id, owner.userId));
-  const store = createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test' });
   const create = (actor: Actor, title: string) => store.create(actor, { requestId: randomUUID(), snapshot: snapshot(title), project: 'Private project' });
   const publish = (read: Awaited<ReturnType<typeof create>>) => store.publish(owner, { requestId: randomUUID(), artifactId: read.artifactId, revisionId: read.revision.id, expectedPublicationVersion: 0 });
   const share = (artifactId: string) => store.share(owner, { requestId: randomUUID(), artifactId, email: 'guest@example.test' });
@@ -131,11 +131,12 @@ test('shared library uses the current verified email and email share kind on eve
     assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [expected] });
     for (const patch of [{ emailVerified: false }, { emailVerified: true, email: 'changed@example.test' }]) {
       await app.db.update(user).set(patch).where(eq(user.id, app.guest.userId));
-      assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [] });
+      if ('email' in patch) await assert.rejects(app.store.listSharedWithMe(app.guest), { code: 'forbidden' });
+      else assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [] });
     }
     await app.db.update(user).set({ email: 'GUEST@Example.TEST' }).where(eq(user.id, app.guest.userId));
     await app.client.execute({ sql: 'UPDATE artifact_share SET kind = ? WHERE id = ?', args: ['domain', shared.shareId] });
-    assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [] });
+    await assert.rejects(app.store.listSharedWithMe(app.guest), { code: 'forbidden' });
     await app.db.update(artifactShare).set({ kind: 'email' }).where(eq(artifactShare.id, shared.shareId));
     await app.db.update(user).set({ name: '   ' }).where(eq(user.id, app.ownerId));
     assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [{ ...expected, ownerName: 'Usuario de Artifacts' }] });

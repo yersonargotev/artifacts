@@ -7,6 +7,8 @@ export default {
     ...workerCompatibility,
     entrypoint: '@astrojs/cloudflare/entrypoints/server',
     env: {
+      OWNER_EMAIL: { type: 'secret' },
+      ALLOW_GUEST_ACCESS: { type: 'text', value: 'false' },
       EMAIL_TRANSPORT: { type: 'text', value: 'resend' },
       EMAIL_FROM: { type: 'secret' },
       RESEND_API_KEY: { type: 'secret' },

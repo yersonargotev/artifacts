@@ -42,6 +42,6 @@ Preconditions:
 
 ## Email-code HTTP sign-in
 
-Launch with `control.ts launch --email-code --run PATH` to opt into the disposable file transport. The default launch keeps legacy password authentication. The private `runtime/email-code.json` records the sink path. Read it only inside the owned verification process. Never capture raw codes or expose a code retrieval endpoint.
+Launch with `control.ts launch --email-code --allow-guests --run PATH` to opt into the disposable file transport. The default launch keeps legacy password authentication. The private `runtime/email-code.json` records the sink path. Read it only inside the owned verification process. Never capture raw codes or expose a code retrieval endpoint.
 
 Run `node --import tsx tests/email-code.browser.proof.ts --run PATH` for invited code sign-in, the dashboard callback, publication access, owner password survival, and guest MCP OAuth. The sign-in form remains a later feature. This proof requests and redeems codes through HTTP, then drives the actual browser callback and publication. Cleanup drains sends before removing the database and sink.

@@ -32,10 +32,10 @@ Preconditions:
 - `.test-artifacts/verify-artifacts/sharing-run` does not exist before launch.
 - Actual Chrome 152 or newer.
 
-- **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/sharing-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/sharing-run`.
+- **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --allow-guests --run .test-artifacts/verify-artifacts/sharing-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/sharing-run`.
 - **Drive.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive sharing --run .test-artifacts/verify-artifacts/sharing-run`. The recipe:
   1. Creates `Verification artifact` in project `Sharing proof` and publishes revision 1 through HTTP MCP.
-  2. Creates `guest@example.test` with a verified email through the supervisor's `POST /account` route. The guest signs in with the run password from `runtime/credentials.json`.
+  2. Creates `guest@example.test` with a verified email and a separate unpublished invitation for global admission through the supervisor's `POST /account` route. The guest signs in with the run password from `runtime/credentials.json`. This setup gives the guest no owned artifacts or visible shared cards.
   3. Opens the publication as the guest in a second browser context, signs in, and checks the panel `404` above.
   4. Calls `artifacts_share` with the owner's MCP token and `GUEST@Example.TEST`, checks that the returned `value` is `guest@example.test`, repeats the call with the same `requestId` and expects the same share, and checks that `artifacts_shares_list` returns exactly that share.
   5. Reopens the URL as the guest, waits for the iframe heading `Verification revision 1`, checks `data-revision-id`, checks that the page has no project link, `Cliente autor`, or `Revisión 1`, downloads `notes.txt`, and repeats the view at 390 pixels without horizontal overflow.
@@ -59,6 +59,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts account --e
 - The command prints the user ID, the lowercase email, the verification state, and the path of `runtime/accounts/<email>.json`. That file holds the same fields plus `accessToken`. The token expires about five minutes after the call; run the command again for a new one.
 - Repeating the command for an existing email keeps the same user ID and sets the verification state. It also signs the account in again, which opens a new central session, mints a new MCP token, and overwrites `runtime/accounts/<email>.json`.
 - Every disposable account uses the run password from `runtime/credentials.json`.
+- Each disposable guest receives an invitation to a separate unpublished fixture artifact. It preserves global admission when the recipe revokes its tested share, without owned artifacts or visible shared cards.
 - Cleanup removes `runtime/`, including these tokens.
 
 ## Gotchas
@@ -82,7 +83,7 @@ The proof writes screenshots, accessible snapshots, request bodies without authe
 
 The unfiltered root library shows **Compartidos conmigo** above owned controls. Each native card contains the current published title, **Compartido por** with the owner's display name, and the protected publication link. Search, project, status, and cursor views apply to owned artifacts and omit this section. Shared cards expose no owner actions. A guest publication's home link returns to `/#shared-with-me`. Empty accounts keep the existing welcome.
 
-Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts --shared-with-me` for all ten S9 lanes. The default proof runs the inherited S8 checks and these S9 checks, so `pnpm test:browser` covers both. The S9 path uses the actual public HTTP MCP endpoint, real guest credentials, built panel, installed Chrome, and native links with JavaScript disabled. It checks published versus private draft titles, attribution, revocation, publish after invitation, empty welcome, filters, current verification, 390px overflow, focus, and guest authoring with a separately issued guest token.
+Run `pnpm build && node --import tsx tests/panel-share.browser.proof.ts --shared-with-me` for all ten S9 lanes. The default proof runs the inherited S8 checks, cleans up, then runs S9 in a fresh disposable instance, so `pnpm test:browser` covers both without carrying account state or authentication quotas between recipes. The S9 path uses the actual public HTTP MCP endpoint, real guest credentials, built panel, installed Chrome, and native links with JavaScript disabled. It checks published versus private draft titles, attribution, revocation, publish after invitation, empty welcome without published shares, filters, current verification, 390px overflow, focus, and guest authoring with a separately issued guest token.
 
 Add `--headed` to the focused S9 command to record the real guest library and publication. It retains chronological cuts at original speed and writes `.test-artifacts/review/S9-review.mp4`, four review PNGs plus the separate mobile publication PNG, and private provenance below the run's `panel-share/` directory. The video shows actual guest navigation. Cleanup removes fixture services and runtime credentials after success or failure.
 

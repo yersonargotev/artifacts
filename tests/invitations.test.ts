@@ -19,7 +19,7 @@ test('a fresh invitation for existing access sends once and its exact replay nev
     const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
     assert(signedIn);
     const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'invitation-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-    const store = createArtifactStore(app.db, { publishOrigin: 'https://published.example.test', sendInvitation: fileEmailSender(app.emailSink!) });
+    const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test', sendInvitation: fileEmailSender(app.emailSink!) });
     const created = await store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'PRIVATE DRAFT TITLE', description: '' }, content: { kind: 'text', text: 'PRIVATE DRAFT BODY' }, files: [] } });
     const plain = await store.share(actor, { requestId: randomUUID(), artifactId: created.artifactId, email: 'Guest@Example.test' });
     assert.deepEqual(Object.keys(plain).sort(), ['artifactId', 'createdAt', 'kind', 'shareId', 'value']);
@@ -45,7 +45,7 @@ async function setup(send?: InvitationSender | false) {
   const session = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(session);
   const actor: Actor = { userId: app.ownerId, sessionId: session.session.id, clientId: 'invitation-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const store = createArtifactStore(app.db, { publishOrigin: 'https://published.example.test', sendInvitation: send === false ? undefined : send ?? fileEmailSender(app.emailSink!) });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test', sendInvitation: send === false ? undefined : send ?? fileEmailSender(app.emailSink!) });
   const created = await store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'PRIVATE', description: '' }, content: { kind: 'text', text: 'Private' }, files: [] } });
   const share = (email: string, notify?: boolean) => store.share(actor, { requestId: randomUUID(), artifactId: created.artifactId, email, ...(notify === undefined ? {} : { notify }) });
   const messages = async () => (await readFile(app.emailSink!, 'utf8').catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return ''; throw error; })).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));

@@ -17,7 +17,7 @@ const invalidCode = { code: 'INVALID_OTP', message: 'Invalid OTP' };
 const snapshot = { metadata: { title: 'Code fixture', description: '' }, content: { kind: 'html' as const, text: '<p>Guest content</p>' }, files: [] };
 
 async function setup() {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-email-code-'));
   const file = join(directory, 'messages.jsonl');
   const config = { ...app.config, email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: file } };
@@ -26,7 +26,7 @@ async function setup() {
   const current = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(current);
   const actor = { userId: app.ownerId, sessionId: current.session.id, clientId: 'email-code-tests', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const store = createArtifactStore(app.db, { publishOrigin: 'https://publication.example.test' });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://publication.example.test' });
   const artifact = await store.create(actor, { requestId: randomUUID(), snapshot });
   async function post(path: string, body: unknown) {
     return fetch(`${app.config.issuer}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: app.config.origin }, body: JSON.stringify(body) });
@@ -94,7 +94,7 @@ test('forged valid code cannot admit an uninvited new or revoked existing user',
 });
 
 for (const transport of ['http', 'api'] as const) test(`malformed redemption hides invitation state through ${transport}`, async (t) => {
-  const app = await fixture({ emailCode: true, transport: 'combined' });
+  const app = await fixture({ allowGuests: true, emailCode: true, transport: 'combined' });
   try {
     const tokens = await grant(app, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
     const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
@@ -142,7 +142,7 @@ for (const transport of ['http', 'api'] as const) test(`malformed redemption hid
 for (const transport of ['http', 'api'] as const) test(`failed OTP authentication has one public representation through ${transport}`, async (t) => {
   const results = [];
   for (const producer of ['no row', 'wrong proof', 'expired proof', 'exhausted proof'] as const) {
-    const app = await fixture({ emailCode: true, transport: 'combined' });
+    const app = await fixture({ allowGuests: true, emailCode: true, transport: 'combined' });
     try {
       const tokens = await grant(app, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
       const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
@@ -205,7 +205,7 @@ test('first owner code preserves exact credential, revokes old sessions, and ret
 });
 
 test('legacy configuration leaves both code routes disabled and retains password login', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     for (let attempt = 0; attempt < 5; attempt++) {
       for (const path of ['/email-otp/send-verification-otp', '/sign-in/email-otp']) {
@@ -214,7 +214,7 @@ test('legacy configuration leaves both code routes disabled and retains password
       }
     }
     assert((await app.auth.api.signInEmail({ body: { email: 'owner@example.test', password: app.password } })).user);
-    const config = authConfig({ AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret, OWNER_EMAIL: 'owner@example.test' });
+    const config = authConfig({ OWNER_EMAIL: 'owner@example.test', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret });
     assert.equal(config.origin, app.config.origin);
   } finally { await app.close(); }
 });
@@ -274,10 +274,10 @@ test('two valid codes cannot create a session while earlier promotion cleanup is
 });
 
 test('email configuration is explicit and validates only the selected transport', () => {
-  const env = { AUTH_URL: 'http://localhost:4100', MCP_URL: 'http://localhost:4200/mcp', DASHBOARD_URL: 'http://127.0.0.1:4321', BETTER_AUTH_SECRET: 'fixture-secret-that-is-at-least-32-characters' };
+  const env = { OWNER_EMAIL: 'owner@example.test', AUTH_URL: 'http://localhost:4100', MCP_URL: 'http://localhost:4200/mcp', DASHBOARD_URL: 'http://127.0.0.1:4321', BETTER_AUTH_SECRET: 'fixture-secret-that-is-at-least-32-characters' };
   assert.deepEqual(authConfig(env).email, { transport: 'disabled' });
-  assert.deepEqual(authConfig({ ...env, OWNER_EMAIL: 'not-an-email' }).email, { transport: 'disabled' });
-  assert.throws(() => authConfig({ ...env, EMAIL_TRANSPORT: 'file' }), /OWNER_EMAIL/);
+  assert.throws(() => authConfig({ ...env, OWNER_EMAIL: 'not-an-email' }), /OWNER_EMAIL/);
+  assert.throws(() => authConfig({ ...env, OWNER_EMAIL: undefined, EMAIL_TRANSPORT: 'file' }), /OWNER_EMAIL/);
   assert.throws(() => authConfig({ ...env, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: 'owner@example.test' }), /EMAIL_FROM/);
   const resend = { ...env, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: ' OWNER@EXAMPLE.TEST ', EMAIL_FROM: ' codes@example.test ', RESEND_API_KEY: 'disposable-key' };
   assert.deepEqual(authConfig(resend).email, { transport: 'resend', ownerEmail: 'owner@example.test', from: 'codes@example.test', apiKey: 'disposable-key' });
@@ -394,7 +394,9 @@ test('revocation denies delivery and redemption while owned artifacts retain for
     const denied = await app.post('/sign-in/email-otp', { email, otp: await app.seed(email) });
     assert.equal(denied.status, 400);
     const actor = { ...app.actor, userId: guest.user.id, sessionId: central.session.id };
+    const restored = await app.invite(email);
     const owned = await app.store.create(actor, { requestId: randomUUID(), snapshot });
+    await app.store.unshare(app.actor, { requestId: randomUUID(), artifactId: app.artifact.artifactId, shareId: restored.shareId });
     assert.equal((await app.post('/email-otp/send-verification-otp', { email, type: 'sign-in' })).status, 200);
     assert.equal((await app.messages()).length, 1);
     assert.equal((await app.post('/sign-in/email-otp', { email, otp: await app.seed(email) })).status, 200);
@@ -420,7 +422,7 @@ test('invited code identity completes the real dashboard callback and guest MCP 
     assert(text.includes(guest.user.id));
     const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Code dashboard', application_type: 'native', redirect_uris: ['http://localhost:4321/auth/callback'], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
     assert(client.client_secret);
-    const identity = createPanelIdentity(app.db, { origin: 'http://localhost:4321', auth: app.config.origin, issuer: app.config.issuer, clientId: client.client_id, clientSecret: client.client_secret });
+    const identity = createPanelIdentity(app.db, { access: app.config.access, origin: 'http://localhost:4321', auth: app.config.origin, issuer: app.config.issuer, clientId: client.client_id, clientSecret: client.client_secret });
     const transaction = await identity.startLogin();
     const authorization = await fetch(transaction.url, { headers: { cookie }, redirect: 'manual' });
     assert.equal(authorization.status, 200);

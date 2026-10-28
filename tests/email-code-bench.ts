@@ -65,7 +65,7 @@ try {
         const current = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
         assert(current);
         const actor = { userId: app.ownerId, sessionId: current.session.id, clientId: 'email-code-benchmark', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-        const store = createArtifactStore(app.db, { publishOrigin: 'https://publication.example.test' });
+        const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://publication.example.test' });
         const artifact = await store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'Timing fixture', description: '' }, content: { kind: 'html', text: '<p>Timing</p>' }, files: [] } });
         for (let pair = 0; pair < 5; pair++) {
           for (const admitted of pair % 2 ? [false, true] : [true, false]) {

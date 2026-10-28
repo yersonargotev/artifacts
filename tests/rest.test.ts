@@ -1,3 +1,6 @@
+import { artifact, artifactShare } from '../packages/db/src/schema.ts';
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
@@ -30,7 +33,7 @@ async function mcp(app: Awaited<ReturnType<typeof fixture>>, token: string, name
 }
 
 test('REST sharing normalizes, lists, replays across transports, and never restores a revoked share', async () => {
-  const app = await fixture({ transport: 'combined' });
+  const app = await fixture({ allowGuests: true, transport: 'combined' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -69,7 +72,7 @@ test('REST sharing normalizes, lists, replays across transports, and never resto
 });
 
 test('REST sharing validates strict path-owned commands, queries, methods, media types, and Origin', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const call = api(app, (await grant(app, fullScope)).access_token);
     const created = await (await call('/artifacts', 'POST', { requestId: 'sharing-boundaries-create', snapshot })).json() as ArtifactRead;
@@ -100,7 +103,7 @@ test('REST sharing validates strict path-owned commands, queries, methods, media
 });
 
 test('REST sharing enforces publish-only authority, ownership, artifact binding, and revocation before replay', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const owner = api(app, (await grant(app, fullScope)).access_token);
     const first = await (await owner('/artifacts', 'POST', { requestId: 'sharing-authority-first', snapshot })).json() as ArtifactRead;
@@ -125,6 +128,7 @@ test('REST sharing enforces publish-only authority, ownership, artifact binding,
     await error(await publisher(`/artifacts/${second.artifactId}/shares/${share.shareId}`, 'DELETE', { requestId: 'sharing-authority-wrong-artifact' }), 404, 'not_found');
     assert.deepEqual(await (await publisher(path)).json(), { items: [share] });
     await app.auth.api.signUpEmail({ body: { name: 'Guest', email: 'sharing-guest@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'sharing-guest@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     const signIn = await app.auth.api.signInEmail({ body: { email: 'sharing-guest@example.test', password: app.password }, returnHeaders: true });
     const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
     const guest = api(app, (await grant({ ...app, cookie }, fullScope)).access_token);
@@ -140,7 +144,7 @@ test('REST sharing enforces publish-only authority, ownership, artifact binding,
 });
 
 test('REST sharing recovers lost committed POST and DELETE responses with the same commands', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const call = api(app, (await grant(app, fullScope)).access_token);
     const created = await (await call('/artifacts', 'POST', { requestId: 'sharing-lost-create', snapshot })).json() as ArtifactRead;
@@ -163,7 +167,7 @@ test('REST sharing recovers lost committed POST and DELETE responses with the sa
 });
 
 test('REST-only HTTP creates, reads, edits, publishes, paginates and exports exact retained bytes', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -215,7 +219,7 @@ test('REST-only HTTP creates, reads, edits, publishes, paginates and exports exa
 });
 
 test('REST validates HTTP boundaries and complete route-bound commands before store mutation', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -243,14 +247,14 @@ test('REST validates HTTP boundaries and complete route-bound commands before st
     await error(await fetch(`${restBase(app.config.resource)}/artifacts`, streamedInit), 413, 'request_too_large');
     assert.equal(chunked, true);
     await error(await fetch(`${restBase(app.config.resource)}/artifacts`, { headers: { authorization: `Bearer ${tokens.access_token}`, origin: 'https://attacker.example' } }), 403, 'forbidden');
-    const handler = createArtifactRestApp(app.mcpOptions, createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' }));
+    const handler = createArtifactRestApp(app.mcpOptions, createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test' }));
     await error(await handler(new Request('http://attacker.example/mcp/v1/artifacts')), 400, 'invalid_host');
     assert.deepEqual(await (await call('/artifacts')).json(), { items: [], nextCursor: null });
   } finally { await app.close(); }
 });
 
 test('REST and MCP share retained state, exact replay, and competing publication expectations', async () => {
-  const app = await fixture({ transport: 'combined' });
+  const app = await fixture({ allowGuests: true, transport: 'combined' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -280,7 +284,7 @@ test('REST and MCP share retained state, exact replay, and competing publication
 });
 
 test('REST and MCP share project creation, filtering, listing, and route-bound moves', async () => {
-  const app = await fixture({ transport: 'combined' });
+  const app = await fixture({ allowGuests: true, transport: 'combined' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -329,7 +333,7 @@ test('REST and MCP share project creation, filtering, listing, and route-bound m
 });
 
 test('two independent HTTP writers produce one head winner and one conflict without an extra revision', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -343,7 +347,7 @@ test('two independent HTTP writers produce one head winner and one conflict with
 });
 
 test('REST ownership, scopes, and central revocation apply before command receipt replay', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);
@@ -360,6 +364,7 @@ test('REST ownership, scopes, and central revocation apply before command receip
     assert.equal((await call(`/artifacts/${created.artifactId}/publication`, 'PUT', publication)).status, 200);
     await error(await api(app, limited.access_token)(`/artifacts/${created.artifactId}/publication`, 'PUT', publication), 403, 'forbidden');
     await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'rest-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'rest-other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     const signIn = await app.auth.api.signInEmail({ body: { email: 'rest-other@example.test', password: app.password }, returnHeaders: true });
     const outsiderCookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
     const outsider = await grant({ ...app, cookie: outsiderCookie }, fullScope);
@@ -377,7 +382,7 @@ test('REST ownership, scopes, and central revocation apply before command receip
 test('canonical root audiences remain compatible and ArtifactError keeps one runtime identity', async () => {
   assert.equal(canonicalResource('https://artifacts.example'), 'https://artifacts.example');
   assert.equal(StoreError, ArtifactError);
-  const app = await fixture({ transport: 'combined', resourcePath: '' });
+  const app = await fixture({ allowGuests: true, transport: 'combined', resourcePath: '' });
   try {
     const tokens = await grant(app, fullScope);
     const identity = await (await api(app, tokens.access_token)('/identity')).json();
@@ -389,7 +394,7 @@ test('canonical root audiences remain compatible and ArtifactError keeps one run
 
 
 test('lost committed HTTP create, update, and publish responses replay their exact receipts', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {
     const tokens = await grant(app, fullScope);
     const call = api(app, tokens.access_token);

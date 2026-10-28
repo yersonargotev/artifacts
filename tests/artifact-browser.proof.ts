@@ -70,7 +70,7 @@ await once(publicationServer, 'listening');
 const publicationAddress = publicationServer.address();
 assert(publicationAddress && typeof publicationAddress === 'object');
 const publish = `http://[::1]:${publicationAddress.port}`;
-const app = await fixture({ dashboard });
+const app = await fixture({ dashboard, allowGuests: true });
 const collected: string[] = [];
 const collector = createHttpServer((request, response) => { collected.push(request.url ?? ''); response.end('Collected'); }).listen(0, '127.0.0.1');
 await once(collector, 'listening');
@@ -81,7 +81,7 @@ const collectorOrigin = new URL(collectorUrl).origin;
 const serviceSecret = randomBytes(32).toString('hex');
 const cookieSecret = randomBytes(32).toString('hex');
 publicationHandler = createPublicationApp({ DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
-const store = createArtifactStore(app.db, { publishOrigin: publish });
+const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: publish });
 const central = await app.db.select().from(session).where(eq(session.userId, app.ownerId)).get();
 assert(central);
 const actor = { userId: app.ownerId, sessionId: central.id, clientId: 'claude-fixture', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
@@ -92,7 +92,7 @@ const firstPublication = await store.publish(actor, { requestId: randomBytes(16)
 const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Artifact proof dashboard', application_type: 'native', redirect_uris: [`${dashboard}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
 assert(client.client_secret);
 const child = spawn(process.execPath, ['apps/dashboard/dist/server/entry.mjs'], {
-  env: { PATH: process.env.PATH, DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' },
+  env: { PATH: process.env.PATH, OWNER_EMAIL: app.config.access.ownerEmail, ALLOW_GUEST_ACCESS: String(app.config.access.allowGuests), DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let startupError = '';
@@ -117,7 +117,7 @@ try {
   }
   const authenticatedWithoutOrigin = await fetch(`${dashboard}/internal/publication/read`, { method: 'POST', headers: { authorization: `Bearer ${serviceSecret}`, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(authenticatedWithoutOrigin.status, 400);
-  browser = await chromium.launch({ channel: 'chrome' });
+  browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   const callbackRequest = page.waitForRequest((request) => new URL(request.url()).origin === publish && new URL(request.url()).pathname === '/callback');
@@ -555,6 +555,7 @@ try {
   }
   assert.equal((await fetch(publishUrl, { method: 'POST', headers: { cookie: panelCookieHeader, origin: dashboard, 'content-type': 'application/json' }, body: JSON.stringify(commandFields) })).status, 400);
   const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other review owner', email: 'review-other@example.test', password: app.password } });
+  await store.share(actor, { requestId: randomBytes(16).toString('hex'), artifactId: created.artifactId, email: outsider.user.email });
   await app.auth.api.signInEmail({ body: { email: 'review-other@example.test', password: app.password } });
   const outsiderSession = await app.db.select().from(session).where(eq(session.userId, outsider.user.id)).get();
   assert(outsiderSession);

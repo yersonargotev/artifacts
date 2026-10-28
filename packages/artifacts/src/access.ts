@@ -1,5 +1,7 @@
 import { and, count, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import type { AccessPolicy } from '@artifacts/config';
+import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, session } from '@artifacts/db/schema';
 import { ArtifactError, type Actor, type ProjectSummary } from './contracts.ts';
@@ -16,12 +18,13 @@ function isBusy(error: unknown): boolean {
   return ('code' in error && typeof error.code === 'string' && /SQLITE_BUSY|SQLITE_LOCKED/.test(error.code)) || isBusy(error.cause);
 }
 
-export function createAccess(db: Database, options: { publishOrigin: string }) {
+export function createAccess(db: Database, options: { publishOrigin: string; access: AccessPolicy }) {
+  const admission = createAdmission(db, options.access);
   const origin = new URL(options.publishOrigin).origin;
 
   async function liveSession(connection: Connection, userId: string, sessionId: string) {
     const [found] = await connection.select().from(session).where(and(eq(session.id, sessionId), eq(session.userId, userId), gt(session.expiresAt, new Date()))).limit(1);
-    if (!found) throw new ArtifactError('forbidden', 'A live owner session is required');
+    if (!found || !await admission.user(userId, connection)) throw new ArtifactError('forbidden', 'A live owner session is required');
     return found;
   }
 

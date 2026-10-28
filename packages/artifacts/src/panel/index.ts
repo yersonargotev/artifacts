@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
+import type { AccessPolicy } from '@artifacts/config';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
 import { ArtifactError, historySchema, moveSchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
@@ -63,7 +64,7 @@ async function readWorkspace(connection: Connection, ownerId: string): Promise<W
   return workspace;
 }
 
-export function createPanel(db: Database, options: { publishOrigin: string }) {
+export function createPanel(db: Database, options: { publishOrigin: string; access: AccessPolicy }) {
   const access = createAccess(db, options);
   return {
     async move(actor: Actor, value: PanelMoveInput): Promise<PanelMoveResult> {

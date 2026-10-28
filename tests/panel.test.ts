@@ -9,7 +9,7 @@ import { fixture } from './helpers.ts';
 async function panel(app: Awaited<ReturnType<typeof fixture>>) {
   const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Test dashboard', application_type: 'native', redirect_uris: ['http://localhost:4321/auth/callback'], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
   assert(client.client_secret);
-  const config = { origin: 'http://localhost:4321', auth: app.config.origin, issuer: app.config.issuer, clientId: client.client_id, clientSecret: client.client_secret };
+  const config = { access: app.config.access, origin: 'http://localhost:4321', auth: app.config.origin, issuer: app.config.issuer, clientId: client.client_id, clientSecret: client.client_secret };
   const identity = createPanelIdentity(app.db, config);
   async function login() {
     const transaction = await identity.startLogin();

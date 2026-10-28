@@ -17,11 +17,11 @@ const snapshot: Snapshot = {
   ],
 };
 async function artifactFixture() {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
   const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'test-author', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const store = createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test' });
   return { ...app, store, actor };
 }
 const createInput = () => ({ requestId: randomUUID(), snapshot });
@@ -101,7 +101,7 @@ test('competing updates and publishers produce one winner and report current ver
   try {
     const first = await app.store.create(app.actor, createInput());
     const secondConnection = await openDatabase({ url: app.databaseUrl });
-    const secondStore = createArtifactStore(secondConnection.db, { publishOrigin: 'https://published.example.test' });
+    const secondStore = createArtifactStore(secondConnection.db, { access: app.config.access, publishOrigin: 'https://published.example.test' });
     const updates = await Promise.allSettled([app.store, secondStore].map((store, number) => store.update(app.actor, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, snapshot: { ...snapshot, content: { kind: 'text', text: `Writer ${number}` } } })));
     secondConnection.client.close();
     assert.equal(updates.filter((result) => result.status === 'fulfilled').length, 1);
@@ -132,6 +132,7 @@ test('owner filters and revision membership prevent reads or publication through
     await assert.rejects(app.store.read(app.actor, { artifactId: first.artifactId, revisionId: other.revision.id }), { code: 'not_found' });
     await assert.rejects(app.store.publish(app.actor, { requestId: randomUUID(), artifactId: first.artifactId, revisionId: other.revision.id, expectedPublicationVersion: 0 }), { code: 'not_found' });
     const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     const otherSession = await app.auth.api.signInEmail({ body: { email: 'other@example.test', password: app.password } });
     const sessions = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
     assert(otherSession.token);
@@ -215,6 +216,7 @@ test('projects group case-insensitively, move without new revisions, and vanish 
     await assert.rejects(app.store.move({ ...app.actor, scopes: ['artifacts:read'] }, { requestId: randomUUID(), artifactId: loose.artifactId, project: 'Alpha' }), { code: 'forbidden' });
     await assert.rejects(app.store.projects({ ...app.actor, scopes: ['artifacts:write'] }), { code: 'forbidden' });
     const outsider = await app.auth.api.signUpEmail({ body: { name: 'Project outsider', email: 'projects-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'projects-other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     await app.auth.api.signInEmail({ body: { email: 'projects-other@example.test', password: app.password } });
     const [outsiderSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
     const other = { ...app.actor, userId: outsider.user.id, sessionId: outsiderSession.id };
@@ -334,6 +336,7 @@ test('MCP share tools require artifacts:publish and ownership, and reject an inv
 
     const signedUp = await app.auth.api.signUpEmail({ body: { name: 'Shared guest', email: 'guest@example.test', password: app.password } });
     await app.db.update(user).set({ emailVerified: true }).where(eq(user.id, signedUp.user.id));
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'guest@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     const signIn = await app.auth.api.signInEmail({ body: { email: 'guest@example.test', password: app.password }, returnHeaders: true });
     const guest = await grant({ ...app, cookie: signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ') }, allScopes);
     for (const [name, input] of calls) {

@@ -6,10 +6,12 @@ export const identityScope = 'artifacts:read';
 export type Environment = Readonly<Record<string, string | undefined>>;
 type DatabaseEnvironment = { DATABASE_URL: string; DATABASE_AUTH_TOKEN?: string };
 type SenderEnvironment = Pick<EmailEnvironment, 'EMAIL_TRANSPORT' | 'EMAIL_FROM' | 'RESEND_API_KEY'>;
+export type AccessPolicy = Readonly<{ ownerEmail: string; allowGuests: boolean }>;
+type AccessEnvironment = { OWNER_EMAIL: string; ALLOW_GUEST_ACCESS?: string };
 type PublicOrigins = { AUTH_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
-export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & { OWNER_EMAIL: string; BETTER_AUTH_SECRET: string };
-export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
-export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
+export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { BETTER_AUTH_SECRET: string };
+export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
+export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
 export type PublicationWorkerEnvironment = Pick<PublicOrigins, 'DASHBOARD_URL' | 'PUBLISH_URL'> & { PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 
 export function required(name: string, env: Environment = process.env): string {
@@ -30,11 +32,18 @@ export function serviceUrl(name: string, env: Environment = process.env): string
   return value.href.replace(/\/$/, '');
 }
 
-export function authConfig(env: Environment = process.env): { origin: string; issuer: string; secret: string; resource: string; dashboard: string; email?: EmailConfiguration } {
+export function accessPolicy(env: Environment = process.env): AccessPolicy {
+  const ownerEmail = required('OWNER_EMAIL', env).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) throw new Error('OWNER_EMAIL must be an email address');
+  if (env.ALLOW_GUEST_ACCESS !== undefined && !['true', 'false'].includes(env.ALLOW_GUEST_ACCESS)) throw new Error('ALLOW_GUEST_ACCESS must be true or false');
+  return { ownerEmail, allowGuests: env.ALLOW_GUEST_ACCESS === 'true' };
+}
+
+export function authConfig(env: Environment = process.env): { origin: string; issuer: string; secret: string; resource: string; dashboard: string; access: AccessPolicy; email?: EmailConfiguration } {
   const origin = serviceUrl('AUTH_URL', env);
   const secret = required('BETTER_AUTH_SECRET', env);
   if (secret.length < 32) throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
-  return { origin, issuer: `${origin}/api/auth`, secret, resource: serviceUrl('MCP_URL', env), dashboard: serviceUrl('DASHBOARD_URL', env), email: emailConfiguration(env, origin) };
+  return { origin, issuer: `${origin}/api/auth`, secret, access: accessPolicy(env), resource: serviceUrl('MCP_URL', env), dashboard: serviceUrl('DASHBOARD_URL', env), email: emailConfiguration(env, origin) };
 }
 
 export function mcpConfig(env: Environment = process.env) {
@@ -50,7 +59,7 @@ export function dashboardConfig(env: Environment = process.env) {
   const origin = serviceUrl('DASHBOARD_URL', env);
   const auth = serviceUrl('AUTH_URL', env);
   if (new URL(origin).hostname === new URL(auth).hostname) throw new Error('AUTH_URL and DASHBOARD_URL must use distinct cookie hosts');
-  return { origin, auth, issuer: `${auth}/api/auth`, clientId: required('PANEL_CLIENT_ID', env), clientSecret: required('PANEL_CLIENT_SECRET', env) };
+  return { origin, auth, issuer: `${auth}/api/auth`, clientId: required('PANEL_CLIENT_ID', env), clientSecret: required('PANEL_CLIENT_SECRET', env), access: accessPolicy(env) };
 }
 
 export function publicationConfig(env: Environment = process.env) {

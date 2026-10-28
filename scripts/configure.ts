@@ -16,6 +16,7 @@ try {
     `PUBLICATION_SERVICE_SECRET=${secret()}`,
     `PUBLICATION_COOKIE_SECRET=${secret()}`,
     'OWNER_EMAIL=owner@example.test',
+    'ALLOW_GUEST_ACCESS=false',
     'OWNER_NAME=Owner',
     `OWNER_PASSWORD=${secret()}`,
     '',

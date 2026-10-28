@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import * as oidc from 'openid-client';
 import { and, eq, gt } from 'drizzle-orm';
+import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { oidcTransaction, panelSession, session, user } from '@artifacts/db/schema';
 import type { dashboardConfig } from '@artifacts/config';
@@ -19,6 +20,7 @@ export function localReturnPath(value: string, origin: string) {
 }
 
 export function createPanelIdentity(db: Database, config: ReturnType<typeof dashboardConfig>) {
+  const admission = createAdmission(db, config.access);
   let provider: Promise<oidc.Configuration> | undefined;
   function getProvider() {
     return provider ??= oidc.discovery(new URL(config.issuer), config.clientId, { client_secret: config.clientSecret, id_token_signed_response_alg: 'EdDSA' }, oidc.ClientSecretBasic(config.clientSecret), {
@@ -50,7 +52,7 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
       const panelToken = random();
       const expiresAt = await db.transaction(async (tx) => {
         const central = await tx.select().from(session).where(and(eq(session.id, sid), eq(session.userId, subject), gt(session.expiresAt, new Date()))).get();
-        if (!central) throw new Error('Central session is no longer active');
+        if (!central || !await admission.user(subject, tx)) throw new Error('Central session is no longer active');
         await tx.insert(panelSession).values({ tokenHash: hash(panelToken), authSessionId: sid, issuer: claims.iss, subject, clientId: config.clientId, scopes: (tokens.scope ?? 'openid profile').split(' '), expiresAt: central.expiresAt });
         return central.expiresAt;
       });
@@ -58,9 +60,10 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
     },
     async load(token: string | undefined): Promise<PanelIdentity | undefined> {
       if (!token || !/^[\w-]{43}$/.test(token)) return;
-      return db.select({ userId: session.userId, sessionId: session.id, name: user.name, clientId: panelSession.clientId, scopes: panelSession.scopes, expiresAt: panelSession.expiresAt })
+      const current = await db.select({ userId: session.userId, sessionId: session.id, name: user.name, clientId: panelSession.clientId, scopes: panelSession.scopes, expiresAt: panelSession.expiresAt })
         .from(panelSession).innerJoin(session, eq(panelSession.authSessionId, session.id)).innerJoin(user, eq(session.userId, user.id))
         .where(and(eq(panelSession.tokenHash, hash(token)), eq(panelSession.issuer, config.issuer), eq(panelSession.subject, session.userId), eq(panelSession.clientId, config.clientId), gt(panelSession.expiresAt, new Date()), gt(session.expiresAt, new Date()))).get();
+      return current && await admission.user(current.userId) ? current : undefined;
     },
     async logout(token: string | undefined) {
       if (token) await db.delete(panelSession).where(eq(panelSession.tokenHash, hash(token)));

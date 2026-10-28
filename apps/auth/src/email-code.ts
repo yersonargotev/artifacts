@@ -1,10 +1,12 @@
 import type { BetterAuthOptions } from 'better-auth';
 import { APIError, createAuthMiddleware, type createAuthEndpoint } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '@artifacts/db';
 import * as schema from '@artifacts/db/schema';
+import type { AccessPolicy } from '@artifacts/config';
+import { createAdmission } from '@artifacts/db/admission';
 import type { EmailSender } from '@artifacts/config/email';
 import { deliverEmailCode, emailCodeIp } from './email-code-context.ts';
 
@@ -12,16 +14,9 @@ export const emailCodePaths = ['/email-otp/send-verification-otp', '/sign-in/ema
 const invalidCode = { code: 'INVALID_OTP', message: 'Invalid OTP' };
 const emailInput = z.object({ email: z.email() });
 
-export function createEmailCode(db: Database, ownerEmail: string, send: EmailSender) {
-  async function admitted(email: string) {
-    if (email === ownerEmail) return true;
-    const share = await db.select({ id: schema.artifactShare.id }).from(schema.artifactShare)
-      .where(and(eq(schema.artifactShare.kind, 'email'), eq(schema.artifactShare.value, email))).limit(1);
-    if (share.length) return true;
-    const owned = await db.select({ id: schema.artifact.id }).from(schema.artifact)
-      .innerJoin(schema.user, eq(schema.artifact.ownerId, schema.user.id)).where(eq(schema.user.email, email)).limit(1);
-    return owned.length > 0;
-  }
+export function createEmailCode(db: Database, policy: AccessPolicy, send: EmailSender) {
+  const { ownerEmail } = policy;
+  const { email: admitted } = createAdmission(db, policy);
   async function reserve(kind: 'send-ip' | 'send-email' | 'redeem-ip', identity: string, maximum: number) {
     const key = `artifacts:email-code:${kind}:${identity}`;
     const now = sql`cast(unixepoch('subsecond') * 1000 as integer)`;

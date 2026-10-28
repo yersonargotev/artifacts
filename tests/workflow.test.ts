@@ -31,7 +31,7 @@ async function workflowFixture() {
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
   const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'workflow-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  return { ...app, actor, store: createArtifactStore(app.db, { publishOrigin: 'https://published.example.test' }) };
+  return { ...app, actor, store: createArtifactStore(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test' }) };
 }
 
 test('compact summaries retain identity and decoded attachment digests without payloads', async () => {

@@ -1,7 +1,8 @@
+import { artifactShare } from '../packages/db/src/schema.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -352,7 +353,7 @@ test('CLI files, lists, and moves projects, and retries a lost move from its ret
 });
 
 test('CLI complete command files, edits, conflicts, request path safety, and owner binding preserve exact inputs', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ transport: 'rest', allowGuests: true });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-bindings-'));
   try {
     const tokens = await grant(app, fullScope);
@@ -386,6 +387,8 @@ test('CLI complete command files, edits, conflicts, request path safety, and own
     let mutationRequests = 0;
     app.setResourceHandler(async (request) => { if (['POST', 'PUT'].includes(request.method)) mutationRequests += 1; return app.resourceHandler(request); });
     const otherOwner = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'cli-other@example.test', password: app.password } });
+    const admissionArtifact = created;
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: admissionArtifact.artifactId, kind: 'email', value: 'cli-other@example.test', createdBy: app.ownerId, createdAt: new Date() });
     const signIn = await app.auth.api.signInEmail({ body: { email: 'cli-other@example.test', password: app.password }, returnHeaders: true });
     const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
     const outsider = await grant({ ...app, cookie }, fullScope);
@@ -517,11 +520,13 @@ test('CLI help works without configuration and invalid options fail before autho
 
 
 test('CLI pins one verified credential across preparation, owner binding, and submission during concurrent login', async () => {
-  const app = await fixture({ transport: 'rest' });
+  const app = await fixture({ transport: 'rest', allowGuests: true });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-owner-race-'));
   try {
     const owner = await grant(app, fullScope);
     await app.auth.api.signUpEmail({ body: { name: 'Concurrent owner', email: 'concurrent-owner@example.test', password: app.password } });
+    const admissionArtifact = await createArtifactHttpClient({ resource: app.config.resource, accessToken: owner.access_token }).create({ requestId: randomUUID(), snapshot });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: admissionArtifact.artifactId, kind: 'email', value: 'concurrent-owner@example.test', createdBy: app.ownerId, createdAt: new Date() });
     const signIn = await app.auth.api.signInEmail({ body: { email: 'concurrent-owner@example.test', password: app.password }, returnHeaders: true });
     const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
     const other = await grant({ ...app, cookie }, fullScope);

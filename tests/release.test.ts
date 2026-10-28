@@ -60,8 +60,8 @@ test('runtime secret projection follows the service declarations and keeps the v
   const projected = projectRuntimeSecrets(config);
   assert.deepEqual(projected.view, { PUBLICATION_SERVICE_SECRET: secrets.PUBLICATION_SERVICE_SECRET, PUBLICATION_COOKIE_SECRET: secrets.PUBLICATION_COOKIE_SECRET });
   assert.deepEqual(Object.keys(projected.auth).sort(), ['BETTER_AUTH_SECRET', 'DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'OWNER_EMAIL', 'RESEND_API_KEY']);
-  assert.deepEqual(Object.keys(projected.mcp).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'MCP_INTROSPECTION_CLIENT_ID', 'MCP_INTROSPECTION_CLIENT_SECRET', 'RESEND_API_KEY']);
-  assert.deepEqual(Object.keys(projected.panel).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'PANEL_CLIENT_ID', 'PANEL_CLIENT_SECRET', 'PUBLICATION_SERVICE_SECRET', 'RESEND_API_KEY']);
+  assert.deepEqual(Object.keys(projected.mcp).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'MCP_INTROSPECTION_CLIENT_ID', 'MCP_INTROSPECTION_CLIENT_SECRET', 'OWNER_EMAIL', 'RESEND_API_KEY']);
+  assert.deepEqual(Object.keys(projected.panel).sort(), ['DATABASE_AUTH_TOKEN', 'DATABASE_URL', 'EMAIL_FROM', 'OWNER_EMAIL', 'PANEL_CLIENT_ID', 'PANEL_CLIENT_SECRET', 'PUBLICATION_SERVICE_SECRET', 'RESEND_API_KEY']);
 });
 
 test('missing and malformed deployment inputs fail before temporary secret files or Worker commands', async () => {
@@ -114,7 +114,7 @@ test('production email is mandatory and effective text bindings validate sender 
     assert.equal(projected.auth.OWNER_EMAIL, 'owner@example.test');
     for (const service of ['mcp', 'panel'] as const) {
       assert.equal(projected[service].EMAIL_FROM, 'invitations@example.test');
-      assert.equal(projected[service].OWNER_EMAIL, undefined);
+      assert.equal(projected[service].OWNER_EMAIL, 'owner@example.test');
     }
     for (const service of ['auth', 'mcp', 'panel'] as const) {
       assert.equal(projected[service].RESEND_API_KEY, secrets.RESEND_API_KEY);
@@ -232,7 +232,7 @@ test('a current release finishes its serial quartet before smoke and a partial r
 test('production smoke performs only read operations and requires database-backed absent-session denial', async () => {
   const app = await fixture();
   const secret = 's'.repeat(40);
-  const store = createArtifactStore(app.db, { publishOrigin: workerOrigins.PUBLISH_URL });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: workerOrigins.PUBLISH_URL });
   let backendReads = 0;
   let forbiddenDatabaseReads = 0;
   const publication = createPublicationApp({ ...workerOrigins, PUBLICATION_SERVICE_SECRET: secret, PUBLICATION_COOKIE_SECRET: 'c'.repeat(40) }, async () => { backendReads++; throw new Error('Anonymous requests must not call the backend'); });
