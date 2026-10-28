@@ -70,7 +70,7 @@ await once(publicationServer, 'listening');
 const publicationAddress = publicationServer.address();
 assert(publicationAddress && typeof publicationAddress === 'object');
 const publish = `http://[::1]:${publicationAddress.port}`;
-const app = await fixture({ dashboard });
+const app = await fixture({ dashboard, allowGuests: true });
 const collected: string[] = [];
 const collector = createHttpServer((request, response) => { collected.push(request.url ?? ''); response.end('Collected'); }).listen(0, '127.0.0.1');
 await once(collector, 'listening');
@@ -117,7 +117,7 @@ try {
   }
   const authenticatedWithoutOrigin = await fetch(`${dashboard}/internal/publication/read`, { method: 'POST', headers: { authorization: `Bearer ${serviceSecret}`, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(authenticatedWithoutOrigin.status, 400);
-  browser = await chromium.launch({ channel: 'chrome' });
+  browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   const callbackRequest = page.waitForRequest((request) => new URL(request.url()).origin === publish && new URL(request.url()).pathname === '/callback');
@@ -555,6 +555,7 @@ try {
   }
   assert.equal((await fetch(publishUrl, { method: 'POST', headers: { cookie: panelCookieHeader, origin: dashboard, 'content-type': 'application/json' }, body: JSON.stringify(commandFields) })).status, 400);
   const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other review owner', email: 'review-other@example.test', password: app.password } });
+  await store.share(actor, { requestId: randomBytes(16).toString('hex'), artifactId: created.artifactId, email: outsider.user.email });
   await app.auth.api.signInEmail({ body: { email: 'review-other@example.test', password: app.password } });
   const outsiderSession = await app.db.select().from(session).where(eq(session.userId, outsider.user.id)).get();
   assert(outsiderSession);
