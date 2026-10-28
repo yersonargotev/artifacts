@@ -4,10 +4,10 @@
     {
       "pack": {
         "id": "pstack",
-        "version": "4.4.0",
-        "catalog_snapshot": "5c7e39821603258ec0f8d42ac2ac4d3858de2883"
+        "version": "6.0.0",
+        "catalog_snapshot": "a559d34b7d3800ab7f0a3a4d534da3d55e91a7e6"
       },
-      "surface": "claude",
+      "surface": "agents",
       "readiness_obligations": [
         "runtime-usability",
         "surface-authorization"
@@ -52,574 +52,7 @@
         },
         {
           "kind": "skill",
-          "id": "create-verification-skill"
-        },
-        {
-          "kind": "skill",
-          "id": "figure-it-out"
-        },
-        {
-          "kind": "skill",
-          "id": "how"
-        },
-        {
-          "kind": "skill",
-          "id": "in-your-own-words"
-        },
-        {
-          "kind": "skill",
-          "id": "interrogate"
-        },
-        {
-          "kind": "skill",
-          "id": "ketchup"
-        },
-        {
-          "kind": "skill",
-          "id": "maintain-verification-skill"
-        },
-        {
-          "kind": "skill",
-          "id": "make-bot-ui"
-        },
-        {
-          "kind": "skill",
-          "id": "no-comments"
-        },
-        {
-          "kind": "skill",
-          "id": "poteto-help"
-        },
-        {
-          "kind": "skill",
-          "id": "poteto-mode"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-attack-the-premise"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-boundary-discipline"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-build-the-lever"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-encode-lessons-in-structure"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-exhaust-the-design-space"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-experience-first"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-explain-the-number"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-fix-root-causes"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-foundational-thinking"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-guard-the-context-window"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-laziness-protocol"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-make-operations-idempotent"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-migrate-callers-then-delete-legacy-apis"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-minimize-reader-load"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-model-the-domain"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-never-block-on-the-human"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-outcome-oriented-execution"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-prove-it-works"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-redesign-from-first-principles"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-separate-before-serializing-shared-state"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-sequence-verifiable-units"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-subtract-before-you-add"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-test-behavior-not-implementation"
-        },
-        {
-          "kind": "skill",
-          "id": "principle-type-system-discipline"
-        },
-        {
-          "kind": "skill",
-          "id": "recall"
-        },
-        {
-          "kind": "skill",
-          "id": "reflect"
-        },
-        {
-          "kind": "skill",
-          "id": "setup-pstack"
-        },
-        {
-          "kind": "skill",
-          "id": "sharpen"
-        },
-        {
-          "kind": "skill",
-          "id": "show-me-your-work"
-        },
-        {
-          "kind": "skill",
-          "id": "swarm"
-        },
-        {
-          "kind": "skill",
-          "id": "tdd"
-        },
-        {
-          "kind": "skill",
-          "id": "teach"
-        },
-        {
-          "kind": "skill",
-          "id": "technical-writing"
-        },
-        {
-          "kind": "skill",
-          "id": "typescript-best-practices"
-        },
-        {
-          "kind": "skill",
-          "id": "unslop"
-        },
-        {
-          "kind": "skill",
-          "id": "why"
-        }
-      ],
-      "projections": [
-        {
-          "id": "skill:architect",
-          "target": ".claude/skills/architect",
-          "digest": "1623844fa44de476e5c8b16ac63e9bb905f2a2fa15d8b7fa36e540d3cfb79dbc",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:arena",
-          "target": ".claude/skills/arena",
-          "digest": "be0bb3c32ef9ed42cad5f4819d9642ef8747237ae6f99d58086e452a9c446b25",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:automate-me",
-          "target": ".claude/skills/automate-me",
-          "digest": "ea4b66fbcd9eb9d34dcd6eed1a9fc3559327f03b3c355f5c192ab562ebac664c",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:benchmark-checklist",
-          "target": ".claude/skills/benchmark-checklist",
-          "digest": "ce8686d585017836942c1c787ab53f189f860e0ce67b480b658a17303aaca671",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:blast-radius",
-          "target": ".claude/skills/blast-radius",
-          "digest": "fffb811f37bc8cd1a657315a15515695ea2eff8f9bfaea1574df8286def3633e",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:bro",
-          "target": ".claude/skills/bro",
-          "digest": "1aedade3e261540faf202f3d0e122001db1af7e242683182d5922ebd2388b01f",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:correct",
-          "target": ".claude/skills/correct",
-          "digest": "c8a93f7441ac64d0b4b84a156d6115ccd3bd5bf458cb1b95c9f726d7566645f5",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:create-verification-skill",
-          "target": ".claude/skills/create-verification-skill",
-          "digest": "2edffadfa2184df021068183f0e7fb31e5fb9e167fc99dd5e7c8c53fb4da66d8",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:figure-it-out",
-          "target": ".claude/skills/figure-it-out",
-          "digest": "4b275694e0c1dec6abaf8edf8cd6e06b4bfb2787fd03018ba534e557c3b26946",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:how",
-          "target": ".claude/skills/how",
-          "digest": "bc46c738947da477df8cbd713cf552b86c80e28d9997381a9e8bf0a4576fc814",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:in-your-own-words",
-          "target": ".claude/skills/in-your-own-words",
-          "digest": "6a1f9e472e6a2b608ae4d64be4c6273c37491f60d5e4a5c72223d0d7da507caf",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:interrogate",
-          "target": ".claude/skills/interrogate",
-          "digest": "fcbdb73b4ab83e63448dc737cb06b9a3bd37fff0d22c7b399e737148aac73b75",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:ketchup",
-          "target": ".claude/skills/ketchup",
-          "digest": "b5c01073848d12a0336b7ad48cf8b7a185b562ee06026a689a193267bfac3ab3",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:maintain-verification-skill",
-          "target": ".claude/skills/maintain-verification-skill",
-          "digest": "4c46a7bec7619e51211078bb0ad85c39943593eb3673458463449e39e29255fd",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:make-bot-ui",
-          "target": ".claude/skills/make-bot-ui",
-          "digest": "96bd211e8577d89fcbc6612cc1c4cfbf26578f44a42096422dda8ecdf30272c4",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:no-comments",
-          "target": ".claude/skills/no-comments",
-          "digest": "37031b547595e1da0a32c236a562674dc05124759254ab8d309887abe712bd65",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:poteto-help",
-          "target": ".claude/skills/poteto-help",
-          "digest": "61cfa9191eaadd6a1aeaad85bc23c51807545b48613979449ad46a2273038e89",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:poteto-mode",
-          "target": ".claude/skills/poteto-mode",
-          "digest": "db53ce61ad9e494b643e74192fb40f8a705b2663c5ff36deca70bb7eb6db0077",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-attack-the-premise",
-          "target": ".claude/skills/principle-attack-the-premise",
-          "digest": "c3a5c40c88faed97690b6da73b07abffd597a5e8868872690f408bc9349a67d2",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-boundary-discipline",
-          "target": ".claude/skills/principle-boundary-discipline",
-          "digest": "0d58982a945190c314d836eb809eec3e4c43f3808290f00bd2a53d4faa16f105",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-build-the-lever",
-          "target": ".claude/skills/principle-build-the-lever",
-          "digest": "d4a45013c8cc98b63c4d8c1c090675152853fa76e681c230bee699596541f40c",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-encode-lessons-in-structure",
-          "target": ".claude/skills/principle-encode-lessons-in-structure",
-          "digest": "76d6708e54f66c813eec6c218e891fe2d93d3bc5976c5ea1debcb5d4e24c510d",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-exhaust-the-design-space",
-          "target": ".claude/skills/principle-exhaust-the-design-space",
-          "digest": "c48bc324cfad382ebbe510cfebbccd3c95bb4d81f8fb39e6425ecf9b5bb267e7",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-experience-first",
-          "target": ".claude/skills/principle-experience-first",
-          "digest": "e53b71cc42b2e232053f772e3bc0b1a86b83ae4ca07a7b5619c5b45675d2899b",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-explain-the-number",
-          "target": ".claude/skills/principle-explain-the-number",
-          "digest": "88ba37012eb5e091f1db4cea6a59a93d08797a6450ea410f65b54587a106be02",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-fix-root-causes",
-          "target": ".claude/skills/principle-fix-root-causes",
-          "digest": "4c8b1db8a947d38185f59263d214ca50cb3ecd699b37285a6d36c29b8c364f1e",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-foundational-thinking",
-          "target": ".claude/skills/principle-foundational-thinking",
-          "digest": "6615edd15830fe640a8f8643e7875ee8687f89c387a00ed912a7994237c96612",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-guard-the-context-window",
-          "target": ".claude/skills/principle-guard-the-context-window",
-          "digest": "25e3548af293a71c119d7cdddd66eb9b60e08e08b3417b17d3617e569cfc79eb",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-laziness-protocol",
-          "target": ".claude/skills/principle-laziness-protocol",
-          "digest": "19b4de728dc677ab1ab12a39c34811325cc82f4ccb02799f77cc0ea55189f3c7",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-make-operations-idempotent",
-          "target": ".claude/skills/principle-make-operations-idempotent",
-          "digest": "cc0aff5be4618f900a900bce07c5eb2ca32c21d546b0d79716e9a2876d93e93d",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-migrate-callers-then-delete-legacy-apis",
-          "target": ".claude/skills/principle-migrate-callers-then-delete-legacy-apis",
-          "digest": "da3e3be293b3fd3df00b61d07213cf9917e8d22fca1c6595aa9f061d4e263210",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-minimize-reader-load",
-          "target": ".claude/skills/principle-minimize-reader-load",
-          "digest": "3f8501a1167c0aad4f084b1e3fe00b0fc3d36b96689d5d6920215d40c748724e",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-model-the-domain",
-          "target": ".claude/skills/principle-model-the-domain",
-          "digest": "82bca030f6a75554680833d71556841c3c0e1eb38328c8049a3700707b048d7e",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-never-block-on-the-human",
-          "target": ".claude/skills/principle-never-block-on-the-human",
-          "digest": "deecdcb8233417d01aa0f394a039a45b48e8a896a438586061f0f91bf5a42cfd",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-outcome-oriented-execution",
-          "target": ".claude/skills/principle-outcome-oriented-execution",
-          "digest": "f9845ff5d0ab7b5c16e8ced7d9013e674b195468dee287e34a400416aec7c219",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-prove-it-works",
-          "target": ".claude/skills/principle-prove-it-works",
-          "digest": "107a6b15e65cbc3ea73421d224caf39f52d8f2bdd1d9b6c4e25dddf6cac10543",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-redesign-from-first-principles",
-          "target": ".claude/skills/principle-redesign-from-first-principles",
-          "digest": "14d31ebd71d6131697dd2d47fbb40c1711e766824e961e4f728bd12f2f9dacc4",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-separate-before-serializing-shared-state",
-          "target": ".claude/skills/principle-separate-before-serializing-shared-state",
-          "digest": "28d455f4c14794cebd3707f5fb7f354a655d683a8ea2edcccc256ce43db23cc1",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-sequence-verifiable-units",
-          "target": ".claude/skills/principle-sequence-verifiable-units",
-          "digest": "3e862fff76ece612eec4d519b78c8b19a35a8a004ce493801afe539eae0e20d8",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-subtract-before-you-add",
-          "target": ".claude/skills/principle-subtract-before-you-add",
-          "digest": "29a3db5a3080f3dfabfbb9c93944b9c85d743c14537112f89060ccd3c89af2ea",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-test-behavior-not-implementation",
-          "target": ".claude/skills/principle-test-behavior-not-implementation",
-          "digest": "0e1107193f4c0f0812abe37646a74e35463cdf2beb4681cb7151e788b1d87791",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:principle-type-system-discipline",
-          "target": ".claude/skills/principle-type-system-discipline",
-          "digest": "02096d99fc557696155ab3c079a58779d3189023ca2cee12ffa060d13cddde8e",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:recall",
-          "target": ".claude/skills/recall",
-          "digest": "e364da03ba6ed6d5323ac4825c3bdbdbcbb7c1cd7933fd585f73fec50c5a39d2",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:reflect",
-          "target": ".claude/skills/reflect",
-          "digest": "7b17175e3b540e42cddeb16b2228cdeb40adf6912c535382af72d9b047fec773",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:setup-pstack",
-          "target": ".claude/skills/setup-pstack",
-          "digest": "0e4e44dd642fe950368477357fa98071f5a257a21742b7099594eebe97537c68",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:sharpen",
-          "target": ".claude/skills/sharpen",
-          "digest": "e79d972532f5e8b976ed71ae84ded6ff90180f5abff463dc7fe4f28a3741dae1",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:show-me-your-work",
-          "target": ".claude/skills/show-me-your-work",
-          "digest": "3cc75e03d068741f32d6858294a5af4da2bb251cf9b44a2e9d98d3710c3d2c83",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:swarm",
-          "target": ".claude/skills/swarm",
-          "digest": "b781cde794c42559eef7287108ac10d30a7f0f4ada6c9e7cf877e56dd8c89e10",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:tdd",
-          "target": ".claude/skills/tdd",
-          "digest": "aedfceb1bba819aa1ab09d331432bac799021e3eac956fd6e602cbca601bc566",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:teach",
-          "target": ".claude/skills/teach",
-          "digest": "496826661be27134633d67527facdfe233b6c55b6e38f6a7c7568e50d595ce99",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:technical-writing",
-          "target": ".claude/skills/technical-writing",
-          "digest": "1d4bcbbf77e118c5d1de83b82806aee0617f902e661d4e84fcb811811c7daa88",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:typescript-best-practices",
-          "target": ".claude/skills/typescript-best-practices",
-          "digest": "fddb21828bd4344ebbe77d735bccd899945c24a15d883bb7f6e963b4c22aa477",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:unslop",
-          "target": ".claude/skills/unslop",
-          "digest": "09b7652993849083d628e17ae5c78ef2f54e3cc481de2b5a44c54c1a3a396ec7",
-          "file_mode": 493
-        },
-        {
-          "id": "skill:why",
-          "target": ".claude/skills/why",
-          "digest": "c8b00996fbefa62f138a79b2373b50c75a4bd6ed980881cb119d0ebd5d71eada",
-          "file_mode": 493
-        },
-        {
-          "id": "notice:pack-pstack-claude",
-          "target": "PACKY-NOTICES.md",
-          "digest": "a2bf645d9d3134891cce002e66881cef4e7216823afdf3c18dbc6a1067bfe4bb",
-          "file_mode": 420
-        }
-      ]
-    },
-    {
-      "pack": {
-        "id": "pstack",
-        "version": "4.3.0",
-        "catalog_snapshot": "15ca0f7033d8d505a2325d20d224ba31fc66fdac"
-      },
-      "surface": "codex",
-      "readiness_obligations": [
-        "runtime-usability",
-        "surface-authorization"
-      ],
-      "external_requirements": [],
-      "selection": {
-        "mode": "all",
-        "roots": []
-      },
-      "resources": [
-        {
-          "kind": "notice",
-          "id": "pstack-mit"
-        },
-        {
-          "kind": "skill",
-          "id": "architect"
-        },
-        {
-          "kind": "skill",
-          "id": "arena"
-        },
-        {
-          "kind": "skill",
-          "id": "automate-me"
-        },
-        {
-          "kind": "skill",
-          "id": "benchmark-checklist"
-        },
-        {
-          "kind": "skill",
-          "id": "blast-radius"
-        },
-        {
-          "kind": "skill",
-          "id": "bro"
-        },
-        {
-          "kind": "skill",
-          "id": "correct"
+          "id": "create-formal-verification-skill"
         },
         {
           "kind": "skill",
@@ -814,331 +247,918 @@
         {
           "id": "skill:architect",
           "target": ".agents/skills/architect",
-          "digest": "9507fccb3dacc27f461fb0cf5321f730d90c88034cdf6ae891d4170e6db72924",
+          "digest": "3d11c62b8b59234813a430d0b8657a9154a30134146e903e4a082d879340b7db",
           "file_mode": 493
         },
         {
           "id": "skill:arena",
           "target": ".agents/skills/arena",
-          "digest": "6194df69ee1c775f06c4602ad7b89e41aaad1f29a430d41485ce2e15b8233fb2",
+          "digest": "3b0dcc3f51574fa3e4cb8e28997b9f7a5cb577556b7b8a5eff7a228376aea4e7",
           "file_mode": 493
         },
         {
           "id": "skill:automate-me",
           "target": ".agents/skills/automate-me",
-          "digest": "9b4d3a72ffb975c00abf575e8ee8e991e178dc50e8ffa48b3d5fdee2e302e0e5",
+          "digest": "46f476d4d30b4af73e0d245f69f583847733a0cdbcfb3a918c47c37dbd0563d8",
           "file_mode": 493
         },
         {
           "id": "skill:benchmark-checklist",
           "target": ".agents/skills/benchmark-checklist",
-          "digest": "aab82ae19b032ef82bb0a35ecae8439f366c24c48b4e2a7d7430932e369bb8ea",
+          "digest": "220d26bae0c28d05809398b832d6b0d139b104e8a4635b9226cbd826daaf9b9b",
           "file_mode": 493
         },
         {
           "id": "skill:blast-radius",
           "target": ".agents/skills/blast-radius",
-          "digest": "f64f10be1b67e451abd3a0a58c156868cc0f36aecadc4356eec8af279bdd869d",
+          "digest": "9eee42263cef870f120382861218d579423befb5fb4200168677a9bd8940af0c",
           "file_mode": 493
         },
         {
           "id": "skill:bro",
           "target": ".agents/skills/bro",
-          "digest": "6d9885888014af38134e4e11e85ad5f88a62322bbddcc347afcaa91615d7b839",
+          "digest": "faf9e83acd843cab6c2f0b0e3be7ee7d2d652392eb195a4848a7dfcdf123a8f7",
           "file_mode": 493
         },
         {
           "id": "skill:correct",
           "target": ".agents/skills/correct",
-          "digest": "efbaac5cc4bd73887cde98c0ac98a3fc48ee3b04d2bfc7b86cacbcdf18f70779",
+          "digest": "06aa083c86c6786d795cc787b7a32afd5750daeddbca63c18cd4a6c33d7d5f2c",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:create-formal-verification-skill",
+          "target": ".agents/skills/create-formal-verification-skill",
+          "digest": "71c45b821a3c70d248b0a8a04efc92c7b0474acf5b146addfd76e2e2a07db45b",
           "file_mode": 493
         },
         {
           "id": "skill:create-verification-skill",
           "target": ".agents/skills/create-verification-skill",
-          "digest": "f2685f2a500ea396ec83d18ba070a279c43923ec8c9bf364889ebd7205e478f8",
+          "digest": "ecb8a827d0364b62ea00357db09e69dcbaad41930929211dad7ba355f8d1106a",
           "file_mode": 493
         },
         {
           "id": "skill:figure-it-out",
           "target": ".agents/skills/figure-it-out",
-          "digest": "8daeaba803a11d07121aaacee05396f12df2cb7678c80eb590e2e06f2d7433b5",
+          "digest": "afe57460cf78c342f6953e52b0681a5834a5bc6c32f8ac05e899bef590a4ff5b",
           "file_mode": 493
         },
         {
           "id": "skill:how",
           "target": ".agents/skills/how",
-          "digest": "edeff76ab5395b1eef689eb66694303b5cde85860205921e943e62de9b0372dc",
+          "digest": "a96e29887cab3674d265b136eaefd390bcff40e9148d31db20a7a85a0eea7898",
           "file_mode": 493
         },
         {
           "id": "skill:in-your-own-words",
           "target": ".agents/skills/in-your-own-words",
-          "digest": "b765d0bac2b9227b80f06e8fc79f22314b7c3fb8d20bae7b588f6e700ec88fc8",
+          "digest": "999b618625eadadac5cf4dc69050dbabddbd21cbe4f22468adae845a14cca9a3",
           "file_mode": 493
         },
         {
           "id": "skill:interrogate",
           "target": ".agents/skills/interrogate",
-          "digest": "73e8f728d475f43842a72b90763aec4a13eae455b180e23f4d98647f4c511ffe",
+          "digest": "ca46209610d2618ec452753327b47bd4085b9b2683641dd04839ded73095b7d8",
           "file_mode": 493
         },
         {
           "id": "skill:ketchup",
           "target": ".agents/skills/ketchup",
-          "digest": "7760d5017554abb3d3b9c4e18e49959a93eaf2714ca0e2d718cf533c81686fb9",
+          "digest": "20c8e0cacda55173ab67aa93355b887b5539628ef23ff4b3134462109a4105cd",
           "file_mode": 493
         },
         {
           "id": "skill:maintain-verification-skill",
           "target": ".agents/skills/maintain-verification-skill",
-          "digest": "156433b7110dda74f0d892fefe41637a150e24180be3e721fc451b42770506d7",
+          "digest": "39dcaa95cd3095ab68599d43654961d637922c0a3bdb3e95bf6b1316f7051166",
           "file_mode": 493
         },
         {
           "id": "skill:make-bot-ui",
           "target": ".agents/skills/make-bot-ui",
-          "digest": "626b740d4cbce47c3282429f71f6342c74b3a69960b5a0f8a79959d8d1792a8e",
+          "digest": "6b78b24e8d4aae9900d6e486924120206d14a3939f79f723a7c77ef82b96e08c",
           "file_mode": 493
         },
         {
           "id": "skill:no-comments",
           "target": ".agents/skills/no-comments",
-          "digest": "54e8b1657a46bbee5c038ff0bb5e20a48965e6fcd1ca1622329c54b7d310c771",
+          "digest": "9e0d757526ebbc567ab272bf081f112e279dd2e1f554dc95f521753d0ee7ae8a",
           "file_mode": 493
         },
         {
           "id": "skill:poteto-help",
           "target": ".agents/skills/poteto-help",
-          "digest": "65ed5393e91408e95c1365e62d5f53d3351b8befc8ddd3f1429b556db638958f",
+          "digest": "88c293abdd69e15268632db3afce333afbaf13cfe17d6ea4c55de568c5068487",
           "file_mode": 493
         },
         {
           "id": "skill:poteto-mode",
           "target": ".agents/skills/poteto-mode",
-          "digest": "27aac136e609bf6350349fa302eefcce63d186da5906397bd7380ce901780df7",
+          "digest": "bae274bf77d400f649583eb8521658ee803a64197b4fe7a628084c75040f2e31",
           "file_mode": 493
         },
         {
           "id": "skill:principle-attack-the-premise",
           "target": ".agents/skills/principle-attack-the-premise",
-          "digest": "5f38bc5ee7425e6d65acf955931a8e813882f9b74f8ca37ab51d256d5e935d82",
+          "digest": "2045357c16c7a9d23bfc914985d50423942bdc09c7c728c3ac02703bf38e7142",
           "file_mode": 493
         },
         {
           "id": "skill:principle-boundary-discipline",
           "target": ".agents/skills/principle-boundary-discipline",
-          "digest": "e369aca46c78f788d3b5ab12bfa44640a21c3b47066883fc89662a728d6d1120",
+          "digest": "502464bd5ba54a9c192d4d9dc471a1086a234037ed3e531bb316d07174f39fab",
           "file_mode": 493
         },
         {
           "id": "skill:principle-build-the-lever",
           "target": ".agents/skills/principle-build-the-lever",
-          "digest": "bab436abe90ca7cfb724409da6aa28e924f8f84890fe0d326ce3546100dbbe78",
+          "digest": "e04dcb091ec982ebd8a9dfa21bccf522f547a869d4124a7ad7adac71ac6bb563",
           "file_mode": 493
         },
         {
           "id": "skill:principle-encode-lessons-in-structure",
           "target": ".agents/skills/principle-encode-lessons-in-structure",
-          "digest": "e62e60d05f113ba4e33e8891974ab13ecac5c29cb60f3ea2e8de99fd48d92d52",
+          "digest": "043b48330aead19be29c0d59a2260274d452825c36e53685d03843bf584f02d2",
           "file_mode": 493
         },
         {
           "id": "skill:principle-exhaust-the-design-space",
           "target": ".agents/skills/principle-exhaust-the-design-space",
-          "digest": "1b0651b709432220e21e3d2e666496aa23721209c7120720c1403a99a69c8452",
+          "digest": "dd8526952420a3cb20b3d03913db0636f07cc43cacf42b00263d9ed6ef34d5a8",
           "file_mode": 493
         },
         {
           "id": "skill:principle-experience-first",
           "target": ".agents/skills/principle-experience-first",
-          "digest": "1659dfd948e75ffdf0d21c7b9a682761391200be39d84d19eb7d3f47874c6fac",
+          "digest": "db108368a888d26962d1202661598773a0d5e622e9098cb5661864b0bbe1cddd",
           "file_mode": 493
         },
         {
           "id": "skill:principle-explain-the-number",
           "target": ".agents/skills/principle-explain-the-number",
-          "digest": "7cfd50c00f397750c05d7175c93879650909298eb4779d9142659505d076dbd0",
+          "digest": "8c1ddc99fb4eae186a2f87fc7a0ffadffe0c7cef8184550962fe7cdebcae0a08",
           "file_mode": 493
         },
         {
           "id": "skill:principle-fix-root-causes",
           "target": ".agents/skills/principle-fix-root-causes",
-          "digest": "e21e6299a3572b1a107c7c7e8841df991dc2f503575912e70d950419a1e4b44f",
+          "digest": "b3ec3664c8d23792f4697b73f7869bce046f58588ad24001dd8cb1fbce727529",
           "file_mode": 493
         },
         {
           "id": "skill:principle-foundational-thinking",
           "target": ".agents/skills/principle-foundational-thinking",
-          "digest": "e7703696eaaaac743051e107bbc147fe69ddd5d3926a8e02d8ce6d5ed0ecd288",
+          "digest": "70664f466b9f9b38f8b3bf2b386dd1092b89a46b98e74881abf34ce28f835f46",
           "file_mode": 493
         },
         {
           "id": "skill:principle-guard-the-context-window",
           "target": ".agents/skills/principle-guard-the-context-window",
-          "digest": "5f19f6aebf76139b3a3b665542abd549a5fd6ef205182167e130ae34b7bfc848",
+          "digest": "05150028a3027886750d9e9f5bf909ea8991661f57e9a4dd6ea42705477f93fa",
           "file_mode": 493
         },
         {
           "id": "skill:principle-laziness-protocol",
           "target": ".agents/skills/principle-laziness-protocol",
-          "digest": "74fed34738d49867b47557031eb4857748b9199c9f9f9e1652822d62b0700577",
+          "digest": "a7650aeef3883455738e58eaa037ac99c534e7a0fac8b1284cbfc3fa3bc4d4ae",
           "file_mode": 493
         },
         {
           "id": "skill:principle-make-operations-idempotent",
           "target": ".agents/skills/principle-make-operations-idempotent",
-          "digest": "90dd5212cc7f4cce8e346940742059a82f245596ae38e70575a3cc0a0814ee94",
+          "digest": "b4285f712b7863ea7fe424d09ecfedd00573b86e0e215eabf52020395964c3af",
           "file_mode": 493
         },
         {
           "id": "skill:principle-migrate-callers-then-delete-legacy-apis",
           "target": ".agents/skills/principle-migrate-callers-then-delete-legacy-apis",
-          "digest": "1d8f6fcd82b2221d2037a5c581bd2244f25daf5bc49f3f0bc2c61d0016d75497",
+          "digest": "f643ad2ac8816950c7fa3e278e81e98053d0ae87f0b8a4dc3fb734f462ea793e",
           "file_mode": 493
         },
         {
           "id": "skill:principle-minimize-reader-load",
           "target": ".agents/skills/principle-minimize-reader-load",
-          "digest": "9b1b85cf0c99515fc6400ca7cec0ed4cda465ba6080752161667a576d94ffaf1",
+          "digest": "f6201b4a3de45e8d6040b1a8da09bf7cd0b4cf438873b6841cf581e37ff49aa7",
           "file_mode": 493
         },
         {
           "id": "skill:principle-model-the-domain",
           "target": ".agents/skills/principle-model-the-domain",
-          "digest": "99ff6b0004cf08d990301b0dc1a9d3293fbd6ebc8edaf0841fdbd15c73c2b469",
+          "digest": "4d4a7eaf254595453a76666b94ab24382e3a73749320218836f4acbea7db25b0",
           "file_mode": 493
         },
         {
           "id": "skill:principle-never-block-on-the-human",
           "target": ".agents/skills/principle-never-block-on-the-human",
-          "digest": "37611c10813b4add89ea0c3d54e90e3b80370a371e24455ab82c8b2c7b0434bd",
+          "digest": "71c55a6e8c3a5240fd3935509cf35d1ad1cb05b0ff3a5f324b5a434fc3385799",
           "file_mode": 493
         },
         {
           "id": "skill:principle-outcome-oriented-execution",
           "target": ".agents/skills/principle-outcome-oriented-execution",
-          "digest": "a5c965a693e7954d3486dafb1c2113baea3f496ae5a98fbab88a2496991ef0fd",
+          "digest": "82ab889b76fe590d28f161c5058ca0970c354ceeaf7ec5c5652368b82547b75f",
           "file_mode": 493
         },
         {
           "id": "skill:principle-prove-it-works",
           "target": ".agents/skills/principle-prove-it-works",
-          "digest": "53f34d259a8a363f229fa7c14d1e6693534ac829d3b2115ee95f87814e3e3322",
+          "digest": "36f42695628a345bf230f9cabd88e802521aa5a5540afceb461cab34e9926d98",
           "file_mode": 493
         },
         {
           "id": "skill:principle-redesign-from-first-principles",
           "target": ".agents/skills/principle-redesign-from-first-principles",
-          "digest": "e1edda41bfbad7513452e259bce8eec3eb99df024c0a0833ce4e6f6ac2bb6836",
+          "digest": "277826e1f5d43c56f4aab3e8b16958771dffe9d9e66678ca3ae808d9424f8332",
           "file_mode": 493
         },
         {
           "id": "skill:principle-separate-before-serializing-shared-state",
           "target": ".agents/skills/principle-separate-before-serializing-shared-state",
-          "digest": "eb3f77bd20a6dfe4795bc2bc7599c7186f44cc4abfe345d3d9711650b2aecd9a",
+          "digest": "5a54d3df660027062ad50cc9452956c6f8c9489f9b843e7cee1a905fd474e61b",
           "file_mode": 493
         },
         {
           "id": "skill:principle-sequence-verifiable-units",
           "target": ".agents/skills/principle-sequence-verifiable-units",
-          "digest": "44630b31fcf9a3aec0caf921814ebf8a1e0329064085c1a0ac17516d913117c0",
+          "digest": "1c9c189a66ca46d04b2166a23b9844fc5811f275d326052d78dd8b1cdea783df",
           "file_mode": 493
         },
         {
           "id": "skill:principle-subtract-before-you-add",
           "target": ".agents/skills/principle-subtract-before-you-add",
-          "digest": "1ec4053a22500a544f5592bc48ad3bfdeb90d8f50015350ef1c1280e3920ded2",
+          "digest": "3de69b8f8700118d6d83a21cac7c5e53337852c4c5364a915eb12fbb13adfca9",
           "file_mode": 493
         },
         {
           "id": "skill:principle-test-behavior-not-implementation",
           "target": ".agents/skills/principle-test-behavior-not-implementation",
-          "digest": "08922b97771c86d4f6e61847a62c8518186f3a970d99f3e0fc86f7301b70c3b4",
+          "digest": "f4db6d1428e77aada3e8ce0a4c3ed5a707bb32d6f4dfcd1aaf4e630f152b372a",
           "file_mode": 493
         },
         {
           "id": "skill:principle-type-system-discipline",
           "target": ".agents/skills/principle-type-system-discipline",
-          "digest": "c4797437e3071210759574a642775e0f3a799893e472203615866f722ec27060",
+          "digest": "de454651a3ecbf181e39ae6d3cfb3fb01825a444d01d5375cd4cd066a0a613d4",
           "file_mode": 493
         },
         {
           "id": "skill:recall",
           "target": ".agents/skills/recall",
-          "digest": "745050bdc3f7489ae9013a4ad85c772756bd67550993369507ef93cf958d1078",
+          "digest": "5b92794181b00f6e1bca5b8ea7b37eca5485539c6a316c53538e5c7c5b18eccc",
           "file_mode": 493
         },
         {
           "id": "skill:reflect",
           "target": ".agents/skills/reflect",
-          "digest": "8cf0003a81bc166755b6d15ac174eff785ae814f4a42cb58a79d8f89b0881d44",
+          "digest": "7c17f673092a9f93e2634c9f54e961142dc43f41bcf64938d86aa54342d13a37",
           "file_mode": 493
         },
         {
           "id": "skill:setup-pstack",
           "target": ".agents/skills/setup-pstack",
-          "digest": "3ef2e8cdb9380b08ec4176ccc19637dee31ecff39d26e43d9e15c2d75e1da469",
+          "digest": "a1f9ecff9da3ef2ef9c1e916aa1290e92b182c48a88ddb7a796c0ee0037c9edc",
           "file_mode": 493
         },
         {
           "id": "skill:sharpen",
           "target": ".agents/skills/sharpen",
-          "digest": "d91db84f6af2ef0a954a275c0022eac76cd216f0f4ebbcec62913e57fbeaa917",
+          "digest": "6ec729c1f070a8100fc0a88a6ed01a2ed1cda008c7bce4d4a66edf8083fcb8e6",
           "file_mode": 493
         },
         {
           "id": "skill:show-me-your-work",
           "target": ".agents/skills/show-me-your-work",
-          "digest": "c173813083bdbbd00e4646c491b8aefe7f7d00de868c8ad6cd54e93d82fa25b5",
+          "digest": "ffbd2b908de33629808b6ad37cea1b4e810864efc425bc1cb210b7698e13d52a",
           "file_mode": 493
         },
         {
           "id": "skill:swarm",
           "target": ".agents/skills/swarm",
-          "digest": "ab9db450d179c958c7bb7a5d46dcd30a71c7dea315e8c7f91801ebb8ecf2747d",
+          "digest": "f863c2a9522b233a075b2ab4b198b82f6fac2451453ef8b11281b74e92c2b23d",
           "file_mode": 493
         },
         {
           "id": "skill:tdd",
           "target": ".agents/skills/tdd",
-          "digest": "9ce8f6c70e5e99b08f4d27b891ef429d2e0c45c203b0d32f481911e1e6b6cf4e",
+          "digest": "6e115d8e9ab11ea947660c3f6809fd8366025ce2c457a3cc90f370d52072a7b6",
           "file_mode": 493
         },
         {
           "id": "skill:teach",
           "target": ".agents/skills/teach",
-          "digest": "f6e08af2a6821ed096c30bd91e232395c49bc5e4d450d5c176c1b963eef24f8f",
+          "digest": "e4eb15f41a3310c70ae84c840e17397963e91ffeccf4e2a82629727d187dc5bc",
           "file_mode": 493
         },
         {
           "id": "skill:technical-writing",
           "target": ".agents/skills/technical-writing",
-          "digest": "09314d8bcaec5efeab11746edff257f40e6d44bffed6f4e95d7f6b31a534089f",
+          "digest": "70be150fc85d4bce68673802a36f1f603b15d07b91bc34e800395c8ce210e73b",
           "file_mode": 493
         },
         {
           "id": "skill:typescript-best-practices",
           "target": ".agents/skills/typescript-best-practices",
-          "digest": "4db0707bc84b55bdabfeee2ffd1f583fecd1e527447fe1c6ab80292892330ef4",
+          "digest": "24a2cd3623bb6a95b68f4a2e5b68c1b0b6f2100fcad182b56c97f4cd11864c0c",
           "file_mode": 493
         },
         {
           "id": "skill:unslop",
           "target": ".agents/skills/unslop",
-          "digest": "a66abd817baea9f47e857f055968e94dd1454f65b2ad696110fa6114113f8a8a",
+          "digest": "b81364737ed9fc572759a1ff28e75c3274fb5a6076ddefcd0ecdcb3817ea3213",
           "file_mode": 493
         },
         {
           "id": "skill:why",
           "target": ".agents/skills/why",
-          "digest": "eb2a43b134355c2ab309f92276c2c96ad0c07d5b29ae4ac772aba2f9bc99d31d",
+          "digest": "848c456f72d6207221a6627d1d257fed16d905f2e13137b480666eb6dbc0a8c1",
           "file_mode": 493
         },
         {
-          "id": "notice:pack-pstack-codex",
+          "id": "notice:pack-pstack-agents",
           "target": "PACKY-NOTICES.md",
-          "digest": "77169ef634e5f94f3f7a8b308a3def6471a59d7c4cec6589587fc68b2d3bfdc5",
+          "digest": "36d2cf3db19fe2551fd005316300fe5f043294aeaf71f82e538faad2f5dca122",
+          "file_mode": 420
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "pstack",
+        "version": "6.0.0",
+        "catalog_snapshot": "a559d34b7d3800ab7f0a3a4d534da3d55e91a7e6"
+      },
+      "surface": "claude",
+      "readiness_obligations": [
+        "runtime-usability",
+        "surface-authorization"
+      ],
+      "external_requirements": [],
+      "selection": {
+        "mode": "all",
+        "roots": []
+      },
+      "resources": [
+        {
+          "kind": "notice",
+          "id": "pstack-mit"
+        },
+        {
+          "kind": "skill",
+          "id": "architect"
+        },
+        {
+          "kind": "skill",
+          "id": "arena"
+        },
+        {
+          "kind": "skill",
+          "id": "automate-me"
+        },
+        {
+          "kind": "skill",
+          "id": "benchmark-checklist"
+        },
+        {
+          "kind": "skill",
+          "id": "blast-radius"
+        },
+        {
+          "kind": "skill",
+          "id": "bro"
+        },
+        {
+          "kind": "skill",
+          "id": "correct"
+        },
+        {
+          "kind": "skill",
+          "id": "create-formal-verification-skill"
+        },
+        {
+          "kind": "skill",
+          "id": "create-verification-skill"
+        },
+        {
+          "kind": "skill",
+          "id": "figure-it-out"
+        },
+        {
+          "kind": "skill",
+          "id": "how"
+        },
+        {
+          "kind": "skill",
+          "id": "in-your-own-words"
+        },
+        {
+          "kind": "skill",
+          "id": "interrogate"
+        },
+        {
+          "kind": "skill",
+          "id": "ketchup"
+        },
+        {
+          "kind": "skill",
+          "id": "maintain-verification-skill"
+        },
+        {
+          "kind": "skill",
+          "id": "make-bot-ui"
+        },
+        {
+          "kind": "skill",
+          "id": "no-comments"
+        },
+        {
+          "kind": "skill",
+          "id": "poteto-help"
+        },
+        {
+          "kind": "skill",
+          "id": "poteto-mode"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-attack-the-premise"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-boundary-discipline"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-build-the-lever"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-encode-lessons-in-structure"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-exhaust-the-design-space"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-experience-first"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-explain-the-number"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-fix-root-causes"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-foundational-thinking"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-guard-the-context-window"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-laziness-protocol"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-make-operations-idempotent"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-migrate-callers-then-delete-legacy-apis"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-minimize-reader-load"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-model-the-domain"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-never-block-on-the-human"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-outcome-oriented-execution"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-prove-it-works"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-redesign-from-first-principles"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-separate-before-serializing-shared-state"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-sequence-verifiable-units"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-subtract-before-you-add"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-test-behavior-not-implementation"
+        },
+        {
+          "kind": "skill",
+          "id": "principle-type-system-discipline"
+        },
+        {
+          "kind": "skill",
+          "id": "recall"
+        },
+        {
+          "kind": "skill",
+          "id": "reflect"
+        },
+        {
+          "kind": "skill",
+          "id": "setup-pstack"
+        },
+        {
+          "kind": "skill",
+          "id": "sharpen"
+        },
+        {
+          "kind": "skill",
+          "id": "show-me-your-work"
+        },
+        {
+          "kind": "skill",
+          "id": "swarm"
+        },
+        {
+          "kind": "skill",
+          "id": "tdd"
+        },
+        {
+          "kind": "skill",
+          "id": "teach"
+        },
+        {
+          "kind": "skill",
+          "id": "technical-writing"
+        },
+        {
+          "kind": "skill",
+          "id": "typescript-best-practices"
+        },
+        {
+          "kind": "skill",
+          "id": "unslop"
+        },
+        {
+          "kind": "skill",
+          "id": "why"
+        }
+      ],
+      "projections": [
+        {
+          "id": "skill:architect",
+          "target": ".claude/skills/architect",
+          "digest": "cb5a893f2f583421c7fdd9d3fbd9c452ede5030a10686236e11671603f2d6289",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:arena",
+          "target": ".claude/skills/arena",
+          "digest": "0c5b57dfd321fbb76ecdd919c0df612ffbdf215a2828a8f3007c085b5d3ceedc",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:automate-me",
+          "target": ".claude/skills/automate-me",
+          "digest": "572aa90e2e52d741132267d128095bcbff1a6ca3b8a09e5a7e452f5d6aed31fd",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:benchmark-checklist",
+          "target": ".claude/skills/benchmark-checklist",
+          "digest": "6e1ce82894f9a299551cfb989260bdc04375633272ae598f8642145385a73d44",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:blast-radius",
+          "target": ".claude/skills/blast-radius",
+          "digest": "d398fcd4b9864b2f614a44a67e30cf0bcaba78786126c64774af0c202e4ebe86",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:bro",
+          "target": ".claude/skills/bro",
+          "digest": "20a279aba6d7f2065651097c48256761e1c5c02c7a50038551bd181e7bc21f19",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:correct",
+          "target": ".claude/skills/correct",
+          "digest": "c94d8a8bc01cddf948704022e9f7b3bdd2e7d3630f482261eee6bba6a8afd4a0",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:create-formal-verification-skill",
+          "target": ".claude/skills/create-formal-verification-skill",
+          "digest": "f711c9c25be84c6263848259c3055cb5d1e7ce0f06e7bccc8a79453b3f25e35b",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:create-verification-skill",
+          "target": ".claude/skills/create-verification-skill",
+          "digest": "f2ecc5ab6cf30397b25341fa67f8ecc2060a362358124f5b8c48917945b0d59a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:figure-it-out",
+          "target": ".claude/skills/figure-it-out",
+          "digest": "d9b2a062e8f89950bdf5c66e16dc84ea19a14f9e96fd53e61414440ce647044b",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:how",
+          "target": ".claude/skills/how",
+          "digest": "4a4a860517fc03988d34dab4a4c3cdedf45a8fc47fe47dee3b8377c736d6efbf",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:in-your-own-words",
+          "target": ".claude/skills/in-your-own-words",
+          "digest": "23f6e6fab406a8e2d235c32895000c90cee236ea08e07a9034bb66c9a543ac17",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:interrogate",
+          "target": ".claude/skills/interrogate",
+          "digest": "c56498d0af7d2f570d0fe1fbc1ad70176713fbbb5cb5bf2887d71fbbd63d7d45",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:ketchup",
+          "target": ".claude/skills/ketchup",
+          "digest": "a58c399b0659ccc78994543909077946de8eb5bf17411060e1b86454f5dd6a14",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:maintain-verification-skill",
+          "target": ".claude/skills/maintain-verification-skill",
+          "digest": "9865f6679c75fd2689a28121c6ee3392299b0e928e18ac8d2af03ddc0c13655b",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:make-bot-ui",
+          "target": ".claude/skills/make-bot-ui",
+          "digest": "b27d8d25c7b5d9a09ee49dbc31dec0d43bb92f9398620564ddd385aabae0e68a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:no-comments",
+          "target": ".claude/skills/no-comments",
+          "digest": "523847f8bebd7ad670ee03abf510f91fbcae510f3daba9a2a42b462a8573797d",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:poteto-help",
+          "target": ".claude/skills/poteto-help",
+          "digest": "6d66ad326be07fef2b223b79395db687ab7aac8c2d9a7e032b2661990698b313",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:poteto-mode",
+          "target": ".claude/skills/poteto-mode",
+          "digest": "21963a169d0e0047661791a0dcb7e0b2ff3b2fb26fe2609fc5834df59811ceca",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-attack-the-premise",
+          "target": ".claude/skills/principle-attack-the-premise",
+          "digest": "1ff43e2c7b2b9b1fcc46774688319f1cfdf313c06a78d3990bc273ada059d8e5",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-boundary-discipline",
+          "target": ".claude/skills/principle-boundary-discipline",
+          "digest": "18c15247b1bcf6598eeb42a62a6cefe702b5401510e75e258906c374a7e2423a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-build-the-lever",
+          "target": ".claude/skills/principle-build-the-lever",
+          "digest": "6e10d945ea9969d9ddd991e5a64145a02140df1d7b85c7dba716701753938957",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-encode-lessons-in-structure",
+          "target": ".claude/skills/principle-encode-lessons-in-structure",
+          "digest": "c5e5104c0c1bed8030c705595fccefaee047a33ea8eb68acef20d1f2b37a3272",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-exhaust-the-design-space",
+          "target": ".claude/skills/principle-exhaust-the-design-space",
+          "digest": "25c8ef58881210da1cb796f2ba4a5883b978982834db43b3d766908e16034f71",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-experience-first",
+          "target": ".claude/skills/principle-experience-first",
+          "digest": "50992457b53fd374cd72eb2520610a2add808dfa0083397c00588a5f8ade17ce",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-explain-the-number",
+          "target": ".claude/skills/principle-explain-the-number",
+          "digest": "0feec6e5f474febb9a0dc299f314e7b9ca12728200f2b9d384487607bf1c1604",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-fix-root-causes",
+          "target": ".claude/skills/principle-fix-root-causes",
+          "digest": "6b1f2369863918e40bbdf0c8283618701ec895c4e79a35c96fe33bae44e14da3",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-foundational-thinking",
+          "target": ".claude/skills/principle-foundational-thinking",
+          "digest": "79cab39d4e677daf76cca7c36cfbdda53740cab253762904e23aebcacff135f9",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-guard-the-context-window",
+          "target": ".claude/skills/principle-guard-the-context-window",
+          "digest": "5893a760cb9b55f1488767516793914a83e5850ed5fc25bf857b23b64c1061c0",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-laziness-protocol",
+          "target": ".claude/skills/principle-laziness-protocol",
+          "digest": "c9d404f05eaf3efc84de6798379fdf2dbc07b9e85002f124e68381598b183d20",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-make-operations-idempotent",
+          "target": ".claude/skills/principle-make-operations-idempotent",
+          "digest": "67453c283e466d6df222105daa4fc6101762d50a87805837d7a97f8d32b529d2",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-migrate-callers-then-delete-legacy-apis",
+          "target": ".claude/skills/principle-migrate-callers-then-delete-legacy-apis",
+          "digest": "ffdb735df48689664df32d5f903813ce6cac741b26fc9f8141ac5f6abaebf3bf",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-minimize-reader-load",
+          "target": ".claude/skills/principle-minimize-reader-load",
+          "digest": "10559f80eee12b823fe5430105537e97b56d1390f189183d925b9a6a88a1eb2c",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-model-the-domain",
+          "target": ".claude/skills/principle-model-the-domain",
+          "digest": "84c260e185e83b066bf60834bf55c11bf38abaa2f8a76d601ef352a24acc6a9f",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-never-block-on-the-human",
+          "target": ".claude/skills/principle-never-block-on-the-human",
+          "digest": "8f203fb7b20df391ce5affc4aaf3f8adedd1c9eaf025ccc0950b01d2dcb1b5e0",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-outcome-oriented-execution",
+          "target": ".claude/skills/principle-outcome-oriented-execution",
+          "digest": "cfa85d8a427acb11034a43b38851f78f209f73ff00355dad634f36de36ed9f53",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-prove-it-works",
+          "target": ".claude/skills/principle-prove-it-works",
+          "digest": "4bd22b2f57264eb34a3254b0425e3336304e6b807683a7dcd8321988b5e24391",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-redesign-from-first-principles",
+          "target": ".claude/skills/principle-redesign-from-first-principles",
+          "digest": "20a4cfe16559d9f0ce6fc200dfc9789eda5f78ec173b3b723d7a49c39f4e7b1c",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-separate-before-serializing-shared-state",
+          "target": ".claude/skills/principle-separate-before-serializing-shared-state",
+          "digest": "b3b3b7dfe23b5ee3339d4be76f96868a4ab16b53dd1660b258c2df72b2816e02",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-sequence-verifiable-units",
+          "target": ".claude/skills/principle-sequence-verifiable-units",
+          "digest": "286ecf3606f0a6938037293e996730b490a78154fa9cc1fcf6f4426f03ebda52",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-subtract-before-you-add",
+          "target": ".claude/skills/principle-subtract-before-you-add",
+          "digest": "2cfd72c0f19c00e347b529454c2619ff738ca59b11b4a1b20642f2a1e819931b",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-test-behavior-not-implementation",
+          "target": ".claude/skills/principle-test-behavior-not-implementation",
+          "digest": "f3f32be945866762d4f3b5f93307cd9e3dcad6ef13839face6f77073eae45301",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:principle-type-system-discipline",
+          "target": ".claude/skills/principle-type-system-discipline",
+          "digest": "191b8c6239862d480945b592cd79e252ad39efc0bc4714134ee2557ce8dc1318",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:recall",
+          "target": ".claude/skills/recall",
+          "digest": "8a18f3550966f85c78338197544ad266370016da3e788a5c0b0fb48164e58312",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:reflect",
+          "target": ".claude/skills/reflect",
+          "digest": "303d5519518f51288cdd3d19833e0dbcd2653e4b1e42bd9ab45d0f1a02dc7b46",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:setup-pstack",
+          "target": ".claude/skills/setup-pstack",
+          "digest": "c9f7ddc09e727394dbef6ad79f9d3c64da8e07477eb920a56833d927788d8575",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:sharpen",
+          "target": ".claude/skills/sharpen",
+          "digest": "6bb3edd9eaafd805035840529cbe312b6d81638292afe20eef810aa02c9849c5",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:show-me-your-work",
+          "target": ".claude/skills/show-me-your-work",
+          "digest": "893d840aab3ddf633d8ab1c5fa30ff0c36db35948dc261b7aed433e742b24c49",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:swarm",
+          "target": ".claude/skills/swarm",
+          "digest": "db5000621c488bff35ec16c446f8479b0a62173964a5e9ba12598f8db1671779",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:tdd",
+          "target": ".claude/skills/tdd",
+          "digest": "f0ca4386020709d17f1ce39be9c57ecff901f9a5357de8e506b9436edfcb1122",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:teach",
+          "target": ".claude/skills/teach",
+          "digest": "e281633505e27df7790f5c3e56e7216e8f37b68ca2378a3b0f4437ff09c4ea89",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:technical-writing",
+          "target": ".claude/skills/technical-writing",
+          "digest": "f3f6e602775d971de2507253a65b6b14ff9137a2d8103eb64cf1e6549c2b6e3b",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:typescript-best-practices",
+          "target": ".claude/skills/typescript-best-practices",
+          "digest": "284dc794a8d82c9e774a362153a242dcae4db3f376e02bdb9effb304494cfa62",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:unslop",
+          "target": ".claude/skills/unslop",
+          "digest": "7f0a0150392ad33e8e3ebd7a807b000bffe83c7a3417ae8127ab21d23ad25ffc",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:why",
+          "target": ".claude/skills/why",
+          "digest": "88686932e667a721bda1a6e58b3eb6db2e179f4a724c572540e4eb00de28f6ea",
+          "file_mode": 493
+        },
+        {
+          "id": "notice:pack-pstack-claude",
+          "target": "PACKY-NOTICES.md",
+          "digest": "f36e44e4af7d3a50328e638586547bb0e95dd1aa5f9124d95949d9dc350f3ab2",
           "file_mode": 420
         }
       ]
