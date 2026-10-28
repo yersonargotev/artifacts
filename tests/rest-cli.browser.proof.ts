@@ -10,7 +10,7 @@ import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 
 const app = await restCliFixture();
 const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-browser-'));
-const browser = await chromium.launch({ channel: 'chrome' });
+const browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
 const cliEnv = { PATH: process.env.PATH, ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state') };
 const children = new Set<ChildProcess>();
 function subprocess(args: string[]) {

@@ -21,7 +21,7 @@ const privateDirectory = await mkdtemp(join(tmpdir(), 'artifacts-invitations-pro
 await mkdir(directory, { recursive: true, mode: 0o700 });
 await mkdir(review, { recursive: true });
 const app = await restCliFixture({ allowGuests: true, emailCode: true, invitations: true });
-const browser = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--headed') });
+const browser = await chromium.launch({ ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' }), headless: !process.argv.includes('--headed') });
 const contexts: BrowserContext[] = [];
 const results: { lane: number | string; status: 'PASS'; observed: unknown }[] = [];
 const segments: { source: string; start: number; duration: number }[] = [];
@@ -207,6 +207,8 @@ try {
   await capture(nativePage, 'invite-limit');
   pass(4, { invitations: 100, limitedAccessGranted: true, screenshot: 'invite-limit.png' });
 
+  const admission = await client.create({ requestId: randomUUID(), snapshot: { metadata: { title: 'Verifier guest admission', description: '' }, content: { kind: 'text', text: 'Independent unpublished invitation for the verification account.' }, files: [] } });
+  await client.share({ requestId: randomUUID(), artifactId: admission.artifactId, email: 'invited@example.test' });
   await client.unshare({ requestId: randomUUID(), artifactId: created.artifactId, shareId: originalShare.shareId });
   const verificationGuest = await context({ storageState: guestState });
   const config: SharingVerification = { authOrigin: app.config.origin, panelOrigin: app.dashboard, publicationOrigin: app.publishOrigin, ownerId: app.ownerId, guestId: guestIdentity.user.id, guestEmail: 'invited@example.test', artifactId: created.artifactId, revisionId: created.revision.id, sha256: created.revision.sha256, publicationVersion: 1, disposable: true, evidenceDirectory: join(directory, 'verifier') };

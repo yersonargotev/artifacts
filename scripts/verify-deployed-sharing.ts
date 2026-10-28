@@ -144,7 +144,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const path of [args[3]!, args[5]!]) assert.equal((await stat(path)).mode & 0o077, 0, 'Browser states must be private to their owner');
   const config = JSON.parse(await readFile(args[1]!, 'utf8')) as SharingVerification;
   validate(config);
-  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const browser = await chromium.launch({ ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' }), headless: true });
   try {
     const owner = await browser.newContext({ storageState: args[3] });
     const guest = await browser.newContext({ storageState: args[5] });
