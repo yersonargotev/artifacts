@@ -68,7 +68,7 @@ S10 adds migration `0004_sweet_the_anarchist.sql` for the owner invitation budge
 
 ## Production email bindings
 
-Auth, MCP, and panel explicitly declare `EMAIL_TRANSPORT=resend`. Their runtime secret projection requires `EMAIL_FROM` and `RESEND_API_KEY`. Only auth also receives `OWNER_EMAIL` for admission policy. The viewer receives no email bindings. `OWNER_PASSWORD` and bootstrap credentials are not runtime bindings and remain rejected.
+Auth, MCP, and panel explicitly declare `EMAIL_TRANSPORT=resend`. Their runtime secret projection requires `EMAIL_FROM` and `RESEND_API_KEY`. Auth, MCP, and panel also receive `OWNER_EMAIL` for admission policy. The viewer receives no email bindings. `OWNER_PASSWORD` and bootstrap credentials are not runtime bindings and remain rejected.
 
 `EMAIL_FROM` and `OWNER_EMAIL` must be email addresses. `EMAIL_FROM` is a bare address on the Resend-verified sending subdomain. `RESEND_API_KEY` must be nonempty and contain no whitespace or control characters. Release preflight does not test the key against Resend or establish domain readiness. Follow [Enable Resend delivery](deployment.md#enable-resend-delivery) for the account and DNS procedure.
 

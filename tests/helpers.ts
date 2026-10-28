@@ -15,7 +15,7 @@ import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 import { createEmailSender } from '../packages/config/src/email-sender-node.ts';
 import { createResourceApp } from '../apps/mcp/src/app.ts';
 
-export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean; invitations?: boolean } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean; invitations?: boolean; allowGuests?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
@@ -36,7 +36,7 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   assert(mcpAddress && typeof mcpAddress === 'object');
   const origin = `http://127.0.0.1:${authAddress.port}`;
   const emailSink = options.emailCode || options.invitations ? join(directory, 'email.jsonl') : undefined;
-  const config = { ...(options.emailCode && emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
+  const config = { access: { ownerEmail: 'owner@example.test', allowGuests: options.allowGuests ?? false }, ...(options.emailCode && emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
   const auth = createAuth(connection.db, config, true);
   const password = randomBytes(24).toString('base64url');
   const owner = await auth.api.signUpEmail({ body: { name: 'Test owner', email: 'owner@example.test', password } });
@@ -49,7 +49,7 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   const authApp = createAuthApp(connection.db, config);
   authHandler = authApp;
   const createResource = options.transport === 'rest' ? createArtifactRestApp : options.transport === 'combined' ? createResourceApp : createMcpApp;
-  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { publishOrigin: options.publishOrigin ?? 'https://published.example.test', sendInvitation: createEmailSender(emailSink && options.invitations ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: emailSink } : {}, origin) }));
+  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { access: config.access, publishOrigin: options.publishOrigin ?? 'https://published.example.test', sendInvitation: createEmailSender(emailSink && options.invitations ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: emailSink } : {}, origin) }));
   return {
     ...connection, emailSink, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
@@ -98,4 +98,9 @@ export async function grant(app: { config: { origin: string; issuer: string; res
 
 export function callWhoami(resource: string, token?: string) {
   return fetch(resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'whoami', arguments: {} } }) });
+}
+
+export function historicalSignIn(app: Awaited<ReturnType<typeof fixture>>, email: string) {
+  const auth = createAuth(app.db, { ...app.config, access: { ...app.config.access, ownerEmail: email } });
+  return auth.api.signInEmail({ body: { email, password: app.password }, returnHeaders: true });
 }

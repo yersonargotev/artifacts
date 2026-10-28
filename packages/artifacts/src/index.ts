@@ -2,6 +2,8 @@ import { and, asc, count, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
+import type { AccessPolicy } from '@artifacts/config';
+import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
 import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type ShareResult, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
@@ -15,7 +17,8 @@ export * from './contracts.ts';
 
 const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null) });
 
-export function createArtifactStore(db: Database, options: { publishOrigin: string; sendInvitation?: InvitationSender }) {
+export function createArtifactStore(db: Database, options: { publishOrigin: string; access: AccessPolicy; sendInvitation?: InvitationSender }) {
+  const admission = createAdmission(db, options.access);
   const { transaction, authorize, liveSession, command, receipt, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
@@ -283,7 +286,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       return transaction(async (connection) => {
         const [found] = await connection.select({ grant: publicationGrant, session }).from(publicationGrant).innerJoin(session, and(eq(session.id, publicationGrant.sessionId), eq(session.userId, publicationGrant.userId)))
           .where(and(eq(publicationGrant.codeHash, codeHash), eq(publicationGrant.state, input.state), eq(publicationGrant.artifactId, input.artifactId), eq(publicationGrant.callback, callback), gt(publicationGrant.expiresAt, new Date()), gt(session.expiresAt, new Date()))).limit(1);
-        if (!found || !await canView(connection, found.grant.userId, input.artifactId)) throw new ArtifactError('invalid_grant', 'Publication grant is invalid or expired');
+        if (!found || !await admission.user(found.grant.userId, connection) || !await canView(connection, found.grant.userId, input.artifactId)) throw new ArtifactError('invalid_grant', 'Publication grant is invalid or expired');
         const consumed = await connection.delete(publicationGrant).where(eq(publicationGrant.codeHash, codeHash)).returning({ codeHash: publicationGrant.codeHash });
         if (consumed.length !== 1) throw new ArtifactError('invalid_grant', 'Publication grant was already consumed');
         return { artifactId: input.artifactId, userId: found.grant.userId, sessionId: found.grant.sessionId, expiresAt: Math.min(Date.now() + 60 * 60_000, found.session.expiresAt.getTime()) };

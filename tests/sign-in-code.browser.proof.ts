@@ -24,7 +24,7 @@ const records: Array<{ lane: number | string; status: 'PASS'; result: string }> 
 const children: ChildProcess[] = [];
 const contexts: BrowserContext[] = [];
 const control = (command: string[]) => execute(process.execPath, ['--import', 'tsx', helper, ...command], { maxBuffer: 1024 * 1024 });
-if (!providedRun) await control(['launch', ...(passwordOnly ? [] : ['--email-code']), '--run', run]);
+if (!providedRun) await control(['launch', '--allow-guests', ...(passwordOnly ? [] : ['--email-code']), '--run', run]);
 await mkdir(directory, { recursive: true });
 await mkdir(review, { recursive: true });
 const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; mcp: string; panel: string; ownerId: string };
@@ -369,7 +369,7 @@ try {
       const disabled = await fixture();
       try {
         if (explicit) {
-          const config = authConfig({ AUTH_URL: disabled.config.origin, BETTER_AUTH_SECRET: disabled.config.secret, MCP_URL: disabled.config.resource, DASHBOARD_URL: instance.panel });
+          const config = authConfig({ OWNER_EMAIL: 'owner@example.test', AUTH_URL: disabled.config.origin, BETTER_AUTH_SECRET: disabled.config.secret, MCP_URL: disabled.config.resource, DASHBOARD_URL: instance.panel });
           assert.equal(config.email?.transport, 'disabled');
           disabled.setAuthHandler(createAuthApp(disabled.db, config));
         }

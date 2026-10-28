@@ -32,7 +32,7 @@ const app = await fixture({ dashboard, publishOrigin: publish });
 const serviceSecret = randomBytes(32).toString('hex');
 const cookieSecret = randomBytes(32).toString('hex');
 publicationHandler = createPublicationApp({ DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
-const store = createArtifactStore(app.db, { publishOrigin: publish });
+const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin: publish });
 const central = await app.db.select().from(session).where(eq(session.userId, app.ownerId)).get();
 assert(central);
 const actor = { userId: app.ownerId, sessionId: central.id, clientId: 'retained-proof-fixture', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
@@ -42,7 +42,7 @@ await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifact
 const expected = await store.read(actor, { artifactId: first.artifactId, revisionId: first.revision.id });
 const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Retained proof dashboard', application_type: 'native', redirect_uris: [`${dashboard}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
 assert(client.client_secret);
-const child = spawn(process.execPath, ['apps/dashboard/dist/server/entry.mjs'], { env: { PATH: process.env.PATH, DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+const child = spawn(process.execPath, ['apps/dashboard/dist/server/entry.mjs'], { env: { PATH: process.env.PATH, OWNER_EMAIL: app.config.access.ownerEmail, ALLOW_GUEST_ACCESS: String(app.config.access.allowGuests), DATABASE_URL: app.databaseUrl, DATABASE_AUTH_TOKEN: '', AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret, PANEL_CLIENT_ID: client.client_id, PANEL_CLIENT_SECRET: client.client_secret, PORT: String(address.port), HOST: '127.0.0.1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let startupError = '';
 child.stderr.on('data', (data: Buffer) => { startupError += data.toString(); });
 let browser: Browser | undefined;

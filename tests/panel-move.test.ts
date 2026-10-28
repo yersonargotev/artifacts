@@ -12,7 +12,7 @@ async function setup() {
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
   const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'panel-move-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const options = { publishOrigin: 'https://published.example.test' };
+  const options = { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://published.example.test' };
   const store = createArtifactStore(app.db, options);
   const panel = createPanel(app.db, options);
   const create = (title: string, project?: string) => store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title, description: '' }, content: { kind: 'text', text: title }, files: [] } satisfies Snapshot, project });

@@ -35,7 +35,7 @@ async function setup() {
   const session = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(session);
   const actor: Actor = { userId: app.ownerId, sessionId: session.session.id, clientId: 'share-form-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const options = { publishOrigin: 'https://publication.example.test' };
+  const options = { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://publication.example.test' };
   const store = createArtifactStore(app.db, options);
   const panel = createPanel(app.db, options);
   const artifact = await store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'Shared document', description: '' }, content: { kind: 'text', text: 'Document' }, files: [] } });

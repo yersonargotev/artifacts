@@ -7,11 +7,11 @@ import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
 import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
-import { session } from '../packages/db/src/schema.ts';
+import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
 const snapshot = (title: string): Snapshot => ({ metadata: { title, description: `Description for ${title}` }, content: { kind: 'text', text: title }, files: [] });
-const options = { publishOrigin: 'https://published.example.test/nested' };
+const options = { access: { ownerEmail: 'owner@example.test', allowGuests: true }, publishOrigin: 'https://published.example.test/nested' };
 const actorFor = async (app: Awaited<ReturnType<typeof fixture>>): Promise<Actor> => {
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
@@ -19,7 +19,7 @@ const actorFor = async (app: Awaited<ReturnType<typeof fixture>>): Promise<Actor
 };
 
 test('panel snapshot resolves every scope, partitions status counts, and retains published revision references', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -64,7 +64,7 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
 });
 
 test('recent cursor orders equal-millisecond heads by descending ID without gaps and ignores move or publish time', async (t) => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -100,13 +100,14 @@ test('recent cursor orders equal-millisecond heads by descending ID without gaps
 });
 
 test('workspace and pages isolate owners even for empty searches, status filters, and same-name projects', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
     const panel = createPanel(app.db, options);
     await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Private owner title'), project: 'Alpha' });
     const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'panel-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'panel-other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     await app.auth.api.signInEmail({ body: { email: 'panel-other@example.test', password: app.password } });
     const [otherSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
     const other = { ...actor, userId: outsider.user.id, sessionId: otherSession.id };
@@ -147,7 +148,7 @@ test('panel URLs validate explicit scopes and cursors and reset cursors when fil
 });
 
 test('projects index returns inclusive tallies, the three newest titles per group, and head-derived update times', async (t) => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -192,7 +193,7 @@ test('projects index returns inclusive tallies, the three newest titles per grou
 });
 
 test('projects index breaks project timestamp ties by project order and represents empty and unfiled-only owners', async (t) => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -208,13 +209,14 @@ test('projects index breaks project timestamp ties by project order and represen
 });
 
 test('projects index filters owners before ranking and rejects missing scope, mismatched sessions, and revocation', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
     const panel = createPanel(app.db, options);
     const own = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Own Alpha'), project: 'Alpha' });
     const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'index-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'index-other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     await app.auth.api.signInEmail({ body: { email: 'index-other@example.test', password: app.password } });
     const [otherSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
     const other = { ...actor, userId: outsider.user.id, sessionId: otherSession.id };
@@ -234,7 +236,7 @@ test('projects index filters owners before ranking and rejects missing scope, mi
 
 
 test('detail reads one selected snapshot, light history and real client names in one transaction', async (t) => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     await app.db.insert(schema.oauthClient).values({ id: 'different-primary-key', clientId: actor.clientId, name: 'Authoring client', redirectUris: [] });
@@ -288,7 +290,7 @@ test('detail reads one selected snapshot, light history and real client names in
 });
 
 test('detail comparison falls through self, publication, head, parent, and the current history page', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -317,7 +319,7 @@ test('detail comparison falls through self, publication, head, parent, and the c
 });
 
 test('detail rejects invalid IDs, another artifact or owner, missing scope, and revoked sessions', async () => {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
     const store = createArtifactStore(app.db, options);
@@ -328,6 +330,7 @@ test('detail rejects invalid IDs, another artifact or owner, missing scope, and 
     for (const patch of [{ revisionId: '' }, { compareTo: '' }, { before: 0 }, { before: 1.5 }]) await assert.rejects(panel.artifact(actor, { ...input, ...patch }), { name: 'ZodError' });
     for (const patch of [{ artifactId: 'missing' }, { revisionId: 'missing' }, { compareTo: 'missing' }, { revisionId: otherArtifact.revision.id }, { compareTo: otherArtifact.revision.id }]) await assert.rejects(panel.artifact(actor, { ...input, ...patch }), { code: 'not_found' });
     const outsider = await app.auth.api.signUpEmail({ body: { name: 'Other owner', email: 'detail-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: (await app.db.select({ id: artifact.id }).from(artifact).where(eq(artifact.ownerId, app.ownerId)).limit(1))[0]!.id, kind: 'email', value: 'detail-other@example.test', createdBy: app.ownerId, createdAt: new Date() }).onConflictDoNothing();
     await app.auth.api.signInEmail({ body: { email: 'detail-other@example.test', password: app.password } });
     const [otherSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
     const other = { ...actor, userId: outsider.user.id, sessionId: otherSession.id };

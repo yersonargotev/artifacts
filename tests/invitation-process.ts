@@ -52,7 +52,7 @@ process.once('message', async (input: { databaseUrl: string; sink: string; confi
     if (String(args[0]).endsWith('/oauth2/introspect')) report('introspection_response', { status: response.status });
     return response;
   };
-  const store = createArtifactStore(connection.db, { publishOrigin: 'https://published.example.test', sendInvitation: fileEmailSender(input.sink) });
+  const store = createArtifactStore(connection.db, { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://published.example.test', sendInvitation: fileEmailSender(input.sink) });
   const share = store.share.bind(store);
   store.share = async (actor, command) => {
     report('share_enter', { requestId: command.requestId });
@@ -64,7 +64,7 @@ process.once('message', async (input: { databaseUrl: string; sink: string; confi
   const databaseEntry = import.meta.url.endsWith('.ts') ? new URL('../packages/db/src/index.ts', import.meta.url) : require.resolve('@artifacts/db');
   const sdk = createRequire(databaseEntry).resolve('@libsql/client');
   const wrapper = createRequire(sdk).resolve('libsql');
-  const server = serve({ fetch: (request) => handler(new Request(new URL(new URL(request.url).pathname, input.config.resource), request)), hostname: '127.0.0.1', port: 0 }, (address) => report('ready', { port: address.port, sdk, wrapper }));
+  const server = serve({ fetch: (request) => handler(new Request(new URL(new URL(request.url).pathname, input.config.resource), { method: request.method, headers: request.headers, ...(request.body ? { body: request.body, duplex: 'half' } : {}) })), hostname: '127.0.0.1', port: 0 }, (address) => report('ready', { port: address.port, sdk, wrapper }));
   process.once('SIGTERM', () => {
     if ('closeAllConnections' in server) server.closeAllConnections();
     server.close(() => { connection.client.close(); process.exit(0); });

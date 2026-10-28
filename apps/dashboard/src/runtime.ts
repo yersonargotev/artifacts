@@ -11,7 +11,7 @@ let runtime: ReturnType<typeof createRuntime> | undefined;
 async function createRuntime() {
   const config = dashboardConfig();
   const { db } = await openDatabase({ url: required('DATABASE_URL'), authToken: process.env.DATABASE_AUTH_TOKEN });
-  const options = { publishOrigin: serviceUrl('PUBLISH_URL'), sendInvitation: createEmailSender(process.env, config.origin) };
+  const options = { access: config.access, publishOrigin: serviceUrl('PUBLISH_URL'), sendInvitation: createEmailSender(process.env, config.origin) };
   const artifacts: DashboardStore = createArtifactStore(db, options);
   return { config, panel: createPanel(db, options), artifacts, identity: createPanelIdentity(db, config), cookieOptions: { httpOnly: true, secure: config.origin.startsWith('https:'), sameSite: 'lax' as const, path: '/' } };
 }

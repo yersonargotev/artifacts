@@ -7,6 +7,7 @@ export default {
     ...workerCompatibility,
     entrypoint: './src/worker.ts',
     env: {
+      ALLOW_GUEST_ACCESS: { type: 'text', value: 'false' },
       EMAIL_TRANSPORT: { type: 'text', value: 'resend' },
       EMAIL_FROM: { type: 'secret' },
       RESEND_API_KEY: { type: 'secret' },

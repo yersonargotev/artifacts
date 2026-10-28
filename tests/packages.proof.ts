@@ -127,7 +127,7 @@ import { createArtifactRestApp } from '@artifacts/rest';
 assert.equal(StoreError, ArtifactError);
 const config = JSON.parse(await readFile('fixture.json','utf8'));
 const connection = await openDatabase({url:config.databaseUrl});
-const app = createArtifactRestApp(config,createArtifactStore(connection.db,{publishOrigin:'https://published.example.test',sendInvitation:fileEmailSender(config.sink)}));
+const app = createArtifactRestApp(config,createArtifactStore(connection.db,{ access: { ownerEmail: 'owner@example.test', allowGuests: false },publishOrigin:'https://published.example.test',sendInvitation:fileEmailSender(config.sink)}));
 async function command(path,method,body){return app(new Request(config.resource+'/v1'+path,{method,headers:{authorization:'Bearer '+config.token,'content-type':'application/json'},body:JSON.stringify(body)}));}
 try {
 const snapshot={metadata:{title:'Packed store and REST',description:'Shared runtime'},content:{kind:'text',text:'Packed store bytes'},files:[]};
@@ -212,7 +212,7 @@ import { createArtifactStore, type ArtifactStore } from '@artifacts/artifacts';
 import { prepareArtifactEdit } from '@artifacts/artifacts/workflow';
 import { createArtifactRestApp } from '@artifacts/rest';
 const {db} = await openDatabase({url:'file:example.db'});
-const store: ArtifactStore = createArtifactStore(db,{publishOrigin:'https://published.example.test'});
+const store: ArtifactStore = createArtifactStore(db,{ access: { ownerEmail: 'owner@example.test', allowGuests: false },publishOrigin:'https://published.example.test'});
 const app: (request: Request) => Promise<Response> = createArtifactRestApp({issuer:'https://auth.example/api/auth',resource:'https://example.test/mcp',clientId:'resource',clientSecret:'secret'},store);
 console.log(app, prepareArtifactEdit);
 `);

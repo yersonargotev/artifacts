@@ -17,7 +17,7 @@ const sharedMode = args.includes('--shared-with-me');
 const sharedParent = args.includes('--s9-parent');
 const run = resolve(providedRun ? args[args.indexOf('--run') + 1]! : `.test-artifacts/verify-artifacts/panel-share-${randomUUID()}`);
 const control = (command: string[]) => execute(process.execPath, ['--import', 'tsx', '.agents/skills/verify-artifacts/scripts/control.ts', ...command]);
-if (!providedRun) await control(['launch', '--run', run]);
+if (!providedRun) await control(['launch', '--allow-guests', '--run', run]);
 const directory = join(run, 'panel-share');
 const review = resolve('.test-artifacts/review');
 await mkdir(directory, { recursive: true });

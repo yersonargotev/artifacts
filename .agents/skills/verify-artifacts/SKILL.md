@@ -38,7 +38,7 @@ pnpm build
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch
 ```
 
-The helper prints JSON with `ready: true`, a unique absolute `run` path, and service URLs only after the built panel and live MCP identity respond. Pass that path unchanged to later commands. Add `--email-code` only for the explicit disposable email-code recipe in [Identity and sessions](features/identity.md). This uses a private file sink and sends no external email. For a named run, add `--run .test-artifacts/verify-artifacts/preview-run`; that directory must not already exist.
+The helper prints JSON with `ready: true`, a unique absolute `run` path, and service URLs only after the built panel and live MCP identity respond. Pass that path unchanged to later commands. Add `--allow-guests` for recipes that need invited accounts. The default is owner-only. Add `--email-code` only for the explicit disposable email-code recipe in [Identity and sessions](features/identity.md). This uses a private file sink and sends no external email. For a named run, add `--run .test-artifacts/verify-artifacts/preview-run`; that directory must not already exist.
 
 Launch starts a supervisor, auth, the combined MCP+REST resource, the built Astro Node panel, and publication. It migrates a temporary local SQLite/libSQL database, creates a disposable owner and confidential panel client, and obtains an MCP token through the existing public OAuth HTTP grant helper. This setup is scaffolding, not proof of interactive CLI OAuth consent. Each drive authors artifacts through the real public HTTP MCP endpoint.
 

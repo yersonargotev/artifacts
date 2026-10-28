@@ -7,7 +7,7 @@ import { createArtifactStore, consumeGrantSchema, type Actor, type Snapshot } fr
 import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { artifactErrorResponse, panelActor, publicationReadSchema, publicationServiceAuthorized } from '../apps/dashboard/src/publication.ts';
-import { fixture } from './helpers.ts';
+import { fixture, historicalSignIn } from './helpers.ts';
 
 const snapshot: Snapshot = { metadata: { title: 'Shared artifact', description: '' }, content: { kind: 'html', text: '<p>shared</p>' }, files: [] };
 const publishedSnapshot: Snapshot = { metadata: { title: 'Quarterly plan', description: 'Shared with one guest', custom: { audience: 'guest' } }, content: { kind: 'html', text: '<h1>Shared revision</h1>' }, files: [{ path: 'notes.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Shared attachment.\n' }] };
@@ -28,16 +28,18 @@ function stubbedWorker(read: typeof fetch) {
 }
 
 async function setup() {
-  const app = await fixture();
+  const app = await fixture({ allowGuests: true });
   const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
   assert(signedIn);
   const owner: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'sharing-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
-  const store = createArtifactStore(app.db, { publishOrigin });
+  const store = createArtifactStore(app.db, { access: app.config.access, publishOrigin });
   async function account(name: string, email: string): Promise<Actor> {
     const created = await app.auth.api.signUpEmail({ body: { name, email, password: app.password } });
-    await app.auth.api.signInEmail({ body: { email, password: app.password } });
+    await historicalSignIn(app, email);
     const [signedInSession] = await app.db.select().from(session).where(eq(session.userId, created.user.id));
-    return panelActor({ userId: created.user.id, sessionId: signedInSession.id, name, clientId: 'panel-client', scopes: [], expiresAt: signedInSession.expiresAt });
+    const actor = panelActor({ userId: created.user.id, sessionId: signedInSession.id, name, clientId: 'panel-client', scopes: [], expiresAt: signedInSession.expiresAt });
+    if (email === 'outsider@example.test') await createArtifactStore(app.db, { publishOrigin, access: { ownerEmail: email, allowGuests: false } }).create(actor, { requestId: randomUUID(), snapshot });
+    return actor;
   }
   const other = await account('Outsider', 'outsider@example.test');
   const guest = await account('Guest', 'guest@example.test');
@@ -209,8 +211,8 @@ test('a share row of another kind is denied even when its value equals the guest
     await app.publish(first.artifactId, first.revision.id);
     await app.db.run(sql`insert into artifact_share (id, artifact_id, kind, value, created_by, created_at) values (${randomUUID()}, ${first.artifactId}, 'domain', 'guest@example.test', ${app.ownerId}, ${Date.now()})`);
     const viewer = { artifactId: first.artifactId, userId: app.guest.userId, sessionId: app.guest.sessionId, expiresAt: Date.now() + 60_000 };
-    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'not_found', message: 'Artifact not found' });
-    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'not_found', message: 'Artifact not found' });
+    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'forbidden', message: 'A live owner session is required' });
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden', message: 'A live owner session is required' });
     await app.share(app.owner, first.artifactId, 'guest@example.test');
     assert.equal((await app.store.readPublished(viewer, { artifactId: first.artifactId })).revision.id, first.revision.id, 'the same viewer is admitted once an email share exists');
   } finally { await app.close(); }
@@ -248,9 +250,9 @@ test('revoking a share denies the next read, the pending grant, and new grants',
     const state = randomUUID();
     const pending = await app.store.issuePublicationGrant(app.guest, { artifactId: first.artifactId, state });
     await app.store.unshare(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, shareId: shared.shareId });
-    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'not_found', message: 'Artifact not found' });
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden', message: 'A live owner session is required' });
     await assert.rejects(app.store.consumePublicationGrant({ artifactId: first.artifactId, state, code: pending.code }), { code: 'invalid_grant', message: 'Publication grant is invalid or expired' });
-    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'not_found', message: 'Artifact not found' });
+    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'forbidden', message: 'A live owner session is required' });
   } finally { await app.close(); }
 });
 
@@ -276,8 +278,8 @@ test('deleting the artifact denies an admitted guest and removes the share', asy
     const viewer = await app.admit(app.guest, first.artifactId);
     assert.equal((await app.store.readPublished(viewer, { artifactId: first.artifactId })).revision.id, first.revision.id);
     await app.store.delete(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, expectedPublicationVersion: 1 });
-    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'not_found' });
-    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'not_found' });
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden' });
+    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'forbidden' });
     assert.deepEqual(await app.db.select().from(artifactShare), []);
   } finally { await app.close(); }
 });
@@ -411,7 +413,7 @@ test('raw guest publication output always contains the current normalized owner 
       assert.deepEqual(read, { artifactId: first.artifactId, ownerName: expected, publication: { revisionId: first.revision.id, version: 1, url: `${publishOrigin}/a/${first.artifactId}` }, revision: { id: first.revision.id, createdAt: first.revision.createdAt, sha256: first.revision.sha256, snapshot: publishedSnapshot } });
     }
     await app.db.update(user).set({ email: 'changed@example.test' }).where(eq(user.id, app.guest.userId));
-    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'not_found' });
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden' });
   } finally { await app.close(); }
 });
 

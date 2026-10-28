@@ -20,7 +20,7 @@ const review = resolve('.test-artifacts/review');
 const privateDirectory = await mkdtemp(join(tmpdir(), 'artifacts-invitations-proof-'));
 await mkdir(directory, { recursive: true, mode: 0o700 });
 await mkdir(review, { recursive: true });
-const app = await restCliFixture({ emailCode: true, invitations: true });
+const app = await restCliFixture({ allowGuests: true, emailCode: true, invitations: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: !process.argv.includes('--headed') });
 const contexts: BrowserContext[] = [];
 const results: { lane: number | string; status: 'PASS'; observed: unknown }[] = [];

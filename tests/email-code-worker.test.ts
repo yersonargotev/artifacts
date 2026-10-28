@@ -40,7 +40,7 @@ test('cached Worker runtime binds overlapping sends to current waitUntil and req
     `;
     const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', source], {
       cwd: new URL('..', import.meta.url), timeout: 15_000,
-      env: { PATH: process.env.PATH, EMAIL_WORKER_FIXTURE: JSON.stringify({ DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret, EMAIL_TRANSPORT: 'resend', OWNER_EMAIL: 'owner@example.test', EMAIL_FROM: 'codes@example.test', RESEND_API_KEY: 'fixture-token' }) },
+      env: { PATH: process.env.PATH, EMAIL_WORKER_FIXTURE: JSON.stringify({ OWNER_EMAIL: app.config.access.ownerEmail, ALLOW_GUEST_ACCESS: String(app.config.access.allowGuests), DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, DASHBOARD_URL: app.config.dashboard, BETTER_AUTH_SECRET: app.config.secret, EMAIL_TRANSPORT: 'resend', EMAIL_FROM: 'codes@example.test', RESEND_API_KEY: 'fixture-token' }) },
     });
     assert.match(result.stdout, /Worker request contexts passed/);
     const counters = await app.client.execute("SELECT identifier FROM verification WHERE id LIKE 'artifacts:email-code:send-ip:%' ORDER BY identifier");

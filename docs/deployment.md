@@ -48,7 +48,7 @@ The authorization Worker's CIMD transport approves only the exact Codex and Clau
 gh secret set --env production CLOUDFLARE_API_TOKEN
 ```
 
-5. Prepare a private JSON object with the complete runtime binding union defined in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Use the existing production values and confidential clients. Do not pass an owner password or bootstrap credentials to CI. Auth alone receives the OWNER_EMAIL admission address.
+5. Prepare a private JSON object with the complete runtime binding union defined in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Use the existing production values and confidential clients. Do not pass an owner password or bootstrap credentials to CI. Auth, MCP, and panel receive the OWNER_EMAIL admission address.
 6. Add that object as the environment secret `ARTIFACTS_RUNTIME_SECRETS`. Keep the input file outside the repository.
 
 ```sh
@@ -61,7 +61,7 @@ The [CI/CD release contract](ci-cd.md) describes artifact integrity, current-mai
 
 ## Enable Resend delivery
 
-The production configurations select Resend for sign-in codes and invitations. Auth, MCP, and panel require `EMAIL_FROM` and `RESEND_API_KEY`. Auth alone also requires `OWNER_EMAIL`. The viewer receives no email bindings. Cloudflare account credentials remain separate deployment inputs.
+The production configurations select Resend for sign-in codes and invitations. Auth, MCP, and panel require `EMAIL_FROM` and `RESEND_API_KEY`. Auth, MCP, and panel also require `OWNER_EMAIL`. The viewer receives no email bindings. Cloudflare account credentials remain separate deployment inputs.
 
 Before deploying the S10 code and this provider replacement, apply the reviewed `0004_sweet_the_anarchist.sql` migration to the intended database. It adds an owner budget with no recipient or artifact data. CI does not run migrations. Deploy in the order auth, MCP, view, panel.
 
@@ -72,7 +72,7 @@ Configure the sender in your Resend account with this procedure:
 3. Copy the exact record names, types, priorities, and values that Resend gives your account into the authoritative DNS service. Preserve the existing SpaceMail MX records and SPF record at the root `sparkydevs.com`. Keep receiving disabled in Resend. Add the account-provided verification and sending records at their specified subdomain names. If a proposed record conflicts with SpaceMail, resolve the name or subdomain choice before changing DNS. Do not copy example DKIM keys or invent SPF values.
 4. Inspect each account-provided record with `dig` using its exact name and type. Compare the full response with the Resend dashboard. Ask Resend to verify the sending domain and retain the DNS responses and verified dashboard state as operator evidence. No DNS values or verified domain state are supplied by this repository.
 5. Create a [Resend API key](https://resend.com/docs/dashboard/api-keys/introduction) with sending permission. Restrict the key to the verified sending domain where available. Save it in your secret manager when Resend displays it, because the dashboard shows the secret only at creation.
-6. Choose a bare sender address on that verified subdomain for `EMAIL_FROM`. Do not use a display-name form. Set `RESEND_API_KEY` and `EMAIL_FROM` in the private runtime secret files for auth, MCP, and panel. Set `OWNER_EMAIL` only for auth. For GitHub releases, update the exact runtime binding union in `ARTIFACTS_RUNTIME_SECRETS` as described in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Remove the obsolete Cloudflare email token and the runtime copy of the Cloudflare account ID. Keep the separate deployment account ID and deployment API token.
+6. Choose a bare sender address on that verified subdomain for `EMAIL_FROM`. Do not use a display-name form. Set `RESEND_API_KEY` and `EMAIL_FROM` in the private runtime secret files for auth, MCP, and panel. Set `OWNER_EMAIL` for auth, MCP, and panel. For GitHub releases, update the exact runtime binding union in `ARTIFACTS_RUNTIME_SECRETS` as described in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Remove the obsolete Cloudflare email token and the runtime copy of the Cloudflare account ID. Keep the separate deployment account ID and deployment API token.
 7. After deployment is separately authorized, verify one sign-in code and one disposable invitation with controlled recipients. Record provider acceptance separately from inbox delivery. A successful API response does not establish delivery.
 
 The sender makes one bounded request and does not retry provider failures. Resend quota rejection preserves the uniform sign-in response and the committed invitation receipt. Replaying a share receipt does not attempt another email. Account readiness, sender verification, DNS changes, deployment, and production delivery remain unverified by local tests. This provider follow-up does not change the historical S10 evidence.
@@ -105,3 +105,13 @@ The portable package distribution retains its upstream registry graph and known 
 Build the optional private server profile with `pnpm build:packages:native`. Its separate inventory is `dist/packages-native-fixed/manifest.json`. Install all required tarballs from that inventory together with `npm install --ignore-scripts`. Native tarball names identify the host target, and the DB package rejects a different OS or CPU. Linux output records its build-host glibc version and has no claim of compatibility with older untested libc versions. Use the portable profile when a fixed build for the deployment host is unavailable, with its inherited limitation explicitly retained.
 
 `pnpm test:packages:native` builds both profiles, verifies the bundled dependency bytes, and installs them in external projects with scripts disabled. It exercises both SDK entrypoints, failed-read recovery through another process, encrypted-file compatibility in both directions, and the actual installed auth and REST invitation gates. The original portable graph is a negative recovery control, not a repaired profile. The native profile remains private, and `release:npm:check` and `release:npm:publish` reject its inventory before registry access.
+
+## Restrict access to the owner
+
+`OWNER_EMAIL` is required even when email delivery is disabled. Auth, MCP, and panel default to `ALLOW_GUEST_ACCESS=false`. Keep the same value on all three services. The flag is server configuration and requires a service restart or Worker configuration update.
+
+Set `ALLOW_GUEST_ACCESS=true` on all three services to admit the current guest population. A guest must have a current email share or own an artifact. An existing account alone does not qualify. Normal per-artifact sharing and verified-email checks still apply. Invalid flag values fail startup.
+
+Closing the flag suspends other accounts at session and token use. Previously issued browser sessions, publication cookies, authorization codes, access tokens, and refresh tokens do not bypass the policy. Changing the flag does not delete accounts, sessions, shares, or token records. Normal expiry, explicit sign-out, single-use code consumption, and revocation still apply. Reopening the flag rechecks current admission. The owner retains password, email-code, CLI, and MCP access.
+
+Authentication rate limits are explicitly enabled. Atomic database counters are shared across runtimes. Node trusts the socket address, and the Worker trusts `cf-connecting-ip`. Client-supplied forwarding headers cannot select a new bucket. Addresses in one IPv6 /64 share a bucket. Email-code quotas remain separate, and live introspection is exempt from the general request quota.

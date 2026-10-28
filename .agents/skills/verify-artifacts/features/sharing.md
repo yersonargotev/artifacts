@@ -32,10 +32,10 @@ Preconditions:
 - `.test-artifacts/verify-artifacts/sharing-run` does not exist before launch.
 - Actual Chrome 152 or newer.
 
-- **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/sharing-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/sharing-run`.
+- **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --allow-guests --run .test-artifacts/verify-artifacts/sharing-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/sharing-run`.
 - **Drive.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive sharing --run .test-artifacts/verify-artifacts/sharing-run`. The recipe:
   1. Creates `Verification artifact` in project `Sharing proof` and publishes revision 1 through HTTP MCP.
-  2. Creates `guest@example.test` with a verified email through the supervisor's `POST /account` route. The guest signs in with the run password from `runtime/credentials.json`.
+  2. Creates `guest@example.test` with a verified email and a separate fixture-owned artifact for global admission through the supervisor's `POST /account` route. The guest signs in with the run password from `runtime/credentials.json`.
   3. Opens the publication as the guest in a second browser context, signs in, and checks the panel `404` above.
   4. Calls `artifacts_share` with the owner's MCP token and `GUEST@Example.TEST`, checks that the returned `value` is `guest@example.test`, repeats the call with the same `requestId` and expects the same share, and checks that `artifacts_shares_list` returns exactly that share.
   5. Reopens the URL as the guest, waits for the iframe heading `Verification revision 1`, checks `data-revision-id`, checks that the page has no project link, `Cliente autor`, or `Revisión 1`, downloads `notes.txt`, and repeats the view at 390 pixels without horizontal overflow.

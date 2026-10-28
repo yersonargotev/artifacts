@@ -11,6 +11,8 @@
     "check": "tsc --noEmit && pnpm --filter @artifacts/dashboard check",
     "build": "pnpm --filter @artifacts/dashboard build",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:owner-access": "node --import tsx --test tests/owner-access.test.ts tests/auth-rate-limit.test.ts",
+    "test:owner-access:browser": "pnpm build && node --import tsx tests/owner-access.browser.proof.ts",
     "db:generate": "pnpm --filter @artifacts/db generate",
     "db:migrate": "tsx packages/db/src/migrate.ts",
     "configure": "tsx scripts/configure.ts",
