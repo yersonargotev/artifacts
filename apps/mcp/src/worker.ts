@@ -13,12 +13,13 @@ async function createRuntime(env: McpWorkerEnvironment) {
 }
 
 export default {
-  async fetch(request: Request, env: McpWorkerEnvironment): Promise<Response> {
+  async fetch(request: Request, env: McpWorkerEnvironment, context?: { waitUntil(task: Promise<void>): void }): Promise<Response> {
     let runtime = runtimes.get(env);
     if (!runtime) {
       runtime = createRuntime(env).catch((error) => { runtimes.delete(env); throw error; });
       runtimes.set(env, runtime);
     }
+    context?.waitUntil(runtime.then(() => undefined, () => undefined));
     try {
       return await (await runtime)(request);
     } catch {

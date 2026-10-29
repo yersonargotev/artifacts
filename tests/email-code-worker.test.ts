@@ -27,11 +27,18 @@ test('cached Worker runtime binds overlapping sends to current waitUntil and req
           worker.fetch(request('192.0.2.2'), env, { waitUntil: (task) => second.push(task) }),
         ]);
         assert.deepEqual(responses.map((response) => response.status), [200, 200]);
-        assert.equal(first.length, 1);
-        assert.equal(second.length, 1);
-        assert.notEqual(first[0], second[0]);
+        assert.equal(first.length, 2);
+        assert.equal(second.length, 2);
+        await Promise.all([first[0], second[0]]);
+        const firstSend = first[1];
+        const secondSend = second[1];
+        assert.notEqual(firstSend, secondSend);
+        let completed = 0;
+        void firstSend.then(() => completed++);
+        void secondSend.then(() => completed++);
         await new Promise((resolve) => setTimeout(resolve, 10));
         assert.equal(calls, 2);
+        assert.equal(completed, 0);
         const missing = await worker.fetch(request('192.0.2.3'), env);
         assert.equal(missing.status, 503);
         assert.equal(calls, 2);

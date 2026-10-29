@@ -26,6 +26,7 @@ export default {
       runtime = createRuntime(env).catch((error) => { runtimes.delete(env); throw error; });
       runtimes.set(env, runtime);
     }
+    context?.waitUntil(runtime.then(() => undefined, () => undefined));
     try {
       const current = await runtime;
       if (current.emailEnabled && !context) throw new Error('Email delivery requires a request execution context');
