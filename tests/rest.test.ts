@@ -21,7 +21,7 @@ test('separate REST and MCP URLs discover exact audiences and share retained art
     const restApp = { ...app, config: { ...app.config, resource } };
     const restGrant = await grant(restApp, fullScope);
     const restToken = restGrant.access_token;
-    const mcpToken = (await grant(app, fullScope)).access_token;
+    const mcpToken = (await grant(app, fullScope, restGrant.clientId)).access_token;
     const call = api(restApp, restToken);
     assert.equal(new URL(restBase(resource)).pathname, '/v1');
     for (const audience of [resource, app.config.resource]) {

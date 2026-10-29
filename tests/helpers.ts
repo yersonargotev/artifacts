@@ -70,13 +70,13 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   };
 }
 
-export async function grant(app: { config: { origin: string; issuer: string; resource: string }; cookie: string }, scope = 'openid profile offline_access artifacts:read', metadataClientId?: string) {
-  const registration = metadataClientId ? undefined : await fetch(`${app.config.issuer}/oauth2/register`, {
+export async function grant(app: { config: { origin: string; issuer: string; resource: string }; cookie: string }, scope = 'openid profile offline_access artifacts:read', clientId?: string) {
+  const registration = clientId ? undefined : await fetch(`${app.config.issuer}/oauth2/register`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'Identity integration', redirect_uris: ['http://127.0.0.1:49999/callback'], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] }),
   });
   if (registration) assert.equal(registration.status, 201, `registration status ${registration.status}`);
-  const registered = registration ? await registration.json() as { client_id: string; application_type: string } : { client_id: metadataClientId!, application_type: 'native' };
+  const registered = registration ? await registration.json() as { client_id: string; application_type: string } : { client_id: clientId!, application_type: 'native' };
   assert.equal(registered.application_type, 'native');
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');

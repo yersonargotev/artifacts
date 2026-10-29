@@ -138,7 +138,7 @@ async function supervisor() {
     }
     assert(ready, 'Built panel is ready');
     const tokens = await grant(app, scopes);
-    const restTokens = await grant({ ...app, config: { ...app.config, resource: app.config.apiResource! } }, scopes);
+    const restTokens = await grant({ ...app, config: { ...app.config, resource: app.config.apiResource! } }, scopes, tokens.clientId);
     const fixtureApp = app;
     const admittedAccounts = new Set<string>();
     async function ensureAccount(email: string, verified: boolean): Promise<Account> {
