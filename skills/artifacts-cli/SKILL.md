@@ -63,9 +63,11 @@ A `request_conflict` means the ID was used with different arguments. Do not desc
 
 ## Verify and deliver
 
-After create or update, read the explicit returned revision. Use `read ARTIFACT_ID --revision REVISION_ID --out FILE --quiet` to retain the full response without printing its snapshot. Check that the installed `--help` supports `--quiet` first. For older versions, use the command workflow's stdout redirection fallback. Compare the saved complete metadata, content, and decoded attachment bytes with the intended snapshot. For an update, check that its parent is the head used for preparation. Compact responses cannot verify omitted content.
+Retain successful create, update, or edit stdout in a private receipt file. After create or update, read the explicit returned revision. Use `read ARTIFACT_ID --revision REVISION_ID --out FILE --quiet` to retain the full response without printing its snapshot. Check that the installed `--help` supports `--quiet` first. For older versions, use the command workflow's stdout redirection fallback. Compare the saved complete metadata, content, and decoded attachment bytes with the intended snapshot. For an update, check that its parent is the head used for preparation. Compact responses cannot verify omitted content.
 
 After publication, read current publication and compare revision, version, and URL with the committed result. A replayed receipt describes the original commit; another writer may have changed the current publication afterward. Report that difference.
+
+For real panel and requested protected-publication checks, follow [the exact saved revision recipe](references/verify-retained.md). It prepares the existing verifier inputs from the write receipt and independent full read. It also gives an installed-browser route when the complete verifier runtime is unavailable. Report persistence, local rendering, panel rendering, and protected publication separately. Input preparation is not a browser pass.
 
 Follow list and history cursors when the request needs more than the first page. Export an explicit retained revision to the requested destination. The CLI checks the archive digest. Confirm that the file exists and inspect its manifest and relevant content before linking it.
 
