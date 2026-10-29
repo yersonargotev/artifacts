@@ -31,10 +31,35 @@ const fixtures: { name: string; html: string; expectedFaces: string[] }[] = [
     html: '<style>:root { --license: "Newsreader" } body { font-family: "Public Sans" } body::after { content: "Newsreader font-style: italic" }</style>',
     expectedFaces: ['Public Sans normal'],
   },
+  ...['text/plain', ' TEXT/CSS ', 'text/css;charset=utf-8', 'text&SOL;css', 'text&Sol;css'].map((type) => ({
+    name: `a style element with inert type ${JSON.stringify(type)} does not select fonts`,
+    html: `${publicSans}<style type="${type}">p { font-family: Newsreader; font-style: italic }</style>`,
+    expectedFaces: ['Public Sans normal'],
+  })),
+  ...['text&#47;css', 'text&#47css', 'text&#x2f;css', 'text&sol;css'].map((type) => ({
+    name: `an encoded CSS style type ${JSON.stringify(type)} selects fonts`,
+    html: `<style type="${type}">body { font-family: "Public Sans" }</style>`,
+    expectedFaces: ['Public Sans normal'],
+  })),
+  {
+    name: 'a CSS style type is case insensitive',
+    html: '<style type="TEXT/CSS">body { font-family: "Public Sans" }</style>',
+    expectedFaces: ['Public Sans normal'],
+  },
   {
     name: 'font shorthand follows referenced custom properties',
     html: '<style>:root { --body: var(--family); --family: "Public Sans", sans-serif } body { font: 15px/1.5 var(--body) }</style>',
     expectedFaces: ['Public Sans normal'],
+  },
+  {
+    name: 'declaration priority is removed before custom property substitution',
+    html: '<style>:root { --body: "Public Sans"!important } body { font-family: var(--body), Newsreader }</style>',
+    expectedFaces: ['Public Sans normal', 'Newsreader normal'],
+  },
+  {
+    name: 'declaration priority allows whitespace after its exclamation mark',
+    html: '<style>body { font-family: "Public Sans" ! important; font-style: italic ! important }</style>',
+    expectedFaces: ['Public Sans normal', 'Public Sans italic'],
   },
   {
     name: 'font-family follows a custom property fallback',
@@ -70,6 +95,11 @@ const fixtures: { name: string; html: string; expectedFaces: string[] }[] = [
     name: 'italic font shorthand selects italic faces',
     html: '<style>body { font: italic 16px "Newsreader", serif }</style>',
     expectedFaces: ['Newsreader normal', 'Newsreader italic'],
+  },
+  {
+    name: 'font shorthand keeps variant keywords separate from its size and family',
+    html: '<style>body { font: small-caps 600 clamp(12px, 2vw, 18px)/1.5 Public Sans, sans-serif }</style>',
+    expectedFaces: ['Public Sans normal'],
   },
   {
     name: 'inline italic styles select italic faces',
