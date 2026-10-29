@@ -27,8 +27,8 @@ const control = (command: string[]) => execute(process.execPath, ['--import', 't
 if (!providedRun) await control(['launch', '--allow-guests', ...(passwordOnly ? [] : ['--email-code']), '--run', run]);
 await mkdir(directory, { recursive: true });
 await mkdir(review, { recursive: true });
-const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; mcp: string; panel: string; ownerId: string };
-const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { accessToken: string; password: string };
+const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; api: string; mcp: string; panel: string; ownerId: string };
+const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { accessToken: string; restAccessToken: string; password: string };
 let browser: Browser | undefined;
 const errors: string[] = [];
 let status = 'ISSUES';
@@ -119,7 +119,7 @@ try {
     assert.equal(await initial.getByRole('button', { name: 'Recibir código', exact: true }).count(), 0);
     pass('parent', 'Verified S6 parent has no email-code form');
   } else {
-    const client = createArtifactHttpClient({ resource: instance.mcp, accessToken: credentials.accessToken });
+    const client = createArtifactHttpClient({ resource: instance.api, accessToken: credentials.restAccessToken });
     const created = await client.create({ requestId: randomUUID(), snapshot: { metadata: { title: 'Sign-in browser proof', description: '' }, content: { kind: 'html', text: '<h1>Code sign-in invitation</h1>' }, files: [] } });
     const invite = async (email: string) => client.share({ requestId: randomUUID(), artifactId: created.artifactId, email });
     const email = 'ana@example.com';
@@ -275,7 +275,7 @@ try {
     const cliEmail = 'cli@example.com';
     await invite(cliEmail);
     const cliState = join(run, 'runtime/cli-state');
-    const cliEnv = { PATH: process.env.PATH, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState };
+    const cliEnv = { PATH: process.env.PATH, ARTIFACTS_SERVER: instance.api, ARTIFACTS_STATE_DIR: cliState };
     const login = spawn('pnpm', ['artifacts', 'login', '--no-browser'], { env: cliEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     children.push(login);
     let stderr = '';
