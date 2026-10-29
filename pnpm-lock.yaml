@@ -200,6 +200,9 @@ importers:
       lightningcss:
         specifier: 1.32.0
         version: 1.32.0
+      miniflare:
+        specifier: 5.20261006.1-alpha
+        version: 5.20261006.1-alpha(@types/node@24.10.1)
       playwright:
         specifier: 1.64.0
         version: 1.64.0
