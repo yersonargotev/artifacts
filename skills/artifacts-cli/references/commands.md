@@ -179,6 +179,10 @@ Share with `--notify` to request one email attempt. Access succeeds when mail is
 
 Owners can reserve 100 invitations per UTC day. Revoke, deletion, and failed delivery do not refund reservations. New access is limited to 100 people per artifact and 1000 grants per owner. Existing access remains listable and revocable.
 
+## Verify the exact saved revision
+
+Follow [the retained revision recipe](verify-retained.md) after successful authoring and requested publication. Retain each successful write stdout in a private receipt file. The recipe extracts its IDs, performs a full independent explicit-revision read, and prepares the existing verifier config without authoring or account mutations. It includes an installed-browser path and identifies the additional capabilities for complete verification.
+
 ## Retry and export
 
 ```sh

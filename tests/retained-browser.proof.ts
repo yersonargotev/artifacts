@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { serve } from '@hono/node-server';
@@ -11,7 +11,7 @@ import { chromium, type Browser } from 'playwright';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, panelSession, session, user } from '../packages/db/src/schema.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
-import { verifyRetainedArtifact } from '../.agents/skills/verify-artifacts/scripts/retained.ts';
+import { parseRetainedVerificationConfig, verifyRetainedArtifact } from '../.agents/skills/verify-artifacts/scripts/retained.ts';
 import { fixture } from './helpers.ts';
 
 const evidence = resolve('.test-artifacts/verify-artifacts', `retained-${Date.now()}-${randomBytes(4).toString('hex')}`);
@@ -37,7 +37,7 @@ const central = await app.db.select().from(session).where(eq(session.userId, app
 assert(central);
 const actor = { userId: app.ownerId, sessionId: central.id, clientId: 'retained-proof-fixture', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
 const first = await store.create(actor, { requestId: randomBytes(16).toString('hex'), snapshot: { metadata: { title: 'Retained browser proof', description: 'Exact saved revision with a newer unpublished head', custom: { retained: true } }, content: { kind: 'html', text: '<h1>Saved retained revision</h1><button id="change">Change cost</button><output id="total">5.00</output><script>document.querySelector("#change").onclick=()=>document.querySelector("#total").textContent="28.40"</script>' }, files: [{ path: 'nested/bytes.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAH/' }, { path: 'notes.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Saved retained attachment.\n' }] } });
-await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: first.artifactId, revisionId: first.revision.id, expectedPublicationVersion: 0 });
+const publicationReceipt = await store.publish(actor, { requestId: randomBytes(16).toString('hex'), artifactId: first.artifactId, revisionId: first.revision.id, expectedPublicationVersion: 0 });
 await store.update(actor, { requestId: randomBytes(16).toString('hex'), artifactId: first.artifactId, expectedRevisionId: first.revision.id, snapshot: { metadata: { title: 'Unpublished newer head', description: 'Verifier must select revision one' }, content: { kind: 'text', text: 'Newer head is not the retained published revision.' }, files: [] } });
 const expected = await store.read(actor, { artifactId: first.artifactId, revisionId: first.revision.id });
 const client = await app.auth.api.adminCreateOAuthClient({ headers: new Headers({ cookie: app.cookie }), body: { client_name: 'Retained proof dashboard', application_type: 'native', redirect_uris: [`${dashboard}/auth/callback`], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile', enable_end_session: true, skip_consent: true, require_pkce: true } });
@@ -72,7 +72,14 @@ try {
   const before = await rows();
   const requests: { method: string; path: string }[] = [];
   context.on('request', (request) => requests.push({ method: request.method(), path: new URL(request.url()).pathname }));
-  const report = await verifyRetainedArtifact(context, { expected, panelUrl, publicationUrl: expected.publication!.url, viewports: [{ width: 1280, height: 900 }, { width: 390, height: 844 }], expectations: [{ kind: 'text', selector: '#total', text: '5.00' }, { kind: 'click', selector: '#change' }, { kind: 'text', selector: '#total', text: '28.40' }], evidenceDirectory: join(evidence, 'verification') });
+  const preparation = { receipt: first, read: expected, publication: publicationReceipt, checks: { viewports: [{ width: 1280, height: 900 }, { width: 390, height: 844 }], expectations: [{ kind: 'text', selector: '#total', text: '5.00' }, { kind: 'click', selector: '#change' }, { kind: 'text', selector: '#total', text: '28.40' }] } };
+  for (const [name, value] of Object.entries(preparation)) await writeFile(join(evidence, `${name}.json`), JSON.stringify(value), { mode: 0o600 });
+  const prepared = spawnSync(process.execPath, [resolve('skills/artifacts-cli/scripts/prepare-retained.mjs'), '--receipt', join(evidence, 'receipt.json'), '--read', join(evidence, 'read.json'), '--publication-receipt', join(evidence, 'publication.json'), '--checks', join(evidence, 'checks.json'), '--panel-origin', dashboard, '--evidence', join(evidence, 'verification'), '--out', join(evidence, 'config.json')], { encoding: 'utf8' });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  assert.equal(JSON.parse(prepared.stdout).headChanged, true);
+  const config = parseRetainedVerificationConfig(JSON.parse(await readFile(join(evidence, 'config.json'), 'utf8')));
+  assert.equal(config.panelUrl, panelUrl);
+  const report = await verifyRetainedArtifact(context, config);
   assert.equal(report.status, 'passed', JSON.stringify(report.errors));
   assert.equal(report.publication, 'verified');
   assert.deepEqual(report.attachments.map(({ path, bytes }) => ({ path, bytes })), [{ path: 'nested/bytes.bin', bytes: 3 }, { path: 'notes.txt', bytes: 27 }]);

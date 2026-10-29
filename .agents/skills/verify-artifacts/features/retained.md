@@ -2,6 +2,12 @@
 
 Use this recipe when the artifact already exists and the task is to prove its saved revision through the actual panel and protected publication. Retain a full independent read from `artifacts_read` or the installed CLI before browser verification. Compact reads do not contain the snapshot bytes needed for this proof.
 
+## Prepare inputs after CLI authoring
+
+Follow [the bundled CLI handoff](../../../../skills/artifacts-cli/references/verify-retained.md) to capture successful authoring and requested publication receipts, perform the independent full explicit-revision read, and run `prepare-retained.mjs`. The helper derives the pinned panel URL and optional publication URL without manual ID transcription. It rejects receipt mismatches and changed publication state. A newer draft head leaves the selected revision pinned. Pass its generated config unchanged to the existing entry point below.
+
+The distributed recipe also supplies a self-contained partial-browser path for installed CLI consumers. The helper prepares inputs only. This repository verifier remains the authority for complete schema, snapshot hash, byte, policy, interaction, archive, and attachment checks.
+
 ## Partial browser-control verification
 
 Use this route when the available authenticated tab exposes browser controls but no supplied Playwright `BrowserContext` or private storage state. Inspect only the authorized retained artifact. Keep authentication inside the browser and use its normal sign-in path if needed.

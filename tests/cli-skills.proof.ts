@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { inspectTarball, packageOutput, readInventory, root } from '../scripts/package-catalog.ts';
 
 const inventory = await readInventory();
@@ -125,6 +126,34 @@ require('node:module').syncBuiltinESMExports();
   assert.equal(bundled, join(catalog, 'artifacts-cli'));
   assert.equal(await readFile(join(bundled, 'SKILL.md'), 'utf8'), skill);
   assert.deepEqual(await files(bundled), sourceFiles);
+  for (const path of sourceFiles.filter((path) => path.endsWith('.md'))) {
+    const text = await readFile(join(bundled, path), 'utf8');
+    for (const [, target] of text.matchAll(/\]\(([^)]+)\)/g)) {
+      if (/^(?:[a-z]+:|#)/i.test(target)) continue;
+      const destination = resolve(dirname(join(bundled, path)), target.split('#')[0]!);
+      assert.equal(relative(bundled, destination).startsWith('..'), false, `Installed reference stays within its bundled skill: ${target}`);
+      assert.equal((await stat(destination)).isFile(), true, `Installed reference resolves: ${target}`);
+    }
+  }
+  const handoffSnapshot = { metadata: { title: 'Installed retained handoff', description: 'Independent complete read' }, content: { kind: 'text', text: 'Exact selected revision.' }, files: [] };
+  const canonical = JSON.stringify(handoffSnapshot, (_key, value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : value);
+  const handoffRead = { artifactId: 'installed-artifact', ownerId: 'installed-owner', headRevisionId: 'newer-head', project: null, publication: { revisionId: 'selected-revision', version: 2, url: 'https://viewer.example.test/a/installed-artifact' }, revision: { id: 'selected-revision', parentRevisionId: null, sequence: 1, authorUserId: 'installed-owner', authorClientId: 'installed-cli', createdAt: '2026-10-28T12:00:00.000Z', sha256: createHash('sha256').update(canonical).digest('hex'), snapshot: handoffSnapshot } };
+  const handoffInputs = { receipt: { artifactId: handoffRead.artifactId, revision: { id: handoffRead.revision.id, sha256: handoffRead.revision.sha256 } }, read: handoffRead, publication: { artifactId: handoffRead.artifactId, ...handoffRead.publication }, checks: { viewports: [{ width: 390, height: 844 }], expectations: [] } };
+  for (const [name, value] of Object.entries(handoffInputs)) await writeFile(join(cwd, `handoff-${name}.json`), JSON.stringify(value));
+  const handoffOutput = join(cwd, 'retained-config.json');
+  const handoffArgs = [join(bundled, 'scripts/prepare-retained.mjs'), '--receipt', join(cwd, 'handoff-receipt.json'), '--read', join(cwd, 'handoff-read.json'), '--publication-receipt', join(cwd, 'handoff-publication.json'), '--checks', join(cwd, 'handoff-checks.json'), '--panel-origin', 'https://panel.example.test', '--evidence', join(cwd, 'new-retained-evidence'), '--out', handoffOutput];
+  const handoff = await run(process.execPath, handoffArgs);
+  assert.equal(handoff.code, 0, handoff.stderr);
+  assert.deepEqual(JSON.parse(handoff.stdout), { status: 'prepared', headChanged: true, publication: 'requested' });
+  const handoffConfig = JSON.parse(await readFile(handoffOutput, 'utf8'));
+  assert.deepEqual(handoffConfig.expected, handoffRead);
+  assert.equal(handoffConfig.panelUrl, 'https://panel.example.test/artifacts/installed-artifact?revisionId=selected-revision');
+  assert.equal(handoffConfig.publicationUrl, handoffRead.publication.url);
+  assert.equal((await stat(handoffOutput)).mode & 0o777, 0o600);
+  await assert.rejects(stat(join(cwd, 'new-retained-evidence')), { code: 'ENOENT' });
+  assert.equal((await run(process.execPath, handoffArgs)).code, 1);
+  assert.deepEqual(JSON.parse(await readFile(handoffOutput, 'utf8')), handoffConfig);
+
   const templates = join(bundled, 'templates/nested');
   await mkdir(templates, { recursive: true });
   const template = '{"metadata":{"title":"Template proof"}}';
@@ -225,7 +254,7 @@ require('node:module').syncBuiltinESMExports();
   ];
   for (const [args, pattern] of invalid) await failure(args, pattern);
   assert.equal((await readdir(home)).includes('cli-state'), false, 'Offline commands never initialize credential state');
-  console.log('Packaged skills passed offline listing, exact content, full references, paths, all install destinations, idempotence, overwrite protection, discovery loading, and invalid arguments.');
+  console.log('Packaged skills passed offline listing, exact content, full references, paths, retained handoff, all install destinations, idempotence, overwrite protection, discovery loading, and invalid arguments.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
