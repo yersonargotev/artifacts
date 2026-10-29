@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 ## Claude Code execution
 
-Apply this workflow when explicitly requested, or read it as a dependency of an explicitly requested pstack workflow. Read sibling pstack skills from this installation, not from another host's roots. Project skills belong under `.claude/skills`; personal skills under `~/.claude/skills`.
+Apply this workflow when explicitly requested.
 
 Claude manual-only dependencies must be read as files; do not invoke them through the Skill tool or preload them as model-invoked skills.
 

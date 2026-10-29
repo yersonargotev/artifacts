@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 ## Claude Code execution
 
-Apply this workflow when explicitly requested, or read it as a dependency of an explicitly requested pstack workflow. Read sibling pstack skills from this installation, not from another host's roots. Project skills belong under `.claude/skills`; personal skills under `~/.claude/skills`.
+Apply this workflow when explicitly requested.
 
 Delegate through the Agent tool with an available agent type, such as general-purpose; use only parameters exposed by this session. Delegate only when current instructions permit it. Read `~/.pstack/claude-models.md` for confirmed role preferences; otherwise inherit the host model. `inherit-parent` means omit an override, not a model ID. Same-model reviewers are not a multi-model panel. When delegation is unavailable, label sequential work as such; a required independent-review gate remains incomplete.
 

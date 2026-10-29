@@ -5,7 +5,9 @@ description: "Apply when tempted to ask 'should I do X?' on reversible work."
 
 ## Codex execution
 
-Apply this workflow when explicitly requested, or read it as a dependency of an explicitly requested pstack workflow. Read sibling pstack skills from this installation, not from another host's roots. Project skills belong under `.agents/skills`; personal skills under `~/.agents/skills`.
+This is a Codex-specific workflow carried by the Agents convention. A shared Agents binding does not provide Codex tools, model choice, or delegation; use only capabilities authorized and available in the actual client.
+
+Apply this workflow when explicitly requested.
 
 # Never Block on the Human
 
