@@ -30,7 +30,7 @@ pnpm dlx @yargote/artifacts-cli@0.1.0-beta.6 --help
 
 ## Complete first use
 
-An existing Artifacts account is required. Select the REST OAuth resource, which is the API origin without `/mcp`. The address below is the configured hostname after the [API migration](../../docs/deployment.md#migrate-the-api-hostname). Its deployment is not yet verified.
+An existing Artifacts account is required. Select the REST OAuth resource, which is the API origin without `/mcp`. When upgrading an older deployment, complete the [API migration](../../docs/deployment.md#migrate-the-api-hostname) before using the address below.
 
 ```sh
 export ARTIFACTS_SERVER='https://artifacts-api.yersonargotev.workers.dev'

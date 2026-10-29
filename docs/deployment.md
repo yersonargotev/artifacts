@@ -41,7 +41,7 @@ The authorization Worker's CIMD transport approves only the exact Codex and Clau
 
 ## Migrate the API hostname
 
-The checked-in target is `https://artifacts-api.yersonargotev.workers.dev`. This hostname migration has not been deployed or verified. Historical acceptance reports describe the previous `artifacts-mcp` address. This migration uses a `workers.dev` hostname and requires no custom-domain DNS changes.
+The checked-in target is `https://artifacts-api.yersonargotev.workers.dev`. Historical acceptance reports describe the previous `artifacts-mcp` address. Follow this procedure when upgrading that deployment. This migration uses a `workers.dev` hostname and requires no custom-domain DNS changes.
 
 1. Review the private deployment environment. Set `API_URL=https://artifacts-api.yersonargotev.workers.dev` and `MCP_URL=https://artifacts-api.yersonargotev.workers.dev/mcp`. Keep the existing database, owner identity, and confidential client credentials. `API_URL` must be an origin, and `MCP_URL` must be that same origin followed by `/mcp`.
 2. Run `ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap` against that reviewed environment. This seeds both resources and links the existing introspection client to both. Repeat runs preserve the client ID and secret. Complete this before the new Worker receives authenticated requests. Do not pass owner bootstrap credentials to CI.

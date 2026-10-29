@@ -14,7 +14,7 @@ Create an artifact from Claude Code, Codex, the standalone CLI, or direct HTTP, 
 | Authorization | https://artifacts-auth.yersonargotev.workers.dev |
 | Publication | https://artifacts-view.yersonargotev.workers.dev |
 
-These are the checked-in deployment targets. The API hostname migration has not been deployed or verified. Keep existing connections on their current address until the [migration procedure](docs/deployment.md#migrate-the-api-hostname) completes.
+These are the checked-in deployment targets. When upgrading a previous deployment, complete the [migration procedure](docs/deployment.md#migrate-the-api-hostname) before changing existing connections.
 
 The publication Worker is separate from the panel. It receives no database or authoring credentials. For every document and attachment request, the authenticated internal service checks the live central session and authorizes the owner or a viewer whose verified email matches a current share. Anonymous document requests redirect to login; anonymous attachments return 401. Revoked access returns 403. Backend failures return 503 without content.
 
