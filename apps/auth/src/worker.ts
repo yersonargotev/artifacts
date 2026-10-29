@@ -12,11 +12,13 @@ const runtimes = new WeakMap<AuthRuntimeEnvironment, ReturnType<typeof createRun
 async function createRuntime(env: AuthRuntimeEnvironment) {
   const config = authConfig(env);
   if (config.email?.transport === 'file') throw new Error('File email delivery is only available in Node');
-  const { db } = await openDatabase({ url: env.DATABASE_URL, authToken: env.DATABASE_AUTH_TOKEN });
-  const sender = config.email?.transport === 'resend' ? resendEmailSender(config.email) : undefined;
-  const auth = createAuth(db, config, { fetchClientMetadataResource, isMetadataDocumentUrlAllowed }, false, sender);
-  await auth.$context;
-  return { handler: createAuthHandler(db, config, auth), emailEnabled: Boolean(sender) };
+  const { db, client } = await openDatabase({ url: env.DATABASE_URL, authToken: env.DATABASE_AUTH_TOKEN });
+  try {
+    const sender = config.email?.transport === 'resend' ? resendEmailSender(config.email) : undefined;
+    const auth = createAuth(db, config, { fetchClientMetadataResource, isMetadataDocumentUrlAllowed }, false, sender);
+    await auth.$context;
+    return { handler: createAuthHandler(db, config, auth), emailEnabled: Boolean(sender) };
+  } catch (error) { client.close(); throw error; }
 }
 
 export default {

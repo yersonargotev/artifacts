@@ -119,6 +119,16 @@ The script validates identities and publication markers before mutations. It cap
 
 Invitations reserve one budget unit atomically with the share and its receipt. The bounded send attempt begins after commit. A crash before sending can lose the message; failures and crashes do not refund the budget. Exact request replay never sends again, and `requested` is not a delivery confirmation. A revoke after the final invitation lookup cannot retract a message that has already started.
 
+## Worker database recovery
+
+Worker builds select a database entrypoint that retains each HTTP exchange with `waitUntil` and aborts it after five seconds. The deadline includes the complete response body. A stalled exchange rejects instead of leaving the shared runtime initialization pending. Failed database or auth-provider initialization closes its client, and the next request can initialize a new runtime.
+
+The current auth startup performs four exchanges when bootstrap has already provisioned both resources. Four five-second budgets fit within twenty seconds, below [Cloudflare's thirty-second retention allowance](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil) after the initiating request ends. This is a bound for the current startup sequence, not an overall deadline for arbitrary application requests. Review that bound when adding startup queries. Node and native database callers keep their existing transport behavior.
+
+This policy adds no SQL retries and does not extend the three-second JWKS or introspection deadlines. A timed-out mutation may have committed remotely. Recover it with the existing retained request ID and exact arguments rather than preparing another mutation.
+
+Run `node --import tsx --test tests/database-worker.test.ts` to exercise actual workerd recovery after stalled headers, stalled bodies, and OAuth resource initialization. The same tests check that exchanges outlive their initiating invocation, release the client's concurrent-operation slots, and permit healthy reads afterward.
+
 ## Local native database correction
 
 The workspace keeps `@libsql/client` 0.18.0 unchanged and selects a prepared `libsql` 0.5.29 package through ordinary pnpm resolution. The pinned native source patch resets the original statement when an operation fails. It covers failed transaction controls and warmed failed reads without changing Config, encryption, persisted data, SQL execution, journal mode, or application retries.
