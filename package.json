@@ -31,6 +31,7 @@
     "verify:artifact-clients": "tsx scripts/verify-artifact-clients.ts",
     "verify:deployed-artifact": "tsx scripts/verify-deployed-artifact.ts",
     "verify:retained-artifact": "tsx .agents/skills/verify-artifacts/scripts/verify-retained.ts",
+    "test:local-html": "node --import tsx --test tests/local-html.test.ts && node --import tsx tests/local-html.browser.proof.ts",
     "test:retained-browser": "pnpm build && node --import tsx --test tests/retained-verification.browser.proof.ts && node --import tsx tests/retained-browser.proof.ts",
     "artifacts": "tsx apps/cli/src/index.ts",
     "dev:rest": "tsx apps/rest/src/server.ts",

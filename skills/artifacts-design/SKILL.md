@@ -77,6 +77,14 @@ Give the `<title>` a specific name of two to four words, or the name the user al
 
 ## Check the rendered page
 
+Run the local helper after embedding fonts and before saving:
+
+```sh
+node <skill-directory>/scripts/verify-local.mjs page.html --evidence ./page-evidence
+```
+
+For the CLI, resolve `<skill-directory>` with `artifacts skills path artifacts-design`. Read [local checks](references/local-checks.md) for existing runtime requirements, optional declarative control expectations, browser selection, and report fields. The helper never installs a dependency, changes the HTML, saves, publishes, or requires service credentials. Its report proves **renderizado local** and leaves visual review required. It does not verify the retained revision or authenticated publication.
+
 Run the [interface checks](references/interface-checks.md) before saving. They distinguish required checks from visual judgment. Render the finished page at 375 px and 1280 px in both light and dark when browser tools are available. Fix observed failures and repeat the affected checks. Report checks you could not run.
 
 The license notices for bundled fonts and adapted guidance are in [third-party notices](THIRD-PARTY-NOTICES.md).

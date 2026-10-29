@@ -71,7 +71,8 @@ require('node:net').Socket.prototype.connect = deny;
 globalThis.fetch = deny;
 require('node:module').syncBuiltinESMExports();
 `);
-  const dependencies = Object.fromEntries(inventory.packages.filter((item) => item.public).map((item) => [item.name, `file:${resolve(packageOutput, item.tarball)}`]));
+  const playwrightVersion = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).devDependencies.playwright;
+  const dependencies = { ...Object.fromEntries(inventory.packages.filter((item) => item.public).map((item) => [item.name, `file:${resolve(packageOutput, item.tarball)}`])), 'playwright-core': playwrightVersion };
   await writeFile(join(consumer, 'package.json'), JSON.stringify({ private: true, dependencies }));
   const installation = await run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], consumer, {
     PATH: process.env.PATH, HOME: home, npm_config_cache: join(directory, 'npm-cache'),
@@ -153,6 +154,26 @@ require('node:module').syncBuiltinESMExports();
   await assert.rejects(stat(join(cwd, 'new-retained-evidence')), { code: 'ENOENT' });
   assert.equal((await run(process.execPath, handoffArgs)).code, 1);
   assert.deepEqual(JSON.parse(await readFile(handoffOutput, 'utf8')), handoffConfig);
+
+  const designBundled = (await cli(['skills', 'path', 'artifacts-design'])).trim();
+  const localHtml = join(consumer, 'local.html');
+  const localSource = '<h1>Installed local verification</h1><button id="change">Change</button><output id="result">before</output><script>document.querySelector("#change").onclick=()=>document.querySelector("#result").textContent="after"</script>';
+  await writeFile(localHtml, localSource);
+  const localChecks = join(consumer, 'checks.json');
+  await writeFile(localChecks, JSON.stringify({ expectations: [{ kind: 'click', selector: '#change' }, { kind: 'text', selector: '#result', text: 'after' }] }));
+  const localRun = await run(process.execPath, [join(designBundled, 'scripts/verify-local.mjs'), localHtml, '--evidence', join(consumer, 'evidence'), '--expectations', localChecks], consumer, {
+    PATH: process.env.PATH, HOME: process.env.HOME, ARTIFACTS_STATE_DIR: join(home, 'cli-state'),
+  });
+  assert.equal(localRun.code, 0, localRun.stderr + localRun.stdout);
+  const localReport = JSON.parse(localRun.stdout);
+  assert.equal(localReport.evidenceKind, 'renderizado local');
+  assert.equal(localReport.authenticatedPublication, 'not-verified');
+  assert.equal(localReport.visualReview.status, 'required');
+  assert.equal(localReport.variants.length, 4);
+  assert(localReport.variants.every((item: { status: string }) => item.status === 'passed'));
+  assert.equal(await readFile(localHtml, 'utf8'), localSource);
+  assert.equal(localReport.input.sha256, localReport.input.sha256After);
+  assert.equal(JSON.parse(await readFile(join(localReport.evidenceDirectory, 'report.json'), 'utf8')).status, 'passed');
 
   const templates = join(bundled, 'templates/nested');
   await mkdir(templates, { recursive: true });
