@@ -1,6 +1,6 @@
 # Standalone CLI over REST
 
-A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI calls REST under `${MCP_URL}/v1`, which shares the store and bearer policy with MCP. It prints JSON to stdout, diagnostics and retained request IDs to stderr, and exits `1` on errors.
+A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI calls REST under `${API_URL}/v1`. MCP uses `${API_URL}/mcp` with its own OAuth audience. Both share the artifact store and account issuer. It prints JSON to stdout, diagnostics and retained request IDs to stderr, and exits `1` on errors.
 
 ## Sub-features
 
@@ -18,7 +18,7 @@ A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI 
 ## How to get to it (user POV)
 
 - Install `@yargote/artifacts-cli` or run `pnpm artifacts` from this checkout.
-- Set `ARTIFACTS_SERVER` to the complete resource, including `/mcp`, then run `artifacts login` and `artifacts whoami`.
+- Set `ARTIFACTS_SERVER` to the API origin without `/mcp`, then run `artifacts login` and `artifacts whoami`.
 - Run `artifacts create`, `edit`, `update`, `history`, `publish`, and `export` as documented in [apps/cli/README.md](../../../../apps/cli/README.md).
 
 ## Driving it with control.ts (source CLI + REST)
@@ -31,7 +31,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive cli -
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts cleanup --run "$R"
 ```
 
-The drive spawns `node --import tsx apps/cli/src/index.ts` with `ARTIFACTS_SERVER` set to the run's MCP URL, `ARTIFACTS_ACCESS_TOKEN` set to the disposable token, and a private `ARTIFACTS_STATE_DIR` under `runtime/`. It runs `whoami`, `create --snapshot`, `edit --changes`, a stale `update`, `history --summary`, `publish`, and `export --revision <r1> --out`.
+The drive spawns `node --import tsx apps/cli/src/index.ts` with `ARTIFACTS_SERVER` set to the run's API origin, `ARTIFACTS_ACCESS_TOKEN` set to the disposable REST token, and a private `ARTIFACTS_STATE_DIR` under `runtime/`. It runs `whoami`, `create --snapshot`, `edit --changes`, a stale `update`, `history --summary`, `publish`, and `export --revision <r1> --out`.
 
 Expected end state:
 

@@ -14,6 +14,7 @@ export default {
       RESEND_API_KEY: { type: 'secret' },
       AUTH_URL: { type: 'text', value: workerOrigins.AUTH_URL },
       MCP_URL: { type: 'text', value: workerOrigins.MCP_URL },
+      API_URL: { type: 'text', value: workerOrigins.API_URL },
       DASHBOARD_URL: { type: 'text', value: workerOrigins.DASHBOARD_URL },
       PUBLISH_URL: { type: 'text', value: workerOrigins.PUBLISH_URL },
       PANEL_CLIENT_ID: { type: 'secret' },

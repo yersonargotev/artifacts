@@ -192,6 +192,16 @@ export async function smokeProduction(serviceSecret: string, options: SmokeOptio
     const response = await send(workerOrigins.MCP_URL);
     expect(response.status === 401 && (await response.json()).error === 'unauthenticated' && response.headers.get('www-authenticate')?.includes(`resource_metadata="${metadata}"`));
   });
+  await probe('REST discovery', async () => {
+    const response = await send(`${workerOrigins.API_URL}/.well-known/oauth-protected-resource`);
+    const body = await response.json();
+    expect(response.status === 200 && body.resource === workerOrigins.API_URL && isDeepStrictEqual(body.authorization_servers, [issuer]));
+  });
+  await probe('anonymous REST denial', async () => {
+    const response = await send(`${workerOrigins.API_URL}/v1/identity`);
+    const body = await response.json();
+    expect(response.status === 401 && body.error?.code === 'unauthenticated');
+  });
   await probe('panel and assets', async () => {
     const response = await send(workerOrigins.DASHBOARD_URL);
     const html = await response.text();

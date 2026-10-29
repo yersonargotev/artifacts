@@ -7,8 +7,8 @@ import { createArtifactHttpClient } from '../packages/client/src/index.ts';
 import { grant, callWhoami } from './helpers.ts';
 
 const run = resolve(process.argv[process.argv.indexOf('--run') + 1] ?? '');
-const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; mcp: string; panel: string; ownerId: string };
-const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { accessToken: string; password: string };
+const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; api: string; mcp: string; panel: string; ownerId: string };
+const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { accessToken: string; restAccessToken: string; password: string };
 const sink = JSON.parse(await readFile(join(run, 'runtime/email-code.json'), 'utf8')) as { path: string };
 const directory = join(run, 'email-code');
 await mkdir(directory, { recursive: true });
@@ -40,12 +40,12 @@ async function receipt(name: string, data: unknown) {
   await page.screenshot({ path: join(directory, `${name}.png`), fullPage: true });
   await page.close();
 }
-async function oauth(context: BrowserContext) {
+async function oauth(context: BrowserContext, resource = instance.mcp) {
   const cookie = (await context.cookies(instance.auth)).map((value) => `${value.name}=${value.value}`).join('; ');
-  return grant({ config, cookie }, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
+  return grant({ config: { ...config, resource }, cookie }, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
 }
 try {
-  let ownerClient = createArtifactHttpClient({ resource: instance.mcp, accessToken: credentials.accessToken });
+  let ownerClient = createArtifactHttpClient({ resource: instance.api, accessToken: credentials.restAccessToken });
   const created = await ownerClient.create({ requestId: randomUUID(), snapshot: { metadata: { title: 'Email-code shared artifact', description: '' }, content: { kind: 'html', text: '<h1>Invited code publication</h1>' }, files: [] } });
   const published = await ownerClient.publish({ requestId: randomUUID(), artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 });
   const email = 'ana@example.com';
@@ -83,7 +83,8 @@ try {
   const whoami = await callWhoami(instance.mcp, guestTokens.access_token);
   assert.equal(whoami.status, 200);
   assert((await whoami.text()).includes(identity.id));
-  const guestClient = createArtifactHttpClient({ resource: instance.mcp, accessToken: guestTokens.access_token });
+  const guestRestTokens = await oauth(guest, instance.api);
+  const guestClient = createArtifactHttpClient({ resource: instance.api, accessToken: guestRestTokens.access_token });
   for (const deniedRead of [() => guestClient.read({ artifactId: created.artifactId }), () => guestClient.history({ artifactId: created.artifactId }), () => guestClient.export({ artifactId: created.artifactId, revisionId: created.revision.id })]) await assert.rejects(deniedRead(), (error: unknown) => (error as { code: string }).code === 'not_found');
   await receipt('guest-oauth', { status: 200, userId: identity.id, ownerOnlyReadHistoryExport: 'denied' });
   records.push({ lane: 10, status: 'PASS', result: 'Guest MCP OAuth returns the code identity and owner-only reads stay denied' });
@@ -102,8 +103,8 @@ try {
   await ownerPage.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await ownerPage.screenshot({ path: join(directory, 'owner-otp.png'), fullPage: true });
   assert.equal((await post(owner, '/sign-in/email', { email: 'owner@example.test', password: credentials.password })).status(), 200);
-  const ownerTokens = await oauth(owner);
-  ownerClient = createArtifactHttpClient({ resource: instance.mcp, accessToken: ownerTokens.access_token });
+  const ownerTokens = await oauth(owner, instance.api);
+  ownerClient = createArtifactHttpClient({ resource: instance.api, accessToken: ownerTokens.access_token });
   await oldOwnerPage.goto(instance.panel);
   await oldOwnerPage.getByRole('link', { name: 'Iniciar sesión', exact: true }).waitFor();
   records.push({ lane: 4, status: 'PASS', result: 'Owner code reaches the library, revokes the old panel session, and preserves the password' });

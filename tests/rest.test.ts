@@ -13,6 +13,50 @@ import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 
 const snapshot: Snapshot = { metadata: { title: 'HTTP retained artifact', description: 'A complete REST snapshot', custom: { preserved: ['one', 2] } }, content: { kind: 'html', text: '<h1>REST first revision</h1>' }, files: [{ path: 'data/raw.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAEC/w==' }] };
 const fullScope = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
+
+test('separate REST and MCP URLs discover exact audiences and share retained artifacts', async () => {
+  const app = await fixture({ transport: 'combined', apiResource: true });
+  try {
+    const resource = app.config.apiResource!;
+    const restApp = { ...app, config: { ...app.config, resource } };
+    const restGrant = await grant(restApp, fullScope);
+    const restToken = restGrant.access_token;
+    const mcpToken = (await grant(app, fullScope, restGrant.clientId)).access_token;
+    const call = api(restApp, restToken);
+    assert.equal(new URL(restBase(resource)).pathname, '/v1');
+    for (const audience of [resource, app.config.resource]) {
+      const metadata = await fetch(protectedResourceMetadataUrl(audience));
+      assert.equal(metadata.status, 200);
+      assert.equal((await metadata.json()).resource, audience);
+    }
+    const challenge = await fetch(app.config.resource);
+    assert.equal(challenge.status, 401);
+    assert(challenge.headers.get('www-authenticate')?.includes(`resource_metadata="${protectedResourceMetadataUrl(app.config.resource)}"`));
+    assert.equal((await (await call('/identity')).json()).userId, app.ownerId);
+    const created = await (await call('/artifacts', 'POST', { requestId: 'separate-routes-create', snapshot })).json() as ArtifactRead;
+    assert.deepEqual((await mcp(app, mcpToken, 'artifacts_read', { artifactId: created.artifactId })).structuredContent, created);
+    await error(await fetch(`${resource}/v1/artifacts`, { headers: { authorization: `Bearer ${mcpToken}` } }), 401, 'unauthenticated');
+    assert.equal((await fetch(app.config.resource, { headers: { authorization: `Bearer ${restToken}` } })).status, 401);
+    await error(await fetch(`${resource}/v1/artifacts`), 401, 'unauthenticated');
+    assert.equal((await fetch(`${app.config.resource}/v1/artifacts`)).status, 404);
+    const refreshed = await fetch(`${app.config.issuer}/oauth2/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', client_id: restGrant.clientId, refresh_token: restGrant.refresh_token, resource }) });
+    assert.equal(refreshed.status, 200);
+    const renewed = await refreshed.json() as { access_token: string };
+    assert.equal((await api(restApp, renewed.access_token)('/identity')).status, 200);
+    assert.equal((await fetch(app.config.resource, { headers: { authorization: `Bearer ${renewed.access_token}` } })).status, 401);
+  } finally { await app.close(); }
+});
+
+test('REST-only handler uses the origin audience without constructing MCP', async () => {
+  const app = await fixture({ transport: 'rest', apiResource: true });
+  try {
+    const resource = app.config.apiResource!;
+    const restApp = { ...app, config: { ...app.config, resource } };
+    const token = (await grant(restApp, fullScope)).access_token;
+    assert.equal((await (await api(restApp, token)('/identity')).json()).userId, app.ownerId);
+    assert.equal((await fetch(app.config.resource)).status, 404);
+  } finally { await app.close(); }
+});
 function api(app: Awaited<ReturnType<typeof fixture>>, token: string) {
   return (path: string, method = 'GET', body?: unknown) => fetch(`${restBase(app.config.resource)}${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'manual' });
 }

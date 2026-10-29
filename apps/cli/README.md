@@ -30,10 +30,10 @@ pnpm dlx @yargote/artifacts-cli@0.1.0-beta.6 --help
 
 ## Complete first use
 
-An existing Artifacts account is required. Select the complete OAuth resource, including `/mcp`:
+An existing Artifacts account is required. Select the REST OAuth resource, which is the API origin without `/mcp`. When upgrading an older deployment, complete the [API migration](../../docs/deployment.md#migrate-the-api-hostname) before using the address below.
 
 ```sh
-export ARTIFACTS_SERVER='https://artifacts-mcp.yersonargotev.workers.dev/mcp'
+export ARTIFACTS_SERVER='https://artifacts-api.yersonargotev.workers.dev'
 artifacts login
 artifacts whoami
 ```
@@ -82,7 +82,9 @@ Run `artifacts logout` before uninstalling if you want to clear credentials. Uni
 
 Skills, help, and version commands work without a server or login. Skills commands do not read credentials or create private state. They accept and ignore global `--server` and `--state-dir` values, including their environment defaults.
 
-`--server RESOURCE` selects the exact canonical OAuth resource. `ARTIFACTS_SERVER` supplies the same value. A resource ending in `/mcp` uses REST under `/mcp/v1`. The CLI has no production default.
+`--server RESOURCE` selects the exact canonical REST OAuth resource. `ARTIFACTS_SERVER` supplies the same value. Use the configured `API_URL` origin to call REST under `/v1`. The CLI has no production default and does not rewrite the supplied URL. Older deployments without `API_URL` still use their complete MCP resource and routes under `/mcp/v1`.
+
+A hostname change requires a new `artifacts login --server RESOURCE`. Credentials and retained operations remain bound to their exact original resource. Do not move an old operation file to the new resource or redirect its bearer requests.
 
 `--state-dir DIR` overrides `ARTIFACTS_STATE_DIR`. The default is `~/.local/state/artifacts`. The state directory must be private and owned by the current user. Credentials are separate from operation files. Profiles bind credentials to the exact resource. Retained operation paths hash the resource and request ID, so request IDs cannot select filesystem paths.
 

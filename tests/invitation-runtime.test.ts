@@ -21,14 +21,15 @@ test('transport configuration stays independent of auth admission and Workers re
   assert.throws(() => workerSender({ EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: '/private/disposable.jsonl' }, 'http://localhost:4100'), /unavailable in Workers/);
 });
 
-test('the actual standalone REST and MCP Node factories deliver to the disposable file sink', async () => {
-  const app = await fixture({ transport: 'rest', invitations: true });
+for (const modern of [false, true]) test(`the actual standalone REST and MCP Node factories deliver with ${modern ? 'origin' : 'legacy MCP'} REST URLs`, async () => {
+  const app = await fixture({ transport: 'rest', invitations: true, apiResource: modern });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-invitation-runtime-'));
   const children: ChildProcess[] = [];
   try {
     await writeFile(join(directory, '.env'), '', { mode: 0o600 });
-    const token = (await grant(app, 'openid profile artifacts:read artifacts:write artifacts:publish')).access_token;
-    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: token });
+    const resource = app.config.apiResource ?? app.config.resource;
+    const token = (await grant({ ...app, config: { ...app.config, resource } }, 'openid profile artifacts:read artifacts:write artifacts:publish')).access_token;
+    const client = createArtifactHttpClient({ resource, accessToken: token });
     const created = await client.create({ requestId: randomUUID(), snapshot: { metadata: { title: 'Runtime invitation', description: '' }, content: { kind: 'text', text: 'Disposable' }, files: [] } });
     for (const service of ['rest', 'mcp']) {
       const reservation = createServer().listen(0, '127.0.0.1');
@@ -36,7 +37,7 @@ test('the actual standalone REST and MCP Node factories deliver to the disposabl
       const address = reservation.address();
       assert(address && typeof address === 'object');
       await new Promise<void>((done) => reservation.close(() => done()));
-      const child = spawn(process.execPath, ['--import', fileURLToPath(new URL('../node_modules/tsx/dist/loader.mjs', import.meta.url)), fileURLToPath(new URL(`../apps/${service}/src/server.ts`, import.meta.url))], { cwd: directory, env: { PATH: process.env.PATH, OWNER_EMAIL: app.config.access.ownerEmail, ALLOW_GUEST_ACCESS: String(app.config.access.allowGuests), DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, PUBLISH_URL: 'https://published.example.test', MCP_INTROSPECTION_CLIENT_ID: app.mcpOptions.clientId, MCP_INTROSPECTION_CLIENT_SECRET: app.mcpOptions.clientSecret, MCP_PORT: String(address.port), EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: app.emailSink }, stdio: ['ignore', 'pipe', 'ignore'] });
+      const child = spawn(process.execPath, ['--import', fileURLToPath(new URL('../node_modules/tsx/dist/loader.mjs', import.meta.url)), fileURLToPath(new URL(`../apps/${service}/src/server.ts`, import.meta.url))], { cwd: directory, env: { PATH: process.env.PATH, OWNER_EMAIL: app.config.access.ownerEmail, ALLOW_GUEST_ACCESS: String(app.config.access.allowGuests), DATABASE_URL: app.databaseUrl, AUTH_URL: app.config.origin, MCP_URL: app.config.resource, API_URL: app.config.apiResource, PUBLISH_URL: 'https://published.example.test', MCP_INTROSPECTION_CLIENT_ID: app.mcpOptions.clientId, MCP_INTROSPECTION_CLIENT_SECRET: app.mcpOptions.clientSecret, MCP_PORT: String(address.port), EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: app.emailSink }, stdio: ['ignore', 'pipe', 'ignore'] });
       children.push(child);
       await Promise.race([once(child.stdout!, 'data'), once(child, 'exit').then(() => { throw new Error(`${service} factory exited before readiness`); })]);
       let listening = false;
@@ -53,7 +54,7 @@ test('the actual standalone REST and MCP Node factories deliver to the disposabl
       assert(listening, 'The standalone listener must accept connections');
       const body = JSON.stringify({ requestId: randomUUID(), email: `${service}@example.test`, notify: true });
       const result = await new Promise<{ status: number; body: unknown }>((accept, reject) => {
-        const outgoing = request({ hostname: '127.0.0.1', port: address.port, path: `/mcp/v1/artifacts/${created.artifactId}/shares`, method: 'POST', headers: { host: new URL(app.config.resource).host, authorization: `Bearer ${token}`, 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (response) => {
+        const outgoing = request({ hostname: '127.0.0.1', port: address.port, path: `${modern ? '/v1' : '/mcp/v1'}/artifacts/${created.artifactId}/shares`, method: 'POST', headers: { host: new URL(resource).host, authorization: `Bearer ${token}`, 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (response) => {
           let bytes = '';
           response.on('data', (chunk) => { bytes += String(chunk); });
           response.on('end', () => { try { accept({ status: response.statusCode!, body: JSON.parse(bytes) }); } catch (error) { reject(error); } });

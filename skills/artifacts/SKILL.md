@@ -9,7 +9,7 @@ Turn the user's content into a retained artifact through the connected MCP. Save
 
 ## Select the connection
 
-Use `artifacts-cloud` unless the user selects another Artifacts connection. Its MCP endpoint is `https://artifacts-mcp.yersonargotev.workers.dev/mcp`. The dashboard is `https://artifacts-panel.yersonargotev.workers.dev`.
+Use `artifacts-cloud` unless the user selects another Artifacts connection. Its MCP endpoint is `https://artifacts-api.yersonargotev.workers.dev/mcp`. The dashboard is `https://artifacts-panel.yersonargotev.workers.dev`.
 
 Discover the tools exposed by that connection. Host prefixes vary. Match the underlying names in [the tool contract](references/tool-contract.md). Keep all calls for one operation on the same connection. Do not silently substitute the local `artifacts` server.
 

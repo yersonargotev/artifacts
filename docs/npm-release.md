@@ -24,11 +24,13 @@ The package build is the only tarball producer. `dist/packages/manifest.json` re
 ```sh
 	pnpm exec tsx scripts/verify-cli-first-use.ts \
 	  --binary /absolute/consumer/node_modules/.bin/artifacts \
-	  --server https://artifacts-mcp.yersonargotev.workers.dev/mcp \
+	  --server https://artifacts-api.yersonargotev.workers.dev \
 	  --env-file /private/path/account.env \
 	  --expected-version 0.1.0-beta.6 \
 	  --report .test-artifacts/npm-beta/first-use-local.json
 ```
+
+Use the API origin without `/mcp`. The example targets the configured new hostname, whose deployment remains unverified. Complete the [API hostname migration](deployment.md#migrate-the-api-hostname) before using that address, or select the exact REST resource of the deployment you are verifying.
 
 The explicitly selected environment file supplies `OWNER_EMAIL` and `OWNER_PASSWORD`. The proof uses an isolated Chrome context and temporary CLI state. It records safe evidence, creates a clearly named verification artifact, and retains it. It logs out only its own CLI profile. It does not revoke other sessions. Do not upload account files, tokens, raw browser state, or credential databases.
 

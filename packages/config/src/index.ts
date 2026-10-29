@@ -8,9 +8,9 @@ type DatabaseEnvironment = { DATABASE_URL: string; DATABASE_AUTH_TOKEN?: string 
 type SenderEnvironment = Pick<EmailEnvironment, 'EMAIL_TRANSPORT' | 'EMAIL_FROM' | 'RESEND_API_KEY'>;
 export type AccessPolicy = Readonly<{ ownerEmail: string; allowGuests: boolean }>;
 type AccessEnvironment = { OWNER_EMAIL: string; ALLOW_GUEST_ACCESS?: string };
-type PublicOrigins = { AUTH_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
-export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { BETTER_AUTH_SECRET: string };
-export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
+type PublicOrigins = { AUTH_URL: string; API_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
+export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'API_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { BETTER_AUTH_SECRET: string };
+export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'API_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
 export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
 export type PublicationWorkerEnvironment = Pick<PublicOrigins, 'DASHBOARD_URL' | 'PUBLISH_URL'> & { PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 
@@ -26,7 +26,7 @@ export function serviceUrl(name: string, env: Environment = process.env): string
   if (value.username || value.password || value.search || value.hash || (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))) {
     throw new Error(`${name} requires HTTPS, or HTTP on an exact loopback host, without credentials, query, or fragment`);
   }
-  if (['AUTH_URL', 'DASHBOARD_URL', 'PUBLISH_URL'].includes(name) && value.pathname !== '/') {
+  if (['AUTH_URL', 'API_URL', 'DASHBOARD_URL', 'PUBLISH_URL'].includes(name) && value.pathname !== '/') {
     throw new Error(`${name} must be an origin without a path`);
   }
   return value.href.replace(/\/$/, '');
@@ -39,17 +39,27 @@ export function accessPolicy(env: Environment = process.env): AccessPolicy {
   return { ownerEmail, allowGuests: env.ALLOW_GUEST_ACCESS === 'true' };
 }
 
-export function authConfig(env: Environment = process.env): { origin: string; issuer: string; secret: string; resource: string; dashboard: string; access: AccessPolicy; email?: EmailConfiguration } {
+function apiResource(env: Environment): string | undefined {
+  if (env.API_URL === undefined) return undefined;
+  const api = serviceUrl('API_URL', env);
+  const mcp = new URL(serviceUrl('MCP_URL', env));
+  if (new URL(api).origin !== mcp.origin) throw new Error('API_URL and MCP_URL must use the same origin');
+  if (mcp.pathname !== '/mcp') throw new Error('MCP_URL must use /mcp when API_URL is configured');
+  return api;
+}
+
+export function authConfig(env: Environment = process.env): { origin: string; issuer: string; secret: string; resource: string; apiResource?: string; dashboard: string; access: AccessPolicy; email?: EmailConfiguration } {
   const origin = serviceUrl('AUTH_URL', env);
   const secret = required('BETTER_AUTH_SECRET', env);
   if (secret.length < 32) throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
-  return { origin, issuer: `${origin}/api/auth`, secret, access: accessPolicy(env), resource: serviceUrl('MCP_URL', env), dashboard: serviceUrl('DASHBOARD_URL', env), email: emailConfiguration(env, origin) };
+  return { origin, issuer: `${origin}/api/auth`, secret, access: accessPolicy(env), resource: serviceUrl('MCP_URL', env), apiResource: apiResource(env), dashboard: serviceUrl('DASHBOARD_URL', env), email: emailConfiguration(env, origin) };
 }
 
-export function mcpConfig(env: Environment = process.env) {
+export function mcpConfig(env: Environment = process.env): { issuer: string; resource: string; apiResource?: string; clientId: string; clientSecret: string } {
   return {
     issuer: `${serviceUrl('AUTH_URL', env)}/api/auth`,
     resource: serviceUrl('MCP_URL', env),
+    apiResource: apiResource(env),
     clientId: required('MCP_INTROSPECTION_CLIENT_ID', env),
     clientSecret: required('MCP_INTROSPECTION_CLIENT_SECRET', env),
   };

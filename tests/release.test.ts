@@ -10,7 +10,7 @@ import view from '../apps/publication/cloudflare.config.ts';
 import { projectRuntimeSecrets, releaseProduction, smokeProduction, verifyCloudflareAccount } from '../scripts/release-production.ts';
 import { workerOrigins } from '../scripts/cloudflare.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
-import { createMcpApp } from '../apps/mcp/src/http.ts';
+import { createResourceApp } from '../apps/mcp/src/app.ts';
 import { artifactErrorResponse, publicationReadSchema, publicationServiceAuthorized } from '../apps/dashboard/src/publication.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { fixture } from './helpers.ts';
@@ -236,7 +236,7 @@ test('production smoke performs only read operations and requires database-backe
   let backendReads = 0;
   let forbiddenDatabaseReads = 0;
   const publication = createPublicationApp({ ...workerOrigins, PUBLICATION_SERVICE_SECRET: secret, PUBLICATION_COOKIE_SECRET: 'c'.repeat(40) }, async () => { backendReads++; throw new Error('Anonymous requests must not call the backend'); });
-  const resource = createMcpApp({ issuer: `${workerOrigins.AUTH_URL}/api/auth`, resource: workerOrigins.MCP_URL, clientId: 'fixture', clientSecret: 'fixture' });
+  const resource = createResourceApp({ issuer: `${workerOrigins.AUTH_URL}/api/auth`, resource: workerOrigins.MCP_URL, apiResource: workerOrigins.API_URL, clientId: 'fixture', clientSecret: 'fixture' }, store);
   const operations: string[] = [];
   const request: typeof fetch = async (input, init) => {
     const req = new Request(input, init);

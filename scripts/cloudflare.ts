@@ -5,7 +5,8 @@ export const workerCompatibility = {
 
 export const workerOrigins = {
   AUTH_URL: 'https://artifacts-auth.yersonargotev.workers.dev',
-  MCP_URL: 'https://artifacts-mcp.yersonargotev.workers.dev/mcp',
+  API_URL: 'https://artifacts-api.yersonargotev.workers.dev',
+  MCP_URL: 'https://artifacts-api.yersonargotev.workers.dev/mcp',
   DASHBOARD_URL: 'https://artifacts-panel.yersonargotev.workers.dev',
   PUBLISH_URL: 'https://artifacts-view.yersonargotev.workers.dev',
 };
