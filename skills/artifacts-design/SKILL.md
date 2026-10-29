@@ -49,7 +49,7 @@ After the HTML file is complete, embed the fonts it names:
 node <skill-directory>/scripts/embed-fonts.mjs page.html
 ```
 
-For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. The script rewrites the file in place and is safe to rerun after edits. It embeds only the families the page names and adds italic faces only for `font-style: italic`, `<em>`, `<i>`, or `<cite>`. It refuses to write a page above 1 MiB. Three families add about 135 KB. Newsreader adds about 80 to 165 KB. Do not name another family unless you embed its `woff2` yourself, because an unembedded face silently falls back. Without Node, keep the fallback stacks and report that the fonts were not embedded.
+For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. The script rewrites the file in place and is safe to rerun after edits. It selects families from CSS `font-family` and `font` declarations in style elements and inline styles, including referenced custom properties. Comments, content text, and JavaScript strings do not select fonts. It adds italic faces for CSS `font-style: italic`, italic `font` shorthand, or real `<em>`, `<i>`, and `<cite>` elements. It refuses to write a page above 1 MiB. Three families add about 135 KB. Newsreader adds about 80 to 165 KB. Do not name another family unless you embed its `woff2` yourself, because an unembedded face silently falls back. Without Node, keep the fallback stacks and report that the fonts were not embedded.
 
 ## Color
 
