@@ -16,11 +16,15 @@ The separate contracts package prevents a client-only installation from acquirin
 
 ## Authentication and deployment
 
-The existing complete `MCP_URL` remains the canonical OAuth resource. REST uses `${resource}/v1`. The CLI takes that canonical resource in `login --server`, retrieves its exact protected-resource metadata and checks equality. REST subroute challenges omit `resource_metadata`, because challenge-derived metadata must match the requested URL under [RFC 9728 section 3.3](https://www.rfc-editor.org/info/rfc9728/#section-3.3). Existing MCP challenges remain compatible.
+REST uses the `API_URL` origin as its canonical OAuth resource and serves `${API_URL}/v1`. MCP uses `${API_URL}/mcp` as its separate resource. `MCP_URL` must match that endpoint. Both adapters share the store, issuer, scopes, and bearer verification. Each accepts only tokens for its own audience.
+
+The CLI takes the exact REST resource in `login --server`, retrieves its protected-resource metadata, and checks equality. Origin metadata identifies `API_URL`; path metadata identifies `MCP_URL`. Separate audiences preserve the exact discovery identity required by [RFC 9728 section 3.3](https://www.rfc-editor.org/rfc/rfc9728.html#section-3.3). A single origin audience advertised by a challenge from `/mcp` would violate that check. REST subroute challenges continue to omit `resource_metadata`.
 
 Native login uses public registration, browser authorization, PKCE and an exact loopback callback. The [native-app OAuth specification](https://datatracker.ietf.org/doc/html/rfc8252) describes that browser and callback model. The CLI receives no introspection or database secret. REST and MCP share signature verification and fresh introspection. The store independently checks live owner sessions and operation scopes before returning receipts.
 
-Default deployment composes REST and MCP in the existing Worker. A reusable Fetch factory and REST-only Node entry point can serve the API without constructing MCP. The four existing deployed services remain sufficient. This change does not deploy production or register a second audience.
+The configured `artifacts-api` Worker composes REST and MCP. The internal service key remains `mcp`. A reusable Fetch factory and REST-only Node entry point can serve the API without constructing MCP. Four services remain sufficient. The hostname migration is not deployed by this code change.
+
+The provider seeds both resources and grants new registrations access to request either audience. Bootstrap idempotently links the confidential introspection client to both. Deployments without `API_URL` retain the previous shared `MCP_URL` resource and REST routes under `/mcp/v1`. The [deployment migration](../deployment.md#migrate-the-api-hostname) coordinates resource links, Worker configuration, and client reconnection. Credentials and retained operations keep their original exact resource identity.
 
 ## Retries and local state
 

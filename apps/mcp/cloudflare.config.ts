@@ -3,7 +3,7 @@ import { workerCompatibility, workerOrigins, type WorkerConfiguration } from '..
 
 export default {
   worker: {
-    name: 'artifacts-mcp',
+    name: 'artifacts-api',
     ...workerCompatibility,
     entrypoint: './src/worker.ts',
     env: {
@@ -14,6 +14,7 @@ export default {
       RESEND_API_KEY: { type: 'secret' },
       AUTH_URL: { type: 'text', value: workerOrigins.AUTH_URL },
       MCP_URL: { type: 'text', value: workerOrigins.MCP_URL },
+      API_URL: { type: 'text', value: workerOrigins.API_URL },
       PUBLISH_URL: { type: 'text', value: workerOrigins.PUBLISH_URL },
       MCP_INTROSPECTION_CLIENT_ID: { type: 'secret' },
       MCP_INTROSPECTION_CLIENT_SECRET: { type: 'secret' },

@@ -2,28 +2,31 @@
 
 Create an artifact from Claude Code, Codex, the standalone CLI, or direct HTTP, retain every revision in Turso, and open its published revision at a stable authenticated URL. The Astro panel lists artifacts, displays revision history, previews selected revisions, and exports their original bytes.
 
-`main` is the canonical branch and GitHub default. It contains the complete deployed implementation. Create short-lived feature branches from `main`, integrate completed work there, and remove those branches after integration. Worker deployments use the explicit commands in [deployment instructions](docs/deployment.md).
+`main` is the canonical branch and GitHub default. It contains the application implementation. Create short-lived feature branches from `main`, integrate completed work there, and remove those branches after integration. Worker deployments use the explicit commands in [deployment instructions](docs/deployment.md).
 
-## Deployed services
+## Configured service addresses
 
 | Service | URL |
 | --- | --- |
 | Panel | https://artifacts-panel.yersonargotev.workers.dev |
-| MCP | https://artifacts-mcp.yersonargotev.workers.dev/mcp |
+| REST | https://artifacts-api.yersonargotev.workers.dev/v1 |
+| MCP | https://artifacts-api.yersonargotev.workers.dev/mcp |
 | Authorization | https://artifacts-auth.yersonargotev.workers.dev |
 | Publication | https://artifacts-view.yersonargotev.workers.dev |
+
+These are the checked-in deployment targets. The API hostname migration has not been deployed or verified. Keep existing connections on their current address until the [migration procedure](docs/deployment.md#migrate-the-api-hostname) completes.
 
 The publication Worker is separate from the panel. It receives no database or authoring credentials. For every document and attachment request, the authenticated internal service checks the live central session and authorizes the owner or a viewer whose verified email matches a current share. Anonymous document requests redirect to login; anonymous attachments return 401. Revoked access returns 403. Backend failures return 503 without content.
 
 ## Connect a client
 
-Register the deployed HTTP MCP and complete its OAuth browser login. Existing local registrations can remain under another name.
+After the hostname migration, register the HTTP MCP endpoint and complete its OAuth browser login. Existing local registrations can remain under another name.
 
 ```sh
-codex mcp add artifacts-cloud --url https://artifacts-mcp.yersonargotev.workers.dev/mcp
+codex mcp add artifacts-cloud --url https://artifacts-api.yersonargotev.workers.dev/mcp
 codex mcp login artifacts-cloud --scopes openid,profile,offline_access,artifacts:read,artifacts:write,artifacts:publish
 
-claude mcp add --scope user --transport http artifacts-cloud https://artifacts-mcp.yersonargotev.workers.dev/mcp
+claude mcp add --scope user --transport http artifacts-cloud https://artifacts-api.yersonargotev.workers.dev/mcp
 claude mcp login artifacts-cloud
 ```
 
@@ -31,14 +34,16 @@ The Artifacts account authenticates the MCP connection. Each CLI also needs its 
 
 ## Use the standalone CLI or REST client
 
-The CLI uses REST under `${MCP_URL}/v1`. The complete `MCP_URL` remains its OAuth resource. MCP and REST share the artifact store and bearer policy. The deployed protected-resource metadata and REST routes were probed during beta preparation. Authenticated first-use evidence is recorded separately in the [release report](.audit/npm-beta-verification.md).
+The CLI uses the API origin as its OAuth resource and calls REST under `${API_URL}/v1`. MCP uses `${API_URL}/mcp` as its separate OAuth resource. Both adapters share the artifact store and bearer verification, but their access tokens have distinct audiences. The [beta release report](.audit/npm-beta-verification.md) records evidence for the previous hostname. It does not verify the new API address.
+
+After the hostname migration, use the API origin without `/mcp`.
 
 Use Node 24 or later. The public beta uses three MIT packages under `@yargote`; the application repository remains private. Install the CLI and its dependencies from npm:
 
 ```sh
 npm install --global @yargote/artifacts-cli@0.1.0-beta.6
 artifacts --version
-export ARTIFACTS_SERVER='https://artifacts-mcp.yersonargotev.workers.dev/mcp'
+export ARTIFACTS_SERVER='https://artifacts-api.yersonargotev.workers.dev'
 artifacts login
 artifacts whoami
 ```
@@ -136,9 +141,9 @@ pnpm identity:bootstrap
 pnpm dev
 ```
 
-`configure` creates an ignored mode-0600 `.env` and preserves an existing file. Read the owner credentials in your editor. Bootstrap preserves existing identities and configured client secrets.
+`configure` creates an ignored mode-0600 `.env` and preserves an existing file. Read the owner credentials in your editor. Bootstrap preserves existing identities and configured client secrets. For an existing `.env`, add `API_URL=http://127.0.0.1:4101` and rerun `pnpm identity:bootstrap` before restarting the services. Set local `ARTIFACTS_SERVER` to that API origin and sign in again. Without `API_URL`, the previous REST routes under `/mcp/v1` remain in use.
 
-Local hosts are authorization `http://localhost:4100`, MCP `http://127.0.0.1:4101/mcp`, panel `http://127.0.0.1:4321`, and publication `http://[::1]:4102`. Keep these distinct cookie hosts. `pnpm dev` supervises all four services. Each also has a `dev:<service>` command; use `dev:dashboard` for the panel.
+Local hosts are authorization `http://localhost:4100`, API `http://127.0.0.1:4101` with REST at `/v1` and MCP at `/mcp`, panel `http://127.0.0.1:4321`, and publication `http://[::1]:4102`. Keep these distinct cookie hosts. `pnpm dev` supervises all four services. Each also has a `dev:<service>` command; use `dev:dashboard` for the panel.
 
 This workspace's existing account has been migrated to Turso. A fresh clone configured with `pnpm configure` starts with a local database. For a remote database, set `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the private environment file.
 

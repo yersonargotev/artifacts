@@ -17,8 +17,10 @@ try {
   const signedIn = await auth.api.signInEmail({ body: { email, password: required('OWNER_PASSWORD') }, returnHeaders: true });
   const headers = new Headers({ cookie: signedIn.headers.getSetCookie().map((cookie) => cookie.split(';')[0]).join('; ') });
   async function ensureResourceLink(clientId: string) {
-    const link = await db.select().from(oauthClientResource).where(and(eq(oauthClientResource.clientId, clientId), eq(oauthClientResource.resourceId, config.resource))).get();
-    if (!link) await auth.api.adminLinkClientResource({ headers, params: { identifier: config.resource, client_id: clientId } });
+    for (const resource of new Set([config.resource, ...(config.apiResource ? [config.apiResource] : [])])) {
+      const link = await db.select().from(oauthClientResource).where(and(eq(oauthClientResource.clientId, clientId), eq(oauthClientResource.resourceId, resource))).get();
+      if (!link) await auth.api.adminLinkClientResource({ headers, params: { identifier: resource, client_id: clientId } });
+    }
   }
   for (const kind of ['PANEL', 'MCP_INTROSPECTION'] as const) {
     const id = process.env[`${kind}_CLIENT_ID`];

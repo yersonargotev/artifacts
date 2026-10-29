@@ -15,7 +15,7 @@ import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 import { createEmailSender } from '../packages/config/src/email-sender-node.ts';
 import { createResourceApp } from '../apps/mcp/src/app.ts';
 
-export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; emailCode?: boolean; invitations?: boolean; allowGuests?: boolean } = {}) {
+export async function fixture(options: { dashboard?: string; publishOrigin?: string; transport?: 'mcp' | 'rest' | 'combined'; resourcePath?: string; apiResource?: boolean; emailCode?: boolean; invitations?: boolean; allowGuests?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-identity-'));
   const url = `file:${join(directory, 'identity.db')}`;
   await migrateDatabase(url);
@@ -37,7 +37,8 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   const origin = `http://127.0.0.1:${authAddress.port}`;
   const emailSink = options.emailCode || options.invitations ? join(directory, 'email.jsonl') : undefined;
   const config = { access: { ownerEmail: 'owner@example.test', allowGuests: options.allowGuests ?? false }, ...(options.emailCode && emailSink ? { email: { transport: 'file' as const, ownerEmail: 'owner@example.test', path: emailSink } } : {}), origin, issuer: `${origin}/api/auth`, secret: randomBytes(32).toString('base64url'), resource: `http://127.0.0.1:${mcpAddress.port}${options.resourcePath ?? '/mcp'}`, dashboard: options.dashboard ?? 'http://localhost:4321' };
-  const auth = createAuth(connection.db, config, true);
+  const resourceConfig = { ...config, apiResource: options.apiResource ? new URL(config.resource).origin : undefined };
+  const auth = createAuth(connection.db, resourceConfig, true);
   const password = randomBytes(24).toString('base64url');
   const owner = await auth.api.signUpEmail({ body: { name: 'Test owner', email: 'owner@example.test', password } });
   const signIn = await auth.api.signInEmail({ body: { email: 'owner@example.test', password }, returnHeaders: true });
@@ -45,13 +46,14 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   const headers = new Headers({ cookie });
   const resourceClient = await auth.api.adminCreateOAuthClient({ headers, body: { client_name: 'Resource introspection', application_type: 'native', redirect_uris: ['http://127.0.0.1/unused'], token_endpoint_auth_method: 'client_secret_basic', grant_types: ['authorization_code'], response_types: ['code'], scope: 'openid profile' } });
   assert(resourceClient.client_secret);
-  const mcpOptions = { issuer: config.issuer, resource: config.resource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
-  const authApp = createAuthApp(connection.db, config);
+  const mcpOptions = { issuer: config.issuer, resource: config.resource, apiResource: resourceConfig.apiResource, clientId: resourceClient.client_id, clientSecret: resourceClient.client_secret };
+  const authApp = createAuthApp(connection.db, resourceConfig);
   authHandler = authApp;
   const createResource = options.transport === 'rest' ? createArtifactRestApp : options.transport === 'combined' ? createResourceApp : createMcpApp;
-  mcpHandler = createResource(mcpOptions, createArtifactStore(connection.db, { access: config.access, publishOrigin: options.publishOrigin ?? 'https://published.example.test', sendInvitation: createEmailSender(emailSink && options.invitations ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: emailSink } : {}, origin) }));
+  const handlerConfig = options.transport === 'rest' ? { ...mcpOptions, resource: resourceConfig.apiResource ?? config.resource } : mcpOptions;
+  mcpHandler = createResource(handlerConfig, createArtifactStore(connection.db, { access: config.access, publishOrigin: options.publishOrigin ?? 'https://published.example.test', sendInvitation: createEmailSender(emailSink && options.invitations ? { EMAIL_TRANSPORT: 'file', EMAIL_FILE_PATH: emailSink } : {}, origin) }));
   return {
-    ...connection, emailSink, databaseUrl: url, auth, config, mcpOptions, ownerId: owner.user.id, cookie, password,
+    ...connection, emailSink, databaseUrl: url, auth, config: resourceConfig, mcpOptions, ownerId: owner.user.id, cookie, password,
     setAuthHandler(handler: typeof authHandler) { authHandler = handler; },
     setResourceHandler(handler: typeof mcpHandler) { mcpHandler = handler; },
     resourceHandler: mcpHandler, authHandler: authApp,
@@ -68,13 +70,13 @@ export async function fixture(options: { dashboard?: string; publishOrigin?: str
   };
 }
 
-export async function grant(app: { config: { origin: string; issuer: string; resource: string }; cookie: string }, scope = 'openid profile offline_access artifacts:read') {
-  const registration = await fetch(`${app.config.issuer}/oauth2/register`, {
+export async function grant(app: { config: { origin: string; issuer: string; resource: string }; cookie: string }, scope = 'openid profile offline_access artifacts:read', metadataClientId?: string) {
+  const registration = metadataClientId ? undefined : await fetch(`${app.config.issuer}/oauth2/register`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_name: 'Identity integration', redirect_uris: ['http://127.0.0.1:49999/callback'], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] }),
   });
-  assert.equal(registration.status, 201, `registration status ${registration.status}`);
-  const registered = await registration.json() as { client_id: string; application_type: string };
+  if (registration) assert.equal(registration.status, 201, `registration status ${registration.status}`);
+  const registered = registration ? await registration.json() as { client_id: string; application_type: string } : { client_id: metadataClientId!, application_type: 'native' };
   assert.equal(registered.application_type, 'native');
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');

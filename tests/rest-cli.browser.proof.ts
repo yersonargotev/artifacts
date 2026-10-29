@@ -8,10 +8,10 @@ import { chromium } from 'playwright';
 import { restCliFixture } from './rest-cli-fixture.ts';
 import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 
-const app = await restCliFixture();
+const app = await restCliFixture({ apiResource: true });
 const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-browser-'));
 const browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
-const cliEnv = { PATH: process.env.PATH, ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state') };
+const cliEnv = { PATH: process.env.PATH, ARTIFACTS_SERVER: app.config.apiResource!, ARTIFACTS_STATE_DIR: join(directory, 'state') };
 const children = new Set<ChildProcess>();
 function subprocess(args: string[]) {
   const child = spawn(process.execPath, ['--import', 'tsx', 'apps/cli/src/index.ts', ...args], { env: cliEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -41,6 +41,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert(authorization, 'CLI prints its native authorization URL');
+  assert.equal(new URL(authorization).searchParams.get('resource'), app.config.apiResource);
   await page.goto(authorization);
   await page.getByLabel('Correo electrónico').fill('owner@example.test');
   await page.getByLabel('Contraseña').fill(app.password);

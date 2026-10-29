@@ -23,7 +23,9 @@ const document = await client.read({ artifactId: 'artifact-id' });
 
 `createArtifactHttpClient({ resource, accessToken, fetch?, timeoutMs? })` returns an `ArtifactHttpClient`.
 
-`resource` is the exact canonical OAuth resource. A resource ending in `/mcp` uses REST routes under `/mcp/v1`. HTTPS is required except for HTTP on `localhost`, `127.0.0.1`, or `[::1]`. Credentials, queries, fragments, and noncanonical URLs are rejected. The client has no default resource.
+`resource` is the exact canonical REST OAuth resource. Set it to the deployment's `API_URL` origin, such as `https://artifacts.example`, to use routes under `/v1`. Request access tokens for that same origin. MCP uses a separate `/mcp` audience. The client appends `/v1` to the supplied resource and does not remove or rewrite paths. Older deployments without `API_URL` retain their complete MCP resource and `/mcp/v1` routes.
+
+HTTPS is required except for HTTP on `localhost`, `127.0.0.1`, or `[::1]`. Credentials, queries, fragments, and noncanonical URLs are rejected. The client has no default resource.
 
 `accessToken` is a bearer token or an asynchronous function that returns one. The function runs once per method call. The caller owns credential storage and refresh.
 

@@ -31,8 +31,11 @@ test('bootstrap registers independent mixed-origin clients and preserves owner I
     const execute = () => run(process.execPath, ['--import', import.meta.resolve('tsx'), fileURLToPath(new URL('../apps/auth/src/bootstrap.ts', import.meta.url))], { cwd: directory, env: childEnv, timeout: 15_000 });
     await execute();
     const first = parseEnv(await readFile(file, 'utf8'));
+    assert.equal((await db.select().from(oauthClientResource).where(eq(oauthClientResource.clientId, first.MCP_INTROSPECTION_CLIENT_ID!))).length, 1);
     const owner = await db.select().from(user).get();
     assert(owner);
+    await writeFile(file, `${await readFile(file, 'utf8')}MCP_URL=https://artifacts-api.example.test/mcp\nAPI_URL=https://artifacts-api.example.test\n`, { mode: 0o600 });
+    await execute();
     await execute();
     const second = parseEnv(await readFile(file, 'utf8'));
     assert(first.PANEL_CLIENT_SECRET === second.PANEL_CLIENT_SECRET);
@@ -41,7 +44,7 @@ test('bootstrap registers independent mixed-origin clients and preserves owner I
     assert.equal((await db.select().from(user).get())?.id, owner.id);
     assert.equal((await db.select().from(oauthClient).where(eq(oauthClient.clientId, second.PANEL_CLIENT_ID!)).get())?.applicationType, 'web');
     assert.equal((await db.select().from(oauthClient).where(eq(oauthClient.clientId, second.MCP_INTROSPECTION_CLIENT_ID!)).get())?.applicationType, 'native');
-    assert.equal((await db.select().from(oauthClientResource).where(eq(oauthClientResource.clientId, second.MCP_INTROSPECTION_CLIENT_ID!))).length, 1);
+    assert.deepEqual((await db.select().from(oauthClientResource).where(eq(oauthClientResource.clientId, second.MCP_INTROSPECTION_CLIENT_ID!))).map((link) => link.resourceId).sort(), [config.MCP_URL, 'https://artifacts-api.example.test', 'https://artifacts-api.example.test/mcp'].sort());
   } finally {
     client.close();
     await rm(directory, { recursive: true, force: true });

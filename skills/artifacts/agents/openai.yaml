@@ -7,4 +7,4 @@ dependencies:
       value: "artifacts-cloud"
       description: "Retained artifacts with authenticated publication"
       transport: "streamable_http"
-      url: "https://artifacts-mcp.yersonargotev.workers.dev/mcp"
+      url: "https://artifacts-api.yersonargotev.workers.dev/mcp"

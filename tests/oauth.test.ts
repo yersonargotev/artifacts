@@ -1,10 +1,43 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { and, eq, isNotNull } from 'drizzle-orm';
-import { oauthRefreshToken, session } from '../packages/db/src/schema.ts';
+import { oauthClient, oauthClientResource, oauthRefreshToken, session } from '../packages/db/src/schema.ts';
 import { decodeJwt } from 'jose';
 import { callWhoami, fixture, grant } from './helpers.ts';
 import { revokeUserIdentity } from '../apps/auth/src/revocation.ts';
+import { createAuth as createAuthCore } from '../apps/auth/src/auth-core.ts';
+
+test('persisted metadata-document clients acquire the new MCP and REST resource links after restart', async () => {
+  const app = await fixture({ transport: 'combined', apiResource: true });
+  try {
+    const clientId = 'https://client.example.test/client.json';
+    let metadataReads = 0;
+    const transport = {
+      isMetadataDocumentUrlAllowed: (value: string) => value === clientId,
+      fetchClientMetadataResource: async () => {
+        metadataReads++;
+        return Response.json({ client_id: clientId, client_name: 'Disposable metadata client', application_type: 'native', redirect_uris: ['http://127.0.0.1:49999/callback'], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] }, { headers: { 'cache-control': 'no-store' } });
+      },
+    };
+    const previous = { ...app.config, resource: 'https://previous.example.test/mcp', apiResource: undefined };
+    const oldAuth = createAuthCore(app.db, previous, transport);
+    app.setAuthHandler((request) => oldAuth.handler(request));
+    await grant({ ...app, config: previous }, undefined, clientId);
+    const persisted = await app.db.select().from(oauthClient).where(eq(oauthClient.clientId, clientId)).get();
+    assert(persisted);
+    const links = async () => (await app.db.select().from(oauthClientResource).where(eq(oauthClientResource.clientId, persisted.clientId))).map((link) => link.resourceId).sort();
+    assert.deepEqual(await links(), [previous.resource]);
+    const oldReads = metadataReads;
+    const restarted = createAuthCore(app.db, app.config, transport);
+    app.setAuthHandler((request) => restarted.handler(request));
+    const token = await grant(app, undefined, clientId);
+    assert(metadataReads > oldReads, 'A fresh provider revalidates the persisted client metadata');
+    assert.equal((await callWhoami(app.config.resource, token.access_token)).status, 200);
+    assert.deepEqual(await links(), [previous.resource, app.config.resource, app.config.apiResource!].sort());
+    await grant({ ...app, config: { ...app.config, resource: app.config.apiResource! } }, undefined, clientId);
+    assert.deepEqual(await links(), [previous.resource, app.config.resource, app.config.apiResource!].sort());
+  } finally { await app.close(); }
+});
 
 test('PKCE token and authenticated introspection identify the owner on every MCP request', async () => {
   const app = await fixture();

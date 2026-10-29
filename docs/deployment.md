@@ -22,7 +22,7 @@ Bootstrap the confidential clients against the selected private deployment envir
 ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap
 ```
 
-The deployment environment must contain the public origins from `scripts/cloudflare.ts`. Bootstrap preserves the owner and existing configured clients. New confidential client credentials append to `.env.deploy` with mode 0600.
+The deployment environment must contain the public origins from `scripts/cloudflare.ts`, including `API_URL` and `MCP_URL`. Bootstrap preserves the owner and existing configured clients. It links the confidential introspection client to both resource identifiers, including when that client already exists. New confidential client credentials append to `.env.deploy` with mode 0600.
 
 Deploy each checked bundle with its own secret file.
 
@@ -35,7 +35,32 @@ pnpm deploy:worker panel --secrets-file /absolute/private/panel.env
 
 All services use distinct `workers.dev` hostnames. The configurations explicitly enable runtime `process.env` bindings through `nodejs_compat_populate_process_env`. The panel uses those bindings for its existing runtime and internal publication service checks. Auth and MCP also receive typed environment objects at their Worker entrypoints.
 
+The `mcp` service key now builds and deploys the `artifacts-api` Worker. Its public REST routes use `/v1`, and its MCP endpoint uses `/mcp`. The commands and `dist/workers/mcp` output directory retain the internal service key.
+
 The authorization Worker's CIMD transport approves only the exact Codex and Claude metadata document URLs in `apps/auth/src/metadata-worker.ts`. It never follows redirects or fetches unapproved JWKS locations. The local Node service retains the pinned DNS transport. Codex metadata returned 403 in the earlier local workerd probe. Both actual deployed CLI OAuth flows subsequently succeeded through the exact vendor transport; Claude created and published a revision and Codex updated, published, read history, and exported its original revision. The local probe result did not establish production reachability. [Execution evidence](../.audit/artifact-e2e/runtime.md) records the final observed gates.
+
+## Migrate the API hostname
+
+The checked-in target is `https://artifacts-api.yersonargotev.workers.dev`. This hostname migration has not been deployed or verified. Historical acceptance reports describe the previous `artifacts-mcp` address. This migration uses a `workers.dev` hostname and requires no custom-domain DNS changes.
+
+1. Review the private deployment environment. Set `API_URL=https://artifacts-api.yersonargotev.workers.dev` and `MCP_URL=https://artifacts-api.yersonargotev.workers.dev/mcp`. Keep the existing database, owner identity, and confidential client credentials. `API_URL` must be an origin, and `MCP_URL` must be that same origin followed by `/mcp`.
+2. Run `ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap` against that reviewed environment. This seeds both resources and links the existing introspection client to both. Repeat runs preserve the client ID and secret. Complete this before the new Worker receives authenticated requests. Do not pass owner bootstrap credentials to CI.
+3. Build and inspect the bundles with `pnpm build:workers` and each service's `deploy:worker --dry-run` command above. `API_URL` is a public text binding in auth, API, and panel configuration. It does not belong in the runtime secret JSON.
+4. After deployment is authorized, deploy auth, `mcp`, view, and panel in that order using the checked bundles and existing per-service secret files. The `mcp` deployment creates `artifacts-api`; it does not rename or retire the previous Worker.
+5. Run the release's read-only smoke checks. They require exact origin metadata, exact `/mcp` metadata, and HTTP 401 for anonymous MCP and REST requests. Also verify native CLI login and the actual MCP clients against the new address. A passing `/health` response alone does not establish OAuth compatibility.
+6. Set `ARTIFACTS_SERVER` to the new API origin and run `artifacts login`. Reconnect MCP clients to the new `/mcp` URL and complete their OAuth login. Credentials and retained operation files remain bound to their original resource. Do not rewrite old operation files or redirect bearer requests to the new hostname.
+7. Keep the previous Worker until its retirement is deliberate. Keeping that Worker alone does not establish continued authorization at the old address. Verify old-client support separately if it is needed during cutover. Preserve the prior checked bundles and auth bindings for rollback.
+
+The two metadata documents must identify different resources.
+
+```sh
+curl --fail-with-body https://artifacts-api.yersonargotev.workers.dev/.well-known/oauth-protected-resource
+curl --fail-with-body https://artifacts-api.yersonargotev.workers.dev/.well-known/oauth-protected-resource/mcp
+```
+
+The first document's `resource` must equal the API origin. The second must equal the same origin with `/mcp`. REST tokens target the origin, and MCP tokens target `/mcp`. Both use the same account issuer and artifact store.
+
+For an existing local `.env`, add `API_URL=http://127.0.0.1:4101`, keep `MCP_URL=http://127.0.0.1:4101/mcp`, rerun `pnpm identity:bootstrap`, and restart the services. Set local `ARTIFACTS_SERVER` to the API origin and sign in again. Omitting `API_URL` preserves the previous REST resource and routes under `/mcp/v1`.
 
 ## Configure GitHub production releases
 

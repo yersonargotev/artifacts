@@ -25,8 +25,8 @@ const script = resolve(import.meta.filename);
 const features = ['identity', 'authoring', 'cli', 'projects', 'screens', 'preview', 'publication', 'export', 'sharing'] as const;
 const scopes = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
 type Feature = typeof features[number];
-type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
-type Credentials = { controlToken: string; accessToken: string; password: string };
+type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; api: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
+type Credentials = { controlToken: string; accessToken: string; restAccessToken: string; password: string };
 type ToolResult = { isError?: boolean; structuredContent: Record<string, any> };
 let args: string[];
 let run: string;
@@ -92,7 +92,10 @@ async function doctor() {
   assert.equal(identity.status, 200, 'MCP token remains active');
   assert.equal(identity.result?.structuredContent.userId, instance.ownerId, 'MCP identity matches disposable owner');
   assert(!identity.result?.isError, 'MCP identity tool succeeds');
-  const proof = { status: 'passed', checkedAt: new Date().toISOString(), instance: instance.id, pid: instance.pid, panelPid: instance.panelPid, build: instance.build, ownerId: instance.ownerId, surfaces: ['auth', 'mcp', 'panel', 'view'], liveMcpSession: true };
+  const restIdentity = await fetch(`${instance.api}/v1/identity`, { headers: { authorization: `Bearer ${credentials.restAccessToken}` }, signal: AbortSignal.timeout(3000) });
+  assert.equal(restIdentity.status, 200, 'REST token remains active at /v1');
+  assert.equal((await restIdentity.json()).userId, instance.ownerId, 'REST identity matches disposable owner');
+  const proof = { status: 'passed', checkedAt: new Date().toISOString(), instance: instance.id, pid: instance.pid, panelPid: instance.panelPid, build: instance.build, ownerId: instance.ownerId, surfaces: ['auth', 'mcp', 'rest', 'panel', 'view'], liveMcpSession: true, liveRestSession: true };
   await json(join(run, 'doctor.json'), proof);
   return { instance, credentials, proof };
 }
@@ -115,7 +118,7 @@ async function supervisor() {
     const view = serve({ fetch: (request) => viewHandler(request), hostname: '::1', port: 0 });
     servers.push(view);
     const viewOrigin = `http://[::1]:${await listen(view)}`;
-    app = await fixture({ transport: 'combined', dashboard: panelOrigin, publishOrigin: viewOrigin, allowGuests: args.includes('--allow-guests'), emailCode: args.includes('--email-code'), invitations: args.includes('--invitations') });
+    app = await fixture({ transport: 'combined', apiResource: true, dashboard: panelOrigin, publishOrigin: viewOrigin, allowGuests: args.includes('--allow-guests'), emailCode: args.includes('--email-code'), invitations: args.includes('--invitations') });
     const serviceSecret = randomBytes(32).toString('hex');
     const cookieSecret = randomBytes(32).toString('hex');
     viewHandler = createPublicationApp({ DASHBOARD_URL: panelOrigin, PUBLISH_URL: viewOrigin, PUBLICATION_SERVICE_SECRET: serviceSecret, PUBLICATION_COOKIE_SECRET: cookieSecret });
@@ -135,6 +138,7 @@ async function supervisor() {
     }
     assert(ready, 'Built panel is ready');
     const tokens = await grant(app, scopes);
+    const restTokens = await grant({ ...app, config: { ...app.config, resource: app.config.apiResource! } }, scopes);
     const fixtureApp = app;
     const admittedAccounts = new Set<string>();
     async function ensureAccount(email: string, verified: boolean): Promise<Account> {
@@ -176,11 +180,11 @@ async function supervisor() {
       catch (error) { return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     } });
     servers.push(control);
-    const instance: Instance = { id, pid: process.pid, panelPid: panel.pid!, build: hash(await readFile(entry)), ownerId: app.ownerId, auth: app.config.origin, mcp: app.config.resource, panel: panelOrigin, view: viewOrigin, control: `http://127.0.0.1:${await listen(control)}/doctor`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
+    const instance: Instance = { id, pid: process.pid, panelPid: panel.pid!, build: hash(await readFile(entry)), ownerId: app.ownerId, auth: app.config.origin, api: app.config.apiResource!, mcp: app.config.resource, panel: panelOrigin, view: viewOrigin, control: `http://127.0.0.1:${await listen(control)}/doctor`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() };
     if (app.emailSink) await json(join(runtime, 'email-code.json'), { path: app.emailSink });
-    await json(join(runtime, 'credentials.json'), { controlToken, accessToken: tokens.access_token, password: app.password } satisfies Credentials);
+    await json(join(runtime, 'credentials.json'), { controlToken, accessToken: tokens.access_token, restAccessToken: restTokens.access_token, password: app.password } satisfies Credentials);
     await json(join(run, 'instance.json'), instance);
-    console.log(JSON.stringify({ ready: true, run, auth: instance.auth, mcp: instance.mcp, panel: instance.panel, view: instance.view }));
+    console.log(JSON.stringify({ ready: true, run, auth: instance.auth, api: instance.api, mcp: instance.mcp, panel: instance.panel, view: instance.view }));
     await stopped;
   } finally {
     clearTimeout(expiry);
@@ -205,7 +209,7 @@ async function launch() {
     for (let attempt = 0; attempt < 200; attempt++) {
       assert(child.exitCode === null, 'Supervisor exited; inspect supervisor.log');
       const instance = await load<Instance>(join(run, 'instance.json')).catch(() => undefined);
-      if (instance) { await doctor(); console.log(JSON.stringify({ ready: true, run, panel: instance.panel, mcp: instance.mcp, auth: instance.auth, view: instance.view })); return; }
+      if (instance) { await doctor(); console.log(JSON.stringify({ ready: true, run, panel: instance.panel, api: instance.api, mcp: instance.mcp, auth: instance.auth, view: instance.view })); return; }
       await delay(100);
     }
     throw new Error('Supervisor readiness timed out; inspect supervisor.log');
@@ -275,7 +279,7 @@ async function drive(feature: Feature) {
   const cliState = join(runtime, 'cli-state');
   async function cli(...cliArgs: string[]) {
     await mkdir(cliState, { recursive: true, mode: 0o700 });
-    const env = { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken };
+    const env = { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.api, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.restAccessToken };
     const child = spawn(process.execPath, ['--import', 'tsx', join(root, 'apps/cli/src/index.ts'), ...cliArgs], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
@@ -481,7 +485,7 @@ async function drive(feature: Feature) {
         await capture(page, 'globally-revoked');
         checks.push('Browser login owner matches MCP owner', 'Mobile native navigation and account disclosure without overflow', 'Native panel logout preserves MCP access', 'SSO reentry', 'Global revoke denies MCP and clears browser session cookies');
       } else if (feature === 'projects') {
-        await driveProjects({ page, browser, context, instance, directory, root, cliEnv: { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.mcp, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.accessToken }, firstSnapshot, secondSnapshot, recordVideo: args.includes('--record-video'), checks, call, ok, login, capture, checkScreen, record, json });
+        await driveProjects({ page, browser, context, instance, directory, root, cliEnv: { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.api, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.restAccessToken }, firstSnapshot, secondSnapshot, recordVideo: args.includes('--record-video'), checks, call, ok, login, capture, checkScreen, record, json });
       } else if (feature === 'sharing') {
         await driveSharing({ page, browser, firstSnapshot, checks, call, account, login, capture, record });
       } else {

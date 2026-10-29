@@ -10,6 +10,7 @@ try {
     `DATABASE_URL=file:${resolve('.data/identity.db')}`,
     'AUTH_URL=http://localhost:4100',
     'MCP_URL=http://127.0.0.1:4101/mcp',
+    'API_URL=http://127.0.0.1:4101',
     'DASHBOARD_URL=http://127.0.0.1:4321',
     'PUBLISH_URL=http://[::1]:4102',
     `BETTER_AUTH_SECRET=${secret()}`,

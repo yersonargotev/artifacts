@@ -12,16 +12,20 @@ Native preparation currently supports macOS arm64 and Linux x64 with glibc. The 
 import { createArtifactRestApp } from '@artifacts/rest';
 
 const fetch = createArtifactRestApp({
-	resource: 'https://artifacts.example/mcp',
+	resource: 'https://artifacts.example',
 	issuer: 'https://accounts.example/api/auth',
 	clientId: process.env.MCP_INTROSPECTION_CLIENT_ID,
 	clientSecret: process.env.MCP_INTROSPECTION_CLIENT_SECRET,
 }, store);
 ```
 
-The canonical resource is the existing complete `MCP_URL`. API routes live at `${MCP_URL}/v1`. Direct consumers need no MCP session. The default Worker composes both adapters. `pnpm dev:rest` starts the REST-only Node listener using `DATABASE_URL`, optional `DATABASE_AUTH_TOKEN`, `AUTH_URL`, `MCP_URL`, `PUBLISH_URL`, both introspection credentials, and the existing `MCP_PORT` and `MCP_BIND_HOST` variables. This entry point reads explicit environment variables and does not load `.env`.
+The canonical REST resource is the `API_URL` origin. Routes live at `${API_URL}/v1`. MCP uses the same origin with `/mcp` as its separate OAuth resource. Request a token for the REST origin when calling this adapter. Direct consumers need no MCP session. The default `artifacts-api` Worker composes both adapters over one store.
+
+`pnpm dev:rest` starts the REST-only Node listener using `DATABASE_URL`, optional `DATABASE_AUTH_TOKEN`, `AUTH_URL`, `API_URL`, `MCP_URL`, `PUBLISH_URL`, both introspection credentials, and the existing `MCP_PORT` and `MCP_BIND_HOST` variables. `API_URL` must be an origin, and `MCP_URL` must be the same origin followed by `/mcp`. Without `API_URL`, older configurations retain `MCP_URL` as the REST resource and expose `${MCP_URL}/v1`. This entry point reads explicit environment variables and does not load `.env`.
 
 ## Routes
+
+Paths below are relative to `${API_URL}/v1`.
 
 | Method | Relative path | Input |
 | --- | --- | --- |
@@ -57,7 +61,7 @@ A move command is `{ "requestId": "...", "artifactId": "...", "project": "Beta" 
 
 `GET /projects` returns `{ "items": [{ "name": "Beta", "artifactCount": 1 }] }`, ordered by name without regard to letter case. Projects exist only while they contain artifacts, so the list has no empty entries and no pagination.
 
-The metadata URL is `/.well-known/oauth-protected-resource` followed by the canonical resource path. Check its `resource` field against the configured canonical resource. REST route challenges omit `resource_metadata` because those route URLs differ from the OAuth audience.
+For an origin resource, the metadata URL is `${API_URL}/.well-known/oauth-protected-resource`. MCP metadata lives at `${API_URL}/.well-known/oauth-protected-resource/mcp`. Each document identifies its own exact OAuth resource. Check the REST document's `resource` field against the configured API origin. REST route challenges omit `resource_metadata` because those route URLs differ from the OAuth audience.
 
 ## Sharing
 
