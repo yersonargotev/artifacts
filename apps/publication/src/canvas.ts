@@ -153,7 +153,7 @@ canvas.addEventListener('pointermove', (event) => {
   last.x = event.clientX;
   last.y = event.clientY;
 });
-for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, (event) => pointers.delete(event.pointerId));
+canvas.addEventListener('lostpointercapture', (event) => pointers.delete(event.pointerId));
 
 render();
 `;
