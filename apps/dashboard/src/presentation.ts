@@ -47,7 +47,7 @@ export function searchFor(page: LibraryPage): LibraryQuery {
 
 export const clientLabel = (client: ClientRef) => client.name ?? client.clientId;
 export const absoluteTime = (at: Date) => `${at.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
-export const contentLabels = { html: 'HTML', markdown: 'Markdown', text: 'Texto' } as const;
+export const contentLabels = { html: 'HTML', markdown: 'Markdown', text: 'Texto', design: 'Diseño' } as const;
 export const publicationStates = {
   unpublished: { label: 'Sin publicar' },
   published: { label: 'Publicado' },

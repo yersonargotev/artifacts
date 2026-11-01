@@ -8,7 +8,8 @@ import { eq } from 'drizzle-orm';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createArtifactStore, createSchema, historySchema, readSchema, updateSchema, type Actor, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from '../packages/artifacts/src/index.ts';
 import { compactArtifactRead, compareRevisions, prepareArtifactEdit, summarizeRevision, type CompactArtifactRead, type RevisionSummary } from '../packages/artifacts/src/workflow.ts';
-import { fixture, grant } from './helpers.ts';
+import { compactArtifactReadSchema, summaryHistoryResultSchema } from '../packages/contracts/src/http.ts';
+import { designSnapshot, fixture, grant } from './helpers.ts';
 
 const snapshot: Snapshot = {
   metadata: { title: 'Saved title', description: 'Saved description', custom: { retained: ['private-custom-payload'] } },
@@ -96,6 +97,29 @@ test('revision comparison reports metadata, content and changed attachment inven
   const textDifference = await compareRevisions(revision, { ...revision, snapshot: { ...snapshot, content: { ...snapshot.content, text: 'Changed text' } } });
   assert.equal(textDifference.content.kindChanged, false);
   assert.equal(textDifference.content.textChanged, true);
+});
+
+test('a compact read and a summary history item of a design revision match the HTTP schemas', async () => {
+  const compact = await compactArtifactRead({ ...document, revision: { ...revision, snapshot: designSnapshot() } });
+  assert.equal(compact.revision.content.kind, 'design');
+  assert.deepEqual(compactArtifactReadSchema.parse(compact), compact);
+  assert.deepEqual(summaryHistoryResultSchema.parse({ items: [compact.revision], nextBeforeSequence: null }).items, [compact.revision]);
+});
+
+test('moving one design board reports a text change and keeps the kind', async () => {
+  const app = await workflowFixture();
+  try {
+    const design = designSnapshot();
+    const created = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: design });
+    const canvas = JSON.parse(design.content.text);
+    canvas.boards['boards/Board-2.html'].x += 240;
+    const moved = await app.store.update(app.actor, { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.revision.id, snapshot: { ...design, content: { kind: 'design', text: JSON.stringify(canvas) } } });
+    const comparison = await compareRevisions(created.revision, moved.revision);
+    assert.equal(comparison.content.textChanged, true);
+    assert.equal(comparison.content.kindChanged, false);
+    assert.deepEqual(comparison.metadata, []);
+    assert.deepEqual(comparison.files, []);
+  } finally { await app.close(); }
 });
 
 test('prepared edits preserve omitted values, isolate callers and freeze every nested value', async () => {

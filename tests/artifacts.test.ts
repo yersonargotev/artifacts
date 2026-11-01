@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { artifact, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
 import { createArtifactStore, projectNameSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
-import { fixture, grant } from './helpers.ts';
+import { designSnapshot, fixture, grant } from './helpers.ts';
 
 const snapshot: Snapshot = {
   metadata: { title: 'Revision one', description: 'Original description', custom: { labels: ['retained'], order: 1 } },
@@ -165,6 +165,21 @@ test('publication grants are bound, one-use, and recheck live sessions and selec
     await app.db.delete(session).where(eq(session.id, app.actor.sessionId));
     await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden' });
     await assert.rejects(app.store.consumePublicationGrant({ artifactId: first.artifactId, state, code: pending.code }), { code: 'invalid_grant' });
+  } finally { await app.close(); }
+});
+
+test('a design revision exports its canvas index as content.json and every board under files/boards', async () => {
+  const app = await artifactFixture();
+  try {
+    const design = designSnapshot();
+    const created = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: design });
+    assert.deepEqual(created.revision.snapshot, design);
+    const exported = await app.store.export(app.actor, { artifactId: created.artifactId, revisionId: created.revision.id });
+    const files = unzipSync(Buffer.from(exported.base64, 'base64'));
+    assert.deepEqual(Object.keys(files), ['artifact.json', 'content.json', 'files/boards/Board-1.html', 'files/boards/Board-2.html', 'files/boards/Board-3.html']);
+    assert.equal(strFromU8(files['content.json']!), design.content.text);
+    for (const board of design.files) assert.equal(strFromU8(files[`files/${board.path}`]!), board.data);
+    assert.deepEqual(JSON.parse(strFromU8(files['artifact.json']!)).content, { kind: 'design', path: 'content.json' });
   } finally { await app.close(); }
 });
 

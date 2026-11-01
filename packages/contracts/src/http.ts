@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { artifactReadSchema, publicationSchema, revisionSchema, snapshotSchema } from './index.ts';
+import { artifactReadSchema, contentKinds, publicationSchema, revisionSchema, snapshotSchema } from './index.ts';
 
 const identifier = z.string().min(1).max(128);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -8,7 +8,7 @@ export type Identity = z.infer<typeof identitySchema>;
 export const attachmentSummarySchema = z.strictObject({ path: z.string(), mediaType: z.string(), encoding: z.enum(['utf8', 'base64']), decodedBytes: z.number().int().nonnegative(), sha256: digest });
 export const revisionSummarySchema = revisionSchema.omit({ snapshot: true }).extend({
   metadata: snapshotSchema.shape.metadata.pick({ title: true, description: true }),
-  content: z.strictObject({ kind: snapshotSchema.shape.content.shape.kind, utf8Bytes: z.number().int().nonnegative() }),
+  content: z.strictObject({ kind: z.enum(contentKinds), utf8Bytes: z.number().int().nonnegative() }),
   files: z.array(attachmentSummarySchema).max(32),
 });
 export const compactArtifactReadSchema = artifactReadSchema.omit({ revision: true }).extend({ revision: revisionSummarySchema });
