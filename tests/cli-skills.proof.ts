@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { snapshotSchema } from '../packages/contracts/src/index.ts';
 import { inspectTarball, packageOutput, readInventory, root } from '../scripts/package-catalog.ts';
 
 const inventory = await readInventory();
@@ -106,6 +107,7 @@ require('node:module').syncBuiltinESMExports();
   assert.ok(all.includes(skill));
   const full = await cli(['skills', 'get', 'artifacts-cli', '--full']);
   const designFull = await cli(['skills', 'get', 'artifacts-design', '--full']);
+  assert.ok(designFull.includes('=== artifacts-design/references/canvas.md ===\n'), 'Installed design skill exposes the canvas authoring guide');
   assert.equal(await cli(['skills', 'get', '--all', '--full']), full + designFull);
   for (const path of designFiles) {
     const bytes = await readFile(join(designSource, path));
@@ -154,6 +156,71 @@ require('node:module').syncBuiltinESMExports();
   await assert.rejects(stat(join(cwd, 'new-retained-evidence')), { code: 'ENOENT' });
   assert.equal((await run(process.execPath, handoffArgs)).code, 1);
   assert.deepEqual(JSON.parse(await readFile(handoffOutput, 'utf8')), handoffConfig);
+
+  const canvasDirectory = join(cwd, 'Product canvas');
+  await mkdir(join(canvasDirectory, 'boards'), { recursive: true });
+  const canvasIndex = { v: 1, boards: { 'boards/Desktop.html': { x: 0, y: 0, w: 1440, h: 900, page: 'overview' }, 'boards/Phone.html': { x: 1520, y: 0, w: 390, h: 844, page: 'detail' } }, order: ['boards/Phone.html', 'boards/Desktop.html'], pages: [{ id: 'overview', name: 'Overview' }, { id: 'detail', name: 'Detail' }] };
+  const canvasText = `${JSON.stringify(canvasIndex, null, 2)}\n`;
+  await writeFile(join(canvasDirectory, 'canvas.json'), canvasText);
+  const desktopHtml = '<!doctype html><title>Desktop</title><h1>Desktop</h1>\n';
+  const phoneHtml = '<!doctype html><title>Phone</title><h1>Phone</h1>\n';
+  await writeFile(join(canvasDirectory, 'boards/Desktop.html'), desktopHtml);
+  await writeFile(join(canvasDirectory, 'boards/Phone.html'), phoneHtml);
+  const canvasArgs = [join(bundled, 'scripts/prepare-retained.mjs'), canvasDirectory];
+  const preparedCanvas = await run(process.execPath, canvasArgs, home);
+  assert.equal(preparedCanvas.code, 0, preparedCanvas.stderr);
+  const canvasSnapshot = snapshotSchema.parse(JSON.parse(preparedCanvas.stdout));
+  assert.deepEqual(canvasSnapshot, { metadata: { title: 'Product canvas', description: '' }, content: { kind: 'design', text: canvasText }, files: [{ path: 'boards/Desktop.html', mediaType: 'text/html', encoding: 'utf8', data: desktopHtml }, { path: 'boards/Phone.html', mediaType: 'text/html', encoding: 'utf8', data: phoneHtml }] });
+  await writeFile(join(canvasDirectory, 'boards/Orphan.html'), '<p>Orphan</p>');
+  const orphan = await run(process.execPath, canvasArgs);
+  assert.equal(orphan.code, 1);
+  assert.equal(orphan.stdout, '');
+  assert.match(orphan.stderr, /boards\/Orphan\.html/);
+  await rm(join(canvasDirectory, 'boards/Orphan.html'));
+  await rm(join(canvasDirectory, 'boards/Phone.html'));
+  const missing = await run(process.execPath, canvasArgs);
+  assert.equal(missing.code, 1);
+  assert.match(missing.stderr, /boards\/Phone\.html/);
+  await writeFile(join(canvasDirectory, 'boards/Phone.html'), phoneHtml);
+  const invalidCanvases = [
+    { ...canvasIndex, order: ['boards/Desktop.html', 'boards/Desktop.html'] },
+    { ...canvasIndex, boards: { ...canvasIndex.boards, 'boards/Phone.html': { x: 1_000_001, y: 0, w: 390, h: 844 } } },
+    { ...canvasIndex, pages: [{ id: '__proto__', name: 'Invalid' }] },
+    { ...canvasIndex, notes: JSON.parse('{"__proto__":{"x":0,"y":0,"text":"Invalid"}}') },
+    { ...canvasIndex, order: Array(33).fill('boards/Desktop.html') },
+    { ...canvasIndex, extra: true },
+  ];
+  for (const index of invalidCanvases) {
+    await writeFile(join(canvasDirectory, 'canvas.json'), JSON.stringify(index));
+    const rejected = await run(process.execPath, canvasArgs);
+    assert.equal(rejected.code, 1, JSON.stringify(index));
+    assert.equal(rejected.stdout, '');
+  }
+  await writeFile(join(canvasDirectory, 'canvas.json'), canvasText);
+  await writeFile(join(canvasDirectory, 'boards/Phone.html'), 'x'.repeat(1_048_576));
+  const oversized = await run(process.execPath, canvasArgs);
+  assert.equal(oversized.code, 1);
+  assert.match(oversized.stderr, /1 MiB/);
+  await rm(join(canvasDirectory, 'boards/Phone.html'));
+  await symlink(join(canvasDirectory, 'boards/Desktop.html'), join(canvasDirectory, 'boards/Phone.html'));
+  const linkedBoard = await run(process.execPath, canvasArgs);
+  assert.equal(linkedBoard.code, 1);
+  assert.match(linkedBoard.stderr, /regular file/);
+  await rm(join(canvasDirectory, 'boards/Phone.html'));
+  await writeFile(join(canvasDirectory, 'boards/Phone.html'), Buffer.from([0xc3, 0x28]));
+  const invalidUtf8 = await run(process.execPath, canvasArgs);
+  assert.equal(invalidUtf8.code, 1);
+  assert.match(invalidUtf8.stderr, /UTF-8/);
+  await writeFile(join(canvasDirectory, 'boards/Phone.html'), phoneHtml);
+  const designCanonical = JSON.stringify(canvasSnapshot, (_key, value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : value);
+  const designHandoffRead = { ...handoffRead, revision: { ...handoffRead.revision, sha256: createHash('sha256').update(designCanonical).digest('hex'), snapshot: canvasSnapshot } };
+  await writeFile(join(cwd, 'handoff-receipt.json'), JSON.stringify({ artifactId: designHandoffRead.artifactId, revision: { id: designHandoffRead.revision.id, sha256: designHandoffRead.revision.sha256 } }));
+  await writeFile(join(cwd, 'handoff-read.json'), JSON.stringify(designHandoffRead));
+  const designHandoffOutput = join(cwd, 'design-retained-config.json');
+  const designHandoffArgs = [...handoffArgs.slice(0, -1), designHandoffOutput];
+  const designHandoff = await run(process.execPath, designHandoffArgs);
+  assert.equal(designHandoff.code, 0, designHandoff.stderr);
+  assert.deepEqual(JSON.parse(await readFile(designHandoffOutput, 'utf8')).expected, designHandoffRead);
 
   const designBundled = (await cli(['skills', 'path', 'artifacts-design'])).trim();
   const localHtml = join(consumer, 'local.html');
@@ -275,7 +342,7 @@ require('node:module').syncBuiltinESMExports();
   ];
   for (const [args, pattern] of invalid) await failure(args, pattern);
   assert.equal((await readdir(home)).includes('cli-state'), false, 'Offline commands never initialize credential state');
-  console.log('Packaged skills passed offline listing, exact content, full references, paths, retained handoff, all install destinations, idempotence, overwrite protection, discovery loading, and invalid arguments.');
+  console.log('Packaged skills passed offline listing, exact content, full references, paths, canvas preparation and rejection, retained handoff, all install destinations, idempotence, overwrite protection, discovery loading, and invalid arguments.');
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

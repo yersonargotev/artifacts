@@ -29,11 +29,13 @@ Create and update save a complete snapshot. Publication selects an existing revi
 
 `metadata.title` is required and contains 1 to 256 characters. `metadata.description` is required and accepts up to 8192 characters. `metadata.custom` is optional JSON.
 
-`content.kind` is `html`, `markdown`, or `text`. `content.text` is well-formed Unicode. `files` is required and accepts zero to 32 entries.
+`content.kind` is `html`, `markdown`, `text`, or `design`. `content.text` is well-formed Unicode. `files` is required and accepts zero to 32 entries.
 
 Every file requires `path`, `mediaType`, `encoding`, and `data`. Paths are unique NFC-normalized relative paths. Empty segments, traversal, backslashes, colons, percent signs, and control characters are rejected. A file path cannot be a parent of another file path. Media types use MIME syntax without parameters. `encoding` is `utf8` or `base64`. Binary data uses canonical padded base64.
 
 The decoded total is at most 1,048,576 bytes. The total includes serialized metadata, UTF-8 content, UTF-8 paths and media types, and decoded attachment data.
+
+For `design`, `content.text` is a JSON canvas index with `v: 1`, `boards`, and `order`. Optional `pages` and `notes` group the boards and annotate the canvas. Each indexed board names a matching `text/html` file with `utf8` encoding. All boards share the same 32-file and 1 MiB revision limits. Read `artifacts-design/references/canvas.md` from the design skill for the complete index shape and authoring rules before creating a design. The tool receives the complete snapshot, not a directory path.
 
 ## Tool inputs and results
 
@@ -65,7 +67,7 @@ Create, update, and move require `artifacts:write`. Publication, share, unshare,
 
 Mutations return their original result for a retry with the same owner-scoped `requestId` and exact arguments. Reuse with different arguments fails. Stale expected revision or publication versions fail with `conflict`.
 
-Export returns a ZIP, not a download URL. It contains `artifact.json`, a content document, and sorted `files/<path>` entries. Its SHA-256 covers the decoded archive bytes.
+Export returns a ZIP, not a download URL. It contains `artifact.json`, a content document (`content.json` for `design`), and sorted `files/<path>` entries. Its SHA-256 covers the decoded archive bytes.
 
 ## Shares
 

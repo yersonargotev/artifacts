@@ -1,6 +1,6 @@
 ---
 name: artifacts-design
-description: Design the HTML document of a retained Artifact with embedded fonts, light and dark Catppuccin tokens, purposeful layout, and rendered checks. Use before writing or restyling HTML for the artifacts or artifacts-cli skills.
+description: Design HTML documents and multi-board design canvases of a retained Artifact with embedded fonts, light and dark Catppuccin tokens, purposeful layout, and rendered checks. Use before writing or restyling HTML or design boards for the artifacts or artifacts-cli skills.
 ---
 
 # Design HTML artifacts
@@ -8,6 +8,8 @@ description: Design the HTML document of a retained Artifact with embedded fonts
 The calling skill owns the snapshot, size limit, and save workflow. This skill owns how the document looks and behaves. Follow the user's visual direction first. When revising content only, keep an existing artifact's established style. When the user asks to redesign or improve the look, start from these defaults.
 
 The document renders in a sandbox that blocks every network request. Fonts, images, and icons load only as `data:` URIs. External stylesheets, Google Fonts links, and CDN scripts silently fail. Inline all CSS and JavaScript.
+
+For multiple boards, read [canvas authoring](references/canvas.md) before writing the index or HTML. It defines the board files, pages, geometry, shared font budget, and complete snapshot workflow.
 
 ## Choose the composition
 
