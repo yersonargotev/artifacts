@@ -11,8 +11,8 @@ const icons = {
 };
 
 const style = `
-:root{--ground:#dce0e8;--panel:#eff1f5;--line:#ccd0da;--text:#4c4f69;--muted:#5c5f77;--accent:#1e66f5;--on-accent:#fff;--note:color-mix(in srgb,#df8e1d 22%,#eff1f5);--note-line:color-mix(in srgb,#df8e1d 45%,#eff1f5);--edge:rgb(76 79 105/.16);--shadow:0 6px 24px rgb(76 79 105/.18);--bar:60px;color-scheme:light dark}
-@media(prefers-color-scheme:dark){:root{--ground:#11111b;--panel:#1e1e2e;--line:#313244;--text:#cdd6f4;--muted:#a6adc8;--accent:#89b4fa;--on-accent:#11111b;--note:color-mix(in srgb,#f9e2af 22%,#1e1e2e);--note-line:color-mix(in srgb,#f9e2af 40%,#1e1e2e);--edge:#45475a;--shadow:0 6px 24px rgb(0 0 0/.5)}}
+:root{--ground:#dce0e8;--panel:#eff1f5;--line:#ccd0da;--text:#4c4f69;--muted:#5c5f77;--accent:#1e66f5;--on-accent:#fff;--edge:rgb(76 79 105/.16);--shadow:0 6px 24px rgb(76 79 105/.18);--bar:60px;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--ground:#11111b;--panel:#1e1e2e;--line:#313244;--text:#cdd6f4;--muted:#a6adc8;--accent:#89b4fa;--on-accent:#11111b;--edge:#45475a;--shadow:0 6px 24px rgb(0 0 0/.5)}}
 *{box-sizing:border-box}html,body{height:100%}body{margin:0;overflow:hidden;background:var(--ground);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
 button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;padding:0 10px;border:0;border-radius:10px;background:none;color:inherit;font:inherit;font-weight:500;cursor:pointer}
 button:hover{background:var(--line)}button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}svg{flex:none}
@@ -22,13 +22,14 @@ button:hover{background:var(--line)}button:focus-visible{outline:2px solid var(-
 .board>iframe{display:block;width:100%;height:100%;border:0}
 .board-name{position:absolute;left:0;bottom:100%;max-width:max(44px,calc(var(--w)*var(--s)*1px));justify-content:flex-start;align-items:flex-end;padding:0 4px 6px;border-radius:8px;color:var(--muted);font-size:13px;transform-origin:0 100%;scale:calc(1/var(--s))}
 .board-name:hover{background:none;color:var(--text)}.board-name span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.board-name svg{width:14px;height:14px}
-.note{position:absolute;left:calc(var(--x)*1px);top:calc(var(--y)*1px);width:calc(var(--w,320)*1px);margin:0;padding:16px 18px;border:1px solid var(--note-line);border-radius:6px;background:var(--note);font-size:20px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 4px 14px rgb(0 0 0/.12)}
-.pages,.zoom,.focus-bar{position:fixed;z-index:1;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
-.pages{top:12px;left:12px;max-width:calc(100% - 24px);overflow-x:auto;scrollbar-width:none;border-radius:14px}.pages button{flex:none;padding:0 14px}
-.zoom{bottom:12px;left:50%;translate:-50% 0;border-radius:14px}.zoom-level{min-width:52px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
-.focus-bar{top:0;left:0;right:0;height:var(--bar);gap:12px;padding:0 12px;border-width:0 0 1px;box-shadow:none}.focus-bar p{display:flex;gap:10px;min-width:0;margin:0}.focus-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.focus-size{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.note{position:absolute;left:calc(var(--x)*1px);top:calc(var(--y)*1px);width:calc(var(--w,320)*1px);margin:0;padding:16px 18px;border:1px solid color-mix(in srgb,#df8e1d 45%,#f9e2af);border-radius:6px;background:#f9e2af;color:#4c4f69;font-size:20px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 4px 14px rgb(0 0 0/.12)}
+.controls{position:fixed;z-index:1;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;pointer-events:none}
+.pages,.zoom,.focus-bar{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
+.pages,.zoom{max-width:100%;border-radius:14px;pointer-events:auto}.pages{overflow-x:auto;scrollbar-width:none}.pages button{flex:none;padding:0 14px}
+.zoom{margin-left:auto}.zoom-level{min-width:52px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
+.focus-bar{position:fixed;z-index:1;top:0;left:0;right:0;height:var(--bar);gap:12px;padding:0 12px;border-width:0 0 1px;box-shadow:none}.focus-bar p{display:flex;gap:10px;min-width:0;margin:0}.focus-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.focus-size{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
 body[data-focus] .canvas{top:var(--bar);overflow:auto;padding:24px;touch-action:auto;user-select:auto;cursor:auto}body[data-focus] .world{position:static;transform:none}body[data-focus] .board{position:relative;left:0;top:0;margin:0 auto}
-body[data-focus] :is(.board:not([data-focused]),.note,.board-name,.pages,.zoom),body:not([data-focus]) .focus-bar{display:none}
+body[data-focus] :is(.board:not([data-focused]),.note,.board-name,.controls),body:not([data-focus]) .focus-bar{display:none}
 `;
 
 // A string literal keeps the served bytes identical across tsx, Vite, and the Worker bundle; the retained verifier compares them.
@@ -37,6 +38,7 @@ const canvas = document.querySelector('.canvas');
 const boards = [...canvas.querySelectorAll('.board')];
 const items = [...canvas.querySelector('.world').children];
 const pages = [...document.querySelectorAll('[data-action=page]')];
+const controls = document.querySelector('.controls');
 const zoomLevel = document.querySelector('.zoom-level');
 const state = { view: null, page: pages[0]?.dataset.page ?? null, focus: null };
 
@@ -47,7 +49,7 @@ function fitted() {
   const top = Math.min(...visible.map((item) => item.offsetTop));
   const width = Math.max(...visible.map((item) => item.offsetLeft + item.offsetWidth)) - left;
   const height = Math.max(...visible.map((item) => item.offsetTop + item.offsetHeight)) - top;
-  const inset = { side: 24, top: pages.length ? 118 : 60, bottom: 80 };
+  const inset = { side: 24, top: controls.offsetTop + controls.offsetHeight + 52, bottom: 24 };
   const room = { width: canvas.clientWidth - 2 * inset.side, height: canvas.clientHeight - inset.top - inset.bottom };
   const s = Math.max(0.01, Math.min(1, room.width / width, room.height / height));
   return { s, x: inset.side + (room.width - width * s) / 2 - left * s, y: inset.top + (room.height - height * s) / 2 - top * s };
@@ -121,7 +123,8 @@ canvas.addEventListener('focusin', (event) => {
   if (state.focus !== null || !event.target.matches(':focus-visible')) return;
   const box = event.target.getBoundingClientRect();
   const dx = box.left < 16 ? 16 - box.left : box.right > canvas.clientWidth - 16 ? canvas.clientWidth - 16 - box.right : 0;
-  const dy = box.top < 72 ? 72 - box.top : box.bottom > canvas.clientHeight - 80 ? canvas.clientHeight - 80 - box.bottom : 0;
+  const top = controls.offsetTop + controls.offsetHeight + 8;
+  const dy = box.top < top ? top - box.top : box.bottom > canvas.clientHeight - 16 ? canvas.clientHeight - 16 - box.bottom : 0;
   if (dx || dy) pan(dx, dy);
 });
 canvas.addEventListener('wheel', (event) => {
@@ -168,5 +171,5 @@ export function canvasDocument(snapshot: Pick<Snapshot, 'content' | 'files'>, in
   const boardMarkup = boards.map((board) => `<section class="board"${page(board.page)} style="--x:${board.x};--y:${board.y};--w:${board.w};--h:${board.h}"><button class="board-name" type="button" data-action="open" aria-label="Abrir ${name(board)} a tamaño real"><span>${name(board)}</span>${icons.open}</button><iframe title="${name(board)}" sandbox="allow-scripts" inert srcdoc="${escapeHtml(board.html)}"></iframe></section>`).join('');
   const noteMarkup = notes.map((note) => `<p class="note"${page(note.page)} style="--x:${note.x};--y:${note.y}${note.w === undefined ? '' : `;--w:${note.w}`}">${escapeHtml(note.text)}</p>`).join('');
   const zoomBar = `<div class="zoom" role="group" aria-label="Zoom del lienzo"><button type="button" data-action="zoom-out" aria-label="Alejar">${icons.minus}</button><span class="zoom-level">100 %</span><button type="button" data-action="zoom-in" aria-label="Acercar">${icons.plus}</button><button type="button" data-action="fit" aria-label="Ajustar a la vista">${icons.fit}<span>Ajustar</span></button></div>`;
-  return `<style>${style}</style>${pageBar}${focusBar}<main class="canvas" aria-label="Lienzo"><div class="world">${boardMarkup}${noteMarkup}</div></main>${zoomBar}<script>${script}</script>`;
+  return `<style>${style}</style><div class="controls">${pageBar}${zoomBar}</div>${focusBar}<main class="canvas" aria-label="Lienzo"><div class="world">${boardMarkup}${noteMarkup}</div></main><script>${script}</script>`;
 }
