@@ -32,7 +32,7 @@ The recipe executes these user paths:
 
 ## Inspect evidence
 
-The run's `design/` directory contains `actions.jsonl`, `result.json`, `saved-read.json`, `published-read.json`, both design ZIPs, `retained-config.json`, and `trace.zip`. Screenshots and ARIA snapshots use `design-panel`, `design-focus`, `design-pages`, and `design-publication`. The `retained/` subdirectory contains the complete verifier report and viewport evidence.
+The run's `design/` directory contains `actions.jsonl`, `result.json`, `saved-read.json`, `published-read.json`, both design ZIPs, `retained-config.json`, and `trace.zip`. The recipe scrolls the panel preview into view and captures the actual 1440 by 900 viewport so Chrome composites its nested frames. Screenshots and ARIA snapshots use `design-panel`, `design-focus`, `design-pages`, and `design-publication`. The `retained/` subdirectory contains the complete verifier report and viewport evidence.
 
 A passing local recipe proves the local built Astro panel, public HTTP MCP authoring, and protected local publication. It does not prove a deployed Worker or a live Claude or Codex client connection. The source fixture uses system fonts. Font embedding and installed CLI directory preparation remain separate authoring checks.
 

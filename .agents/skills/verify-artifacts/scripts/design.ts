@@ -21,6 +21,7 @@ interface DesignDrive {
 }
 
 export async function driveDesign({ page, context, instance, directory, checks, call, login, capture, record, json }: DesignDrive) {
+  page.setDefaultTimeout(10_000);
   const index: CanvasIndex = {
     v: 1,
     boards: {
@@ -49,9 +50,10 @@ export async function driveDesign({ page, context, instance, directory, checks, 
   const canvas = page.frameLocator('.preview');
   const openDesktop = canvas.getByRole('button', { name: 'Abrir Desktop a tamaño real', exact: true });
   await openDesktop.waitFor();
+  await page.locator('.preview').scrollIntoViewIfNeeded();
   assert.equal(await canvas.locator('.board:not([hidden])').count(), 2);
   assert.equal(await canvas.locator('.board iframe').count(), 4);
-  for (const title of ['Desktop', 'Phone', 'Detail', 'Detail phone']) await canvas.frameLocator(`iframe[title="${title}"]`).getByRole('heading', { name: title, exact: true }).waitFor();
+  for (const title of ['Desktop', 'Phone']) await canvas.frameLocator(`iframe[title="${title}"]`).getByRole('heading', { name: title, exact: true }).waitFor();
   await capture(page, 'design-panel');
   const transform = await canvas.locator('.canvas').getAttribute('style');
   await openDesktop.click();
@@ -65,6 +67,7 @@ export async function driveDesign({ page, context, instance, directory, checks, 
   await canvas.getByRole('button', { name: 'Página Detail', exact: true }).click();
   assert.equal(await canvas.locator('.board:not([hidden])').count(), 2);
   assert.deepEqual(await canvas.locator('.board:not([hidden]) iframe').evaluateAll((frames) => frames.map((frame) => frame.getAttribute('title'))), ['Detail', 'Detail phone']);
+  for (const title of ['Detail', 'Detail phone']) await canvas.frameLocator(`iframe[title="${title}"]`).getByRole('heading', { name: title, exact: true }).waitFor();
   await capture(page, 'design-pages');
   await canvas.getByRole('button', { name: 'Página Overview', exact: true }).click();
   checks.push('Real HTTP MCP design create and independent complete read', 'All four nested board documents render', 'Native-size focus enables board interaction and restores canvas transform', 'Page selection filters the declared boards');

@@ -6,6 +6,14 @@ The rule is that a canvas is an ordinary revision. It keeps history, export, sha
 
 The program lands three PRs in this order. D1 adds the `design` content kind and its canvas index. D2 renders the canvas in the panel and the publication page. D3 teaches the skills to author canvases and adds the verification recipe.
 
+## Current continuation
+
+This checked plan records the completed D1 and approved D2 work and the D3 implementation state before its independent verdict. The current Codex execution uses the owner and verifier roles configured in `~/.pstack/codex-models.md`. Older Claude model and scheduler references below describe the original program and are not claims about this continuation. No scheduler was verified for the continuation. Monitoring exists only while the active root session runs.
+
+D3 branches from exact D2 commit `809709b457cd56eae6eb11a8c01084084af1de2b` and targets the D2 branch in PR #67. The root owns topology and landing. No rebase, force-push, merge, or deployment is authorized for this owner. The existing exact parent makes a rebase unnecessary.
+
+The D3 owner receipts live in `/tmp/swarm-d3/owner/`. Its local check and all 368 unit tests pass, and installed-package skills proof passes. The final independent live lanes, performance gates, audits, and exact-head verdict remain unchecked below until their evidence exists. Owner self-proof does not replace those independent lanes.
+
 ## How to read this
 
 One box is one unit of work. Every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
@@ -39,34 +47,34 @@ Boards live in `snapshot.files`, so the store, the 1 MiB budget, the 32 file lim
 
 ### Arm the program
 
-- [ ] State the protocol and this plan to the operator, then stop. Start execution only on the operator's explicit go.
-- [ ] Read these from their installed locations at program start. Re-read them at every tick.
-  - [ ] Read `/Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/autopilot-stack.md`
-  - [ ] Read `/Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/autopilot-full.md`
-  - [ ] Read the sibling `swarm/SKILL.md`
-  - [ ] `git show origin/main:.claude/skills/verify-artifacts/SKILL.md`
-  - [ ] `cat /Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/opening-a-pr.md`
-  - [ ] Read `principle-model-the-domain`, `principle-boundary-discipline`, `principle-type-system-discipline`, and `principle-prove-it-works` from `.claude/skills`
-- [ ] On the operator's go, arrange an hourly audit with the tick prompt below, using active-session monitoring or a verified host scheduler. Respect the host's maximum wait and keep the operator informed. Report missing scheduling and do not promise ticks after this session ends. Never leave the cadence to memory.
-- [ ] Use this tick prompt, verbatim. "Re-read the installed execution playbook. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
+- [x] State the protocol and this plan to the operator, then stop. Start execution only on the operator's explicit go.
+- [x] Read these from their installed locations at program start. Re-read them at every tick.
+  - [x] Read `/Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/autopilot-stack.md`
+  - [x] Read `/Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/autopilot-full.md`
+  - [x] Read the sibling `swarm/SKILL.md`
+  - [x] `git show origin/main:.claude/skills/verify-artifacts/SKILL.md`
+  - [x] `cat /Users/argote/Documents/dev/artifacts/.claude/skills/poteto-mode/playbooks/opening-a-pr.md`
+  - [x] Read `principle-model-the-domain`, `principle-boundary-discipline`, `principle-type-system-discipline`, and `principle-prove-it-works` from `.claude/skills`
+- [x] On the operator's go, arrange an hourly audit with the tick prompt below, using active-session monitoring or a verified host scheduler. Respect the host's maximum wait and keep the operator informed. Report missing scheduling and do not promise ticks after this session ends. Never leave the cadence to memory.
+- [x] Use this tick prompt, verbatim. "Re-read the installed execution playbook. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
 - [ ] On the operator's hold or stand-down, send every owner a zero-writes order at once.
 
 ### Spawn owners
 
 - [ ] Spawn one owner per PR with the full lifecycle the execution playbook names. Owners run on `opus` at `xhigh` per `~/.pstack/claude-models.md`. D2's canvas host runs on `fable` at `xhigh` as a hardest task.
 - [ ] Follow this dependency graph. Each link branches from its parent's branch.
-  - [ ] D1 is first and branches from `main`.
-  - [ ] D2 after D1.
-  - [ ] D3 after D2.
+  - [x] D1 is first and branches from `main`.
+  - [x] D2 after D1.
+  - [x] D3 after D2.
 - [ ] Hold the file boundaries.
-  - [ ] D1 touches only `packages/contracts/**`, `packages/artifacts/**`, `apps/dashboard/src/presentation.ts`, `apps/mcp/src/http.ts`, `.agents/skills/verify-artifacts/scripts/retained.ts`, and `tests/**`.
+  - [x] D1 touches only `packages/contracts/**`, `packages/artifacts/**`, `apps/dashboard/src/presentation.ts`, `apps/mcp/src/http.ts`, `.agents/skills/verify-artifacts/scripts/retained.ts`, and `tests/**`.
   - [ ] D2 touches only `apps/publication/src/**`, `apps/dashboard/src/pages/artifacts/**`, `apps/dashboard/src/components/detail/**`, and `tests/**`.
-  - [ ] D3 touches only `skills/**`, `.agents/skills/verify-artifacts/**`, `.claude/skills/verify-artifacts/**`, `docs/**`, and `tests/cli-skills.proof.ts`.
-- [ ] Hold the review gate. D2 changes an interaction. It waits for the operator's review in chat with screenshots and a video before it joins the stack.
+  - [x] D3 touches only `skills/**`, `.agents/skills/verify-artifacts/**`, `.claude/skills/verify-artifacts/**`, `docs/**`, and `tests/cli-skills.proof.ts`.
+- [x] Hold the review gate. The operator approved D2 interaction at `809709b` in chat. D2 changes an interaction. It waits for the operator's review in chat with screenshots and a video before it joins the stack.
 
 ### PR mechanics, for every PR
 
-- [ ] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
+- [x] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
 - [ ] Open the PR ready, never draft, per **Opening a PR**. Use the run's built-in PR tool when it has one, else `origin pr create --status open --base <parent-branch>` or `gh pr create --base <parent-branch>` according to the resolved forge. A stack child targets its parent branch.
 - [ ] Run `pnpm check` and `pnpm test` once before the PR-facing push. The repository has no lint script. Push with hooks on.
 - [ ] Run `/deslop` before each commit and `/no-comments` before review. When `cursor-team-kit` is absent, apply the same checks by hand and record that in the PR body.
@@ -95,129 +103,131 @@ Each live lane runs in its own git worktree at the PR head. No scenario needs a 
 
 **Files.**
 
-- [ ] Edit `packages/contracts/src/index.ts`.
-- [ ] Edit `packages/contracts/src/http.ts`.
-- [ ] Edit `packages/artifacts/src/panel/model.ts`.
-- [ ] Edit `packages/artifacts/src/index.ts`.
-- [ ] Edit `apps/dashboard/src/presentation.ts`.
-- [ ] Edit `apps/mcp/src/http.ts`.
-- [ ] Edit `.agents/skills/verify-artifacts/scripts/retained.ts`.
-- [ ] Create `tests/design-canvas.test.ts`.
-- [ ] Edit `tests/helpers.ts`.
+- [x] Edit `packages/contracts/src/index.ts`.
+- [x] Edit `packages/contracts/src/http.ts`.
+- [x] Edit `packages/artifacts/src/panel/model.ts`.
+- [x] Edit `packages/artifacts/src/index.ts`.
+- [x] Edit `apps/dashboard/src/presentation.ts`.
+- [x] Edit `apps/mcp/src/http.ts`.
+- [x] Edit `.agents/skills/verify-artifacts/scripts/retained.ts`.
+- [x] Create `tests/design-canvas.test.ts`.
+- [x] Edit `tests/helpers.ts`.
 
 **Build.**
 
-- [ ] Add `'design'` to the kind enum at `packages/contracts/src/index.ts:16` and export one `contentKinds` tuple that `http.ts` and `panel/model.ts` reuse, so the hand-written `ContentKind` union is deleted.
-- [ ] Add `canvasIndexSchema` in `packages/contracts/src/index.ts` with the shape in "The canvas data shape". Export `parseCanvas(snapshot)` that returns the typed index and its resolved board files.
-- [ ] Extend the snapshot `superRefine` so a `design` snapshot fails when the text is not a valid index, when `order` and `boards` differ as sets, when a board path has no matching file, when a board file is not `text/html` with `utf8` encoding, or when a board or note names an unknown page.
-- [ ] Map `design` to `json` in the export extension table at `packages/artifacts/src/index.ts:257` and in `.agents/skills/verify-artifacts/scripts/retained.ts`.
-- [ ] Add a `design` entry to `contentLabels` in `apps/dashboard/src/presentation.ts:50` with the label `Diseño`.
-- [ ] Describe the `design` kind in the create and publish tool prose at `apps/mcp/src/http.ts:51` and `:72`.
+- [x] Add `'design'` to the kind enum at `packages/contracts/src/index.ts:16` and export one `contentKinds` tuple that `http.ts` and `panel/model.ts` reuse, so the hand-written `ContentKind` union is deleted.
+- [x] Add `canvasIndexSchema` in `packages/contracts/src/index.ts` with the shape in "The canvas data shape". Export `parseCanvas(snapshot)` that returns the typed index and its resolved board files.
+- [x] Extend the snapshot `superRefine` so a `design` snapshot fails when the text is not a valid index, when `order` and `boards` differ as sets, when a board path has no matching file, when a board file is not `text/html` with `utf8` encoding, or when a board or note names an unknown page.
+- [x] Map `design` to `json` in the export extension table at `packages/artifacts/src/index.ts:257` and in `.agents/skills/verify-artifacts/scripts/retained.ts`.
+- [x] Add a `design` entry to `contentLabels` in `apps/dashboard/src/presentation.ts:50` with the label `Diseño`.
+- [x] Describe the `design` kind in the create and publish tool prose at `apps/mcp/src/http.ts:51` and `:72`.
 
 **You see.**
 
-- [ ] `artifacts create --snapshot canvas.json` with a three-board snapshot prints a revision with `content.kind` `design`, and the panel library card shows the label `Diseño`.
-- [ ] A snapshot whose `order` names `boards/Missing.html` fails with a validation error naming that path.
+- [x] `artifacts create --snapshot canvas.json` with a three-board snapshot prints a revision with `content.kind` `design`, and the panel library card shows the label `Diseño`.
+- [x] A snapshot whose `order` names `boards/Missing.html` fails with a validation error naming that path.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/design-canvas.test.ts` gains cases for a valid canvas, an order and boards mismatch, a missing board file, a non-HTML board file, an unknown page reference, an out-of-range `w`, and a 33-board canvas rejected by the file limit. Run `node --import tsx --test tests/design-canvas.test.ts`.
-- [ ] `tests/artifacts.test.ts` gains a case that exports a design revision and finds `content.json` plus each board under `files/boards/`. Run `pnpm test`.
-- [ ] `tests/workflow.test.ts` gains a case where moving one board reports `textChanged` and leaves `kindChanged` false. Run `pnpm test`.
+- [x] `tests/design-canvas.test.ts` gains cases for a valid canvas, an order and boards mismatch, a missing board file, a non-HTML board file, an unknown page reference, an out-of-range `w`, and a 33-board canvas rejected by the file limit. Run `node --import tsx --test tests/design-canvas.test.ts`.
+- [x] `tests/artifacts.test.ts` gains a case that exports a design revision and finds `content.json` plus each board under `files/boards/`. Run `pnpm test`.
+- [x] `tests/workflow.test.ts` gains a case where moving one board reports `textChanged` and leaves `kindChanged` false. Run `pnpm test`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet (xhigh)` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Create, update, publish, and export an HTML artifact through the CLI at trunk and head. Trunk lacks `design`, so record that and also gate a design create, publish, and export at head. Save `d1-regression.png`. Pass when both HTML flows produce byte-identical ZIPs for the same snapshot and the head design export contains `content.json` and every board.
-- [ ] Lane 2. Create a three-board design through MCP `artifacts_create`. Save `d1-mcp-create.png`. Pass when `artifacts_read` returns the same index and three board files.
-- [ ] Lane 3. Create the same design through REST with `curl` against the launched API. Save `d1-rest-create.png`. Pass when the response revision SHA-256 equals the MCP revision SHA-256 for the same snapshot.
-- [ ] Lane 4. Send a design whose `order` names a missing board through the CLI. Save `d1-cli-missing.png`. Pass when the CLI exits non-zero and stderr names `boards/Missing.html`.
-- [ ] Lane 5. Update a design with `expectedRevisionId` after moving one board. Save `d1-update.png`. Pass when history shows two revisions and the compare panel shows a text change with an unchanged kind.
-- [ ] Lane 6. Open the panel library after Lane 2. Save `d1-library.png`. Pass when the card shows the `Diseño` label and no console error.
-- [ ] Lane 7. Open the panel detail for the design. Save `d1-detail.png`. Pass when the header and facts card show `Diseño` and the files panel lists each board path.
-- [ ] Lane 8. Download one board attachment from the publication page. Save `d1-attachment.png`. Pass when the response is `content-disposition: attachment` with the board bytes.
-- [ ] Lane 9. Create a design whose total size is 1 MiB plus one byte. Save `d1-oversize.png`. Pass when every surface rejects it with the existing size error.
-- [ ] Lane 10. Retry a design create with the same `requestId`. Save `d1-retry.png`. Pass when the retry returns the original revision and no second revision exists.
+- [x] Lane 1. Regression lane against trunk. Create, update, publish, and export an HTML artifact through the CLI at trunk and head. Trunk lacks `design`, so record that and also gate a design create, publish, and export at head. Save `d1-regression.png`. Pass when both HTML flows produce byte-identical ZIPs for the same snapshot and the head design export contains `content.json` and every board.
+- [x] Lane 2. Create a three-board design through MCP `artifacts_create`. Save `d1-mcp-create.png`. Pass when `artifacts_read` returns the same index and three board files.
+- [x] Lane 3. Create the same design through REST with `curl` against the launched API. Save `d1-rest-create.png`. Pass when the response revision SHA-256 equals the MCP revision SHA-256 for the same snapshot.
+- [x] Lane 4. Send a design whose `order` names a missing board through the CLI. Save `d1-cli-missing.png`. Pass when the CLI exits non-zero and stderr names `boards/Missing.html`.
+- [x] Lane 5. Update a design with `expectedRevisionId` after moving one board. Save `d1-update.png`. Pass when history shows two revisions and the compare panel shows a text change with an unchanged kind.
+- [x] Lane 6. Open the panel library after Lane 2. Save `d1-library.png`. Pass when the card shows the `Diseño` label and no console error.
+- [x] Lane 7. Open the panel detail for the design. Save `d1-detail.png`. Pass when the header and facts card show `Diseño` and the files panel lists each board path.
+- [x] Lane 8. Download one board attachment from the publication page. Save `d1-attachment.png`. Pass when the response is `content-disposition: attachment` with the board bytes.
+- [x] Lane 9. Create a design whose total size is 1 MiB plus one byte. Save `d1-oversize.png`. Pass when every surface rejects it with the existing size error.
+- [x] Lane 10. Retry a design create with the same `requestId`. Save `d1-retry.png`. Pass when the retry returns the original revision and no second revision exists.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Median `snapshotSchema.parse` time for the largest valid HTML fixture at trunk and head, and at head for a 32-board design near 1 MiB.
-- [ ] Probe. A `node --import tsx` script that parses each fixture 500 times after 50 warmups, run at trunk and at head in interleaved order, five rounds each.
-- [ ] Baseline. Record the trunk HTML median first.
-- [ ] Rule. Fail when the head HTML median exceeds the trunk median by more than 10 percent, or when the 32-board design median exceeds 25 ms.
+- [x] Metric. Median `snapshotSchema.parse` time for the largest valid HTML fixture at trunk and head, and at head for a 32-board design near 1 MiB.
+- [x] Probe. A `node --import tsx` script that parses each fixture 500 times after 50 warmups, run at trunk and at head in interleaved order, five rounds each.
+- [x] Baseline. Record the trunk HTML median first.
+- [x] Rule. Fail when the head HTML median exceeds the trunk median by more than 10 percent, or when the 32-board design median exceeds 25 ms.
 
 **Review gate.** None. D1 is not review-gated.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto `main` after the verdict, patch-id unchanged.
-- [ ] The root appends D1 as the stack root with base `main`. The operator lands it.
+- [x] Root's clean verdict at the exact head SHA.
+- [x] Bugbot triage done.
+- [x] Rebased onto `main` after the verdict, patch-id unchanged.
+- [x] The root appends D1 as the stack root with base `main`. The operator lands it.
 
 ## Render the canvas in the panel and publication (D2)
 
 **Depends on.** D1.
 
+The current code head is `809709b457cd56eae6eb11a8c01084084af1de2b`. Original live and perf receipts remain under `/tmp/swarm-d2/worker-*`. The scoped correction receipts are under `/tmp/swarm-d2/pickup-fix/`, with an independent exact-head verdict under `/tmp/swarm-d2/pickup-review/`. The video plays at 2x and lasts 38.666 seconds. Focus recovery is an availability measure with a transient input race, not absolute keyboard isolation.
+
 **Files.**
 
-- [ ] Edit `apps/publication/src/document.ts`.
-- [ ] Create `apps/publication/src/canvas.ts`.
-- [ ] Edit `apps/dashboard/src/components/detail/PreviewCard.astro`.
-- [ ] Create `tests/design-canvas.browser.proof.ts`.
-- [ ] Edit `tests/publication.test.ts`.
-- [ ] Edit `package.json` to add the new proof to `test:browser`.
+- [x] Edit `apps/publication/src/document.ts`.
+- [x] Create `apps/publication/src/canvas.ts`.
+- [x] Reuse `PreviewCard.astro` unchanged. Its existing preview route already calls `previewDocument`; the final panel proof verifies the canvas there.
+- [x] Create `tests/design-canvas.browser.proof.ts`.
+- [x] Edit `tests/publication.test.ts`.
+- [x] Edit `package.json` to add the new proof to `test:browser`.
 
 **Build.**
 
-- [ ] Replace the kind branch in `previewDocument` at `apps/publication/src/document.ts:22` with a renderer table keyed by content kind. The `design` entry calls `canvasDocument` in `apps/publication/src/canvas.ts`. Both the panel preview route and the publication content route already call `previewDocument`, so neither route changes.
-- [ ] `canvasDocument` renders each board as `<iframe sandbox="allow-scripts" srcdoc>` at its `x`, `y`, `w`, `h`, in `order`, inside the existing content document and its unchanged `previewPolicy`. Notes render as escaped text blocks. Pages render as a row of real buttons that filter boards and notes.
-- [ ] The canvas script supports drag and wheel to pan, ctrl or pinch wheel to zoom around the cursor, `+`, `-`, and `Fit` buttons, and a focus view opened from each board's name button that shows the board at native size with a `Volver al lienzo` button and Escape to return. Every control is a `<button>` with an `aria-label`. No global key handler other than Escape inside the focus view.
-- [ ] The inert renderer for other browsers lists each board title with its escaped source in a `<pre>`, as HTML does today.
-- [ ] Give the canvas host a Catppuccin Latte and Mocha ground that follows `prefers-color-scheme`, matching `docs/decisions/catppuccin-blue.md`.
+- [x] Replace the kind branch in `previewDocument` at `apps/publication/src/document.ts:22` with a renderer table keyed by content kind. The `design` entry calls `canvasDocument` in `apps/publication/src/canvas.ts`. Both the panel preview route and the publication content route already call `previewDocument`, so neither route changes.
+- [x] `canvasDocument` renders each board as `<iframe sandbox="allow-scripts" srcdoc>` at its `x`, `y`, `w`, `h`, in `order`, inside the existing content document and its unchanged `previewPolicy`. Notes render as escaped text blocks. Pages render as a row of real buttons that filter boards and notes.
+- [x] The canvas script supports drag and wheel to pan, ctrl or pinch wheel to zoom around the cursor, `+`, `-`, and `Fit` buttons, and a focus view opened from each board's name button that shows the board at native size with a `Volver al lienzo` button and Escape to return. Every control is a `<button>` with an `aria-label`. No global key handler other than Escape inside the focus view.
+- [x] The inert renderer for other browsers lists each board title with its escaped source in a `<pre>`, as HTML does today.
+- [x] Give the canvas host a Catppuccin Latte and Mocha ground that follows `prefers-color-scheme`, matching `docs/decisions/catppuccin-blue.md`.
 
 **You see.**
 
-- [ ] The panel preview tab for a three-board design shows three artboards fitted to the viewport, each labeled with its title or path.
-- [ ] Clicking a board's name opens it alone at native size, and `Volver al lienzo` restores the previous pan and zoom.
-- [ ] The publication page shows the same canvas inside the existing wrapper, and the content response headers equal those of an HTML artifact.
+- [x] The panel preview tab for a three-board design shows three artboards fitted to the viewport, each labeled with its title or path.
+- [x] Clicking a board's name opens it alone at native size, and `Volver al lienzo` restores the previous pan and zoom.
+- [x] The publication page shows the same canvas inside the existing wrapper, and the content response headers equal those of an HTML artifact.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/publication.test.ts` gains cases that `canvasDocument` escapes a board containing `"` and `</iframe>` in `srcdoc`, escapes note text, and emits the inert listing when `interactive` is false. Run `pnpm test`.
-- [ ] `tests/design-canvas.browser.proof.ts` asserts in Chrome that every board's script runs, that a board `fetch` is blocked by `connect-src 'none'`, that a board reading `parent.document` throws, and that a board's origin is `null`. Run `node --import tsx tests/design-canvas.browser.proof.ts`.
+- [x] `tests/publication.test.ts` gains cases that `canvasDocument` escapes a board containing `"` and `</iframe>` in `srcdoc`, escapes note text, and emits the inert listing when `interactive` is false. Run `pnpm test`.
+- [x] `tests/design-canvas.browser.proof.ts` asserts in Chrome that every board's script runs, that a board `fetch` is blocked by `connect-src 'none'`, that a board reading `parent.document` throws, and that a board's origin is `null`. Run `node --import tsx tests/design-canvas.browser.proof.ts`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet (xhigh)` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Open an HTML artifact's panel preview and publication page at trunk and head. Trunk renders a design as escaped JSON, so record that and gate the head canvas render of the same design. Save `d2-regression.png`. Pass when the HTML preview and publication screenshots match pixel for pixel across trunk and head, and the head design shows every board.
-- [ ] Lane 2. Open the panel preview of a three-board design at 1440 by 900. Save `d2-panel-canvas.png`. Pass when all three boards are visible after load without user input.
-- [ ] Lane 3. Pan by drag and zoom with ctrl wheel around a board corner. Save `d2-pan-zoom.png`. Pass when the corner under the cursor stays within 2 px of its start position after zoom.
-- [ ] Lane 4. Open one board in focus view, then press Escape. Save `d2-focus.png`. Pass when the focused board renders at its declared `w` and `h` and Escape restores the prior transform.
-- [ ] Lane 5. Switch pages on a canvas with two pages. Save `d2-pages.png`. Pass when only the selected page's boards and notes are visible.
-- [ ] Lane 6. Tab through every canvas control. Save `d2-keyboard.png`. Pass when each control receives a visible focus ring and activates with Enter or Space.
-- [ ] Lane 7. Open the publication page as an invited viewer. Save `d2-viewer.png`. Pass when the viewer sees the canvas and the content response carries `previewPolicy` and `connection-allowlist: ()`.
-- [ ] Lane 8. Open the publication page with a Firefox user agent. Save `d2-inert.png`. Pass when the content is the inert listing with `script-src 'none'` and no board executes.
-- [ ] Lane 9. Open the panel preview at 390 by 844. Save `d2-phone.png`. Pass when the canvas fits, controls stay reachable at 44 px or larger, and the page has no horizontal scroll.
-- [ ] Lane 10. Load a board whose script calls `fetch`, opens `window.open`, and posts to `parent`. Save `d2-containment.png`. Pass when fetch and popups are blocked, no message changes the canvas, and the wrapper console shows no errors from the host.
+- [x] Lane 1. Regression lane against trunk. Open an HTML artifact's panel preview and publication page at trunk and head. Trunk renders a design as escaped JSON, so record that and gate the head canvas render of the same design. Save `d2-regression.png`. Pass when the HTML preview and publication screenshots match pixel for pixel across trunk and head, and the head design shows every board.
+- [x] Lane 2. Open the panel preview of a three-board design at 1440 by 900. Save `d2-panel-canvas.png`. Pass when all three boards are visible after load without user input.
+- [x] Lane 3. Pan by drag and zoom with ctrl wheel around a board corner. Save `d2-pan-zoom.png`. Pass when the corner under the cursor stays within 2 px of its start position after zoom.
+- [x] Lane 4. Open one board in focus view, then press Escape. Save `d2-focus.png`. Pass when the focused board renders at its declared `w` and `h` and Escape restores the prior transform.
+- [x] Lane 5. Switch pages on a canvas with two pages. Save `d2-pages.png`. Pass when only the selected page's boards and notes are visible.
+- [x] Lane 6. Tab through every canvas control. Save `d2-keyboard.png`. Pass when each control receives a visible focus ring and activates with Enter or Space.
+- [x] Lane 7. Open the publication page as an invited viewer. Save `d2-viewer.png`. Pass when the viewer sees the canvas and the content response carries `previewPolicy` and `connection-allowlist: ()`.
+- [x] Lane 8. Open the publication page with a Firefox user agent. Save `d2-inert.png`. Pass when the content is the inert listing with `script-src 'none'` and no board executes.
+- [x] Lane 9. Open the panel preview at 390 by 844. Save `d2-phone.png`. Pass when the canvas fits, controls stay reachable at 44 px or larger, and the page has no horizontal scroll.
+- [x] Lane 10. Load a board whose script calls `fetch`, opens `window.open`, and posts to `parent`. Save `d2-containment.png`. Pass when fetch and popups are blocked, no message changes the canvas, and the wrapper console shows no errors from the host.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Time from publication navigation to the content frame's `load` event for an HTML artifact at trunk and head. At head also the time until every board frame of a 24-board design fires `load`.
-- [ ] Probe. A Playwright script on real Chrome that opens each page 20 times, alternating trunk and head servers on separate ports, reading `performance.now()` deltas from the content frame.
-- [ ] Baseline. Record the trunk HTML median first.
-- [ ] Rule. Fail when the head HTML median exceeds trunk by more than 10 percent, or when the 24-board design median exceeds 1500 ms. The prototype measured 385 ms for 24 boards on a static server.
+- [x] Metric. Time from publication navigation to the content frame's `load` event for an HTML artifact at trunk and head. At head also the time until every board frame of a 24-board design fires `load`.
+- [x] Probe. A Playwright script on real Chrome that opens each page 20 times, alternating trunk and head servers on separate ports, reading `performance.now()` deltas from the content frame.
+- [x] Baseline. Record the trunk HTML median first.
+- [x] Rule. Fail when the head HTML median exceeds trunk by more than 10 percent, or when the 24-board design median exceeds 1500 ms. The prototype measured 385 ms for 24 boards on a static server.
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Copy lane 2, 4, 5, and 9 screenshots into `.audit/design-canvas/d2-review-<slug>.png`.
-- [ ] Record a 30 to 60 second video of pan, zoom, focus, and page switching on the panel and the publication page. Save it as `.audit/design-canvas/d2-review.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at stack-ready. Wait for the operator's click.
+- [x] Copy lane 2, 4, 5, and 9 screenshots into `.audit/design-canvas/pickup/review/d2-review-<slug>.png`.
+- [x] Record a 30 to 60 second video of pan, zoom, focus, and page switching on the panel and the publication page. Save it as `.audit/design-canvas/pickup/review/d2-review.mp4`.
+- [x] Post the screenshots and the video in chat. The operator approved D2 at `809709b` and authorized D3 continuation.
 
 **Merge.**
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto the D1 branch after the verdict, patch-id unchanged.
-- [ ] The root appends D2 with base set to the D1 branch. The operator lands it after D1.
+- [x] Root's clean technical verdict at `809709b457cd56eae6eb11a8c01084084af1de2b`. Exact-head CI and independent correction verification pass. Operator interaction review is still pending.
+- [x] Bugbot triage done.
+- [x] Confirmed that D1 remains the exact parent base at `a5d9127`. No base drift occurred, so no rebase or force-push was needed.
+- [x] The root appends D2 with base set to the D1 branch. The operator approved the interaction; landing remains operator-owned.
 
 ## Teach the skills to author and verify canvases (D3)
 
@@ -225,36 +235,36 @@ Each live lane runs in its own git worktree at the PR head. No scenario needs a 
 
 **Files.**
 
-- [ ] Create `skills/artifacts-design/references/canvas.md`.
-- [ ] Edit `skills/artifacts-design/SKILL.md`.
-- [ ] Edit `skills/artifacts/references/tool-contract.md`.
-- [ ] Edit `skills/artifacts-cli/references/commands.md`.
-- [ ] Edit `skills/artifacts-cli/scripts/prepare-retained.mjs`.
-- [ ] Create `.agents/skills/verify-artifacts/features/design.md` and mirror it under `.claude/skills/verify-artifacts/features/`.
-- [ ] Edit `.agents/skills/verify-artifacts/features/README.md`.
-- [ ] Create `docs/decisions/design-canvas.md`.
-- [ ] Edit `tests/cli-skills.proof.ts`.
+- [x] Create `skills/artifacts-design/references/canvas.md`.
+- [x] Edit `skills/artifacts-design/SKILL.md`.
+- [x] Edit `skills/artifacts/references/tool-contract.md`.
+- [x] Edit `skills/artifacts-cli/references/commands.md`.
+- [x] Edit `skills/artifacts-cli/scripts/prepare-retained.mjs`.
+- [x] Create `.agents/skills/verify-artifacts/features/design.md` and mirror it under `.claude/skills/verify-artifacts/features/`.
+- [x] Edit `.agents/skills/verify-artifacts/features/README.md`.
+- [x] Create `docs/decisions/design-canvas.md`.
+- [x] Edit `tests/cli-skills.proof.ts`.
 
 **Build.**
 
-- [ ] `canvas.md` gives the canvas index shape, frame sizes, 80 px gaps in a row and 120 px between rows, the board file rules, the shared 1 MiB budget, and how to embed fonts per board with `scripts/embed-fonts.mjs`.
-- [ ] `prepare-retained.mjs` accepts a directory with `canvas.json` and `boards/*.html` and emits one `design` snapshot.
-- [ ] `features/design.md` drives create, preview, focus, publish, and export of a design through `control.ts`.
-- [ ] `docs/decisions/design-canvas.md` records why boards are files, why `srcdoc` keeps the sandbox unchanged, and what stays out of scope.
+- [x] `canvas.md` gives the canvas index shape, frame sizes, 80 px gaps in a row and 120 px between rows, the board file rules, the shared 1 MiB budget, and how to embed fonts per board with `scripts/embed-fonts.mjs`.
+- [x] `prepare-retained.mjs` accepts a directory with `canvas.json` and `boards/*.html` and emits one `design` snapshot.
+- [x] `features/design.md` drives create, preview, focus, publish, and export of a design through `control.ts`.
+- [x] `docs/decisions/design-canvas.md` records why boards are files, why `srcdoc` keeps the sandbox unchanged, and what stays out of scope.
 
 **You see.**
 
-- [ ] `artifacts skills get artifacts-design --full` lists `references/canvas.md`.
-- [ ] `node skills/artifacts-cli/scripts/prepare-retained.mjs ./my-canvas` prints a snapshot with `content.kind` `design` and one file per board.
+- [x] `artifacts skills get artifacts-design --full` lists `references/canvas.md`.
+- [x] `node skills/artifacts-cli/scripts/prepare-retained.mjs ./my-canvas` prints a snapshot with `content.kind` `design` and one file per board.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `tests/cli-skills.proof.ts` gains a case that the bundled skill lists `references/canvas.md`. Run `pnpm test:cli-skills`.
-- [ ] `tests/design-canvas.test.ts` gains a case that `prepare-retained.mjs` output parses with `snapshotSchema`. Run `pnpm test`.
+- [x] `tests/cli-skills.proof.ts` gains a case that the bundled skill lists `references/canvas.md`. Run `pnpm test:cli-skills`.
+- [x] `tests/cli-skills.proof.ts` gains a case that canvas-directory preparation output parses with `snapshotSchema`, preserving the D3 test-file boundary. Run `pnpm test:cli-skills` and `pnpm test`.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet (xhigh)` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Prepare and create a single HTML artifact with `prepare-retained.mjs` at trunk and head. Trunk lacks canvas preparation, so record that and gate a head canvas directory through create and preview. Save `d3-regression.png`. Pass when the HTML snapshots are byte-identical and the head canvas previews every board.
+- [ ] Lane 1. Regression lane against trunk. Prepare the retained verification configuration for the same HTML receipt, read, and checks with the existing named options at trunk and head. Trunk lacks canvas-directory preparation, so record that and gate a head canvas directory through create and preview. Save `d3-regression.png`. Pass when the HTML verification configurations are byte-identical and the head canvas previews every board.
 - [ ] Lane 2. Run `control.ts drive design`. Save `d3-drive.png`. Pass when the recipe exits zero and saves its screenshots.
 - [ ] Lane 3. Follow `canvas.md` in a fresh agent session to author a two-page, four-board canvas through MCP. Save `d3-mcp-author.png`. Pass when the first create validates and the preview shows both pages.
 - [ ] Lane 4. Repeat Lane 3 through the CLI skill. Save `d3-cli-author.png`. Pass when the first create validates.
@@ -267,10 +277,10 @@ Each live lane runs in its own git worktree at the PR head. No scenario needs a 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Wall time of `prepare-retained.mjs` for a single HTML file at trunk and head, and at head for a 32-board canvas directory.
+- [ ] Metric. Wall time of the existing named-option `prepare-retained.mjs` command for an HTML retained-selection configuration at trunk and head, and separately at head for a 32-board canvas directory.
 - [ ] Probe. `hyperfine --warmup 3 --runs 20` on each input, trunk and head interleaved.
-- [ ] Baseline. Record the trunk single-file median first.
-- [ ] Rule. Fail when the head single-file median exceeds trunk by more than 10 percent, or when the 32-board median exceeds 500 ms.
+- [ ] Baseline. Record the trunk HTML retained-selection configuration median first.
+- [ ] Rule. Fail when the head HTML retained-selection configuration median exceeds trunk by more than 10 percent, or when the 32-board directory median exceeds 500 ms.
 
 **Review gate.** None. D3 is not review-gated.
 
@@ -278,7 +288,7 @@ Each live lane runs in its own git worktree at the PR head. No scenario needs a 
 
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Bugbot triage done.
-- [ ] Rebased onto the D2 branch after the verdict, patch-id unchanged.
+- [x] Confirmed the exact approved D2 parent at `809709b457cd56eae6eb11a8c01084084af1de2b`. No rebase or force-push was needed or authorized.
 - [ ] The root appends D3 with base set to the D2 branch. The operator lands the chain bottom-up.
 
 ## Close the program
