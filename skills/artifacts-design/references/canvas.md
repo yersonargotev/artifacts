@@ -93,7 +93,7 @@ Resolve `<cli-skill-directory>` with `artifacts skills path artifacts-cli`. Use 
 
 ## Check the retained canvas
 
-Open the exact saved revision in the authenticated panel. Confirm all boards fit on the initial page, select each page, and open a board through its name button. Focus view shows that board at its declared width and height and enables its controls. **Volver al lienzo** or Escape returns to the prior pan and zoom. Embedded boards remain inert in the overview.
+Open the exact saved revision in the authenticated panel. Confirm all boards fit on the initial page, select each page, and open a board through its name button. Focus view shows that board at its declared width and height and enables its controls. **Volver al lienzo** returns to the prior pan and zoom. Escape also returns when a canvas control has keyboard focus. After interacting inside a board, use **Volver al lienzo** to return. For Escape, first use Shift+Tab to move focus back to the canvas controls. Embedded boards remain inert in the overview.
 
 Check publication through the protected URL returned by `artifacts_publish`. In unsupported browsers, the canvas displays an inert listing of board source. Rendering uses nested opaque `srcdoc` iframes with `sandbox="allow-scripts"` and the existing content policy. Board scripts can still consume renderer time or briefly perturb focus. The canvas is not an absolute keyboard isolation boundary.
 

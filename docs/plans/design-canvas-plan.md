@@ -224,7 +224,7 @@ The current code head is `809709b457cd56eae6eb11a8c01084084af1de2b`. Original li
 
 **Merge.**
 
-- [x] Root's clean technical verdict at `809709b457cd56eae6eb11a8c01084084af1de2b`. Exact-head CI and independent correction verification pass. Operator interaction review is still pending.
+- [x] Root's clean technical verdict at `809709b457cd56eae6eb11a8c01084084af1de2b`. Exact-head CI and independent correction verification pass. The operator approved the interaction and authorized D3 continuation.
 - [x] Bugbot triage done.
 - [x] Confirmed that D1 remains the exact parent base at `a5d9127`. No base drift occurred, so no rebase or force-push was needed.
 - [x] The root appends D2 with base set to the D1 branch. The operator approved the interaction; landing remains operator-owned.
@@ -232,6 +232,8 @@ The current code head is `809709b457cd56eae6eb11a8c01084084af1de2b`. Original li
 ## Teach the skills to author and verify canvases (D3)
 
 **Depends on.** D2.
+
+The completed original-head build, unit, and ten live lane receipts cover `c91b450fa3adbfd98d67ab522099f9844ecbf275`. They are recorded under `/tmp/swarm-d3/worker-0` through `worker-13`. Code audit A and ADR lane 10 passed. Audit B found only the Escape wording and carried D2 status corrections, plus a root-local note already corrected. This documentation-only correction retains the original live and application evidence. The corrected existing-command performance gate and the 32-board directory budget passed in 60 samples per case, with no measurable speedup claim. Its independent final verification and exact-head CI remain separate pending gates.
 
 **Files.**
 
@@ -264,23 +266,23 @@ The current code head is `809709b457cd56eae6eb11a8c01084084af1de2b`. Original li
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet (xhigh)` at the PR head, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Prepare the retained verification configuration for the same HTML receipt, read, and checks with the existing named options at trunk and head. Trunk lacks canvas-directory preparation, so record that and gate a head canvas directory through create and preview. Save `d3-regression.png`. Pass when the HTML verification configurations are byte-identical and the head canvas previews every board.
-- [ ] Lane 2. Run `control.ts drive design`. Save `d3-drive.png`. Pass when the recipe exits zero and saves its screenshots.
-- [ ] Lane 3. Follow `canvas.md` in a fresh agent session to author a two-page, four-board canvas through MCP. Save `d3-mcp-author.png`. Pass when the first create validates and the preview shows both pages.
-- [ ] Lane 4. Repeat Lane 3 through the CLI skill. Save `d3-cli-author.png`. Pass when the first create validates.
-- [ ] Lane 5. Embed fonts in two boards with `embed-fonts.mjs`. Save `d3-fonts.png`. Pass when both boards render the embedded family and the total stays under 1 MiB.
-- [ ] Lane 6. Prepare a directory whose board is missing from `canvas.json`. Save `d3-orphan.png`. Pass when the script exits non-zero and names the orphan file.
-- [ ] Lane 7. Install the discovery skill with `artifacts skills install --global --agent claude` into a temp home. Save `d3-install.png`. Pass when the installed skill loads `canvas.md` through the CLI.
-- [ ] Lane 8. Export the Lane 3 canvas and re-create it from the ZIP contents. Save `d3-roundtrip.png`. Pass when the new revision SHA-256 equals the original.
-- [ ] Lane 9. Run `verify-retained.ts` against the published Lane 3 canvas. Save `d3-retained.png`. Pass when the result is `passed`.
-- [ ] Lane 10. Read `docs/decisions/design-canvas.md` and check each claim against D1 and D2 code. Save `d3-decision.png`. Pass when every claim cites a file that supports it.
+- [x] Lane 1. Regression lane against trunk. Prepare the retained verification configuration for the same HTML receipt, read, and checks with the existing named options at trunk and head. Trunk lacks canvas-directory preparation, so record that and gate a head canvas directory through create and preview. Save `d3-regression.png`. Pass when the HTML verification configurations are byte-identical and the head canvas previews every board.
+- [x] Lane 2. Run `control.ts drive design`. Save `d3-drive.png`. Pass when the recipe exits zero and saves its screenshots.
+- [x] Lane 3. Follow `canvas.md` in a fresh agent session to author a two-page, four-board canvas through MCP. Save `d3-mcp-author.png`. Pass when the first create validates and the preview shows both pages.
+- [x] Lane 4. Repeat Lane 3 through the CLI skill. Save `d3-cli-author.png`. Pass when the first create validates.
+- [x] Lane 5. Embed fonts in two boards with `embed-fonts.mjs`. Save `d3-fonts.png`. Pass when both boards render the embedded family and the total stays under 1 MiB.
+- [x] Lane 6. Prepare a directory whose board is missing from `canvas.json`. Save `d3-orphan.png`. Pass when the script exits non-zero and names the orphan file.
+- [x] Lane 7. Install the discovery skill with `artifacts skills install --global --agent claude` into a temp home. Save `d3-install.png`. Pass when the installed skill loads `canvas.md` through the CLI.
+- [x] Lane 8. Export the Lane 3 canvas and re-create it from the ZIP contents. Save `d3-roundtrip.png`. Pass when the new revision SHA-256 equals the original.
+- [x] Lane 9. Run `verify-retained.ts` against the published Lane 3 canvas. Save `d3-retained.png`. Pass when the result is `passed`.
+- [x] Lane 10. Read `docs/decisions/design-canvas.md` and check each claim against D1 and D2 code. Save `d3-decision.png`. Pass when every claim cites a file that supports it.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Wall time of the existing named-option `prepare-retained.mjs` command for an HTML retained-selection configuration at trunk and head, and separately at head for a 32-board canvas directory.
-- [ ] Probe. `hyperfine --warmup 3 --runs 20` on each input, trunk and head interleaved.
-- [ ] Baseline. Record the trunk HTML retained-selection configuration median first.
-- [ ] Rule. Fail when the head HTML retained-selection configuration median exceeds trunk by more than 10 percent, or when the 32-board directory median exceeds 500 ms.
+- [x] Metric. Wall time of the existing named-option `prepare-retained.mjs` command for an HTML retained-selection configuration at trunk and head, and separately at head for a 32-board canvas directory.
+- [x] Probe. `hyperfine --warmup 3 --runs 20` on each input, trunk and head interleaved.
+- [x] Baseline. Record the trunk HTML retained-selection configuration median first.
+- [x] Rule. Fail when the head HTML retained-selection configuration median exceeds trunk by more than 10 percent, or when the 32-board directory median exceeds 500 ms.
 
 **Review gate.** None. D3 is not review-gated.
 
