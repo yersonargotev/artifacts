@@ -116,7 +116,7 @@ Each live lane runs in its own git worktree at the PR head. No scenario needs a 
 
 **You see.**
 
-- [ ] `artifacts create --file canvas.json` with a three-board snapshot prints a revision with `content.kind` `design`, and the panel library card shows the label `Diseño`.
+- [ ] `artifacts create --snapshot canvas.json` with a three-board snapshot prints a revision with `content.kind` `design`, and the panel library card shows the label `Diseño`.
 - [ ] A snapshot whose `order` names `boards/Missing.html` fails with a validation error naming that path.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
