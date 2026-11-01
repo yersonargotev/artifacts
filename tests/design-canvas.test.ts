@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import { createSchema, parseCanvas, snapshotSchema, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { designSnapshot } from './helpers.ts';
 
-type CanvasJson = { boards: Record<string, Record<string, unknown>>; order: string[]; notes?: Record<string, Record<string, unknown>>; pages?: { id: string; name: string }[] } & Record<string, unknown>;
+type Entry = Record<string, unknown> | null;
+type CanvasJson = { boards: Record<string, Entry>; order: string[]; notes?: Record<string, Entry>; pages?: { id: string; name: string }[] } & Record<string, unknown>;
 
 const base = designSnapshot();
 const [first, second] = base.files.map((file) => file.path) as [string, string, string];
@@ -74,6 +75,8 @@ test('order and boards must name the same boards, each once', () => {
   assert.match(repeated[0]!.message, new RegExp(first));
   const empty = rejection({ ...base, content: { kind: 'design', text: JSON.stringify({ v: 1, boards: {}, order: [] }) }, files: [] });
   assert.deepEqual(empty.map(({ path, message }) => ({ path, message })), [{ path: ['content', 'text', 'order'], message: 'A canvas needs at least one board' }]);
+  const unordered = rejection(design((canvas) => { canvas.order = []; }));
+  assert.deepEqual(unordered.map(({ message }) => message), ['A canvas needs at least one board', ...base.files.map(({ path }) => `Canvas order omits board ${path}`)]);
 });
 
 test('every board needs a matching utf8 text/html file', () => {
@@ -126,13 +129,14 @@ test('a 33-board canvas breaks both the file limit and the board cap', () => {
 });
 
 test('a canvas holds at most 32 boards, 200 notes, and 32 pages, and an oversized list reports one issue', () => {
-  const notes = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, index) => [`note-${index}`, { x: 0, y: 0, text: '' }]));
-  const pages = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `page-${index}`, name: `Page ${index}` }));
-  assert.equal(snapshotSchema.safeParse(design((canvas) => { canvas.notes = notes(200); canvas.pages = pages(32); })).success, true);
+  assert.equal(snapshotSchema.safeParse(design((canvas) => {
+    canvas.notes = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`note-${index}`, { x: 0, y: 0, text: '' }]));
+    canvas.pages = Array.from({ length: 32 }, (_, index) => ({ id: `page-${index}`, name: `Page ${index}` }));
+  })).success, true);
   for (const [change, field, message] of [
-    [(canvas) => { canvas.notes = notes(201); }, 'notes', 'A canvas holds at most 200 notes'],
-    [(canvas) => { canvas.pages = pages(33); }, 'pages', 'A canvas holds at most 32 pages'],
-    [(canvas) => { for (let index = 0; index < 30; index++) canvas.boards[`boards/Extra-${index}.html`] = { x: 0, y: 0, w: 100, h: 100 }; }, 'boards', 'A canvas holds at most 32 boards'],
+    [(canvas) => { canvas.notes = Object.fromEntries(Array.from({ length: 201 }, (_, index) => [`bad id ${index}`, null])); }, 'notes', 'A canvas holds at most 200 notes'],
+    [(canvas) => { canvas.pages = Array.from({ length: 33 }, () => ({ id: 'web', name: 'Web' })); }, 'pages', 'A canvas holds at most 32 pages'],
+    [(canvas) => { for (let index = 0; index < 30; index++) canvas.boards[`boards/Extra ${index}.html`] = { x: 0, y: 0, w: 1, h: 1 }; }, 'boards', 'A canvas holds at most 32 boards'],
     [(canvas) => { canvas.order = Array.from({ length: 40_000 }, (_, index) => `boards/B${index}.html`); }, 'order', 'A canvas holds at most 32 boards'],
   ] as [(canvas: CanvasJson) => void, string, string][]) {
     assert.deepEqual(rejection(design(change)).map(({ path, code, message }) => ({ path, code, message })), [{ path: ['content', 'text', field], code: 'too_big', message }]);
@@ -180,6 +184,8 @@ test('each malformed note, page, or board field reports its own path and code, w
     [(canvas) => { canvas.pages = [{ id: 'web', name: 'Web', order: 1 } as { id: string; name: string }]; }, ['pages', 0], 'unrecognized_keys', 'Unrecognized key: "order"'],
     [(canvas) => { canvas.notes = { ['n'.repeat(41)]: note }; }, ['notes', 'n'.repeat(41)], 'invalid_key', idMessage],
     [(canvas) => { canvas.notes = { 'bad id': note }; }, ['notes', 'bad id'], 'invalid_key', idMessage],
+    [(canvas) => { canvas.notes = { 'bad id': null }; }, ['notes', 'bad id'], 'invalid_key', idMessage],
+    [(canvas) => { canvas.boards = [canvas.boards[first]] as unknown as CanvasJson['boards']; }, ['boards'], 'invalid_type'],
     [(canvas) => { canvas.notes = JSON.parse('{"__proto__":{"x":0,"y":0,"text":"Idea"}}'); }, ['notes', '__proto__'], 'invalid_key', protoMessage],
     [(canvas) => { canvas.pages = [{ id: 'p'.repeat(41), name: 'Page' }]; }, ['pages', 0, 'id'], 'invalid_format', idMessage],
     [(canvas) => { canvas.pages = [{ id: '__proto__', name: 'Page' }]; }, ['pages', 0, 'id'], 'custom', protoMessage],

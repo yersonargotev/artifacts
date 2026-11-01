@@ -18,7 +18,7 @@ const coordinate = z.number().min(-1_000_000).max(1_000_000);
 const extent = z.number().min(40).max(8000);
 const label = z.string().min(1).max(256);
 
-// A count or key failure aborts before any entry is parsed, so an oversized collection reports one issue.
+// An oversized count or a bad key aborts before any entry is parsed, so an oversized collection reports one issue.
 // Keys are read from the raw object because a zod record skips a __proto__ key without checking it.
 function keyed<T extends z.ZodType>(key: z.ZodType<string>, value: T, max: number, noun: string) {
   return z.unknown().superRefine((input, context) => {
@@ -38,7 +38,7 @@ function keyed<T extends z.ZodType>(key: z.ZodType<string>, value: T, max: numbe
 export const canvasIndexSchema = z.strictObject({
   v: z.literal(1),
   boards: keyed(boardPath, z.strictObject({ x: coordinate, y: coordinate, w: extent, h: extent, title: label.optional(), page: canvasId.optional() }), 32, 'boards'),
-  order: z.array(z.unknown()).min(1, { message: 'A canvas needs at least one board', abort: true }).max(32, { message: 'A canvas holds at most 32 boards', abort: true }).pipe(z.array(boardPath)),
+  order: z.array(z.unknown()).min(1, 'A canvas needs at least one board').max(32, { message: 'A canvas holds at most 32 boards', abort: true }).pipe(z.array(boardPath)),
   notes: keyed(canvasId, z.strictObject({ x: coordinate, y: coordinate, text: z.string(), w: extent.optional(), page: canvasId.optional() }), 200, 'notes').optional(),
   pages: z.array(z.unknown()).max(32, { message: 'A canvas holds at most 32 pages', abort: true }).pipe(z.array(z.strictObject({ id: canvasId, name: label }))).optional(),
 }).superRefine((index, context) => {
