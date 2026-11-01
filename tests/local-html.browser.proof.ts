@@ -95,7 +95,7 @@ assert.equal(positive.report.authenticatedPublication, 'not-verified');
 assert.equal(positive.report.visualReview.status, 'required');
 assert.equal(supportsInteractiveHtml(positive.report.browser.userAgent), true);
 assert.equal(positive.report.sandbox.chromiumSandbox, true);
-const wrapped = previewDocument({ revision: { snapshot: { content: { kind: 'html', text: source } } } }, true);
+const wrapped = previewDocument({ revision: { snapshot: { content: { kind: 'html', text: source }, files: [] } } }, true);
 const contentHash = createHash('sha256').update(wrapped).digest('hex');
 assert.equal(positive.report.sandbox.contentSha256, contentHash, 'Local wrapping matches the actual preview');
 for (const item of positive.report.variants) {

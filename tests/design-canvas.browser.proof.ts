@@ -1,0 +1,194 @@
+import assert from 'node:assert/strict';
+import { createSocket } from 'node:dgram';
+import { once } from 'node:events';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { serve } from '@hono/node-server';
+import { chromium, type FrameLocator, type Page } from 'playwright';
+import { inertPreviewPolicy, previewDocument, previewPolicy, supportsInteractiveHtml } from '../apps/publication/src/document.ts';
+import { snapshotSchema, type Snapshot } from '../packages/contracts/src/index.ts';
+
+type Board = { path: string; x: number; y: number; w: number; h: number; title?: string; page?: string; script: string };
+type Report = { name: string; ran: boolean; origin: string; parent: string; popup: string; fetch: string; violations: string[] };
+
+const collector = createSocket('udp4');
+let packets = 0;
+collector.on('message', () => { packets++; });
+collector.bind(0, '127.0.0.1');
+await once(collector, 'listening');
+const peer = `(async () => {
+  const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:127.0.0.1:${collector.address().port}' }] });
+  peer.createDataChannel('canvas-proof');
+  await peer.setLocalDescription(await peer.createOffer());
+  setTimeout(() => peer.close(), 1500);
+})();`;
+const probe = (name: string) => `const report = { name: ${JSON.stringify(name)}, ran: true, origin: self.origin, violations: [] };
+addEventListener('securitypolicyviolation', (event) => report.violations.push(event.effectiveDirective));
+try { report.parent = String(parent.document.title); } catch (error) { report.parent = error.name; }
+try { report.popup = window.open('/beacon') === null ? 'blocked' : 'opened'; } catch (error) { report.popup = error.name; }
+parent.postMessage({ type: 'zoom', scale: 9 }, '*');
+fetch('/beacon').then(() => 'allowed', () => 'blocked').then((result) => {
+  report.fetch = result;
+  return new Promise((done) => setTimeout(done, 200));
+}).then(() => {
+  const output = document.createElement('output');
+  output.id = 'report';
+  output.textContent = JSON.stringify(report);
+  document.body.append(output);
+});`;
+
+function design(boards: Board[], extra: object = {}): Pick<Snapshot, 'content' | 'files'> {
+  return snapshotSchema.parse({
+    metadata: { title: 'Canvas containment proof', description: 'Disposable browser fixture' },
+    content: { kind: 'design', text: JSON.stringify({ v: 1, boards: Object.fromEntries(boards.map(({ path, script: _, ...board }) => [path, board])), order: boards.map(({ path }) => path), ...extra }) },
+    files: boards.map(({ path, script }) => ({ path, mediaType: 'text/html', encoding: 'utf8', data: `<!doctype html><html lang="es"><meta charset="utf-8"><title>${path}</title><body style="margin:0;font:32px system-ui"><h1 title="&quot;quoted&quot;">${path} "</iframe></h1><script>${script}</script></body></html>` })),
+  });
+}
+const boards: Board[] = [
+  { path: 'boards/Home.html', x: 0, y: 0, w: 1440, h: 900, title: 'Inicio', page: 'desktop', script: probe('boards/Home.html') },
+  { path: 'boards/Detail.html', x: 1520, y: 0, w: 1440, h: 900, page: 'desktop', script: probe('boards/Detail.html') },
+  { path: 'boards/Phone.html', x: 0, y: 0, w: 390, h: 844, title: 'Móvil', page: 'phone', script: probe('boards/Phone.html') },
+];
+const canvases = {
+  '/content': design(boards, { pages: [{ id: 'desktop', name: 'Escritorio' }, { id: 'phone', name: 'Teléfono' }], notes: { review: { x: 0, y: 980, text: 'Nota <b>sin</b> HTML' } } }),
+  '/webrtc-content': design([{ path: 'boards/Peer.html', x: 0, y: 0, w: 400, h: 300, script: peer }]),
+};
+
+let beacons = 0;
+const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
+  const path = new URL(request.url).pathname;
+  if (path === '/beacon') {
+    beacons++;
+    return new Response('reached');
+  }
+  if (path === '/control') return new Response(`<!doctype html><script>${peer}</script>`, { headers: { 'content-type': 'text/html' } });
+  if (!path.endsWith('content')) return new Response(`<!doctype html><style>body{margin:0}iframe{display:block;width:1200px;height:760px;border:0}</style><iframe title="Vista previa" sandbox="allow-scripts" src="${path}-content"></iframe>`, { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
+  const interactive = path !== '/inert-content';
+  const snapshot = canvases[path === '/webrtc-content' ? '/webrtc-content' : '/content'];
+  return new Response(previewDocument({ revision: { snapshot } }, interactive), { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()', 'cross-origin-opener-policy': 'same-origin' } });
+} });
+await once(server, 'listening');
+const address = server.address();
+assert(address && typeof address === 'object');
+const origin = `http://127.0.0.1:${address.port}`;
+
+const reports = async (page: Page) => Promise.all(page.frames().filter((frame) => frame.url() === 'about:srcdoc').map(async (frame) => {
+  await frame.locator('#report').waitFor({ state: 'attached' });
+  return JSON.parse(await frame.locator('#report').textContent() ?? '') as Report;
+}));
+const transform = (content: FrameLocator) => content.locator('.world').evaluate((world) => getComputedStyle(world).transform);
+const box = async (content: FrameLocator, selector: string) => {
+  const found = await content.locator(selector).boundingBox();
+  assert(found, `${selector} has a layout box`);
+  return found;
+};
+
+const browser = await chromium.launch({ channel: 'chrome' });
+const observations: Record<string, unknown> = { browser: browser.version() };
+try {
+  for (const path of ['/control', '/webrtc']) {
+    const page = await browser.newPage();
+    let crashed = false;
+    page.on('crash', () => { crashed = true; });
+    packets = 0;
+    await page.goto(`${origin}${path}`).catch((error: unknown) => { if (!crashed) throw error; });
+    await new Promise((done) => setTimeout(done, 2500));
+    if (path === '/control') assert(packets > 0, 'Unrestricted control proves the UDP collector and WebRTC are active');
+    else assert.equal(packets, 0, 'A board that opens a WebRTC connection sends no packets');
+    observations[path] = { packets, crashed };
+    await page.close();
+  }
+
+  const page = await browser.newPage({ viewport: { width: 1200, height: 760 } });
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error' && message.location().url !== 'about:srcdoc') errors.push(`${message.location().url}: ${message.text()}`); });
+  beacons = 0;
+  await page.goto(`${origin}/panel`);
+  assert(supportsInteractiveHtml(await page.evaluate(() => navigator.userAgent)), 'This proof requires Chrome 152 or newer');
+  const content = page.frameLocator('iframe');
+  const boardReports = await reports(page);
+  assert.equal(boardReports.length, boards.length, 'Every board renders as its own srcdoc frame, including boards on hidden pages');
+  for (const report of boardReports) {
+    assert.equal(report.ran, true, `${report.name} script runs`);
+    assert.equal(report.origin, 'null', `${report.name} has an opaque origin`);
+    assert.equal(report.parent, 'SecurityError', `${report.name} cannot read parent.document`);
+    assert.equal(report.fetch, 'blocked', `${report.name} fetch is blocked`);
+    assert(report.violations.includes('connect-src'), `${report.name} fetch violates connect-src 'none'`);
+    assert.equal(report.popup, 'blocked', `${report.name} cannot open a popup`);
+  }
+  assert.equal(page.context().pages().length, 1, 'No popup page opened');
+  assert.equal(beacons, 0, 'No board request reached the server');
+  observations.boards = boardReports;
+
+  const viewport = await box(content, '.canvas');
+  for (const title of ['Inicio', 'boards/Detail.html']) {
+    const frame = await box(content, `iframe[title="${title}"]`);
+    assert(frame.x >= viewport.x && frame.y >= viewport.y && frame.x + frame.width <= viewport.x + viewport.width && frame.y + frame.height <= viewport.y + viewport.height, `${title} is fitted inside the viewport`);
+  }
+  assert(await content.getByRole('button', { name: 'Abrir boards/Detail.html a tamaño real' }).isVisible(), 'A board without a title is labeled with its path');
+  assert(!await content.getByRole('button', { name: 'Abrir Móvil a tamaño real' }).isVisible(), 'Boards on another page are hidden');
+  assert.equal(await content.locator('.note').textContent(), 'Nota <b>sin</b> HTML', 'Note text renders as text');
+  const fitted = await transform(content);
+  await page.waitForTimeout(300);
+  assert.equal(await transform(content), fitted, 'Board messages to the parent do not change the canvas');
+
+  const start = await box(content, 'iframe[title="Inicio"]');
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 - 120, start.y + start.height / 2 + 40, { steps: 4 });
+  await page.mouse.up();
+  const panned = await box(content, 'iframe[title="Inicio"]');
+  assert(Math.abs(panned.x - (start.x - 120)) < 1 && Math.abs(panned.y - (start.y + 40)) < 1, 'Drag pans the canvas');
+  const corner = { x: panned.x + panned.width, y: panned.y + panned.height };
+  const level = await content.locator('.zoom-level').textContent() ?? '';
+  await page.mouse.move(corner.x, corner.y);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -40);
+  await page.keyboard.up('Control');
+  await content.locator('.zoom-level').filter({ hasNotText: level }).waitFor();
+  const zoomed = await box(content, 'iframe[title="Inicio"]');
+  const drift = Math.hypot(zoomed.x + zoomed.width - corner.x, zoomed.y + zoomed.height - corner.y);
+  assert(zoomed.width > panned.width, 'Ctrl and wheel zooms in');
+  assert(drift <= 2, `The corner under the cursor stays within 2 px, drift ${drift}`);
+  observations.zoomAnchorDrift = drift;
+
+  const open = content.getByRole('button', { name: 'Abrir Inicio a tamaño real' });
+  await open.focus();
+  const before = await transform(content);
+  await open.press('Enter');
+  const back = content.getByRole('button', { name: 'Volver al lienzo' });
+  await back.waitFor();
+  assert.equal(await back.evaluate((button) => button === document.activeElement), true, 'Focus moves to Volver al lienzo');
+  const native = await box(content, 'iframe[title="Inicio"]');
+  assert.deepEqual([native.width, native.height], [1440, 900], 'Focus view shows the board at its declared size');
+  assert.equal(await content.locator('iframe[title="Inicio"]').evaluate((frame) => (frame as HTMLIFrameElement).inert), false, 'The focused board is interactive');
+  await page.keyboard.press('Escape');
+  await content.locator('.zoom').waitFor();
+  assert.equal(await transform(content), before, 'Escape restores the prior transform');
+  assert.equal(await content.getByRole('button', { name: 'Abrir Inicio a tamaño real' }).evaluate((button) => button === document.activeElement), true, 'Focus returns to the board name');
+
+  await content.getByRole('button', { name: 'Página Teléfono' }).click();
+  assert(await content.getByRole('button', { name: 'Abrir Móvil a tamaño real' }).isVisible(), 'The selected page shows its boards');
+  assert(!await content.getByRole('button', { name: 'Abrir Inicio a tamaño real' }).isVisible(), 'The selected page hides other boards');
+  assert(!await content.locator('.note').isVisible(), 'A note without a page belongs to the first page');
+  assert.equal(await content.getByRole('button', { name: 'Página Teléfono' }).getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(errors, [], 'The canvas host logs no errors');
+  await page.close();
+
+  const inert = await browser.newPage();
+  await inert.goto(`${origin}/inert`);
+  const listing = inert.frameLocator('iframe');
+  await listing.locator('pre').first().waitFor();
+  assert.equal(await listing.locator('iframe').count(), 0, 'The inert listing has no board frames');
+  assert.equal(await listing.locator('pre').count(), boards.length + 1, 'The inert listing shows every board source and the note');
+  assert.match(await listing.locator('pre').first().innerText(), /<script>/, 'Board source is shown as text');
+  await inert.close();
+
+  await mkdir('.test-artifacts', { recursive: true });
+  await writeFile('.test-artifacts/design-canvas.json', JSON.stringify(observations, null, 2));
+  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, or WebRTC packets; pan, zoom, focus, pages, and the inert listing work.');
+} finally {
+  await browser.close();
+  await new Promise<void>((done) => server.close(() => done()));
+  collector.close();
+}
