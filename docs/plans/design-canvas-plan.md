@@ -10,9 +10,9 @@ The program lands three PRs in this order. D1 adds the `design` content kind and
 
 This checked plan records the completed D1 and approved D2 work and the D3 implementation state before its independent verdict. The current Codex execution uses the owner and verifier roles configured in `~/.pstack/codex-models.md`. Older Claude model and scheduler references below describe the original program and are not claims about this continuation. No scheduler was verified for the continuation. Monitoring exists only while the active root session runs.
 
-D3 branches from exact D2 commit `809709b457cd56eae6eb11a8c01084084af1de2b` and targets the D2 branch in PR #67. The root owns topology and landing. No rebase, force-push, merge, or deployment is authorized for this owner. The existing exact parent makes a rebase unnecessary.
+D3 branches from exact D2 commit `809709b457cd56eae6eb11a8c01084084af1de2b` and targets the D2 branch in PR #67. The root owns topology. The operator owns landing. No rebase, force-push, merge, or deployment is authorized for this owner. The existing exact parent makes a rebase unnecessary.
 
-The D3 owner receipts live in `/tmp/swarm-d3/owner/`. Its local check and all 368 unit tests pass, and installed-package skills proof passes. The final independent live lanes, performance gates, audits, and exact-head verdict remain unchecked below until their evidence exists. Owner self-proof does not replace those independent lanes.
+The D3 owner receipts live in `/tmp/swarm-d3/owner/`. Its local check and all 368 unit tests pass, and installed-package skills proof passes. Independent gates, all ten live lanes, performance, code audit A, and the ADR source audit passed at `c91b450fa3adbfd98d67ab522099f9844ecbf275`. The receipts audit identified the documentation corrections described below. Verification of the documentation correction and its exact-head CI remain pending until their own receipts exist. Owner self-proof does not replace those independent lanes.
 
 ## How to read this
 
