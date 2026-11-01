@@ -42,6 +42,7 @@ const pages = [...document.querySelectorAll('[data-action=page]')];
 const controls = document.querySelector('.controls');
 const zoomLevel = document.querySelector('.zoom-level');
 const state = { view: null, page: pages[0]?.dataset.page ?? null, focus: null };
+let mouse = null;
 
 function fitted() {
   const visible = items.filter((item) => !item.hidden);
@@ -123,15 +124,26 @@ addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && state.focus !== null) actions.close();
 });
 addEventListener('resize', () => {
+  mouse = null;
   if (state.view === null) place();
 });
 
 let hostFocus = null;
 document.addEventListener('focusin', (event) => { hostFocus = event.target; });
-addEventListener('blur', () => setTimeout(() => {
+// Inert does not stop a board's own script from taking focus, so the host returns focus that lands in an inert board.
+function recoverFocus() {
+  if (!document.hasFocus()) return;
   const frame = document.activeElement;
-  if (frame instanceof HTMLIFrameElement && frame.inert && hostFocus?.isConnected) refocus(hostFocus);
-}));
+  if (frame instanceof HTMLIFrameElement && frame.inert) refocus(hostFocus ?? controls.querySelector('button'));
+}
+requestAnimationFrame(function initialFocus() {
+  recoverFocus();
+  if (hostFocus === null) requestAnimationFrame(initialFocus);
+});
+addEventListener('blur', () => {
+  mouse = null;
+  setTimeout(recoverFocus);
+});
 
 canvas.addEventListener('focusin', (event) => {
   if (state.focus !== null || !event.target.matches(':focus-visible')) return;
@@ -145,7 +157,8 @@ addEventListener('wheel', (event) => {
   if (state.focus !== null) return;
   event.preventDefault();
   const unit = [1, 16, canvas.clientHeight][event.deltaMode];
-  if (event.ctrlKey) zoom(Math.exp(-Math.max(-50, Math.min(50, event.deltaY * unit)) / 200), event.clientX, event.clientY);
+  const pivot = mouse && Math.trunc(mouse.x) === event.clientX && Math.trunc(mouse.y) === event.clientY ? mouse : { x: event.clientX, y: event.clientY };
+  if (event.ctrlKey) zoom(Math.exp(-Math.max(-50, Math.min(50, event.deltaY * unit)) / 200), pivot.x, pivot.y);
   else pan(-event.deltaX * unit, -event.deltaY * unit);
 }, { passive: false });
 
@@ -155,7 +168,11 @@ canvas.addEventListener('pointerdown', (event) => {
   canvas.setPointerCapture(event.pointerId);
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 });
-canvas.addEventListener('pointermove', (event) => {
+addEventListener('pointerout', (event) => {
+  if (event.pointerType === 'mouse' && event.relatedTarget === null) mouse = null;
+});
+addEventListener('pointermove', (event) => {
+  if (event.pointerType === 'mouse') mouse = { x: event.clientX, y: event.clientY };
   const last = pointers.get(event.pointerId);
   if (!last) return;
   const other = [...pointers].find(([id]) => id !== event.pointerId)?.[1];
@@ -183,8 +200,6 @@ export function canvasDocument(snapshot: Pick<Snapshot, 'content' | 'files'>, in
   const pageBar = pages.length ? `<nav class="pages" aria-label="Páginas">${pages.map((item, position) => `<button type="button" data-action="page" data-page="${escapeHtml(item.id)}" aria-label="Página ${escapeHtml(item.name)}" aria-pressed="${position === 0}">${escapeHtml(item.name)}</button>`).join('')}</nav>` : '';
   const focusBar = `<header class="focus-bar"><button type="button" data-action="close" aria-label="Volver al lienzo">${icons.back}<span>Volver al lienzo</span></button><p><span class="focus-name"></span><span class="focus-size"></span></p></header>`;
   // Boards stay inert on the canvas so pointer input and Tab reach the host; the focus view makes one board interactive.
-  // Inert does not stop a board's own script from taking focus, so the host script returns focus that lands in an inert board.
-  // It does so one task later, because a refocus inside the blur event loses to the board's focus() call that is still running.
   const boardMarkup = boards.map((board) => `<section class="board"${page(board.page)} style="--x:${board.x};--y:${board.y};--w:${board.w};--h:${board.h}"><button class="board-name" type="button" data-action="open" aria-label="Abrir ${name(board)} a tamaño real"><span>${name(board)}</span>${icons.open}</button><iframe title="${name(board)}" sandbox="allow-scripts" inert srcdoc="${escapeHtml(board.html)}"></iframe></section>`).join('');
   const noteMarkup = notes.map((note) => `<p class="note"${page(note.page)} style="--x:${note.x};--y:${note.y}${note.w === undefined ? '' : `;--w:${note.w}`}">${escapeHtml(note.text)}</p>`).join('');
   const zoomBar = `<div class="zoom" role="group" aria-label="Zoom del lienzo"><button type="button" data-action="zoom-out" aria-label="Alejar">${icons.minus}</button><span class="zoom-level">100 %</span><button type="button" data-action="zoom-in" aria-label="Acercar">${icons.plus}</button><button type="button" data-action="fit" aria-label="Ajustar a la vista">${icons.fit}<span>Ajustar</span></button></div>`;

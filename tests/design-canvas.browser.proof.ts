@@ -64,7 +64,7 @@ const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
     return new Response('reached');
   }
   if (path === '/control') return new Response(`<!doctype html><script>${peer}</script>`, { headers: { 'content-type': 'text/html' } });
-  if (!path.endsWith('content')) return new Response(`<!doctype html><style>body{margin:0}iframe{display:block;width:1200px;height:760px;border:0}</style><iframe title="Vista previa" sandbox="allow-scripts" src="${path}-content"></iframe>`, { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
+  if (!path.endsWith('content')) return new Response(`<!doctype html><style>body{margin:0}iframe{display:block;width:1200px;height:760px;border:0}${path === '/precision' ? 'iframe{position:absolute;left:323px;top:152.796875px;width:690px;height:700px}' : ''}</style><iframe title="Vista previa" sandbox="allow-scripts" src="${path}-content"></iframe>`, { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
   const interactive = path !== '/inert-content';
   const snapshot = canvases[path === '/webrtc-content' || path === '/theft-content' ? path : '/content'];
   return new Response(previewDocument({ revision: { snapshot } }, interactive), { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()', 'cross-origin-opener-policy': 'same-origin' } });
@@ -128,6 +128,15 @@ try {
   assert.equal(beacons, 0, 'No board request reached the server');
   observations.boards = boardReports;
 
+  const zoomControls = content.getByRole('group', { name: 'Zoom del lienzo', exact: true });
+  for (const name of ['Acercar', 'Alejar', 'Ajustar a la vista']) assert.equal(await zoomControls.getByRole('button', { name, exact: true }).count(), 1, `${name} has its accessible name in the zoom group`);
+  const fittedView = await transform(content);
+  await zoomControls.getByRole('button', { name: 'Alejar', exact: true }).click();
+  const smaller = await box(content, 'iframe[title="Inicio"]');
+  await zoomControls.getByRole('button', { name: 'Ajustar a la vista', exact: true }).click();
+  const initial = await box(content, 'iframe[title="Inicio"]');
+  assert(smaller.width < initial.width, 'Alejar decreases the board scale');
+  assert.equal(await transform(content), fittedView, 'Ajustar restores the fitted view after zooming out');
   const viewport = await box(content, '.canvas');
   for (const title of ['Inicio', 'boards/Detail.html']) {
     const frame = await box(content, `iframe[title="${title}"]`);
@@ -155,6 +164,8 @@ try {
   assert(zoomed.width > panned.width, 'Ctrl and wheel zooms in');
   assert(drift <= 2, `The corner under the cursor stays within 2 px, drift ${drift}`);
   observations.zoomAnchorDrift = drift;
+  await zoomControls.getByRole('button', { name: 'Ajustar a la vista', exact: true }).click();
+  assert.equal(await transform(content), fittedView, 'Ajustar restores the fitted view after drag and wheel zoom');
 
   const open = content.getByRole('button', { name: 'Abrir Inicio a tamaño real' });
   const back = content.getByRole('button', { name: 'Volver al lienzo' });
@@ -196,6 +207,37 @@ try {
   assert.deepEqual(errors, [], 'The canvas host logs no errors');
   await page.close();
 
+  const precision = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+  await precision.goto(`${origin}/precision`);
+  const preciseContent = precision.frameLocator('iframe');
+  const frameBox = await precision.locator('iframe').boundingBox();
+  assert(frameBox);
+  for (const [name, pivot] of [['Without a pointer sample', { x: 400, y: 350 }], ['With a mismatched pointer sample', { x: 420, y: 370 }]] as const) {
+    if (name !== 'Without a pointer sample') await precision.mouse.move(frameBox.x + 180.5, frameBox.y + 350.5);
+    const before = await box(preciseContent, 'iframe[title="boards/Detail.html"]');
+    await preciseContent.locator('.canvas').dispatchEvent('wheel', { clientX: pivot.x, clientY: pivot.y, deltaY: -40, ctrlKey: true });
+    const after = await box(preciseContent, 'iframe[title="boards/Detail.html"]');
+    const ratio = after.width / before.width;
+    const expected = { x: frameBox.x + pivot.x + (before.x - frameBox.x - pivot.x) * ratio, y: frameBox.y + pivot.y + (before.y - frameBox.y - pivot.y) * ratio };
+    assert(after.width > before.width, `${name}, wheel zoom increases scale`);
+    assert(Math.hypot(after.x - expected.x, after.y - expected.y) <= 0.1, `${name}, zoom uses the wheel pivot`);
+  }
+  await preciseContent.getByRole('button', { name: 'Ajustar a la vista', exact: true }).click();
+  const anchorBefore = await box(preciseContent, 'iframe[title="boards/Detail.html"]');
+  await precision.mouse.move(anchorBefore.x, anchorBefore.y);
+  await precision.keyboard.down('Control');
+  for (let step = 0; step < 6; step++) {
+    await precision.mouse.wheel(0, -100);
+    await precision.waitForTimeout(40);
+  }
+  await precision.keyboard.up('Control');
+  const anchorAfter = await box(preciseContent, 'iframe[title="boards/Detail.html"]');
+  const repeatedDrift = Math.hypot(anchorAfter.x - anchorBefore.x, anchorAfter.y - anchorBefore.y);
+  assert(anchorAfter.width > anchorBefore.width, 'Repeated ctrl-wheel zoom increases the board scale at DPR 2');
+  assert(repeatedDrift <= 2, `Six ctrl-wheel notches preserve a fractional iframe anchor within 2 px at DPR 2, drift ${repeatedDrift}`);
+  observations.repeatedZoomAnchorDrift = repeatedDrift;
+  await precision.close();
+
   const inert = await browser.newPage();
   await inert.goto(`${origin}/inert`);
   const listing = inert.frameLocator('iframe');
@@ -208,6 +250,10 @@ try {
   const theft = await browser.newPage({ viewport: { width: 1200, height: 760 } });
   await theft.goto(`${origin}/theft`);
   const host = theft.frameLocator('iframe');
+  await host.locator('.controls button:focus').waitFor();
+  const initialZoom = await host.locator('.zoom-level').textContent() ?? '';
+  await theft.keyboard.press('Enter');
+  await host.locator('.zoom-level').filter({ hasNotText: initialZoom }).waitFor();
   const zoomIn = host.getByRole('button', { name: 'Acercar' });
   await zoomIn.focus();
   const untouched = await transform(host);
@@ -226,7 +272,7 @@ try {
 
   await mkdir('.test-artifacts', { recursive: true });
   await writeFile('.test-artifacts/design-canvas.json', JSON.stringify(observations, null, 2));
-  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, WebRTC packets, or focus theft; pan, zoom, focus, pages, and the inert listing work.');
+  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, WebRTC packets; focus recovery, pan, zoom, focus, pages, and the inert listing work.');
 } finally {
   await browser.close();
   await new Promise<void>((done) => server.close(() => done()));
