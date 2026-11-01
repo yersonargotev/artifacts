@@ -67,41 +67,46 @@ export const snapshotSchema = z.strictObject({
   if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex && (path === other || other.startsWith(`${path}/`))))) context.addIssue({ code: 'custom', path: ['files'], message: 'File paths must be unique and cannot contain another file' });
   const bytes = Buffer.byteLength(JSON.stringify(snapshot.metadata)) + Buffer.byteLength(snapshot.content.text) + snapshot.files.reduce((total, file) => total + Buffer.byteLength(file.path) + Buffer.byteLength(file.mediaType) + decodeFile(file).length, 0);
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
-  // A request body can reach 8 MiB, so an oversized index would cost time and one issue per entry.
+  // A request body can reach 8 MiB, so the index of an oversized design is not parsed.
   if (snapshot.content.kind !== 'design' || bytes > 1_048_576) return;
-  let value: unknown;
-  try {
-    value = JSON.parse(snapshot.content.text);
-  } catch {
-    context.addIssue({ code: 'custom', path: ['content', 'text'], message: 'Design content must be a canvas index in JSON' });
-    return;
-  }
-  const index = canvasIndexSchema.safeParse(value);
-  if (!index.success) {
-    for (const issue of index.error.issues) context.addIssue({ ...issue, path: ['content', 'text', ...issue.path] });
-    return;
-  }
-  const positions = new Map(snapshot.files.map((file, position) => [file.path, position]));
-  for (const path of index.data.order) {
-    const position = positions.get(path);
-    if (position === undefined) {
-      context.addIssue({ code: 'custom', path: ['content', 'text', 'boards', path], message: `Canvas board ${path} has no matching file` });
-      continue;
-    }
-    const { mediaType, encoding } = snapshot.files[position]!;
-    if (mediaType !== 'text/html' || encoding !== 'utf8') context.addIssue({ code: 'custom', path: ['files', position], message: `Canvas board ${path} must be a text/html file with utf8 encoding` });
-  }
+  const canvas = readCanvas(snapshot);
+  if (!canvas.success) for (const issue of canvas.issues) context.addIssue({ ...issue });
 });
 
 export type CanvasIndex = z.infer<typeof canvasIndexSchema>;
 export type CanvasBoard = CanvasIndex['boards'][string] & { path: string; html: string };
 export type Canvas = { index: CanvasIndex; boards: CanvasBoard[] };
 
+function readCanvas({ content, files }: Pick<Snapshot, 'content' | 'files'>): { success: true; data: Canvas } | { success: false; issues: z.core.$ZodIssue[] } {
+  let value: unknown;
+  try {
+    value = JSON.parse(content.text);
+  } catch {
+    return { success: false, issues: [{ code: 'custom', path: ['content', 'text'], message: 'Design content must be a canvas index in JSON' }] };
+  }
+  const index = canvasIndexSchema.safeParse(value);
+  if (!index.success) return { success: false, issues: index.error.issues.map((issue) => ({ ...issue, path: ['content', 'text', ...issue.path] })) };
+  const positions = new Map(files.map((file, position) => [file.path, position]));
+  const boards: CanvasBoard[] = [];
+  const issues: z.core.$ZodIssue[] = [];
+  for (const path of index.data.order) {
+    const position = positions.get(path);
+    if (position === undefined) {
+      issues.push({ code: 'custom', path: ['content', 'text', 'boards', path], message: `Canvas board ${path} has no matching file` });
+      continue;
+    }
+    const file = files[position]!;
+    if (file.mediaType !== 'text/html' || file.encoding !== 'utf8') issues.push({ code: 'custom', path: ['files', position], message: `Canvas board ${path} must be a text/html file with utf8 encoding` });
+    else boards.push({ ...index.data.boards[path]!, path, html: file.data });
+  }
+  return issues.length ? { success: false, issues } : { success: true, data: { index: index.data, boards } };
+}
+
 export function parseCanvas(snapshot: Pick<Snapshot, 'content' | 'files'>): Canvas {
   if (snapshot.content.kind !== 'design') throw new TypeError('Only a design snapshot has a canvas');
-  const index = canvasIndexSchema.parse(JSON.parse(snapshot.content.text));
-  const html = new Map(snapshot.files.map((file) => [file.path, file.data]));
-  return { index, boards: index.order.map((path) => ({ ...index.boards[path]!, path, html: html.get(path)! })) };
+  const canvas = readCanvas(snapshot);
+  if (!canvas.success) throw new z.ZodError(canvas.issues);
+  return canvas.data;
 }
 
 export const projectNameSchema = z.string().normalize('NFC').trim().min(1).max(80).refine((name) => name.isWellFormed() && !/\p{Cc}/u.test(name), 'Use a project name without control characters');

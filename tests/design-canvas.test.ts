@@ -48,6 +48,20 @@ test('a valid design parses unchanged and resolves its boards back to front', ()
   ]);
 });
 
+test('parseCanvas throws a ZodError when the index or a board file breaks a snapshot rule', () => {
+  assert.throws(() => parseCanvas({ content: { kind: 'html', text: base.content.text }, files: base.files }), TypeError);
+  assert.throws(() => parseCanvas({ content: base.content, files: base.files.slice(0, 2) }), {
+    name: 'ZodError', issues: [{ code: 'custom', path: ['content', 'text', 'boards', 'boards/Board-3.html'], message: 'Canvas board boards/Board-3.html has no matching file' }],
+  });
+  assert.throws(() => parseCanvas({ content: base.content, files: [base.files[0]!, { path: second, mediaType: 'image/png', encoding: 'base64', data: 'iVBORw0KGgo=' }, base.files[2]!] }), {
+    name: 'ZodError', issues: [{ code: 'custom', path: ['files', 1], message: `Canvas board ${second} must be a text/html file with utf8 encoding` }],
+  });
+  assert.throws(() => parseCanvas({ content: { kind: 'design', text: '<h1>Not a canvas</h1>' }, files: [] }), {
+    name: 'ZodError', issues: [{ code: 'custom', path: ['content', 'text'], message: 'Design content must be a canvas index in JSON' }],
+  });
+  assert.throws(() => parseCanvas(design((canvas) => { canvas.order.pop(); })), (error: { name: string; issues: { path: unknown[] }[] }) => error.name === 'ZodError' && error.issues.length === 1 && error.issues[0]!.path.join('/') === 'content/text/order');
+});
+
 test('order and boards must name the same boards, each once', () => {
   const missing = rejection(design((canvas) => { canvas.order.push('boards/Missing.html'); }));
   assert.deepEqual(missing.map(({ path }) => path), [['content', 'text', 'order', 3]]);
