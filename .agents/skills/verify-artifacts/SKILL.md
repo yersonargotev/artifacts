@@ -62,7 +62,9 @@ After the identity recipe deliberately revokes all sessions, a failing MCP docto
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run
 ```
 
-Choose `identity`, `authoring`, `cli`, `projects`, `screens`, `preview`, `publication`, `export`, or `sharing` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps. Browser drives use a 1440x900 desktop viewport and 390x844 for mobile checks.
+Choose `identity`, `authoring`, `cli`, `projects`, `screens`, `preview`, `publication`, `export`, `sharing`, or `design` as documented in the map. The helper exposes fixed recipes, not a generic click API. Read the recipe for its real ARIA selectors, entry points, expected state, and coverage gaps. Browser drives use a 1440x900 desktop viewport and 390x844 for mobile checks.
+
+`design` follows the [design recipe](features/design.md) to create four retained boards across two pages, exercise nested-board focus interaction, publish, export, recreate by digest, and run complete retained verification.
 
 `screens` seeds ten artifacts across four projects and two unfiled artifacts, then captures the welcome, library, project, detail, move, and delete confirmation pages at both widths. It checks overflow, browser errors, and the visible primary-action count. See [Panel screen captures](features/screens.md) for the exact fixture, selectors, evidence, and `--headed` video option.
 

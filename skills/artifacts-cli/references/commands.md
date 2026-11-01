@@ -61,7 +61,7 @@ Save this JSON as `snapshot.json`, replacing its content with the requested arti
 }
 ```
 
-`metadata.description` and `files` are required even when empty. Content kind is `html`, `markdown`, or `text`. Binary files use `encoding: "base64"` and canonical padded base64. Paths are unique normalized relative paths. Do not use empty, dot, parent, absolute, backslash, percent, or colon path segments. A file cannot also be another file's directory.
+`metadata.description` and `files` are required even when empty. Content kind is `html`, `markdown`, `text`, or `design`. Binary files use `encoding: "base64"` and canonical padded base64. Paths are unique normalized relative paths. Do not use empty, dot, parent, absolute, backslash, percent, or colon path segments. A file cannot also be another file's directory.
 
 ```sh
 artifacts create --snapshot snapshot.json
@@ -74,6 +74,20 @@ Keep the request ID printed for the mutation. Successful JSON goes to stdout; di
 For `read`, `--out FILE --quiet` saves the returned response without printing successful JSON. It requires a nonempty output path. It preserves the selected response mode, so use the default full response for snapshot verification. Errors still go to stderr and exit nonzero. Without `--quiet`, `read --out FILE` also prints the response to stdout.
 
 Check installed help for `--quiet` support before running these examples. Older versions, including `0.1.0-beta.1`, can suppress stdout with `artifacts read ARTIFACT_ID --out saved.json > /dev/null`. This redirection preserves stderr and the command's exit status. Use the same fallback for the revision reads below.
+
+## Prepare a design canvas
+
+Read the design skill's `references/canvas.md` through `artifacts skills get artifacts-design --full`. Keep the index in `my-canvas/canvas.json` and complete UTF-8 board documents in `my-canvas/boards/*.html`.
+
+```sh
+artifacts skills path artifacts-cli
+node <returned-skill-directory>/scripts/prepare-retained.mjs ./my-canvas > snapshot.json
+artifacts create --snapshot snapshot.json
+```
+
+The positional form accepts exactly one directory. It preserves the index text and board HTML, sorts snapshot files by path, validates the complete `design` snapshot with the installed contracts, and rejects missing or orphan boards. It uses the directory basename as the title and an empty description. Edit the emitted metadata before saving when needed. Keep the script under the path returned by `skills path` so its package dependencies resolve. All board data, embedded fonts, index text, and metadata share the 1 MiB budget.
+
+The existing named-option form of `prepare-retained.mjs` builds a private retained-verification config from saved receipts and an independent read. It does not prepare a content snapshot. The two input forms cannot be combined.
 
 ## Organize projects
 
