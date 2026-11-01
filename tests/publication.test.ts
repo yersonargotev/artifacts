@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
+import { Script } from 'node:vm';
+import { canvasDocument } from '../apps/publication/src/canvas.ts';
+import { previewDocument } from '../apps/publication/src/document.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
-import type { ArtifactRead } from '../packages/artifacts/src/contracts.ts';
+import { escapeHtml } from '../apps/publication/src/markup.ts';
+import { snapshotSchema, type ArtifactRead } from '../packages/artifacts/src/contracts.ts';
 import { localReturnPath } from '../apps/dashboard/src/identity.ts';
 import { publicationServiceAuthorized } from '../apps/dashboard/src/publication.ts';
 
@@ -12,6 +16,24 @@ const artifact: ArtifactRead = {
   artifactId: 'artifact-a', ownerId: 'owner-a', headRevisionId: 'revision-1', project: null, publication: { revisionId: 'revision-1', version: 1, url: `${publish}/a/artifact-a` },
   revision: { id: 'revision-1', parentRevisionId: null, sequence: 1, authorUserId: 'owner-a', authorClientId: 'client-a', createdAt: '2026-01-01T00:00:00Z', sha256: 'a'.repeat(64), snapshot: { metadata: { title: 'Protected document', description: 'A retained document' }, content: { kind: 'html', text: '<h1>Protected bytes</h1><script>window.secret = 1</script>' }, files: [{ path: 'nested/file.html', mediaType: 'text/html', encoding: 'base64', data: 'AAH/PGgxPkF0dGFjaG1lbnQ8L2gxPg==' }] } },
 };
+
+const hostileBoard = '<!doctype html><h1 title="a&quot;b">Board "quoted" </iframe><script>parent.document.title = 1</script></h1>';
+const design = snapshotSchema.parse({
+  metadata: { title: 'Design canvas', description: 'Three boards on two pages' },
+  content: { kind: 'design', text: JSON.stringify({
+    v: 1,
+    pages: [{ id: 'web', name: 'Web' }, { id: 'phone', name: 'Teléfono <b>' }],
+    boards: { 'boards/Home.html': { x: 0, y: 0, w: 1440, h: 900, title: 'Inicio <script>' }, 'boards/Menu.html': { x: 1520, y: 0, w: 1440, h: 900, page: 'web' }, 'boards/Phone.html': { x: 0, y: 0, w: 390, h: 844, page: 'phone' } },
+    order: ['boards/Home.html', 'boards/Menu.html', 'boards/Phone.html'],
+    notes: { review: { x: 0, y: 980, text: '<img src=x onerror=alert(1)> & "quoted"\nsecond line' }, phone: { x: 470, y: 0, w: 360, text: 'Phone note', page: 'phone' } },
+  }) },
+  files: [
+    { path: 'boards/Home.html', mediaType: 'text/html', encoding: 'utf8', data: hostileBoard },
+    { path: 'boards/Menu.html', mediaType: 'text/html', encoding: 'utf8', data: '<p>Menu</p>' },
+    { path: 'boards/Phone.html', mediaType: 'text/html', encoding: 'utf8', data: '<p>Phone</p>' },
+    { path: 'boards/Unindexed.html', mediaType: 'text/html', encoding: 'utf8', data: '<p>Not on the canvas</p>' },
+  ],
+});
 
 function environment() {
   return { DASHBOARD_URL: dashboard, PUBLISH_URL: publish, PUBLICATION_SERVICE_SECRET: randomBytes(32).toString('hex'), PUBLICATION_COOKIE_SECRET: randomBytes(32).toString('hex') };
@@ -183,4 +205,77 @@ test('service admission precedes browser Origin exemption and OIDC return paths 
   assert(!publicationServiceAuthorized(new Request(`${dashboard}/internal/publication/read`, { method: 'GET', headers: { authorization: `Bearer ${secret}` } }), secret));
   assert.equal(localReturnPath('/publication/open?artifactId=a&state=b', dashboard), '/publication/open?artifactId=a&state=b');
   for (const target of ['https://attacker.example', '//attacker.example', '/\\attacker.example', '/\nattacker', '/#hidden']) assert.throws(() => localReturnPath(target, dashboard));
+});
+
+test('canvasDocument renders indexed boards as escaped srcdoc frames and notes as escaped text', () => {
+  const canvas = canvasDocument(design, true);
+  assert.equal(canvas.match(/<iframe /g)?.length, 3, 'one frame per indexed board, and board markup cannot open or close frames');
+  assert(canvas.includes(`sandbox="allow-scripts" inert srcdoc="${escapeHtml(hostileBoard)}"`));
+  assert(canvas.includes('&lt;/iframe&gt;&lt;script&gt;parent.document.title = 1&lt;/script&gt;'));
+  assert(canvas.includes('a&amp;quot;b') && canvas.includes('Board &quot;quoted&quot;'));
+  assert(!canvas.includes('</iframe><script>parent'));
+  assert(!canvas.includes('Not on the canvas'), 'files outside the index stay attachments');
+  assert(canvas.includes('&lt;img src=x onerror=alert(1)&gt; &amp; &quot;quoted&quot;\nsecond line</p>'));
+  assert(!canvas.includes('<img src=x'));
+  assert(canvas.includes('aria-label="Abrir Inicio &lt;script&gt; a tamaño real"'));
+  assert(canvas.includes('aria-label="Abrir boards/Menu.html a tamaño real"'), 'a board without a title is labeled with its path');
+  assert(canvas.includes('aria-label="Página Teléfono &lt;b&gt;"'));
+  assert.equal(canvas.match(/<script>/g)?.length, 1, 'only the canvas host script runs in the content document');
+  assert.doesNotThrow(() => new Script(canvas.slice(canvas.indexOf('<script>') + 8, canvas.lastIndexOf('</script>'))), 'the canvas host script parses');
+});
+
+test('a canvas board or note without a page belongs to the first page', () => {
+  const canvas = canvasDocument(design, true);
+  assert.match(canvas, /<section class="board" data-page="web" style="--x:0;--y:0;--w:1440;--h:900">/);
+  assert.match(canvas, /<section class="board" data-page="phone" style="--x:0;--y:0;--w:390;--h:844">/);
+  assert.match(canvas, /<p class="note" data-page="web" style="--x:0;--y:980">/);
+  assert.match(canvas, /<p class="note" data-page="phone" style="--x:470;--y:0;--w:360">Phone note<\/p>/);
+  const single = snapshotSchema.parse({ ...design, content: { kind: 'design', text: JSON.stringify({ v: 1, boards: { 'boards/Menu.html': { x: 5, y: 6, w: 400, h: 300 } }, order: ['boards/Menu.html'] }) } });
+  const unpaged = canvasDocument(single, true);
+  assert(!unpaged.includes('data-page') && !unpaged.includes('class="pages"'));
+  const builtins = snapshotSchema.parse({ ...single, content: { kind: 'design', text: JSON.stringify({ v: 1, pages: [{ id: 'toString', name: 'Inicio' }, { id: 'constructor', name: 'Otra' }], boards: { 'boards/Menu.html': { x: 0, y: 0, w: 400, h: 300, page: 'constructor' } }, order: ['boards/Menu.html'], notes: { constructor: { x: 0, y: 400, text: 'Nota constructor' } } }) } });
+  const named = canvasDocument(builtins, true);
+  assert(named.includes('<section class="board" data-page="constructor"') && named.includes('<p class="note" data-page="toString" style="--x:0;--y:400">Nota constructor</p>'), 'ids that name Object builtins render as plain ids');
+});
+
+test('canvasDocument emits an inert source listing when interactive is false', () => {
+  const listing = canvasDocument(design, false);
+  assert(listing.startsWith('<p>Vista de código. Abre este diseño en Chrome 152 o posterior para usar su lienzo interactivo.</p>'));
+  assert(!listing.includes('<iframe') && !listing.includes('<script') && !listing.includes('<img'));
+  assert(listing.indexOf('Inicio &lt;script&gt;') < listing.indexOf('boards/Menu.html') && listing.indexOf('boards/Menu.html') < listing.indexOf('boards/Phone.html'));
+  assert(listing.includes(`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(hostileBoard)}</pre>`));
+  assert(listing.includes('&lt;img src=x onerror=alert(1)&gt;'));
+  assert(!listing.includes('Not on the canvas'));
+});
+
+test('previewDocument keeps HTML, Markdown, and text bytes and renders a design as a canvas', () => {
+  const shell = (policy: string, body: string) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><meta name="referrer" content="no-referrer"></head><body>${body}</body></html>`;
+  const scripts = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+  const inert = scripts.replace("script-src 'unsafe-inline'", "script-src 'none'");
+  const read = (content: { kind: 'html' | 'markdown' | 'text'; text: string }) => ({ revision: { snapshot: { content, files: [] } } });
+  const pre = (text: string) => `<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(text)}</pre>`;
+  assert.equal(previewDocument(read({ kind: 'html', text: '<h1>Hi</h1>' }), true), shell(scripts, '<h1>Hi</h1>'));
+  assert.equal(previewDocument(read({ kind: 'html', text: '<h1>Hi</h1>' })), shell(inert, `<p>Vista de código. Abre este HTML en Chrome 152 o posterior para usar su versión interactiva.</p>${pre('<h1>Hi</h1>')}`));
+  assert.equal(previewDocument(read({ kind: 'markdown', text: '# <Hi>' }), true), shell(scripts, pre('# <Hi>')));
+  assert.equal(previewDocument(read({ kind: 'text', text: 'a & b' }), true), shell(scripts, pre('a & b')));
+  assert.equal(previewDocument({ revision: { snapshot: design } }, true), shell(scripts, canvasDocument(design, true)));
+  assert.equal(previewDocument({ revision: { snapshot: design } }), shell(inert, canvasDocument(design, false)));
+});
+
+test('a design content response carries the same headers as an HTML content response', async () => {
+  const headers: Record<string, [string, string][]> = {};
+  for (const [kind, snapshot] of [['html', artifact.revision.snapshot], ['design', design]] as const) {
+    const handler = createPublicationApp(environment(), async (input) => String(input).endsWith('/consume')
+      ? Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 })
+      : Response.json({ ...artifact, revision: { ...artifact.revision, snapshot } }));
+    const cookie = cookieHeader((await authorize(handler)).admitted);
+    for (const agent of ['Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36', 'Mozilla/5.0 Firefox/152.0']) {
+      const response = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': agent } }));
+      assert.equal(response.status, 200);
+      headers[`${kind} ${agent}`] = [...response.headers];
+      if (kind === 'design') assert((await response.text()).includes(agent.includes('Chrome') ? '<main class="canvas"' : 'Vista de código. Abre este diseño'));
+    }
+  }
+  assert.deepEqual(headers['design Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36'], headers['html Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36']);
+  assert.deepEqual(headers['design Mozilla/5.0 Firefox/152.0'], headers['html Mozilla/5.0 Firefox/152.0']);
 });

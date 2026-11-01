@@ -1,4 +1,6 @@
 import type { ArtifactRead, SharedRead, Snapshot } from '@artifacts/artifacts/contracts';
+import { canvasDocument } from './canvas.ts';
+import { escapeHtml, sourceBlock } from './markup.ts';
 
 export type PublicationUrls = Readonly<{ library: string; project: (name: string) => string; content: string; attachment: (path: string) => string }>;
 
@@ -13,13 +15,17 @@ export function supportsInteractiveHtml(userAgent: string | null) {
   return version !== null && Number(version[1]) >= 152;
 }
 
-export function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
-}
+type RenderedSnapshot = Pick<Snapshot, 'content' | 'files'>;
+const renderers: Record<Snapshot['content']['kind'], (snapshot: RenderedSnapshot, interactive: boolean) => string> = {
+  html: ({ content }, interactive) => interactive ? content.text : `<p>Vista de código. Abre este HTML en Chrome 152 o posterior para usar su versión interactiva.</p>${sourceBlock(content.text)}`,
+  markdown: ({ content }) => sourceBlock(content.text),
+  text: ({ content }) => sourceBlock(content.text),
+  design: canvasDocument,
+};
 
-export function previewDocument(artifact: { revision: { snapshot: Pick<Snapshot, 'content'> } }, interactive = false) {
-  const { content } = artifact.revision.snapshot;
-  const body = content.kind === 'html' && interactive ? content.text : `${content.kind === 'html' ? '<p>Vista de código. Abre este HTML en Chrome 152 o posterior para usar su versión interactiva.</p>' : ''}<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(content.text)}</pre>`;
+export function previewDocument(artifact: { revision: { snapshot: RenderedSnapshot } }, interactive = false) {
+  const { snapshot } = artifact.revision;
+  const body = renderers[snapshot.content.kind](snapshot, interactive);
   const policy = interactive ? framePolicy : framePolicy.replace("script-src 'unsafe-inline'", "script-src 'none'");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><meta name="referrer" content="no-referrer"></head><body>${body}</body></html>`;
 }
