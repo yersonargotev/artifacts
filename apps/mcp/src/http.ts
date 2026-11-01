@@ -48,7 +48,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
         const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
         const mutation = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
         server.registerTool('artifacts_create', {
-          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, or text and downloadable attachments. Limit 1 MiB decoded total and 32 files. Published HTML must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments. Optional project files the artifact under a project name of up to 80 characters: an existing project with the same name in any letter case is reused with its stored spelling, otherwise the project is created. Optional response=compact omits content, custom metadata, and file data from the result.',
+          title: 'Create artifact', description: 'Create an immutable snapshot with metadata, HTML, Markdown, text, or a design, and downloadable attachments. A design is a canvas of HTML boards: content.text is the canvas index JSON {"v":1,"boards":{PATH:{x,y,w,h,title?,page?}},"order":[PATH],"notes"?:{ID:{x,y,text,w?,page?}},"pages"?:[{id,name}]}. order lists every board once from back to front, w and h are 40 to 8000, a page must be declared in pages, and each board PATH is a boards/NAME.html file with mediaType text/html and utf8 encoding. Limit 1 MiB decoded total and 32 files, boards included. Published HTML and boards must be self-contained. Requires artifacts:write. Retry with the same requestId and arguments. Optional project files the artifact under a project name of up to 80 characters: an existing project with the same name in any letter case is reused with its stored spelling, otherwise the project is created. Optional response=compact omits content, custom metadata, and file data from the result.',
           inputSchema: createSchema, annotations: mutation,
         }, async (input) => execute(async () => {
           const result = await artifacts.create(principal, input);
@@ -69,7 +69,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           return input.response === 'compact' ? compactArtifactRead(result) : result;
         }));
         server.registerTool('artifacts_publish', {
-          title: 'Publish artifact revision', description: 'Select a retained revision at a stable protected URL. Requires artifacts:publish and the current expectedPublicationVersion, or zero if unpublished. Published HTML is self-contained with downloadable attachments. Retry with the same requestId and arguments.',
+          title: 'Publish artifact revision', description: 'Select a retained revision at a stable protected URL. Requires artifacts:publish and the current expectedPublicationVersion, or zero if unpublished. Published HTML and design boards are self-contained, and every file, boards included, downloads as an attachment. Retry with the same requestId and arguments.',
           inputSchema: publishSchema, annotations: mutation,
         }, async (input) => execute(() => artifacts.publish(principal, input)));
         server.registerTool('artifacts_share', {

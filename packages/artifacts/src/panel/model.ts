@@ -1,8 +1,8 @@
-import type { Revision } from '../contracts.ts';
+import type { contentKinds, Revision } from '../contracts.ts';
 import type { RevisionComparison } from '../workflow.ts';
 
 export type ProjectName = string & { readonly __brand: 'ProjectName' };
-export type ContentKind = 'html' | 'markdown' | 'text';
+export type ContentKind = typeof contentKinds[number];
 
 export const projectKey = (name: string) => name.toLowerCase();
 export const libraryStatuses = ['all', 'published', 'unpublished', 'pending'] as const;

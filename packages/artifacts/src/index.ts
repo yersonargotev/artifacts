@@ -254,7 +254,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const files = [...selected.snapshot.files].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
       const fileManifest = await Promise.all(files.map(async (file) => ({ path: file.path, mediaType: file.mediaType, encoding: file.encoding, size: decodeFile(file).length, sha256: await sha256(decodeFile(file)) })));
       const { snapshot, ...revisionMetadata } = selected;
-      const extension = { html: 'html', markdown: 'md', text: 'txt' }[snapshot.content.kind];
+      const extension = { html: 'html', markdown: 'md', text: 'txt', design: 'json' }[snapshot.content.kind];
       const manifest = { formatVersion: 1, artifactId: document.artifactId, ownerId: document.ownerId, revision: revisionMetadata, metadata: snapshot.metadata, content: { kind: snapshot.content.kind, path: `content.${extension}` }, files: fileManifest };
       const archive: Zippable = {
         'artifact.json': new TextEncoder().encode(`${canonicalJson(manifest)}\n`),

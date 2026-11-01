@@ -47,7 +47,7 @@ export type RetainedVerificationReport = {
 const markerNames = ['data-artifact-id', 'data-revision-id', 'data-revision-sha256', 'data-publication-version'] as const;
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const canonicalJson = (value: unknown) => JSON.stringify(value, (_key, item: unknown) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item);
-const contentPath = (expected: ArtifactRead) => `content.${{ html: 'html', markdown: 'md', text: 'txt' }[expected.revision.snapshot.content.kind]}`;
+const contentPath = (expected: ArtifactRead) => `content.${{ html: 'html', markdown: 'md', text: 'txt', design: 'json' }[expected.revision.snapshot.content.kind]}`;
 const safeUrl = (value: string) => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? `${url.origin}${url.pathname}` : url.protocol === 'about:' ? `about:${url.pathname}` : url.protocol; };
 const safeMessage = (value: string) => value.replace(/https?:\/\/[^\s"'<>]+/g, (url) => { try { return safeUrl(url); } catch { return '[URL]'; } }).slice(0, 1000);
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const identifier = z.string().min(1).max(128);
 const requestId = z.string().min(8).max(128);
+export const contentKinds = ['html', 'markdown', 'text', 'design'] as const;
 const fileSchema = z.strictObject({
   path: z.string().min(1).max(240).refine((path) => path === path.normalize('NFC') && !/[:\\%\x00-\x1f\x7f]/.test(path) && path.split('/').every((part) => part !== '' && part !== '.' && part !== '..'), 'Use a normalized relative file path'),
   mediaType: z.string().max(128).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
@@ -11,16 +12,78 @@ const fileSchema = z.strictObject({
   if (file.encoding === 'base64' && Buffer.from(file.data, 'base64').toString('base64') !== file.data) context.addIssue({ code: 'custom', path: ['data'], message: 'Use canonical padded base64' });
 });
 
+const canvasId = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Use 1 to 40 letters, digits, underscores, or hyphens');
+const boardPath = z.string().regex(/^boards\/[A-Za-z0-9_][A-Za-z0-9_.-]*\.html$/, 'Use a board path such as boards/Home.html');
+const extent = z.number().min(40).max(8000);
+const label = z.string().min(1).max(256);
+
+export const canvasIndexSchema = z.strictObject({
+  v: z.literal(1),
+  boards: z.record(boardPath, z.strictObject({ x: z.number(), y: z.number(), w: extent, h: extent, title: label.optional(), page: canvasId.optional() })),
+  order: z.array(boardPath).min(1),
+  notes: z.record(canvasId, z.strictObject({ x: z.number(), y: z.number(), text: z.string(), w: extent.optional(), page: canvasId.optional() })).optional(),
+  pages: z.array(z.strictObject({ id: canvasId, name: label })).optional(),
+}).superRefine((index, context) => {
+  const ordered = new Set<string>();
+  index.order.forEach((path, position) => {
+    if (!Object.hasOwn(index.boards, path)) context.addIssue({ code: 'custom', path: ['order', position], message: `Canvas order names ${path}, which is not a board` });
+    else if (ordered.has(path)) context.addIssue({ code: 'custom', path: ['order', position], message: `Canvas order lists ${path} more than once` });
+    ordered.add(path);
+  });
+  for (const path of Object.keys(index.boards)) if (!ordered.has(path)) context.addIssue({ code: 'custom', path: ['order'], message: `Canvas order omits board ${path}` });
+  const pages = new Set<string>();
+  index.pages?.forEach(({ id }, position) => {
+    if (pages.has(id)) context.addIssue({ code: 'custom', path: ['pages', position, 'id'], message: `Canvas page ${id} is declared more than once` });
+    pages.add(id);
+  });
+  for (const [path, board] of Object.entries(index.boards)) if (board.page !== undefined && !pages.has(board.page)) context.addIssue({ code: 'custom', path: ['boards', path, 'page'], message: `Canvas board ${path} names unknown page ${board.page}` });
+  for (const [id, note] of Object.entries(index.notes ?? {})) if (note.page !== undefined && !pages.has(note.page)) context.addIssue({ code: 'custom', path: ['notes', id, 'page'], message: `Canvas note ${id} names unknown page ${note.page}` });
+});
+
 export const snapshotSchema = z.strictObject({
   metadata: z.strictObject({ title: z.string().min(1).max(256), description: z.string().max(8192), custom: z.json().optional() }),
-  content: z.strictObject({ kind: z.enum(['html', 'markdown', 'text']), text: z.string().max(1_048_576).refine((text) => text.isWellFormed(), 'Content must contain well-formed Unicode') }),
+  content: z.strictObject({ kind: z.enum(contentKinds), text: z.string().max(1_048_576).refine((text) => text.isWellFormed(), 'Content must contain well-formed Unicode') }),
   files: z.array(fileSchema).max(32),
 }).superRefine((snapshot, context) => {
   const paths = snapshot.files.map((file) => file.path);
   if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex && (path === other || other.startsWith(`${path}/`))))) context.addIssue({ code: 'custom', path: ['files'], message: 'File paths must be unique and cannot contain another file' });
   const bytes = Buffer.byteLength(JSON.stringify(snapshot.metadata)) + Buffer.byteLength(snapshot.content.text) + snapshot.files.reduce((total, file) => total + Buffer.byteLength(file.path) + Buffer.byteLength(file.mediaType) + decodeFile(file).length, 0);
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
+  if (snapshot.content.kind !== 'design') return;
+  let value: unknown;
+  try {
+    value = JSON.parse(snapshot.content.text);
+  } catch {
+    context.addIssue({ code: 'custom', path: ['content', 'text'], message: 'Design content must be a canvas index in JSON' });
+    return;
+  }
+  const index = canvasIndexSchema.safeParse(value);
+  if (!index.success) {
+    for (const issue of index.error.issues) context.addIssue({ ...issue, path: ['content', 'text', ...issue.path] });
+    return;
+  }
+  const positions = new Map(snapshot.files.map((file, position) => [file.path, position]));
+  for (const path of index.data.order) {
+    const position = positions.get(path);
+    if (position === undefined) {
+      context.addIssue({ code: 'custom', path: ['content', 'text', 'boards', path], message: `Canvas board ${path} has no matching file` });
+      continue;
+    }
+    const { mediaType, encoding } = snapshot.files[position]!;
+    if (mediaType !== 'text/html' || encoding !== 'utf8') context.addIssue({ code: 'custom', path: ['files', position], message: `Canvas board ${path} must be a text/html file with utf8 encoding` });
+  }
 });
+
+export type CanvasIndex = z.infer<typeof canvasIndexSchema>;
+export type CanvasBoard = CanvasIndex['boards'][string] & { path: string; html: string };
+export type Canvas = { index: CanvasIndex; boards: CanvasBoard[] };
+
+export function parseCanvas(snapshot: Pick<Snapshot, 'content' | 'files'>): Canvas {
+  if (snapshot.content.kind !== 'design') throw new TypeError('Only a design snapshot has a canvas');
+  const index = canvasIndexSchema.parse(JSON.parse(snapshot.content.text));
+  const html = new Map(snapshot.files.map((file) => [file.path, file.data]));
+  return { index, boards: index.order.map((path) => ({ ...index.boards[path]!, path, html: html.get(path)! })) };
+}
 
 export const projectNameSchema = z.string().normalize('NFC').trim().min(1).max(80).refine((name) => name.isWellFormed() && !/\p{Cc}/u.test(name), 'Use a project name without control characters');
 const response = z.enum(['full', 'compact']).optional();

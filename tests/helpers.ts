@@ -9,7 +9,7 @@ import { openDatabase } from '../packages/db/src/index.ts';
 import { migrateDatabase } from '../packages/db/src/migrate.ts';
 import { createAuth } from '../apps/auth/src/auth.ts';
 import { createAuthApp } from '../apps/auth/src/http.ts';
-import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 import { createEmailSender } from '../packages/config/src/email-sender-node.ts';
@@ -105,4 +105,14 @@ export function callWhoami(resource: string, token?: string) {
 export function historicalSignIn(app: Awaited<ReturnType<typeof fixture>>, email: string) {
   const auth = createAuth(app.db, { ...app.config, access: { ...app.config.access, ownerEmail: email } });
   return auth.api.signInEmail({ body: { email, password: app.password }, returnHeaders: true });
+}
+
+export function designSnapshot(boardCount = 3, html = (path: string) => `<!doctype html><html lang="es"><meta charset="utf-8"><title>${path}</title><h1>${path}</h1></html>`): Snapshot {
+  const paths = Array.from({ length: boardCount }, (_, index) => `boards/Board-${index + 1}.html`);
+  const canvas = { v: 1, boards: Object.fromEntries(paths.map((path, index) => [path, { x: index * 1520, y: 0, w: 1440, h: 900, title: `Board ${index + 1}` }])), order: paths };
+  return {
+    metadata: { title: 'Design canvas', description: `${boardCount} boards` },
+    content: { kind: 'design', text: JSON.stringify(canvas) },
+    files: paths.map((path) => ({ path, mediaType: 'text/html', encoding: 'utf8', data: html(path) })),
+  };
 }
