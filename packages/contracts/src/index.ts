@@ -12,17 +12,35 @@ const fileSchema = z.strictObject({
   if (file.encoding === 'base64' && Buffer.from(file.data, 'base64').toString('base64') !== file.data) context.addIssue({ code: 'custom', path: ['data'], message: 'Use canonical padded base64' });
 });
 
-const canvasId = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Use 1 to 40 letters, digits, underscores, or hyphens');
+const canvasId = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Use 1 to 40 letters, digits, underscores, or hyphens').refine((id) => id !== '__proto__', 'Use an id other than __proto__');
 const boardPath = z.string().regex(/^boards\/[A-Za-z0-9_][A-Za-z0-9_.-]*\.html$/, 'Use a board path such as boards/Home.html');
+const coordinate = z.number().min(-1_000_000).max(1_000_000);
 const extent = z.number().min(40).max(8000);
 const label = z.string().min(1).max(256);
 
+// A count or key failure aborts before any entry is parsed, so an oversized collection reports one issue.
+// Keys are read from the raw object because a zod record skips a __proto__ key without checking it.
+function keyed<T extends z.ZodType>(key: z.ZodType<string>, value: T, max: number, noun: string) {
+  return z.unknown().superRefine((input, context) => {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) return;
+    const keys = Object.keys(input);
+    if (keys.length > max) {
+      context.addIssue({ code: 'too_big', origin: 'object', maximum: max, inclusive: true, input, continue: false, message: `A canvas holds at most ${max} ${noun}` });
+      return;
+    }
+    for (const name of keys) {
+      const result = key.safeParse(name);
+      if (!result.success) context.addIssue({ code: 'invalid_key', origin: 'record', issues: result.error.issues, input: name, path: [name], continue: false, message: result.error.issues[0]!.message });
+    }
+  }).pipe(z.record(z.string(), value));
+}
+
 export const canvasIndexSchema = z.strictObject({
   v: z.literal(1),
-  boards: z.record(boardPath, z.strictObject({ x: z.number(), y: z.number(), w: extent, h: extent, title: label.optional(), page: canvasId.optional() })),
-  order: z.array(boardPath).min(1),
-  notes: z.record(canvasId, z.strictObject({ x: z.number(), y: z.number(), text: z.string(), w: extent.optional(), page: canvasId.optional() })).optional(),
-  pages: z.array(z.strictObject({ id: canvasId, name: label })).optional(),
+  boards: keyed(boardPath, z.strictObject({ x: coordinate, y: coordinate, w: extent, h: extent, title: label.optional(), page: canvasId.optional() }), 32, 'boards'),
+  order: z.array(z.unknown()).min(1, { message: 'A canvas needs at least one board', abort: true }).max(32, { message: 'A canvas holds at most 32 boards', abort: true }).pipe(z.array(boardPath)),
+  notes: keyed(canvasId, z.strictObject({ x: coordinate, y: coordinate, text: z.string(), w: extent.optional(), page: canvasId.optional() }), 200, 'notes').optional(),
+  pages: z.array(z.unknown()).max(32, { message: 'A canvas holds at most 32 pages', abort: true }).pipe(z.array(z.strictObject({ id: canvasId, name: label }))).optional(),
 }).superRefine((index, context) => {
   const ordered = new Set<string>();
   index.order.forEach((path, position) => {

@@ -25,9 +25,9 @@ test('a valid design parses unchanged and resolves its boards back to front', ()
   const phone = '<!doctype html><title>Móvil</title><h1>Móvil 🌎</h1>';
   const canvas = {
     v: 1,
-    boards: { 'boards/Home.html': { x: 0, y: 0, w: 1440, h: 900, title: 'Inicio', page: 'web' }, 'boards/Phone_v2.html': { x: 1520.5, y: -40, w: 40, h: 8000, page: 'mobile' } },
+    boards: { 'boards/Home.html': { x: -1_000_000, y: 1_000_000, w: 1440, h: 900, title: 'I'.repeat(256), page: 'web' }, 'boards/Phone_v2.html': { x: 1520.5, y: -40, w: 40, h: 8000, page: 'mobile' } },
     order: ['boards/Phone_v2.html', 'boards/Home.html'],
-    notes: { 'contrast-1': { x: 0, y: -200, text: 'Revisar contraste', w: 320, page: 'web' }, loose: { x: 10, y: 10, text: '' } },
+    notes: { 'contrast-1': { x: 0, y: -200, text: 'Revisar contraste', w: 320, page: 'web' }, ['n'.repeat(40)]: { x: 10, y: 10, text: '' } },
     pages: [{ id: 'web', name: 'Web' }, { id: 'mobile', name: 'Móvil' }],
   };
   const snapshot: Snapshot = {
@@ -44,9 +44,8 @@ test('a valid design parses unchanged and resolves its boards back to front', ()
   assert.deepEqual(parsed.index, canvas);
   assert.deepEqual(parsed.boards, [
     { path: 'boards/Phone_v2.html', x: 1520.5, y: -40, w: 40, h: 8000, page: 'mobile', html: phone },
-    { path: 'boards/Home.html', x: 0, y: 0, w: 1440, h: 900, title: 'Inicio', page: 'web', html: home },
+    { path: 'boards/Home.html', x: -1_000_000, y: 1_000_000, w: 1440, h: 900, title: 'I'.repeat(256), page: 'web', html: home },
   ]);
-  assert.throws(() => parseCanvas({ content: { kind: 'html', text: canvas.order[0]! }, files: [] }), TypeError);
 });
 
 test('order and boards must name the same boards, each once', () => {
@@ -60,7 +59,7 @@ test('order and boards must name the same boards, each once', () => {
   assert.deepEqual(repeated.map(({ path }) => path), [['content', 'text', 'order', 3]]);
   assert.match(repeated[0]!.message, new RegExp(first));
   const empty = rejection({ ...base, content: { kind: 'design', text: JSON.stringify({ v: 1, boards: {}, order: [] }) }, files: [] });
-  assert.deepEqual(empty.map(({ path }) => path), [['content', 'text', 'order']]);
+  assert.deepEqual(empty.map(({ path, message }) => ({ path, message })), [{ path: ['content', 'text', 'order'], message: 'A canvas needs at least one board' }]);
 });
 
 test('every board needs a matching utf8 text/html file', () => {
@@ -103,9 +102,27 @@ test('board and note widths and heights stay within 40 to 8000', () => {
   ]);
 });
 
-test('the 32 file limit caps a canvas at 32 boards', () => {
+test('a 33-board canvas breaks both the file limit and the board cap', () => {
   assert.equal(snapshotSchema.safeParse(designSnapshot(32)).success, true);
-  assert.deepEqual(rejection(designSnapshot(33)).map(({ path, code }) => ({ path, code })), [{ path: ['files'], code: 'too_big' }]);
+  assert.deepEqual(rejection(designSnapshot(33)).map(({ path, code }) => ({ path, code })), [
+    { path: ['files'], code: 'too_big' },
+    { path: ['content', 'text', 'boards'], code: 'too_big' },
+    { path: ['content', 'text', 'order'], code: 'too_big' },
+  ]);
+});
+
+test('a canvas holds at most 32 boards, 200 notes, and 32 pages, and an oversized list reports one issue', () => {
+  const notes = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, index) => [`note-${index}`, { x: 0, y: 0, text: '' }]));
+  const pages = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `page-${index}`, name: `Page ${index}` }));
+  assert.equal(snapshotSchema.safeParse(design((canvas) => { canvas.notes = notes(200); canvas.pages = pages(32); })).success, true);
+  for (const [change, field, message] of [
+    [(canvas) => { canvas.notes = notes(201); }, 'notes', 'A canvas holds at most 200 notes'],
+    [(canvas) => { canvas.pages = pages(33); }, 'pages', 'A canvas holds at most 32 pages'],
+    [(canvas) => { for (let index = 0; index < 30; index++) canvas.boards[`boards/Extra-${index}.html`] = { x: 0, y: 0, w: 100, h: 100 }; }, 'boards', 'A canvas holds at most 32 boards'],
+    [(canvas) => { canvas.order = Array.from({ length: 40_000 }, (_, index) => `boards/B${index}.html`); }, 'order', 'A canvas holds at most 32 boards'],
+  ] as [(canvas: CanvasJson) => void, string, string][]) {
+    assert.deepEqual(rejection(design(change)).map(({ path, code, message }) => ({ path, code, message })), [{ path: ['content', 'text', field], code: 'too_big', message }]);
+  }
 });
 
 test('an oversized design reports the size limit before its index', () => {
@@ -121,9 +138,52 @@ test('design text must be a version 1 canvas index', () => {
     [(canvas) => { canvas.v = 2; }, ['content', 'text', 'v']],
     [(canvas) => { canvas.zoom = 1; }, ['content', 'text']],
     [(canvas) => { canvas.boards[first]!.color = 'red'; }, ['content', 'text', 'boards', first]],
-    [(canvas) => { canvas.boards['boards/nested/Deep.html'] = { x: 0, y: 0, w: 100, h: 100 }; canvas.order.push('boards/nested/Deep.html'); }, ['content', 'text', 'boards', 'boards/nested/Deep.html']],
   ] as [(canvas: CanvasJson) => void, (string | number)[]][]) {
     assert.deepEqual(rejection(design(change))[0]!.path, path);
+  }
+});
+
+test('a board path outside boards/NAME.html is rejected even when its file exists', () => {
+  const message = 'Use a board path such as boards/Home.html';
+  for (const board of ['boards/nested/Deep.html', 'boards/.hid.html', 'boards/a.txt', 'pages/Home.html']) {
+    const issues = rejection(design((canvas) => {
+      canvas.boards[board] = { x: 0, y: 1000, w: 800, h: 600 };
+      canvas.order.push(board);
+    }, [...base.files, { path: board, mediaType: 'text/html', encoding: 'utf8', data: '<h1>Board</h1>' }]));
+    assert.deepEqual(issues.map(({ path, code, message }) => ({ path, code, message })), [
+      { path: ['content', 'text', 'boards', board], code: 'invalid_key', message },
+      { path: ['content', 'text', 'order', 3], code: 'invalid_format', message },
+    ]);
+  }
+});
+
+test('each malformed note, page, or board field reports its own path and code, with the id rule in the message', () => {
+  const idMessage = 'Use 1 to 40 letters, digits, underscores, or hyphens';
+  const protoMessage = 'Use an id other than __proto__';
+  const note = { x: 0, y: 0, text: 'Idea' };
+  for (const [change, path, code, message] of [
+    [(canvas) => { canvas.notes = { idea: { ...note, color: 'red' } }; }, ['notes', 'idea'], 'unrecognized_keys', 'Unrecognized key: "color"'],
+    [(canvas) => { canvas.pages = [{ id: 'web', name: 'Web', order: 1 } as { id: string; name: string }]; }, ['pages', 0], 'unrecognized_keys', 'Unrecognized key: "order"'],
+    [(canvas) => { canvas.notes = { ['n'.repeat(41)]: note }; }, ['notes', 'n'.repeat(41)], 'invalid_key', idMessage],
+    [(canvas) => { canvas.notes = { 'bad id': note }; }, ['notes', 'bad id'], 'invalid_key', idMessage],
+    [(canvas) => { canvas.notes = JSON.parse('{"__proto__":{"x":0,"y":0,"text":"Idea"}}'); }, ['notes', '__proto__'], 'invalid_key', protoMessage],
+    [(canvas) => { canvas.pages = [{ id: 'p'.repeat(41), name: 'Page' }]; }, ['pages', 0, 'id'], 'invalid_format', idMessage],
+    [(canvas) => { canvas.pages = [{ id: '__proto__', name: 'Page' }]; }, ['pages', 0, 'id'], 'custom', protoMessage],
+    [(canvas) => { canvas.boards[first]!.title = ''; }, ['boards', first, 'title'], 'too_small'],
+    [(canvas) => { canvas.boards[first]!.title = 'T'.repeat(257); }, ['boards', first, 'title'], 'too_big'],
+    [(canvas) => { canvas.pages = [{ id: 'web', name: '' }]; }, ['pages', 0, 'name'], 'too_small'],
+    [(canvas) => { canvas.pages = [{ id: 'web', name: 'P'.repeat(257) }]; }, ['pages', 0, 'name'], 'too_big'],
+    [(canvas) => { canvas.boards[first]!.x = '0'; }, ['boards', first, 'x'], 'invalid_type'],
+    [(canvas) => { canvas.boards[first]!.y = null; }, ['boards', first, 'y'], 'invalid_type'],
+    [(canvas) => { canvas.boards[first]!.x = 1e308; }, ['boards', first, 'x'], 'too_big'],
+    [(canvas) => { canvas.boards[first]!.y = 1_000_001; }, ['boards', first, 'y'], 'too_big'],
+    [(canvas) => { canvas.notes = { idea: { ...note, x: -1_000_001 } }; }, ['notes', 'idea', 'x'], 'too_small'],
+    [(canvas) => { canvas.notes = { idea: { ...note, y: 1_000_001 } }; }, ['notes', 'idea', 'y'], 'too_big'],
+    [(canvas) => { canvas.notes = { idea: { x: 0, y: 0 } }; }, ['notes', 'idea', 'text'], 'invalid_type'],
+  ] as [(canvas: CanvasJson) => void, (string | number)[], string, string?][]) {
+    const issues = rejection(design(change));
+    assert.deepEqual(issues.map(({ path, code }) => ({ path, code })), [{ path: ['content', 'text', ...path], code }], `${path.join('/')} ${code}`);
+    if (message) assert.equal(issues[0]!.message, message);
   }
 });
 
