@@ -8,7 +8,7 @@ import { inertPreviewPolicy, previewDocument, previewPolicy, supportsInteractive
 import { snapshotSchema, type Snapshot } from '../packages/contracts/src/index.ts';
 
 type Board = { path: string; x: number; y: number; w: number; h: number; title?: string; page?: string; script: string };
-type Report = { name: string; ran: boolean; origin: string; parent: string; popup: string; fetch: string; violations: string[] };
+type Report = { name: string; ran: boolean; origin: string; viewport: string; parent: string; popup: string; fetch: string; violations: string[] };
 
 const collector = createSocket('udp4');
 let packets = 0;
@@ -21,7 +21,7 @@ const peer = `(async () => {
   await peer.setLocalDescription(await peer.createOffer());
   setTimeout(() => peer.close(), 1500);
 })();`;
-const probe = (name: string) => `const report = { name: ${JSON.stringify(name)}, ran: true, origin: self.origin, violations: [] };
+const probe = (name: string) => `const report = { name: ${JSON.stringify(name)}, ran: true, origin: self.origin, viewport: innerWidth + 'x' + innerHeight, violations: [] };
 addEventListener('securitypolicyviolation', (event) => report.violations.push(event.effectiveDirective));
 try { report.parent = String(parent.document.title); } catch (error) { report.parent = error.name; }
 try { report.popup = window.open('/beacon') === null ? 'blocked' : 'opened'; } catch (error) { report.popup = error.name; }
@@ -35,12 +35,14 @@ fetch('/beacon').then(() => 'allowed', () => 'blocked').then((result) => {
   output.textContent = JSON.stringify(report);
   document.body.append(output);
 });`;
+const thief = `addEventListener('keydown', (event) => { document.getElementById('keys').textContent += event.key; });
+setInterval(() => { document.querySelector('input').focus(); parent.postMessage({ type: 'zoom', scale: 9 }, '*'); }, 50);`;
 
 function design(boards: Board[], extra: object = {}): Pick<Snapshot, 'content' | 'files'> {
   return snapshotSchema.parse({
     metadata: { title: 'Canvas containment proof', description: 'Disposable browser fixture' },
     content: { kind: 'design', text: JSON.stringify({ v: 1, boards: Object.fromEntries(boards.map(({ path, script: _, ...board }) => [path, board])), order: boards.map(({ path }) => path), ...extra }) },
-    files: boards.map(({ path, script }) => ({ path, mediaType: 'text/html', encoding: 'utf8', data: `<!doctype html><html lang="es"><meta charset="utf-8"><title>${path}</title><body style="margin:0;font:32px system-ui"><h1 title="&quot;quoted&quot;">${path} "</iframe></h1><script>${script}</script></body></html>` })),
+    files: boards.map(({ path, script }) => ({ path, mediaType: 'text/html', encoding: 'utf8', data: `<!doctype html><html lang="es"><meta charset="utf-8"><title>${path}</title><body style="margin:0;font:32px system-ui"><h1 title="&quot;quoted&quot;">${path} "</iframe></h1><input aria-label="Campo"><output id="keys"></output><script>${script}</script></body></html>` })),
   });
 }
 const boards: Board[] = [
@@ -51,6 +53,7 @@ const boards: Board[] = [
 const canvases = {
   '/content': design(boards, { pages: [{ id: 'desktop', name: 'Escritorio' }, { id: 'phone', name: 'Teléfono' }], notes: { review: { x: 0, y: 980, text: 'Nota <b>sin</b> HTML' } } }),
   '/webrtc-content': design([{ path: 'boards/Peer.html', x: 0, y: 0, w: 400, h: 300, script: peer }]),
+  '/theft-content': design([{ path: 'boards/Thief.html', x: 0, y: 0, w: 400, h: 300, script: thief }, { path: 'boards/Victim.html', x: 480, y: 0, w: 400, h: 300, script: '' }]),
 };
 
 let beacons = 0;
@@ -63,7 +66,7 @@ const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
   if (path === '/control') return new Response(`<!doctype html><script>${peer}</script>`, { headers: { 'content-type': 'text/html' } });
   if (!path.endsWith('content')) return new Response(`<!doctype html><style>body{margin:0}iframe{display:block;width:1200px;height:760px;border:0}</style><iframe title="Vista previa" sandbox="allow-scripts" src="${path}-content"></iframe>`, { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
   const interactive = path !== '/inert-content';
-  const snapshot = canvases[path === '/webrtc-content' ? '/webrtc-content' : '/content'];
+  const snapshot = canvases[path === '/webrtc-content' || path === '/theft-content' ? path : '/content'];
   return new Response(previewDocument({ revision: { snapshot } }, interactive), { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()', 'cross-origin-opener-policy': 'same-origin' } });
 } });
 await once(server, 'listening');
@@ -90,10 +93,13 @@ try {
     let crashed = false;
     page.on('crash', () => { crashed = true; });
     packets = 0;
-    await page.goto(`${origin}${path}`).catch((error: unknown) => { if (!crashed) throw error; });
+    await page.goto(`${origin}${path}`).catch((error: Error) => { if (!/crash/i.test(error.message)) throw error; });
     await new Promise((done) => setTimeout(done, 2500));
     if (path === '/control') assert(packets > 0, 'Unrestricted control proves the UDP collector and WebRTC are active');
-    else assert.equal(packets, 0, 'A board that opens a WebRTC connection sends no packets');
+    else {
+      assert.equal(packets, 0, 'A board that opens a WebRTC connection sends no packets');
+      assert.equal(crashed, true, 'Chrome ends the content renderer when a board opens WebRTC under Connection-Allowlist; if this changes, recheck board WebRTC containment');
+    }
     observations[path] = { packets, crashed };
     await page.close();
   }
@@ -111,6 +117,8 @@ try {
   for (const report of boardReports) {
     assert.equal(report.ran, true, `${report.name} script runs`);
     assert.equal(report.origin, 'null', `${report.name} has an opaque origin`);
+    const declared = boards.find(({ path }) => path === report.name)!;
+    assert.equal(report.viewport, `${declared.w}x${declared.h}`, `${report.name} loads at its declared size, even on a hidden page`);
     assert.equal(report.parent, 'SecurityError', `${report.name} cannot read parent.document`);
     assert.equal(report.fetch, 'blocked', `${report.name} fetch is blocked`);
     assert(report.violations.includes('connect-src'), `${report.name} fetch violates connect-src 'none'`);
@@ -128,10 +136,6 @@ try {
   assert(await content.getByRole('button', { name: 'Abrir boards/Detail.html a tamaño real' }).isVisible(), 'A board without a title is labeled with its path');
   assert(!await content.getByRole('button', { name: 'Abrir Móvil a tamaño real' }).isVisible(), 'Boards on another page are hidden');
   assert.equal(await content.locator('.note').textContent(), 'Nota <b>sin</b> HTML', 'Note text renders as text');
-  const fitted = await transform(content);
-  await page.waitForTimeout(300);
-  assert.equal(await transform(content), fitted, 'Board messages to the parent do not change the canvas');
-
   const start = await box(content, 'iframe[title="Inicio"]');
   await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
   await page.mouse.down();
@@ -153,19 +157,36 @@ try {
   observations.zoomAnchorDrift = drift;
 
   const open = content.getByRole('button', { name: 'Abrir Inicio a tamaño real' });
+  const back = content.getByRole('button', { name: 'Volver al lienzo' });
+  const label = await box(content, '.board-name >> nth=0');
+  const middle = await box(content, 'iframe[title="Inicio"]');
+  await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(middle.x + middle.width / 2 + 420 - label.x, middle.y + middle.height / 2 + 24 - label.y, { steps: 4 });
+  await page.mouse.up();
+  const nearEdge = await transform(content);
+  await open.click();
+  await back.waitFor();
+  await page.keyboard.press('Escape');
+  await content.locator('.zoom').waitFor();
+  assert.equal(await transform(content), nearEdge, 'Escape after a mouse open restores the view even when the board name sits under the controls row');
+
   await open.focus();
   const before = await transform(content);
   await open.press('Enter');
-  const back = content.getByRole('button', { name: 'Volver al lienzo' });
   await back.waitFor();
   assert.equal(await back.evaluate((button) => button === document.activeElement), true, 'Focus moves to Volver al lienzo');
   const native = await box(content, 'iframe[title="Inicio"]');
   assert.deepEqual([native.width, native.height], [1440, 900], 'Focus view shows the board at its declared size');
-  assert.equal(await content.locator('iframe[title="Inicio"]').evaluate((frame) => (frame as HTMLIFrameElement).inert), false, 'The focused board is interactive');
+  await content.frameLocator('iframe[title="Inicio"]').getByRole('textbox', { name: 'Campo' }).click();
+  await page.keyboard.press('Escape');
+  assert.equal(await content.locator('body[data-focus]').count(), 1, 'Escape typed inside the focused board belongs to the board');
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await back.evaluate((button) => button === document.activeElement), true, 'Shift+Tab leads from the board back to Volver al lienzo');
   await page.keyboard.press('Escape');
   await content.locator('.zoom').waitFor();
   assert.equal(await transform(content), before, 'Escape restores the prior transform');
-  assert.equal(await content.getByRole('button', { name: 'Abrir Inicio a tamaño real' }).evaluate((button) => button === document.activeElement), true, 'Focus returns to the board name');
+  assert.equal(await open.evaluate((button) => button === document.activeElement), true, 'Focus returns to the board name');
 
   await content.getByRole('button', { name: 'Página Teléfono' }).click();
   assert(await content.getByRole('button', { name: 'Abrir Móvil a tamaño real' }).isVisible(), 'The selected page shows its boards');
@@ -184,9 +205,28 @@ try {
   assert.match(await listing.locator('pre').first().innerText(), /<script>/, 'Board source is shown as text');
   await inert.close();
 
+  const theft = await browser.newPage({ viewport: { width: 1200, height: 760 } });
+  await theft.goto(`${origin}/theft`);
+  const host = theft.frameLocator('iframe');
+  const zoomIn = host.getByRole('button', { name: 'Acercar' });
+  await zoomIn.focus();
+  const untouched = await transform(host);
+  await theft.waitForTimeout(300);
+  assert.equal(await zoomIn.evaluate((button) => button === document.activeElement), true, 'An inert board that keeps calling focus() cannot take focus from a canvas control');
+  assert.equal(await transform(host), untouched, 'Board messages to the parent do not change the canvas');
+  const zoomLevel = await host.locator('.zoom-level').textContent() ?? '';
+  await theft.keyboard.press('Enter');
+  await host.locator('.zoom-level').filter({ hasNotText: zoomLevel }).waitFor();
+  await host.getByRole('button', { name: 'Abrir boards/Victim.html a tamaño real' }).click();
+  await theft.waitForTimeout(300);
+  await theft.keyboard.press('Escape');
+  await host.locator('.zoom').waitFor();
+  assert.equal(await host.frameLocator('iframe[title="boards/Thief.html"]').locator('#keys').textContent(), '', 'No keystroke reached the focus-stealing board');
+  await theft.close();
+
   await mkdir('.test-artifacts', { recursive: true });
   await writeFile('.test-artifacts/design-canvas.json', JSON.stringify(observations, null, 2));
-  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, or WebRTC packets; pan, zoom, focus, pages, and the inert listing work.');
+  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, WebRTC packets, or focus theft; pan, zoom, focus, pages, and the inert listing work.');
 } finally {
   await browser.close();
   await new Promise<void>((done) => server.close(() => done()));

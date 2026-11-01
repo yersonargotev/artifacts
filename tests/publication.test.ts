@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
+import { Script } from 'node:vm';
 import { canvasDocument } from '../apps/publication/src/canvas.ts';
 import { previewDocument } from '../apps/publication/src/document.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
@@ -220,6 +221,7 @@ test('canvasDocument renders indexed boards as escaped srcdoc frames and notes a
   assert(canvas.includes('aria-label="Abrir boards/Menu.html a tamaño real"'), 'a board without a title is labeled with its path');
   assert(canvas.includes('aria-label="Página Teléfono &lt;b&gt;"'));
   assert.equal(canvas.match(/<script>/g)?.length, 1, 'only the canvas host script runs in the content document');
+  assert.doesNotThrow(() => new Script(canvas.slice(canvas.indexOf('<script>') + 8, canvas.lastIndexOf('</script>'))), 'the canvas host script parses');
 });
 
 test('a canvas board or note without a page belongs to the first page', () => {
@@ -231,6 +233,9 @@ test('a canvas board or note without a page belongs to the first page', () => {
   const single = snapshotSchema.parse({ ...design, content: { kind: 'design', text: JSON.stringify({ v: 1, boards: { 'boards/Menu.html': { x: 5, y: 6, w: 400, h: 300 } }, order: ['boards/Menu.html'] }) } });
   const unpaged = canvasDocument(single, true);
   assert(!unpaged.includes('data-page') && !unpaged.includes('class="pages"'));
+  const builtins = snapshotSchema.parse({ ...single, content: { kind: 'design', text: JSON.stringify({ v: 1, pages: [{ id: 'toString', name: 'Inicio' }, { id: 'constructor', name: 'Otra' }], boards: { 'boards/Menu.html': { x: 0, y: 0, w: 400, h: 300, page: 'constructor' } }, order: ['boards/Menu.html'], notes: { constructor: { x: 0, y: 400, text: 'Nota constructor' } } }) } });
+  const named = canvasDocument(builtins, true);
+  assert(named.includes('<section class="board" data-page="constructor"') && named.includes('<p class="note" data-page="toString" style="--x:0;--y:400">Nota constructor</p>'), 'ids that name Object builtins render as plain ids');
 });
 
 test('canvasDocument emits an inert source listing when interactive is false', () => {

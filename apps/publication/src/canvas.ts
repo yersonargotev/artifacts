@@ -10,6 +10,7 @@ const icons = {
   back: icon('M5 12l14 0', 'M5 12l6 6', 'M5 12l6 -6'),
 };
 
+// Items on other pages stay laid out but invisible, so their boards load at their declared size instead of 0 x 0.
 const style = `
 :root{--ground:#dce0e8;--panel:#eff1f5;--line:#ccd0da;--text:#4c4f69;--muted:#5c5f77;--accent:#1e66f5;--on-accent:#fff;--edge:rgb(76 79 105/.16);--shadow:0 6px 24px rgb(76 79 105/.18);--bar:60px;color-scheme:light dark}
 @media(prefers-color-scheme:dark){:root{--ground:#11111b;--panel:#1e1e2e;--line:#313244;--text:#cdd6f4;--muted:#a6adc8;--accent:#89b4fa;--on-accent:#11111b;--edge:#45475a;--shadow:0 6px 24px rgb(0 0 0/.5)}}
@@ -19,7 +20,7 @@ button:hover{background:var(--line)}button:focus-visible{outline:2px solid var(-
 .canvas{position:fixed;inset:0;overflow:clip;touch-action:none;user-select:none;cursor:grab;--tx:0px;--ty:0px;--s:1}.canvas:active{cursor:grabbing}
 .world{position:absolute;left:0;top:0;transform-origin:0 0;transform:translate(var(--tx),var(--ty)) scale(var(--s))}
 .board{position:absolute;left:calc(var(--x)*1px);top:calc(var(--y)*1px);width:calc(var(--w)*1px);height:calc(var(--h)*1px);background:#fff;box-shadow:0 0 0 1px var(--edge),0 10px 32px rgb(0 0 0/.16)}
-.board>iframe{display:block;width:100%;height:100%;border:0}
+.board>iframe{display:block;width:100%;height:100%;border:0}.world>[hidden]{display:block;visibility:hidden}
 .board-name{position:absolute;left:0;bottom:100%;max-width:max(44px,calc(var(--w)*var(--s)*1px));justify-content:flex-start;align-items:flex-end;padding:0 4px 6px;border-radius:8px;color:var(--muted);font-size:13px;transform-origin:0 100%;scale:calc(1/var(--s))}
 .board-name:hover{background:none;color:var(--text)}.board-name span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.board-name svg{width:14px;height:14px}
 .note{position:absolute;left:calc(var(--x)*1px);top:calc(var(--y)*1px);width:calc(var(--w,320)*1px);margin:0;padding:16px 18px;border:1px solid color-mix(in srgb,#df8e1d 45%,#f9e2af);border-radius:6px;background:#f9e2af;color:#4c4f69;font-size:20px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 4px 14px rgb(0 0 0/.12)}
@@ -51,7 +52,7 @@ function fitted() {
   const height = Math.max(...visible.map((item) => item.offsetTop + item.offsetHeight)) - top;
   const inset = { side: 24, top: controls.offsetTop + controls.offsetHeight + 52, bottom: 24 };
   const room = { width: canvas.clientWidth - 2 * inset.side, height: canvas.clientHeight - inset.top - inset.bottom };
-  const s = Math.max(0.01, Math.min(1, room.width / width, room.height / height));
+  const s = Math.max(1e-4, Math.min(1, room.width / width, room.height / height));
   return { s, x: inset.side + (room.width - width * s) / 2 - left * s, y: inset.top + (room.height - height * s) / 2 - top * s };
 }
 
@@ -89,6 +90,12 @@ const zoom = (factor, cx, cy) => move(({ x, y, s }) => {
   const next = Math.min(4, Math.max(Math.min(0.02, s), s * factor));
   return { x: cx - (cx - x) * next / s, y: cy - (cy - y) * next / s, s: next };
 });
+function refocus(element) {
+  const view = state.view;
+  element.focus({ preventScroll: true });
+  state.view = view;
+  place();
+}
 
 const actions = {
   'zoom-in': () => zoom(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2),
@@ -105,7 +112,7 @@ const actions = {
     const board = boards[state.focus];
     state.focus = null;
     render();
-    board.querySelector('.board-name').focus({ preventScroll: true });
+    refocus(board.querySelector('.board-name'));
   },
 };
 document.addEventListener('click', (event) => {
@@ -119,6 +126,13 @@ addEventListener('resize', () => {
   if (state.view === null) place();
 });
 
+let hostFocus = null;
+document.addEventListener('focusin', (event) => { hostFocus = event.target; });
+addEventListener('blur', () => setTimeout(() => {
+  const frame = document.activeElement;
+  if (frame instanceof HTMLIFrameElement && frame.inert && hostFocus?.isConnected) refocus(hostFocus);
+}));
+
 canvas.addEventListener('focusin', (event) => {
   if (state.focus !== null || !event.target.matches(':focus-visible')) return;
   const box = event.target.getBoundingClientRect();
@@ -127,7 +141,7 @@ canvas.addEventListener('focusin', (event) => {
   const dy = box.top < top ? top - box.top : box.bottom > canvas.clientHeight - 16 ? canvas.clientHeight - 16 - box.bottom : 0;
   if (dx || dy) pan(dx, dy);
 });
-canvas.addEventListener('wheel', (event) => {
+addEventListener('wheel', (event) => {
   if (state.focus !== null) return;
   event.preventDefault();
   const unit = [1, 16, canvas.clientHeight][event.deltaMode];
@@ -162,12 +176,15 @@ export function canvasDocument(snapshot: Pick<Snapshot, 'content' | 'files'>, in
   const { index, boards } = parseCanvas(snapshot);
   const name = (board: { title?: string; path: string }) => escapeHtml(board.title ?? board.path);
   const notes = Object.values(index.notes ?? {});
-  if (!interactive) return `<p>Vista de código. Abre este diseño en Chrome 152 o posterior para usar su lienzo interactivo.</p>${boards.map((board) => `<h2 style="font:600 20px/1.4 system-ui">${name(board)}</h2>${sourceBlock(board.html)}`).join('')}${notes.length ? `<h2 style="font:600 20px/1.4 system-ui">Notas</h2>${notes.map((note) => sourceBlock(note.text)).join('')}` : ''}`;
+  const heading = (text: string) => `<h2 style="font:600 20px/1.4 system-ui">${text}</h2>`;
+  if (!interactive) return `<p>Vista de código. Abre este diseño en Chrome 152 o posterior para usar su lienzo interactivo.</p>${boards.map((board) => `${heading(name(board))}${sourceBlock(board.html)}`).join('')}${notes.length ? `${heading('Notas')}${notes.map((note) => sourceBlock(note.text)).join('')}` : ''}`;
   const pages = index.pages ?? [];
   const page = (id: string | undefined) => pages.length ? ` data-page="${escapeHtml(id ?? pages[0]!.id)}"` : '';
   const pageBar = pages.length ? `<nav class="pages" aria-label="Páginas">${pages.map((item, position) => `<button type="button" data-action="page" data-page="${escapeHtml(item.id)}" aria-label="Página ${escapeHtml(item.name)}" aria-pressed="${position === 0}">${escapeHtml(item.name)}</button>`).join('')}</nav>` : '';
   const focusBar = `<header class="focus-bar"><button type="button" data-action="close" aria-label="Volver al lienzo">${icons.back}<span>Volver al lienzo</span></button><p><span class="focus-name"></span><span class="focus-size"></span></p></header>`;
-  // Boards stay inert on the canvas so drag, wheel, and Tab reach the host; the focus view makes one board interactive.
+  // Boards stay inert on the canvas so pointer input and Tab reach the host; the focus view makes one board interactive.
+  // Inert does not stop a board's own script from taking focus, so the host script returns focus that lands in an inert board.
+  // It does so one task later, because a refocus inside the blur event loses to the board's focus() call that is still running.
   const boardMarkup = boards.map((board) => `<section class="board"${page(board.page)} style="--x:${board.x};--y:${board.y};--w:${board.w};--h:${board.h}"><button class="board-name" type="button" data-action="open" aria-label="Abrir ${name(board)} a tamaño real"><span>${name(board)}</span>${icons.open}</button><iframe title="${name(board)}" sandbox="allow-scripts" inert srcdoc="${escapeHtml(board.html)}"></iframe></section>`).join('');
   const noteMarkup = notes.map((note) => `<p class="note"${page(note.page)} style="--x:${note.x};--y:${note.y}${note.w === undefined ? '' : `;--w:${note.w}`}">${escapeHtml(note.text)}</p>`).join('');
   const zoomBar = `<div class="zoom" role="group" aria-label="Zoom del lienzo"><button type="button" data-action="zoom-out" aria-label="Alejar">${icons.minus}</button><span class="zoom-level">100 %</span><button type="button" data-action="zoom-in" aria-label="Acercar">${icons.plus}</button><button type="button" data-action="fit" aria-label="Ajustar a la vista">${icons.fit}<span>Ajustar</span></button></div>`;
