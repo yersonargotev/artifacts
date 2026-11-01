@@ -49,7 +49,8 @@ export const snapshotSchema = z.strictObject({
   if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex && (path === other || other.startsWith(`${path}/`))))) context.addIssue({ code: 'custom', path: ['files'], message: 'File paths must be unique and cannot contain another file' });
   const bytes = Buffer.byteLength(JSON.stringify(snapshot.metadata)) + Buffer.byteLength(snapshot.content.text) + snapshot.files.reduce((total, file) => total + Buffer.byteLength(file.path) + Buffer.byteLength(file.mediaType) + decodeFile(file).length, 0);
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
-  if (snapshot.content.kind !== 'design') return;
+  // A request body can reach 8 MiB, so an oversized index would cost time and one issue per entry.
+  if (snapshot.content.kind !== 'design' || bytes > 1_048_576) return;
   let value: unknown;
   try {
     value = JSON.parse(snapshot.content.text);

@@ -108,6 +108,13 @@ test('the 32 file limit caps a canvas at 32 boards', () => {
   assert.deepEqual(rejection(designSnapshot(33)).map(({ path, code }) => ({ path, code })), [{ path: ['files'], code: 'too_big' }]);
 });
 
+test('an oversized design reports the size limit before its index', () => {
+  const order = Array.from({ length: 60_000 }, (_, index) => `boards/Board-${index}.html`);
+  const issues = rejection({ ...base, content: { kind: 'design', text: JSON.stringify({ v: 1, boards: {}, order }) } });
+  assert(issues.some(({ message }) => message === 'A revision must fit within 1 MiB of decoded content and metadata'));
+  assert.equal(issues.filter(({ path }) => path.length > 2).length, 0, 'no canvas index issue is reported');
+});
+
 test('design text must be a version 1 canvas index', () => {
   assert.deepEqual(rejection({ ...base, content: { kind: 'design', text: '<h1>Not a canvas</h1>' } }).map(({ path }) => path), [['content', 'text']]);
   for (const [change, path] of [
