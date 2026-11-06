@@ -16,7 +16,9 @@ Using `srcdoc` keeps the existing content policy and routes. The content documen
 
 [`design-canvas.browser.proof.ts`](../../tests/design-canvas.browser.proof.ts) exercises actual Chrome execution, opaque origin, parent access denial, blocked fetch and popups, and ignored board messages. The proof also checks focus recovery and renderer availability behavior. This is browser behavior to keep testing. A browser change that starts blocking `srcdoc` under `frame-src 'none'` can stop board rendering without a schema change.
 
-A board script still shares renderer resources with its host. A busy script can stall the canvas. Nested `srcdoc` WebRTC probes have also exposed fail-closed renderer crashes in the existing Chrome coverage. Focus recovery returns focus from an inert overview board when the document has focus, but script scheduling leaves a transient input window. Neither `inert` nor the recovery loop is an absolute keyboard isolation boundary. Focus view intentionally enables the selected board's inputs.
+Nested `srcdoc` WebRTC probes have exposed fail-closed renderer crashes in earlier Chrome coverage. Current Chrome can instead complete the local description while blocking the connection. Chromium [changed WebRTC blocking to CSP-style behavior](https://chromium.googlesource.com/external/w3c/web-platform-tests/+/7ba7013f9eab51c771cb980eec5807c49c1a4bb1). The proof compares identical nested peer fixtures with and without `Connection-Allowlist: ()`. The control must complete the local description and send UDP packets. The protected board must send zero packets during at least 2.5 seconds after the peer starts. It must also complete the local description unless its renderer crashes after starting.
+
+A board script still shares renderer resources with its host. A busy script can stall the canvas. Focus recovery returns focus from an inert overview board when the document has focus, but script scheduling leaves a transient input window. Neither `inert` nor the recovery loop is an absolute keyboard isolation boundary. Focus view intentionally enables the selected board's inputs.
 
 ## Interaction and authoring
 
