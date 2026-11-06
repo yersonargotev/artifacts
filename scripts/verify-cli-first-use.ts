@@ -61,7 +61,7 @@ await chmod(report, 0o600);
 const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-first-use-'));
 await chmod(directory, 0o700);
 const stateDir = join(directory, 'state');
-const environment = { PATH: process.env.PATH, HOME: directory, TMPDIR: directory, ARTIFACTS_SERVER: server, ARTIFACTS_STATE_DIR: stateDir };
+const environment: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: directory, TMPDIR: directory, ARTIFACTS_SERVER: server, ARTIFACTS_STATE_DIR: stateDir };
 const children = new Set<ChildProcess>();
 const evidence: Evidence = {
   startedAt: new Date().toISOString(), binary, server,
@@ -187,8 +187,11 @@ try {
   assert(!signedIn.failure && signedIn.code === 0, 'Native CLI completes browser consent');
   loggedIn = true;
   const identity = identitySchema.parse(JSON.parse(signedIn.stdout));
-  assert.equal(identitySchema.parse(await cli(['whoami', '--server', server])).userId, identity.userId);
+  delete environment.ARTIFACTS_SERVER;
+  delete environment.ARTIFACTS_ACCESS_TOKEN;
+  assert.equal(identitySchema.parse(await cli(['whoami'])).userId, identity.userId);
   checked('native-browser-consent-and-persisted-whoami');
+  checked('bare-whoami-uses-saved-rest-resource');
   if (loginServer !== server) checked('mcp-started-rest-identity');
 
   stage = 'create';

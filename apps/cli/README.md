@@ -30,15 +30,18 @@ pnpm dlx @yargote/artifacts-cli@0.1.0-beta.7 --help
 
 ## Complete first use
 
+Check `artifacts --help` for saved-connection support. With an older package that requires a server on every command, keep `ARTIFACTS_SERVER` set to the selected REST resource.
+
 An existing Artifacts account is required. Select the REST OAuth resource, which is the API origin without `/mcp`. When upgrading an older deployment, complete the [API migration](../../docs/deployment.md#migrate-the-api-hostname) before using the address below.
 
 ```sh
-export ARTIFACTS_SERVER='https://artifacts-api.yersonargotev.workers.dev'
-artifacts login
+artifacts login --server 'https://artifacts-api.yersonargotev.workers.dev'
 artifacts whoami
 ```
 
-Login opens browser authorization. After you approve access, `whoami` prints JSON with your user ID and scopes. Use `artifacts login --no-browser` to open the printed authorization URL yourself on the same machine.
+Login opens browser authorization. After you approve access and the CLI verifies your identity, it saves the resolved REST resource in private state. A new terminal can run `artifacts whoami` without a server option or environment variable. It prints JSON with your user ID and scopes.
+
+Use `artifacts login --no-browser` to open the printed authorization URL yourself on the same machine. This manual flow saves the connection only after identity verification succeeds.
 
 Create `snapshot.json`:
 
@@ -82,17 +85,25 @@ Run `artifacts logout` before uninstalling if you want to clear credentials. Uni
 
 Skills, help, and version commands work without a server or login. Skills commands do not read credentials or create private state. They accept and ignore global `--server` and `--state-dir` values, including their environment defaults.
 
-`--server RESOURCE` selects the exact canonical REST OAuth resource for commands. Login also accepts an MCP resource that advertises its REST resource. `ARTIFACTS_SERVER` supplies the same value. Use the configured `API_URL` origin to call REST under `/v1`. The CLI has no production default and does not rewrite the supplied URL. Older deployments without `API_URL` still use their complete MCP resource and routes under `/mcp/v1`.
+`--server RESOURCE` overrides `ARTIFACTS_SERVER`, which overrides the connection saved by the last successful login in the selected state directory.
+
+An ordinary command override applies to that command and does not replace the saved connection. A later successful login replaces it with the verified canonical REST resource. A failed login to another server preserves the previous selection and its credentials.
+
+Login also accepts an MCP resource that advertises its REST resource. Use the configured `API_URL` origin to call REST under `/v1`.
+
+Without an override or saved connection, run `artifacts login --server RESOURCE` first. The CLI has no production default and does not rewrite the supplied URL. Existing installations keep their exact-resource credentials, but must complete a successful login to save a connection.
+
+Older deployments without `API_URL` still use their complete MCP resource and routes under `/mcp/v1`.
 
 A hostname change requires a new `artifacts login --server RESOURCE`. Credentials and retained operations remain bound to their exact original resource. Do not move an old operation file to the new resource or redirect its bearer requests.
 
-`--state-dir DIR` overrides `ARTIFACTS_STATE_DIR`. The default is `~/.local/state/artifacts`. The state directory must be private and owned by the current user. Credentials are separate from operation files. Profiles bind credentials to the exact resource. Retained operation paths hash the resource and request ID, so request IDs cannot select filesystem paths.
+`--state-dir DIR` overrides `ARTIFACTS_STATE_DIR`. The default is `~/.local/state/artifacts`. The state directory must be private and owned by the current user. Each state directory has its own saved connection and credential profiles. Credentials and the saved connection share one private database, separate from operation files. Profiles bind credentials to the exact resource. Retained operation paths hash the resource and request ID, so request IDs cannot select filesystem paths.
 
 HTTPS is required except for HTTP on the exact loopback hosts `localhost`, `127.0.0.1`, and `[::1]`. Server URLs cannot contain credentials, a query, or a fragment.
 
 ## Authentication
 
-`artifacts login --server RESOURCE` verifies protected-resource metadata. If an MCP resource advertises `artifacts_rest_resource`, login verifies the linked REST metadata and prints the REST URL to stderr. Use that REST URL with `--server` or `ARTIFACTS_SERVER` for later commands. Login anonymously checks `<resource>/v1/identity` before registering a public native OAuth client and opening browser authorization with PKCE. This check confirms REST compatibility. Login verifies your identity again with the received token before saving credentials.
+`artifacts login --server RESOURCE` verifies protected-resource metadata. If an MCP resource advertises `artifacts_rest_resource`, login verifies the linked REST metadata and prints the REST URL to stderr. After identity verification, login saves that REST URL for later commands. An existing `ARTIFACTS_SERVER` still overrides it. Unset the variable to use the saved connection. Login anonymously checks `<resource>/v1/identity` before registering a public native OAuth client and opening browser authorization with PKCE. This check confirms REST compatibility. Login verifies your identity again with the received token before atomically saving credentials and the connection.
 
 Errors identify the phase, method, endpoint, and HTTP status when a response exists. Network failures have no HTTP status. If the compatibility check fails, confirm the configured REST URL with your service administrator. A valid MCP metadata document alone does not establish REST compatibility.
 
@@ -100,7 +111,7 @@ Errors identify the phase, method, endpoint, and HTTP status when a response exi
 
 `artifacts whoami` returns the verified user, session, OAuth client, and scopes.
 
-`artifacts logout` clears local credentials and attempts to revoke the refresh token. Its JSON contains `signedOut: true` and `remoteRevocation` with `confirmed`, `unconfirmed`, or `not-needed`. Issued access JWTs can remain valid until expiry or central-session revocation.
+`artifacts logout` clears local credentials and attempts to revoke the refresh token. It preserves the saved connection, so `artifacts login` can reuse the server without another URL. Its JSON contains `signedOut: true` and `remoteRevocation` with `confirmed`, `unconfirmed`, or `not-needed`. Issued access JWTs can remain valid until expiry or central-session revocation.
 
 `ARTIFACTS_ACCESS_TOKEN` supplies an access token for automation. It does not require local login. Tokens are never command arguments or retained operation fields.
 

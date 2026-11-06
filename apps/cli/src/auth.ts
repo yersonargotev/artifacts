@@ -308,7 +308,7 @@ export async function login(options: { resource: string; stateDir: string; noBro
       const credentials = tokenRecord(tokens);
       const identity = await checkIdentity(resource, { kind: 'authenticated', accessToken: credentials.accessToken, signal, claims: tokens.claims()! });
       signal.throwIfAborted();
-      store.write(resource, { ...profile, tokens: credentials, refreshAttempt: null });
+      store.commitLogin(resource, epoch, credentials);
       return { resource, identity };
     });
   } finally { await listener?.close(); store.close(); }

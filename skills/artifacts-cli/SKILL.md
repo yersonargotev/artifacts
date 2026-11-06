@@ -9,7 +9,7 @@ Use the installed `artifacts` executable. Run `artifacts --help` and read [the c
 
 ## Select the account and resource
 
-Use the resource selected by the user or the existing `ARTIFACTS_SERVER` environment value. Pass `--server RESOURCE` or set `ARTIFACTS_SERVER` for service commands. Skills, help, and version commands work offline without a server or login. Login does not set an implicit default. A resource is the canonical OAuth URL, such as `https://artifacts.example.test/mcp`. REST routes are below that resource at `/v1`. Do not infer a production connection from an example or silently switch to a local server.
+Use the resource selected by the user. Service commands select `--server RESOURCE` before `ARTIFACTS_SERVER`, then the connection saved by a successful login in the selected private state directory. Ordinary command overrides do not replace that connection. Skills, help, and version commands work offline without a server or login. Check installed help for saved-connection support. A resource is the canonical OAuth URL, such as `https://artifacts.example.test/mcp`. REST routes are below that resource at `/v1`. Do not infer a production connection from an example or silently switch to a local server.
 
 Run `artifacts whoami` before the first mutation when the current identity is not established. Keep the selected resource and owner consistent throughout one operation. If login is needed, use `artifacts login --server RESOURCE`. The user authenticates in the browser. Do not collect their password or read another application's credentials. Never put tokens in command arguments, operation files, logs, or the final reply.
 
