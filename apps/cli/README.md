@@ -92,7 +92,11 @@ HTTPS is required except for HTTP on the exact loopback hosts `localhost`, `127.
 
 ## Authentication
 
-`artifacts login --server RESOURCE` verifies protected-resource metadata, registers a public native OAuth client, and opens browser authorization with PKCE. `--no-browser` prints the authorization URL for manual navigation. The loopback callback listener starts before browser navigation. Login requests read, write, and publication scopes. Client registration is reused for the profile.
+`artifacts login --server RESOURCE` verifies protected-resource metadata and anonymously checks `<resource>/v1/identity` before registering a public native OAuth client and opening browser authorization with PKCE. This check confirms REST compatibility. Login verifies your identity again with the received token before saving credentials.
+
+Errors identify the phase, method, endpoint, and HTTP status when a response exists. Network failures have no HTTP status. If the compatibility check fails, confirm the configured REST URL with your service administrator. A valid MCP metadata document alone does not establish REST compatibility.
+
+`--no-browser` runs the same checks and prints the authorization URL for manual navigation. The loopback callback listener starts before browser navigation. Login requests read, write, and publication scopes. Client registration is reused for the profile.
 
 `artifacts whoami` returns the verified user, session, OAuth client, and scopes.
 

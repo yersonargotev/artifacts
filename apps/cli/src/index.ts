@@ -16,7 +16,7 @@ import { runSkillsCommand } from './skills.ts';
 const help = `Usage: artifacts COMMAND [OPTIONS]
 
 Global options:
-  --server RESOURCE       Canonical OAuth resource, or ARTIFACTS_SERVER
+  --server RESOURCE       Exact REST OAuth resource, or ARTIFACTS_SERVER
   --state-dir DIR         Private local state, or ARTIFACTS_STATE_DIR
                          Default: ~/.local/state/artifacts
   --help                 Print this reference
@@ -62,6 +62,11 @@ Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
 JSON results go to stdout. Diagnostics and recovery guidance go to stderr.
+Login checks <resource>/v1/identity before browser authorization. Legacy /mcp
+resources work when their REST API is at /mcp/v1. If the check fails, confirm
+the configured REST URL with your service administrator.
+Login errors report the phase, method, endpoint, and HTTP status when received.
+Network failures have no HTTP status. Login verifies identity again after OAuth.
 ARTIFACTS_ACCESS_TOKEN supplies a token for automation without local login.
 Skills commands work offline without a server, login, or private state.
 They print plain text. Global server and state options are accepted and ignored.

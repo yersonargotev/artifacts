@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import * as oidc from 'openid-client';
-import { canonicalResource, identitySchema, protectedResourceMetadataUrl, restBase, type Identity } from '@yargote/artifacts-contracts/http';
+import { canonicalResource, httpErrorSchema, identitySchema, protectedResourceMetadataUrl, restBase, type Identity } from '@yargote/artifacts-contracts/http';
 import { z } from 'zod';
+import { HttpError } from '@yargote/artifacts-client';
 import { CredentialStore, type Registration, type Tokens } from './credentials.ts';
 
 const networkTimeout = 10_000;
@@ -19,12 +20,32 @@ function endpoint(value: string, issuer?: string): URL {
   return url;
 }
 
-async function boundedFetch(url: URL | string, options: RequestInit = {}): Promise<Response> {
-  const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(networkTimeout)]) : AbortSignal.timeout(networkTimeout);
-  const response = await fetch(url, { ...options, redirect: 'manual', signal });
+type RequestContext = { phase: 'resource_metadata' | 'rest_preflight' | 'oauth' | 'authenticated_identity'; method: string; url: URL | string };
+type IdentityRequest = { kind: 'anonymous' } | { kind: 'authenticated'; accessToken: string; signal: AbortSignal; claims: { sub: string; sid?: unknown } };
+
+class AuthTransportError extends Error {}
+
+function safeUrl(value: URL | string): string {
+  try { const url = new URL(value); return `${url.origin}${url.pathname}`; }
+  catch { return '[invalid endpoint]'; }
+}
+
+function authFailure(context: RequestContext, code: string, explanation: string, status?: number): Error {
+  const message = `${context.phase} ${context.method} ${safeUrl(context.url)}${status === undefined ? '' : ` HTTP ${status}`}: ${explanation}`;
+  return status === undefined ? new AuthTransportError(message) : new HttpError(status, code, message);
+}
+
+async function boundedFetch(context: RequestContext, options: RequestInit = {}): Promise<Response> {
+  const timeout = AbortSignal.timeout(networkTimeout);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  let response: Response;
+  try { response = await fetch(context.url, { ...options, redirect: 'manual', signal }); }
+  catch {
+    throw authFailure(context, 'network_error', timeout.aborted || (options.signal?.aborted && options.signal.reason instanceof DOMException && options.signal.reason.name === 'TimeoutError') ? 'Request timed out' : options.signal?.aborted ? 'Request cancelled' : 'Network request failed');
+  }
   if (response.status >= 300 && response.status < 400) {
-    await response.body?.cancel();
-    throw new Error('Authentication redirects are not allowed');
+    await response.body?.cancel().catch(() => {});
+    throw authFailure(context, 'redirect_refused', 'Redirect refused', response.status);
   }
   const reader = response.body?.getReader();
   const chunks: Uint8Array[] = [];
@@ -35,38 +56,141 @@ async function boundedFetch(url: URL | string, options: RequestInit = {}): Promi
         const chunk = await reader.read();
         if (chunk.done) break;
         size += chunk.value.byteLength;
-        if (size > 1024 * 1024) throw new Error('Authentication response is too large');
+        if (size > 1024 * 1024) throw new Error('too large');
         chunks.push(chunk.value);
       }
-    } catch (error) { await reader.cancel().catch(() => {}); throw error; }
-    finally { reader.releaseLock(); }
+    } catch {
+      await reader.cancel().catch(() => {});
+      throw authFailure(context, 'invalid_response', timeout.aborted || (options.signal?.aborted && options.signal.reason instanceof DOMException && options.signal.reason.name === 'TimeoutError') ? 'Response timed out' : options.signal?.aborted ? 'Request cancelled' : 'Cannot read response', response.status);
+    } finally { reader.releaseLock(); }
   }
   return new Response(size ? Buffer.concat(chunks) : null, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 
-function discoveryOptions(issuer: string, signal?: AbortSignal): oidc.DiscoveryRequestOptions {
+function jsonResponse(response: Response, context: RequestContext): Promise<unknown> {
+  if (response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') throw authFailure(context, 'invalid_response', 'Expected a JSON response', response.status);
+  return response.json().catch(() => { throw authFailure(context, 'invalid_response', 'Invalid JSON response', response.status); });
+}
+
+async function discoverResource(resource: string): Promise<string> {
+  const context: RequestContext = { phase: 'resource_metadata', method: 'GET', url: protectedResourceMetadataUrl(resource) };
+  const response = await boundedFetch(context);
+  if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'Resource metadata service failed' : 'Cannot discover the protected resource. Confirm the configured REST URL', response.status);
+  const parsed = resourceMetadata.safeParse(await jsonResponse(response, context));
+  if (!parsed.success) throw authFailure(context, 'invalid_response', 'Invalid protected resource metadata', response.status);
+  if (parsed.data.resource !== resource) throw authFailure(context, 'invalid_response', 'Protected resource metadata does not match the exact server URL', response.status);
+  const issuer = parsed.data.authorization_servers[0]!;
+  try { endpoint(issuer); } catch { throw authFailure(context, 'invalid_response', 'Invalid authorization server URL in protected resource metadata', response.status); }
+  return issuer;
+}
+
+function compatibleChallenge(value: string | null): boolean {
+  if (!value) return false;
+  const match = /^Bearer\s+(.+)$/i.exec(value);
+  if (!match) return false;
+  const parameters = new Map<string, string>();
+  const input = match[1]!;
+  const parameter = /\s*([!#$%&'*+.^_`|~0-9A-Za-z-]+)\s*=\s*(?:"((?:[^"\\]|\\[\x20-\x7e])*)"|([!#$%&'*+.^_`|~0-9A-Za-z-]+))\s*(,|$)/gy;
+  let position = 0;
+  while (position < input.length) {
+    parameter.lastIndex = position;
+    const param = parameter.exec(input);
+    if (!param || (param[4] === ',' && parameter.lastIndex === input.length)) return false;
+    const key = param[1]!.toLowerCase();
+    if (parameters.has(key)) return false;
+    parameters.set(key, param[2] === undefined ? param[3]! : param[2].replace(/\\([\x20-\x7e])/g, '$1'));
+    position = parameter.lastIndex;
+  }
+  return parameters.get('error') === 'invalid_token' && (parameters.get('scope')?.split(/\s+/).includes('artifacts:read') ?? false);
+}
+
+function checkIdentity(resource: string, request: { kind: 'anonymous' }): Promise<void>;
+function checkIdentity(resource: string, request: Extract<IdentityRequest, { kind: 'authenticated' }>): Promise<Identity>;
+async function checkIdentity(resource: string, request: IdentityRequest): Promise<void | Identity> {
+  const context: RequestContext = { phase: request.kind === 'anonymous' ? 'rest_preflight' : 'authenticated_identity', method: 'GET', url: `${restBase(resource)}/identity` };
+  const response = await boundedFetch(context, request.kind === 'anonymous' ? {} : { signal: request.signal, headers: { authorization: `Bearer ${request.accessToken}` } });
+  if (request.kind === 'anonymous') {
+    if (response.status === 401) {
+      const body = httpErrorSchema.safeParse(await jsonResponse(response, context));
+      if (body.success && body.data.error.code === 'unauthenticated' && compatibleChallenge(response.headers.get('www-authenticate'))) return;
+    }
+    throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'REST identity service failed' : 'REST identity route is incompatible. Confirm the configured REST URL', response.status);
+  }
+  if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : response.status === 401 || response.status === 403 ? 'access_denied' : 'incompatible_resource', response.status >= 500 ? 'REST identity service failed' : response.status === 401 || response.status === 403 ? 'OAuth grant cannot access this Artifacts server' : 'REST identity route is unavailable. Confirm the configured REST URL', response.status);
+  const parsed = identitySchema.safeParse(await jsonResponse(response, context));
+  if (!parsed.success) throw authFailure(context, 'invalid_response', 'Invalid REST identity response', response.status);
+  if (request.claims.sub !== parsed.data.userId || (request.claims.sid !== undefined && request.claims.sid !== parsed.data.sessionId)) throw authFailure(context, 'invalid_response', 'OAuth identity does not match the Artifacts session', response.status);
+  return parsed.data;
+}
+
+type OAuthObservation = { context: RequestContext; response: Response };
+
+async function oauth<T>(issuer: string, signal: AbortSignal | undefined, operation: (options: oidc.DiscoveryRequestOptions) => Promise<T>): Promise<T> {
+  const observations: OAuthObservation[] = [];
+  try {
+    const result = await operation(discoveryOptions(issuer, signal, observations));
+    if (result instanceof oidc.Configuration) {
+      validateConfiguration(result, issuer, observations);
+      result[oidc.customFetch] = discoveryOptions(issuer, signal)[oidc.customFetch]!;
+    }
+    return result;
+  }
+  catch (error) {
+    let cause: unknown = error;
+    let observed: OAuthObservation | undefined;
+    for (let depth = 0; depth < 5; depth++) {
+      if (cause instanceof HttpError || cause instanceof AuthTransportError) throw cause;
+      const response = cause instanceof Response ? cause : cause instanceof Error && 'response' in cause ? cause.response : undefined;
+      if (response instanceof Response) observed = observations.find((item) => item.response === response);
+      if (observed || !(cause instanceof Error)) break;
+      cause = cause.cause;
+    }
+    observed ??= observations.at(-1);
+    if (observed) throw authFailure(observed.context, 'invalid_response', 'OAuth protocol validation failed', observed.response.status);
+    throw new Error('OAuth protocol validation failed');
+  }
+}
+
+function discoveryOptions(issuer: string, signal?: AbortSignal, observations?: OAuthObservation[]): oidc.DiscoveryRequestOptions {
   endpoint(issuer);
   return {
     timeout: networkTimeout / 1000,
     execute: [...(new URL(issuer).protocol === 'http:' ? [oidc.allowInsecureRequests] : []), oidc.enableNonRepudiationChecks],
-    [oidc.customFetch]: (url, options) => boundedFetch(endpoint(url, issuer), { ...options, signal: signal && options.signal ? AbortSignal.any([signal, options.signal]) : signal ?? options.signal, body: options.body instanceof Uint8Array ? Uint8Array.from(options.body) : options.body }),
+    [oidc.customFetch]: async (url, options) => {
+      const context: RequestContext = { phase: 'oauth', method: options.method ?? 'GET', url };
+      try { endpoint(url, issuer); } catch { throw authFailure({ ...context, url: issuer }, 'invalid_response', 'Invalid OAuth endpoint'); }
+      const response = await boundedFetch(context, { ...options, signal: signal && options.signal ? AbortSignal.any([signal, options.signal]) : signal ?? options.signal, body: options.body instanceof Uint8Array ? Uint8Array.from(options.body) : options.body });
+      if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : 'oauth_error', response.status >= 500 ? 'OAuth service failed' : 'OAuth request failed', response.status);
+      observations?.push({ context, response });
+      return response;
+    },
   };
 }
 
-function validateConfiguration(config: oidc.Configuration, issuer: string): void {
+function validateConfiguration(config: oidc.Configuration, issuer: string, observations: OAuthObservation[]): void {
+  const discovery = observations.find((item) => item.context.method === 'GET');
+  const registration = observations.find((item) => item.context.method === 'POST');
+  if (!discovery) throw new Error('OAuth discovery response was not observed');
+  const failDiscovery = (message: string): Error => authFailure(discovery.context, 'invalid_response', message, discovery.response.status);
   const metadata = config.serverMetadata();
-  if (metadata.issuer !== issuer) throw new Error('OAuth issuer metadata does not match the configured issuer');
+  if (metadata.issuer !== issuer) throw failDiscovery('OAuth issuer metadata does not match the configured issuer');
   for (const [key, value] of Object.entries(metadata)) {
-    if ((key.endsWith('_endpoint') || key === 'jwks_uri') && typeof value === 'string') endpoint(value, issuer);
+    if ((key.endsWith('_endpoint') || key === 'jwks_uri') && typeof value === 'string') {
+      try { endpoint(value, issuer); } catch (error) {
+        const message = error instanceof Error && error.message === 'OAuth endpoints must use the issuer origin' ? error.message : 'OAuth URLs require HTTPS or an exact loopback HTTP host, without credentials, query, or fragment';
+        throw failDiscovery(message);
+      }
+    }
   }
-  if (!metadata.authorization_endpoint || !metadata.token_endpoint) throw new Error('OAuth metadata is missing authorization or token endpoints');
-  if (config.clientMetadata().client_secret || config.clientMetadata().token_endpoint_auth_method !== 'none') throw new Error('The CLI requires a public OAuth client without a secret');
+  if (!metadata.authorization_endpoint || !metadata.token_endpoint) throw failDiscovery('OAuth metadata is missing authorization or token endpoints');
+  if (config.clientMetadata().client_secret || config.clientMetadata().token_endpoint_auth_method !== 'none') {
+    const message = 'The CLI requires a public OAuth client without a secret';
+    throw registration ? authFailure(registration.context, 'invalid_response', message, registration.response.status) : new Error(message);
+  }
 }
 
 async function configuration(registration: Registration, signal?: AbortSignal): Promise<oidc.Configuration> {
-  const config = await oidc.discovery(new URL(registration.issuer), registration.clientId, { token_endpoint_auth_method: 'none', id_token_signed_response_alg: 'EdDSA' }, oidc.None(), discoveryOptions(registration.issuer, signal));
-  validateConfiguration(config, registration.issuer);
-  return config;
+  return oauth(registration.issuer, signal, (options) => oidc.discovery(new URL(registration.issuer), registration.clientId, { token_endpoint_auth_method: 'none', id_token_signed_response_alg: 'EdDSA' }, oidc.None(), options));
 }
 
 function tokenRecord(tokens: Awaited<ReturnType<typeof oidc.refreshTokenGrant>>, previousRefresh?: string): Tokens {
@@ -145,23 +269,18 @@ export async function login(options: { resource: string; stateDir: string; noBro
       store.write(resource, { ...profile, epoch: profile.epoch + 1 });
       return profile.epoch + 1;
     });
-    const response = await boundedFetch(protectedResourceMetadataUrl(resource));
-    if (!response.ok) throw new Error('Cannot discover the protected resource');
-    const metadata = resourceMetadata.parse(await response.json());
-    if (metadata.resource !== resource) throw new Error('Protected resource metadata does not match the exact server URL');
-    const issuer = metadata.authorization_servers[0]!;
-    endpoint(issuer);
+    const issuer = await discoverResource(resource);
+    await checkIdentity(resource, { kind: 'anonymous' });
     listener = await callback();
     const { redirectUri, signal } = listener;
     const config = await store.exclusive(async () => {
       const profile = store.read(resource);
       if (profile.epoch !== epoch) throw new Error('Login was superseded by another login or logout');
       if (profile.registration?.issuer === issuer) return configuration(profile.registration, signal);
-      const registered = await oidc.dynamicClientRegistration(new URL(issuer), {
+      const registered = await oauth(issuer, signal, (options) => oidc.dynamicClientRegistration(new URL(issuer), {
         client_name: 'Artifacts CLI', application_type: 'native', token_endpoint_auth_method: 'none', id_token_signed_response_alg: 'EdDSA',
         redirect_uris: [redirectUri], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], scope: scopes,
-      }, oidc.None(), discoveryOptions(issuer, signal));
-      validateConfiguration(registered, issuer);
+      }, oidc.None(), options));
       store.write(resource, { ...profile, registration: { issuer, clientId: registered.clientMetadata().client_id }, tokens: null, refreshAttempt: null });
       return registered;
     });
@@ -176,16 +295,16 @@ export async function login(options: { resource: string; stateDir: string; noBro
     options.onAuthorizationUrl(authorizationUrl);
     if (!options.noBrowser) await openBrowser(authorizationUrl);
     const currentUrl = await authorization;
+    if (currentUrl.searchParams.has('error')) throw new Error(currentUrl.searchParams.get('error') === 'access_denied' ? 'Authorization denied' : 'Authorization failed');
     return await store.exclusive(async () => {
       const profile = store.read(resource);
       if (profile.epoch !== epoch) throw new Error('Login was superseded by another login or logout');
-      const tokens = await oidc.authorizationCodeGrant(config, currentUrl, { expectedState: state, expectedNonce: nonce, pkceCodeVerifier: verifier, idTokenExpected: true }, { resource });
+      const tokens = await oauth(issuer, signal, (options) => {
+        config[oidc.customFetch] = options[oidc.customFetch]!;
+        return oidc.authorizationCodeGrant(config, currentUrl, { expectedState: state, expectedNonce: nonce, pkceCodeVerifier: verifier, idTokenExpected: true }, { resource });
+      });
       const credentials = tokenRecord(tokens);
-      const identityResponse = await boundedFetch(`${restBase(resource)}/identity`, { signal, headers: { authorization: `Bearer ${credentials.accessToken}` } });
-      if (!identityResponse.ok) throw new Error('The OAuth grant cannot access this Artifacts server');
-      const identity = identitySchema.parse(await identityResponse.json());
-      const claims = tokens.claims()!;
-      if (claims.sub !== identity.userId || (claims.sid !== undefined && claims.sid !== identity.sessionId)) throw new Error('OAuth identity does not match the Artifacts session');
+      const identity = await checkIdentity(resource, { kind: 'authenticated', accessToken: credentials.accessToken, signal, claims: tokens.claims()! });
       signal.throwIfAborted();
       store.write(resource, { ...profile, tokens: credentials, refreshAttempt: null });
       return identity;
