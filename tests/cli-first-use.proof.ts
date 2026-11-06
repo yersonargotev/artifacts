@@ -39,19 +39,28 @@ try {
   await run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', ...packages.map((item) => resolve(packageOutput, item.tarball))], directory);
   const binary = join(directory, 'node_modules/.bin/artifacts');
   assert.equal((await run(binary, ['--version'], directory)).trim(), cli.version);
-  app = await restCliFixture();
+  app = await restCliFixture({ apiResource: true });
+  const mcpMetadataPath = `/.well-known/oauth-protected-resource${new URL(app.config.resource).pathname}`;
+  let mcpMetadataRequests = 0;
+  const resourceHandler = app.resourceHandler;
+  app.setResourceHandler(async (request) => {
+    if (new URL(request.url).pathname === mcpMetadataPath) mcpMetadataRequests++;
+    return resourceHandler(request);
+  });
   await rm(report, { force: true });
   const output = await run(process.execPath, [
     '--import', 'tsx', resolve(root, 'scripts/verify-cli-first-use.ts'),
-    '--binary', binary, '--server', app.config.resource,
+    '--binary', binary, '--server', app.config.apiResource!, '--login-server', app.config.resource,
     '--expected-version', cli.version, '--report', report, '--panel', app.dashboard,
     ...(browser ? ['--browser-executable', browser] : []),
   ], root, { ...environment, OWNER_EMAIL: 'owner@example.test', OWNER_PASSWORD: app.password });
   const evidence = JSON.parse(await readFile(report, 'utf8')) as { status: string; version: string; checks: string[] };
   assert.equal(evidence.status, 'passed');
   assert.equal(evidence.version, cli.version);
+  assert(mcpMetadataRequests > 0, 'Installed login fetched MCP resource metadata');
   for (const check of [
     'native-browser-consent-and-persisted-whoami',
+    'mcp-started-rest-identity',
     'create-list-read',
     'update-edit-and-three-revision-history',
     'historical-publication-and-exact-retained-replays',

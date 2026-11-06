@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { test, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createAuthApp } from '../apps/auth/src/http.ts';
+import { CredentialStore } from '../apps/cli/src/credentials.ts';
 import { fixture } from './helpers.ts';
 
 type App = Awaited<ReturnType<typeof fixture>>;
@@ -471,6 +472,7 @@ test('login rejects a missing REST identity route before authorization or browse
   assert.equal(result.code, 1);
   assert.equal(result.stdout, '');
   assert.match(result.stderr, /rest_preflight.*GET.*identity.*404/);
+  assert.match(result.stderr, /exact REST URL or configure artifacts_rest_resource/);
   assert.doesNotMatch(result.stderr, /SECRET_|https?:\/\/[^\s]*authorize/);
   await assert.rejects(access(launched));
   assert.equal(registrations, 0);
@@ -645,7 +647,10 @@ test('CLI help explains the REST resource and login preflight', { timeout: 10_00
   const result = await command(t, app, directory, ['--help']).result;
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Exact REST OAuth resource/);
-  assert.match(result.stdout, /checks <resource>\/v1\/identity before browser authorization/);
+  assert.match(result.stdout, /MCP URL when its metadata advertises artifacts_rest_resource/);
+  assert.match(result.stdout, /Split MCP and REST resources require this relation/);
+  assert.match(result.stdout, /Use the resolved REST URL\nfor later commands/);
+  assert.match(result.stdout, /checks <resource>\/v1\/identity before browser\nauthorization/);
   assert.match(result.stdout, /confirm\nthe configured REST URL/);
 });
 
@@ -726,4 +731,101 @@ test('login accepts a quoted comma and escaped characters in the Bearer realm', 
     return new Response(response.body, { status: response.status, headers });
   });
   await signIn(t, app, directory);
+});
+
+test('MCP login uses the advertised REST audience and stores only its verified credentials', { timeout: 35_000 }, async (t) => {
+  const { app, directory } = await setup(t, { transport: 'combined', apiResource: true });
+  const rest = app.config.apiResource!;
+  const mcpProfile = { epoch: 7, registration: { issuer: app.config.issuer, clientId: 'mcp-only-client' }, tokens: { accessToken: 'mcp-only-token', expiresAt: Date.now() + 60_000 }, refreshAttempt: null };
+  const store = await CredentialStore.open(directory);
+  await store.exclusive(() => store.write(app.config.resource, mcpProfile));
+  store.close();
+  let grantResource: string | null = null;
+  interceptTokens(app, async (body, response) => {
+    if (body.get('grant_type') === 'authorization_code') grantResource = body.get('resource');
+    return response;
+  });
+  app.setResourceHandler(async (incoming) => {
+    const path = new URL(incoming.url).pathname;
+    if (path.startsWith('/.well-known/') || path === '/v1/identity' && !incoming.headers.has('authorization')) {
+      assert.equal(incoming.headers.get('authorization'), null);
+      assert.equal(incoming.headers.get('cookie'), null);
+    }
+    return app.resourceHandler(incoming);
+  });
+  const login = command(t, app, directory, ['login', '--no-browser'], { ARTIFACTS_ACCESS_TOKEN: 'SECRET_AUTOMATION' });
+  const url = await login.authorizationUrl();
+  assert.equal(url.searchParams.get('resource'), rest);
+  await approve(app, url);
+  const result = await login.result;
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).userId, app.ownerId);
+  assert.match(result.stderr, /REST resource:/);
+  assert.equal(grantResource, rest);
+  assert(storedProfile(directory, rest).tokens.accessToken);
+  assert.deepEqual(storedProfile(directory, app.config.resource), mcpProfile);
+  assert.notEqual(url.searchParams.get('client_id'), mcpProfile.registration.clientId);
+  const restApp = { ...app, config: { ...app.config, resource: rest } };
+  const whoami = await command(t, restApp, directory, ['whoami']).result;
+  assert.equal(whoami.code, 0, whoami.stderr);
+  assert.deepEqual(JSON.parse(whoami.stdout), JSON.parse(result.stdout));
+});
+
+test('login rejects unsafe or invalid REST relations without authorization or credential access', { timeout: 45_000 }, async (t) => {
+  const { app, directory } = await setup(t, { transport: 'combined', apiResource: true });
+  const source = app.config.resource;
+  const rest = app.config.apiResource!;
+  const sourcePath = new URL(source).pathname;
+  const metadataPath = `/.well-known/oauth-protected-resource${sourcePath}`;
+  const relationCases: Array<{ sourceResource?: string; link: unknown; target?: Record<string, unknown> | Response }> = [
+    { link: 'http://example.test/path' }, { link: 'https://user:secret@example.test' },
+    { link: 'https://example.test/?secret=value' }, { link: 'https://example.test/#secret' },
+    { link: 'https://example.test/path/' }, { link: 'not a URL' }, { link: null },
+    { sourceResource: `${source}/wrong`, link: rest },
+    { link: rest, target: { resource: `${rest}/wrong`, authorization_servers: [app.config.issuer] } },
+    { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: rest } },
+    { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: source } },
+    { link: source, target: { resource: source, authorization_servers: [app.config.issuer], artifacts_rest_resource: source } },
+    { link: rest, target: new Response(null, { status: 302, headers: { location: 'https://example.test/?SECRET_LOCATION' } }) },
+  ];
+  for (const scenario of relationCases) {
+    let sourceReads = 0;
+    app.setResourceHandler(async (incoming) => {
+      assert.equal(incoming.headers.get('authorization'), null);
+      assert.equal(incoming.headers.get('cookie'), null);
+      const path = new URL(incoming.url).pathname;
+      if (path === metadataPath && sourceReads++ === 0) return Response.json({ resource: scenario.sourceResource ?? source, authorization_servers: [app.config.issuer], artifacts_rest_resource: scenario.link });
+      if (scenario.target) return scenario.target instanceof Response ? scenario.target : Response.json(scenario.target);
+      return new Response(null, { status: 500 });
+    });
+    const result = await command(t, app, directory, ['login', '--no-browser'], { ARTIFACTS_ACCESS_TOKEN: 'SECRET_AUTOMATION' }).result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, /resource_metadata GET .* HTTP (200|302)/);
+    assert.doesNotMatch(result.stderr, /SECRET_|Authorize this login|user:secret/);
+  }
+  await assert.rejects(access(join(directory, 'credentials.sqlite')));
+});
+
+test('login follows an explicitly announced arbitrary path and uses the target issuer', { timeout: 25_000 }, async (t) => {
+  const { app, directory } = await setup(t, { transport: 'combined', apiResource: true });
+  const other = await fixture({ transport: 'combined' });
+  t.after(() => other.close());
+  const target = `${app.config.apiResource}/custom/rest`;
+  const seen: string[] = [];
+  app.setResourceHandler(async (incoming) => {
+    const path = new URL(incoming.url).pathname;
+    seen.push(path);
+    assert.equal(incoming.headers.get('authorization'), null);
+    if (path === '/.well-known/oauth-protected-resource/mcp') return Response.json({ resource: app.config.resource, authorization_servers: [app.config.issuer], artifacts_rest_resource: target });
+    if (path === '/.well-known/oauth-protected-resource/custom/rest') return Response.json({ resource: target, authorization_servers: [other.config.issuer] });
+    if (path === '/custom/rest/v1/identity') return app.resourceHandler(new Request(`${app.config.apiResource}/v1/identity`));
+    return new Response(null, { status: 404 });
+  });
+  const login = command(t, app, directory, ['login', '--no-browser']);
+  const authorization = await login.authorizationUrl();
+  assert.equal(authorization.origin, other.config.origin);
+  assert.equal(authorization.searchParams.get('resource'), target);
+  assert.deepEqual(seen, ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-protected-resource/custom/rest', '/custom/rest/v1/identity']);
+  login.child.kill('SIGTERM');
+  assert.equal((await login.result).code, 1);
 });

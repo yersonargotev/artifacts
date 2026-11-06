@@ -12,7 +12,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
   return async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     if (url.host !== resource.host) return new Response('Invalid host', { status: 400 });
-    if (url.pathname === metadataPath || url.pathname === '/.well-known/oauth-protected-resource') return Response.json({ resource: config.resource, authorization_servers: [config.issuer], scopes_supported: scopes, bearer_methods_supported: ['header'] });
+    if (url.pathname === metadataPath || url.pathname === '/.well-known/oauth-protected-resource') return Response.json({ resource: config.resource, authorization_servers: [config.issuer], ...(config.apiResource ? { artifacts_rest_resource: config.apiResource } : {}), scopes_supported: scopes, bearer_methods_supported: ['header'] });
     if (url.pathname === '/health') return Response.json({ status: 'ok' });
     if (url.pathname !== resource.pathname) return new Response('Not found', { status: 404 });
     if (request.headers.has('origin') && request.headers.get('origin') !== resource.origin) return new Response('Origin denied', { status: 403 });
