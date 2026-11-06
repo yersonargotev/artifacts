@@ -82,7 +82,7 @@ Run `artifacts logout` before uninstalling if you want to clear credentials. Uni
 
 Skills, help, and version commands work without a server or login. Skills commands do not read credentials or create private state. They accept and ignore global `--server` and `--state-dir` values, including their environment defaults.
 
-`--server RESOURCE` selects the exact canonical REST OAuth resource. `ARTIFACTS_SERVER` supplies the same value. Use the configured `API_URL` origin to call REST under `/v1`. The CLI has no production default and does not rewrite the supplied URL. Older deployments without `API_URL` still use their complete MCP resource and routes under `/mcp/v1`.
+`--server RESOURCE` selects the exact canonical REST OAuth resource for commands. Login also accepts an MCP resource that advertises its REST resource. `ARTIFACTS_SERVER` supplies the same value. Use the configured `API_URL` origin to call REST under `/v1`. The CLI has no production default and does not rewrite the supplied URL. Older deployments without `API_URL` still use their complete MCP resource and routes under `/mcp/v1`.
 
 A hostname change requires a new `artifacts login --server RESOURCE`. Credentials and retained operations remain bound to their exact original resource. Do not move an old operation file to the new resource or redirect its bearer requests.
 
@@ -92,7 +92,7 @@ HTTPS is required except for HTTP on the exact loopback hosts `localhost`, `127.
 
 ## Authentication
 
-`artifacts login --server RESOURCE` verifies protected-resource metadata and anonymously checks `<resource>/v1/identity` before registering a public native OAuth client and opening browser authorization with PKCE. This check confirms REST compatibility. Login verifies your identity again with the received token before saving credentials.
+`artifacts login --server RESOURCE` verifies protected-resource metadata. If an MCP resource advertises `artifacts_rest_resource`, login verifies the linked REST metadata and prints the REST URL to stderr. Use that REST URL with `--server` or `ARTIFACTS_SERVER` for later commands. Login anonymously checks `<resource>/v1/identity` before registering a public native OAuth client and opening browser authorization with PKCE. This check confirms REST compatibility. Login verifies your identity again with the received token before saving credentials.
 
 Errors identify the phase, method, endpoint, and HTTP status when a response exists. Network failures have no HTTP status. If the compatibility check fails, confirm the configured REST URL with your service administrator. A valid MCP metadata document alone does not establish REST compatibility.
 

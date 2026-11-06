@@ -36,7 +36,7 @@ The Artifacts account authenticates the MCP connection. Each CLI also needs its 
 
 The CLI uses the API origin as its OAuth resource and calls REST under `${API_URL}/v1`. MCP uses `${API_URL}/mcp` as its separate OAuth resource. Both adapters share the artifact store and bearer verification, but their access tokens have distinct audiences. The [beta release report](.audit/npm-beta-verification.md) records evidence for the previous hostname. It does not verify the new API address.
 
-After the hostname migration, use the API origin without `/mcp`.
+For login, you can also pass the MCP URL with `artifacts login --server "$MCP_URL"`. When the MCP server advertises its REST resource, login prints that REST URL. Use the REST URL for subsequent commands.
 
 Use Node 24 or later. The public beta uses three MIT packages under `@yargote`; the application repository remains private. Install the CLI and its dependencies from npm:
 

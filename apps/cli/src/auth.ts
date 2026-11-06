@@ -2,15 +2,13 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import * as oidc from 'openid-client';
-import { canonicalResource, httpErrorSchema, identitySchema, protectedResourceMetadataUrl, restBase, type Identity } from '@yargote/artifacts-contracts/http';
-import { z } from 'zod';
+import { canonicalResource, httpErrorSchema, identitySchema, protectedResourceMetadataSchema, protectedResourceMetadataUrl, restBase, type Identity } from '@yargote/artifacts-contracts/http';
 import { HttpError } from '@yargote/artifacts-client';
 import { CredentialStore, type Registration, type Tokens } from './credentials.ts';
 
 const networkTimeout = 10_000;
 const callbackTimeout = 180_000;
 const scopes = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
-const resourceMetadata = z.object({ resource: z.string(), authorization_servers: z.array(z.string()).min(1) });
 
 function endpoint(value: string, issuer?: string): URL {
   const url = new URL(value);
@@ -72,16 +70,18 @@ function jsonResponse(response: Response, context: RequestContext): Promise<unkn
   return response.json().catch(() => { throw authFailure(context, 'invalid_response', 'Invalid JSON response', response.status); });
 }
 
-async function discoverResource(resource: string): Promise<string> {
+async function discoverResource(resource: string, terminal = false): Promise<{ issuer: string; restResource?: string }> {
   const context: RequestContext = { phase: 'resource_metadata', method: 'GET', url: protectedResourceMetadataUrl(resource) };
   const response = await boundedFetch(context);
   if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'Resource metadata service failed' : 'Cannot discover the protected resource. Confirm the configured REST URL', response.status);
-  const parsed = resourceMetadata.safeParse(await jsonResponse(response, context));
+  const document = await jsonResponse(response, context);
+  if (terminal && typeof document === 'object' && document !== null && Object.hasOwn(document, 'artifacts_rest_resource')) throw authFailure(context, 'invalid_response', 'REST resource metadata must not advertise another artifacts_rest_resource', response.status);
+  const parsed = protectedResourceMetadataSchema.safeParse(document);
   if (!parsed.success) throw authFailure(context, 'invalid_response', 'Invalid protected resource metadata', response.status);
   if (parsed.data.resource !== resource) throw authFailure(context, 'invalid_response', 'Protected resource metadata does not match the exact server URL', response.status);
   const issuer = parsed.data.authorization_servers[0]!;
   try { endpoint(issuer); } catch { throw authFailure(context, 'invalid_response', 'Invalid authorization server URL in protected resource metadata', response.status); }
-  return issuer;
+  return { issuer, ...(parsed.data.artifacts_rest_resource === undefined ? {} : { restResource: parsed.data.artifacts_rest_resource }) };
 }
 
 function compatibleChallenge(value: string | null): boolean {
@@ -114,7 +114,7 @@ async function checkIdentity(resource: string, request: IdentityRequest): Promis
       const body = httpErrorSchema.safeParse(await jsonResponse(response, context));
       if (body.success && body.data.error.code === 'unauthenticated' && compatibleChallenge(response.headers.get('www-authenticate'))) return;
     }
-    throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'REST identity service failed' : 'REST identity route is incompatible. Confirm the configured REST URL', response.status);
+    throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'REST identity service failed' : 'REST identity route is incompatible. Use the exact REST URL or configure artifacts_rest_resource on the MCP server', response.status);
   }
   if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : response.status === 401 || response.status === 403 ? 'access_denied' : 'incompatible_resource', response.status >= 500 ? 'REST identity service failed' : response.status === 401 || response.status === 403 ? 'OAuth grant cannot access this Artifacts server' : 'REST identity route is unavailable. Confirm the configured REST URL', response.status);
   const parsed = identitySchema.safeParse(await jsonResponse(response, context));
@@ -259,8 +259,12 @@ async function openBrowser(url: string): Promise<void> {
   });
 }
 
-export async function login(options: { resource: string; stateDir: string; noBrowser: boolean; onAuthorizationUrl: (url: string) => void }): Promise<Identity> {
-  const resource = canonicalResource(options.resource);
+export async function login(options: { resource: string; stateDir: string; noBrowser: boolean; onAuthorizationUrl: (url: string) => void }): Promise<{ resource: string; identity: Identity }> {
+  const source = canonicalResource(options.resource);
+  const metadata = await discoverResource(source);
+  const resource = metadata.restResource ?? source;
+  const { issuer } = metadata.restResource === undefined ? metadata : await discoverResource(resource, true);
+  await checkIdentity(resource, { kind: 'anonymous' });
   const store = await CredentialStore.open(options.stateDir);
   let listener: Awaited<ReturnType<typeof callback>> | undefined;
   try {
@@ -269,8 +273,6 @@ export async function login(options: { resource: string; stateDir: string; noBro
       store.write(resource, { ...profile, epoch: profile.epoch + 1 });
       return profile.epoch + 1;
     });
-    const issuer = await discoverResource(resource);
-    await checkIdentity(resource, { kind: 'anonymous' });
     listener = await callback();
     const { redirectUri, signal } = listener;
     const config = await store.exclusive(async () => {
@@ -307,7 +309,7 @@ export async function login(options: { resource: string; stateDir: string; noBro
       const identity = await checkIdentity(resource, { kind: 'authenticated', accessToken: credentials.accessToken, signal, claims: tokens.claims()! });
       signal.throwIfAborted();
       store.write(resource, { ...profile, tokens: credentials, refreshAttempt: null });
-      return identity;
+      return { resource, identity };
     });
   } finally { await listener?.close(); store.close(); }
 }

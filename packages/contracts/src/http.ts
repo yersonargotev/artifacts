@@ -28,6 +28,14 @@ export function canonicalResource(value: string): string {
   return value;
 }
 
+export const protectedResourceMetadataSchema = z.object({
+  resource: z.string(),
+  authorization_servers: z.array(z.string()).min(1),
+  artifacts_rest_resource: z.string().refine((value) => {
+    try { canonicalResource(value); return true; } catch { return false; }
+  }).optional(),
+});
+
 export function protectedResourceMetadataUrl(resource: string): URL {
   const url = new URL(canonicalResource(resource));
   return new URL(`/.well-known/oauth-protected-resource${url.pathname === '/' ? '' : url.pathname}`, url.origin);

@@ -27,7 +27,9 @@ test('separate REST and MCP URLs discover exact audiences and share retained art
     for (const audience of [resource, app.config.resource]) {
       const metadata = await fetch(protectedResourceMetadataUrl(audience));
       assert.equal(metadata.status, 200);
-      assert.equal((await metadata.json()).resource, audience);
+      const discovery = await metadata.json() as { resource: string; artifacts_rest_resource?: string };
+      assert.equal(discovery.resource, audience);
+      assert.equal(discovery.artifacts_rest_resource, audience === app.config.resource ? resource : undefined);
     }
     const challenge = await fetch(app.config.resource);
     assert.equal(challenge.status, 401);

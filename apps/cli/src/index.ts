@@ -62,7 +62,10 @@ Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
 JSON results go to stdout. Diagnostics and recovery guidance go to stderr.
-Login checks <resource>/v1/identity before browser authorization. Legacy /mcp
+Login accepts an MCP URL when its metadata advertises artifacts_rest_resource.
+Split MCP and REST resources require this relation. Use the resolved REST URL
+for later commands. Login checks <resource>/v1/identity before browser
+authorization. Legacy /mcp
 resources work when their REST API is at /mcp/v1. If the check fails, confirm
 the configured REST URL with your service administrator.
 Login errors report the phase, method, endpoint, and HTTP status when received.
@@ -195,7 +198,11 @@ async function main(): Promise<unknown> {
   switch (command) {
     case 'login':
       none();
-      return login({ resource, stateDir, noBrowser: values['no-browser'] ?? false, onAuthorizationUrl: (url: string) => { process.stderr.write(`Authorize this login in your browser:\n${url}\n`); } });
+      {
+        const result = await login({ resource, stateDir, noBrowser: values['no-browser'] ?? false, onAuthorizationUrl: (url: string) => { process.stderr.write(`Authorize this login in your browser:\n${url}\n`); } });
+        if (result.resource !== resource) process.stderr.write(`REST resource: ${result.resource}\nUse this URL with --server for subsequent commands.\n`);
+        return result.identity;
+      }
     case 'logout': none(); return logout({ resource, stateDir });
     case 'whoami': none(); return client.identity();
     case 'create': {

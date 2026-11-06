@@ -37,7 +37,7 @@ type Evidence = {
 };
 
 const { values } = parseArgs({ options: {
-  binary: { type: 'string' }, server: { type: 'string' }, report: { type: 'string' },
+  binary: { type: 'string' }, server: { type: 'string' }, 'login-server': { type: 'string' }, report: { type: 'string' },
   'env-file': { type: 'string' }, 'expected-version': { type: 'string' },
   'browser-executable': { type: 'string' }, panel: { type: 'string' },
 } });
@@ -48,6 +48,7 @@ assert(!values['browser-executable'] || isAbsolute(values['browser-executable'])
 const binary = values.binary;
 const panel = values.panel ? new URL(values.panel).origin : undefined;
 const server = canonicalResource(values.server);
+const loginServer = canonicalResource(values['login-server'] ?? server);
 const report = resolve(values.report);
 const supplied = values['env-file'] ? parseEnv(await readFile(resolve(values['env-file']), 'utf8')) : {};
 const email = process.env.OWNER_EMAIL ?? supplied.OWNER_EMAIL;
@@ -161,7 +162,7 @@ try {
   const context = await browser.newContext();
   context.setDefaultTimeout(30_000);
   const page = await context.newPage();
-  const login = subprocess(['login', '--no-browser'], 180_000);
+  const login = subprocess(['login', '--server', loginServer, '--no-browser'], 180_000);
   let authorization: string | undefined;
   const authorizationDeadline = Date.now() + 45_000;
   while (Date.now() < authorizationDeadline) {
@@ -176,6 +177,7 @@ try {
     await new Promise((done) => setTimeout(done, 50));
   }
   assert(authorization, 'Native CLI supplies an authorization URL');
+  assert.equal(new URL(authorization).searchParams.get('resource'), server, 'Authorization uses the REST resource');
   await page.goto(authorization);
   await page.getByLabel('Correo electrónico', { exact: true }).fill(email);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
@@ -185,8 +187,9 @@ try {
   assert(!signedIn.failure && signedIn.code === 0, 'Native CLI completes browser consent');
   loggedIn = true;
   const identity = identitySchema.parse(JSON.parse(signedIn.stdout));
-  assert.equal(identitySchema.parse(await cli(['whoami'])).userId, identity.userId);
+  assert.equal(identitySchema.parse(await cli(['whoami', '--server', server])).userId, identity.userId);
   checked('native-browser-consent-and-persisted-whoami');
+  if (loginServer !== server) checked('mcp-started-rest-identity');
 
   stage = 'create';
   const suffix = `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`;
