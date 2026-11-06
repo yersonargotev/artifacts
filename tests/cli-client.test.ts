@@ -505,7 +505,9 @@ test('CLI retains the same request ID independently for two resources and create
   } finally { await first.close(); await second.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
-test('CLI help works without configuration and invalid options fail before authoring', async () => {
+test('CLI help works without configuration and invalid options fail before authoring', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-no-server-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
   const help = await cli(['--help']);
   assert.equal(help.code, 0);
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
@@ -513,7 +515,7 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.match(help.stdout, /\n  projects\n/);
   assert.match(help.stdout, /move ID --project NAME \[--request-id ID\]\n  move ID --no-project \[--request-id ID\]/);
   assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);
-  assert.equal(failure(await cli(['whoami']), 'invalid_arguments').message, 'Specify --server RESOURCE or ARTIFACTS_SERVER. No production server is selected by default.');
+  assert.equal(failure(await cli(['whoami'], { ARTIFACTS_STATE_DIR: directory }), 'invalid_arguments').message, 'No server is saved. Run artifacts login --server RESOURCE or set ARTIFACTS_SERVER.');
   failure(await cli(['create', '--snapshot', 'missing', '--server', 'https://example.test/mcp', '--server', 'https://other.test/mcp']), 'invalid_arguments');
   failure(await cli(['read', 'artifact', '--summary', '--server', 'https://example.test/mcp']), 'invalid_arguments');
 });

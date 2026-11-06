@@ -18,7 +18,7 @@ A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI 
 ## How to get to it (user POV)
 
 - Install `@yargote/artifacts-cli` or run `pnpm artifacts` from this checkout.
-- Set `ARTIFACTS_SERVER` to the API origin without `/mcp`, then run `artifacts login` and `artifacts whoami`.
+- Run `artifacts login --server RESOURCE`, then `artifacts whoami`. Successful identity verification saves the resolved REST resource in private state. `--server` overrides `ARTIFACTS_SERVER`, which overrides that saved connection. Logout keeps the connection.
 - Run `artifacts create`, `edit`, `update`, `history`, `publish`, and `export` as documented in [apps/cli/README.md](../../../../apps/cli/README.md).
 
 ## Driving it with control.ts (source CLI + REST)

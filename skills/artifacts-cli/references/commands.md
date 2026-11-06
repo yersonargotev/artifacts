@@ -24,16 +24,17 @@ The published `0.1.0-beta.1` package predates skills commands. Do not assume sup
 ## Authenticate
 
 ```sh
-export ARTIFACTS_SERVER=https://artifacts.example.test/mcp
-artifacts login
+artifacts login --server https://artifacts.example.test/mcp
 artifacts whoami
 ```
 
-Replace the example with the selected resource before executing it. Service commands read `ARTIFACTS_SERVER` or an explicit `--server RESOURCE`. Login does not save a default resource. `--state-dir DIR` or `ARTIFACTS_STATE_DIR` selects an isolated private state directory. For automation, `ARTIFACTS_ACCESS_TOKEN` supplies an already authorized bearer token. Do not echo it or put it in an argument.
+Replace the example with the selected resource before executing it. Service commands select `--server RESOURCE` before `ARTIFACTS_SERVER`, then the connection saved by a successful identity-verified login. Ordinary overrides do not replace the saved connection. A later successful login replaces it with the verified REST resource. A failed login to another server preserves the previous connection and its credentials. Check installed help for saved-connection support.
+
+`--state-dir DIR` or `ARTIFACTS_STATE_DIR` selects an isolated private state directory. For automation, `ARTIFACTS_ACCESS_TOKEN` supplies an already authorized bearer token. Do not echo it or put it in an argument.
 
 Use `--no-browser` when the environment cannot open a browser automatically. Open the printed authorization URL and keep the CLI running for its loopback callback. A remote machine's loopback callback must be reachable by the browser used for login. Do not replace the callback with an arbitrary public listener.
 
-`logout` clears local credentials and attempts refresh-token revocation. Copied access JWTs can remain valid until expiry. The existing account page's global session revocation stops access across CLI, REST, MCP, and panel. Local logout does not claim to perform that global action.
+`logout` clears local credentials and attempts refresh-token revocation. It keeps the saved connection, so a later `artifacts login` can reuse it. Copied access JWTs can remain valid until expiry. The existing account page's global session revocation stops access across CLI, REST, MCP, and panel. Local logout does not claim to perform that global action.
 
 ## Create a complete snapshot
 

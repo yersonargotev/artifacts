@@ -10,6 +10,7 @@ import { createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema,
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
+import { CredentialStore } from './credentials.ts';
 import { loadOperation, retainOperation, submitOperation, type Mutation } from './operations.ts';
 import { runSkillsCommand } from './skills.ts';
 
@@ -17,6 +18,7 @@ const help = `Usage: artifacts COMMAND [OPTIONS]
 
 Global options:
   --server RESOURCE       Exact REST OAuth resource, or ARTIFACTS_SERVER
+                         Defaults to the last successful login
   --state-dir DIR         Private local state, or ARTIFACTS_STATE_DIR
                          Default: ~/.local/state/artifacts
   --help                 Print this reference
@@ -63,8 +65,11 @@ Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
 JSON results go to stdout. Diagnostics and recovery guidance go to stderr.
 Login accepts an MCP URL when its metadata advertises artifacts_rest_resource.
-Split MCP and REST resources require this relation. Use the resolved REST URL
-for later commands. Login checks <resource>/v1/identity before browser
+Split MCP and REST resources require this relation. Login remembers the verified
+REST URL for later commands. --server takes precedence over ARTIFACTS_SERVER,
+which takes precedence over the saved URL. Ordinary overrides do not replace
+the saved URL. Logout keeps it for a later login.
+Login checks <resource>/v1/identity before browser
 authorization. Legacy /mcp
 resources work when their REST API is at /mcp/v1. If the check fails, confirm
 the configured REST URL with your service administrator.
@@ -148,10 +153,15 @@ async function main(): Promise<unknown> {
   if (!command || !Object.hasOwn(commandOptions, command)) throw new UsageError('Specify a command. Use artifacts --help for the reference.');
   for (const option of seen) if (!['server', 'state-dir', 'help', ...commandOptions[command]].includes(option)) throw new UsageError(`Option --${option} is not supported by ${command}`);
   if (command === 'skills') return runSkillsCommand(arguments_, values, seen);
-  const resourceValue = values.server ?? process.env.ARTIFACTS_SERVER;
-  if (!resourceValue) throw new UsageError('Specify --server RESOURCE or ARTIFACTS_SERVER. No production server is selected by default.');
-  const resource = canonicalResource(resourceValue);
   const stateDir = resolve(values['state-dir'] ?? process.env.ARTIFACTS_STATE_DIR ?? join(homedir(), '.local', 'state', 'artifacts'));
+  let resourceValue = values.server ?? process.env.ARTIFACTS_SERVER;
+  if (resourceValue === undefined) {
+    const store = await CredentialStore.open(stateDir);
+    try { resourceValue = await store.exclusive(() => store.readSelectedResource()); }
+    finally { store.close(); }
+  }
+  if (resourceValue === undefined) throw new UsageError('No server is saved. Run artifacts login --server RESOURCE or set ARTIFACTS_SERVER.');
+  const resource = canonicalResource(resourceValue);
   function argument(required = true): string | undefined {
     if (arguments_.length > 1 || (required && arguments_.length !== 1)) throw new UsageError(`${command} requires ${required ? 'one' : 'zero or one'} positional argument`);
     return arguments_[0];
@@ -200,7 +210,7 @@ async function main(): Promise<unknown> {
       none();
       {
         const result = await login({ resource, stateDir, noBrowser: values['no-browser'] ?? false, onAuthorizationUrl: (url: string) => { process.stderr.write(`Authorize this login in your browser:\n${url}\n`); } });
-        if (result.resource !== resource) process.stderr.write(`REST resource: ${result.resource}\nUse this URL with --server for subsequent commands.\n`);
+        if (result.resource !== resource) process.stderr.write(`REST resource: ${result.resource}\nThis verified REST URL is saved for subsequent commands.\n`);
         return result.identity;
       }
     case 'logout': none(); return logout({ resource, stateDir });

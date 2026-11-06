@@ -22,9 +22,9 @@ async function setup(t: TestContext, options: Parameters<typeof fixture>[0] = {}
   return { app, directory };
 }
 
-function command(t: TestContext, app: App, directory: string, args: string[], extraEnvironment: NodeJS.ProcessEnv = {}) {
-  const environment = { ...process.env, ARTIFACTS_ACCESS_TOKEN: undefined, NODE_NO_WARNINGS: '1', ...extraEnvironment };
-  const child = spawn(process.execPath, ['--import', 'tsx', cliPath, ...args, '--server', app.config.resource, '--state-dir', directory], { env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
+function command(t: TestContext, app: App, directory: string, args: string[], extraEnvironment: NodeJS.ProcessEnv = {}, explicitServer = true) {
+  const environment = { ...process.env, ARTIFACTS_SERVER: undefined, ARTIFACTS_ACCESS_TOKEN: undefined, NODE_NO_WARNINGS: '1', ...extraEnvironment };
+  const child = spawn(process.execPath, ['--import', 'tsx', cliPath, ...args, ...(explicitServer ? ['--server', app.config.resource] : []), '--state-dir', directory], { env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
   child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout += text; });
@@ -179,6 +179,8 @@ test('CLI logout advances the epoch while the browser waits and a late callback 
   const { app, directory } = await setup(t);
   const login = command(t, app, directory, ['login', '--no-browser']);
   const authorization = await login.authorizationUrl();
+  const before = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.match(before.stderr, /No server is saved/);
   const signedOut = await command(t, app, directory, ['logout']).result;
   assert.equal(signedOut.code, 0, signedOut.stderr);
   assert.deepEqual(JSON.parse(signedOut.stdout), { signedOut: true, remoteRevocation: 'not-needed' });
@@ -186,6 +188,7 @@ test('CLI logout advances the epoch while the browser waits and a late callback 
   const result = await login.result;
   assert.equal(result.code, 1);
   assert.match(result.stderr, /Login was superseded by another login or logout/);
+  assert.match((await command(t, app, directory, ['whoami'], {}, false).result).stderr, /No server is saved/);
   const whoami = await command(t, app, directory, ['whoami']).result;
   assert.equal(whoami.code, 1);
   assert.match(whoami.stderr, /You are not signed in/);
@@ -649,7 +652,9 @@ test('CLI help explains the REST resource and login preflight', { timeout: 10_00
   assert.match(result.stdout, /Exact REST OAuth resource/);
   assert.match(result.stdout, /MCP URL when its metadata advertises artifacts_rest_resource/);
   assert.match(result.stdout, /Split MCP and REST resources require this relation/);
-  assert.match(result.stdout, /Use the resolved REST URL\nfor later commands/);
+  assert.match(result.stdout, /Login remembers the verified\nREST URL for later commands/);
+  assert.match(result.stdout, /--server takes precedence over ARTIFACTS_SERVER/);
+  assert.match(result.stdout, /Logout keeps it for a later login/);
   assert.match(result.stdout, /checks <resource>\/v1\/identity before browser\nauthorization/);
   assert.match(result.stdout, /confirm\nthe configured REST URL/);
 });
@@ -828,4 +833,122 @@ test('login follows an explicitly announced arbitrary path and uses the target i
   assert.deepEqual(seen, ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-protected-resource/custom/rest', '/custom/rest/v1/identity']);
   login.child.kill('SIGTERM');
   assert.equal((await login.result).code, 1);
+});
+
+
+test('saved connection survives fresh processes, overrides, logout, and isolated state', { timeout: 60_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const other = await fixture({ transport: 'rest', resourcePath: '/other' });
+  t.after(() => other.close());
+  const first = await signIn(t, app, directory);
+  const bare = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.equal(bare.code, 0, bare.stderr);
+  assert.deepEqual(JSON.parse(bare.stdout), first.identity);
+  const second = await signIn(t, other, directory);
+  const envOverride = await command(t, app, directory, ['whoami'], { ARTIFACTS_SERVER: app.config.resource }, false).result;
+  assert.deepEqual(JSON.parse(envOverride.stdout), first.identity);
+  const flagOverride = await command(t, app, directory, ['whoami'], { ARTIFACTS_SERVER: other.config.resource }).result;
+  assert.deepEqual(JSON.parse(flagOverride.stdout), first.identity);
+  const invalidFlag = await command(t, app, directory, ['whoami', '--server', ''], {}, false).result;
+  assert.equal(invalidFlag.code, 1);
+  const invalidEnv = await command(t, app, directory, ['whoami'], { ARTIFACTS_SERVER: '' }, false).result;
+  assert.equal(invalidEnv.code, 1);
+  const stillSecond = await command(t, other, directory, ['whoami'], {}, false).result;
+  assert.deepEqual(JSON.parse(stillSecond.stdout), second.identity);
+  const isolated = await mkdtemp(join(tmpdir(), 'artifacts-cli-isolated-'));
+  t.after(() => rm(isolated, { recursive: true, force: true }));
+  assert.match((await command(t, app, isolated, ['whoami'], {}, false).result).stderr, /No server is saved/);
+  const isolatedLogin = await signIn(t, app, isolated);
+  const isolatedWhoami = await command(t, app, isolated, ['whoami'], { ARTIFACTS_STATE_DIR: directory }, false).result;
+  assert.deepEqual(JSON.parse(isolatedWhoami.stdout), isolatedLogin.identity);
+  assert.deepEqual(JSON.parse((await command(t, other, directory, ['whoami'], {}, false).result).stdout), second.identity);
+  const logout = await command(t, other, directory, ['logout'], {}, false).result;
+  assert.equal(logout.code, 0, logout.stderr);
+  const again = command(t, other, directory, ['login', '--no-browser'], {}, false);
+  await approve(other, await again.authorizationUrl());
+  const signedIn = await again.result;
+  assert.equal(signedIn.code, 0, signedIn.stderr);
+  assert.equal(JSON.parse(signedIn.stdout).userId, second.identity.userId);
+});
+
+test('failed login to another server preserves the saved connection and its credentials', { timeout: 60_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const other = await fixture({ transport: 'rest', resourcePath: '/other' });
+  t.after(() => other.close());
+  const first = await signIn(t, app, directory);
+  const assertFirst = async () => {
+    const result = await command(t, app, directory, ['whoami'], {}, false).result;
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), first.identity);
+  };
+  const cancelled = command(t, other, directory, ['login', '--no-browser']);
+  await cancelled.authorizationUrl();
+  await assertFirst();
+  cancelled.child.kill('SIGTERM');
+  assert.match((await cancelled.result).stderr, /Login cancelled/);
+  await assertFirst();
+  const denied = command(t, other, directory, ['login', '--no-browser']);
+  const url = await denied.authorizationUrl();
+  const callback = new URL(url.searchParams.get('redirect_uri')!);
+  callback.search = new URLSearchParams({ error: 'access_denied', state: url.searchParams.get('state')!, iss: other.config.issuer }).toString();
+  assert.equal((await request(callback)).status, 200);
+  assert.match((await denied.result).stderr, /Authorization denied/);
+  await assertFirst();
+  const superseded = command(t, other, directory, ['login', '--no-browser']);
+  const pending = await superseded.authorizationUrl();
+  assert.equal((await command(t, other, directory, ['logout']).result).code, 0);
+  await approve(other, pending);
+  assert.match((await superseded.result).stderr, /Login was superseded/);
+  await assertFirst();
+  other.setResourceHandler(async (incoming) => new URL(incoming.url).pathname.endsWith('/v1/identity') && incoming.headers.has('authorization')
+    ? new Response(null, { status: 403 }) : other.resourceHandler(incoming));
+  const failedIdentity = command(t, other, directory, ['login', '--no-browser']);
+  await approve(other, await failedIdentity.authorizationUrl());
+  assert.match((await failedIdentity.result).stderr, /authenticated_identity/);
+  await assertFirst();
+});
+
+test('selection write failure rolls back login credentials and preserves the previous connection', { timeout: 40_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const other = await fixture({ transport: 'rest', resourcePath: '/other' });
+  t.after(() => other.close());
+  const first = await signIn(t, app, directory);
+  const db = new DatabaseSync(join(directory, 'credentials.sqlite'));
+  db.exec("CREATE TRIGGER fail_selection BEFORE UPDATE ON selected_resource BEGIN SELECT RAISE(ABORT, 'injected selection failure'); END");
+  db.close();
+  const login = command(t, other, directory, ['login', '--no-browser']);
+  await approve(other, await login.authorizationUrl());
+  assert.match((await login.result).stderr, /injected selection failure/);
+  assert.equal(storedProfile(directory, other.config.resource).tokens, null);
+  const bare = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.equal(bare.code, 0, bare.stderr);
+  assert.deepEqual(JSON.parse(bare.stdout), first.identity);
+});
+
+test('legacy profiles remain available without guessing a saved server', { timeout: 30_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const first = await signIn(t, app, directory);
+  const db = new DatabaseSync(join(directory, 'credentials.sqlite'));
+  db.exec('DROP TABLE selected_resource');
+  db.close();
+  const bare = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.match(bare.stderr, /No server is saved/);
+  const explicit = await command(t, app, directory, ['whoami']).result;
+  assert.equal(explicit.code, 0, explicit.stderr);
+  assert.deepEqual(JSON.parse(explicit.stdout), first.identity);
+});
+
+
+test('invalid saved resources fail closed while explicit servers bypass the saved value', { timeout: 30_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const first = await signIn(t, app, directory);
+  const db = new DatabaseSync(join(directory, 'credentials.sqlite'));
+  db.prepare('UPDATE selected_resource SET resource = ? WHERE id = 1').run('https://example.test/noncanonical/');
+  db.close();
+  const bare = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.equal(bare.code, 1);
+  assert.match(bare.stderr, /canonical resource URL/);
+  const explicit = await command(t, app, directory, ['whoami']).result;
+  assert.equal(explicit.code, 0, explicit.stderr);
+  assert.deepEqual(JSON.parse(explicit.stdout), first.identity);
 });

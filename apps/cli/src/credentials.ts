@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
+import { canonicalResource } from '@yargote/artifacts-contracts/http';
 
 const registrationSchema = z.strictObject({ issuer: z.string(), clientId: z.string().min(1) });
 const tokensSchema = z.strictObject({ accessToken: z.string().min(1), refreshToken: z.string().min(1).optional(), expiresAt: z.number().finite() });
@@ -47,6 +48,7 @@ export class CredentialStore {
       await store.exclusive(() => {
         data!.exec('PRAGMA busy_timeout = 0; PRAGMA synchronous = FULL; PRAGMA secure_delete = ON;');
         data!.exec('CREATE TABLE IF NOT EXISTS profiles (resource TEXT PRIMARY KEY, profile TEXT NOT NULL) STRICT');
+        data!.exec('CREATE TABLE IF NOT EXISTS selected_resource (id INTEGER PRIMARY KEY CHECK (id = 1), resource TEXT NOT NULL) STRICT');
       });
       return store;
     } catch (error) {
@@ -78,6 +80,26 @@ export class CredentialStore {
 
   write(resource: string, profile: CredentialProfile): void {
     this.data.prepare('INSERT INTO profiles(resource, profile) VALUES (?, ?) ON CONFLICT(resource) DO UPDATE SET profile = excluded.profile').run(resource, JSON.stringify(profileSchema.parse(profile)));
+  }
+
+  readSelectedResource(): string | undefined {
+    const row = this.data.prepare('SELECT resource FROM selected_resource WHERE id = 1').get();
+    return row ? canonicalResource(String(row.resource)) : undefined;
+  }
+
+  commitLogin(resource: string, epoch: number, tokens: Tokens): void {
+    canonicalResource(resource);
+    this.data.exec('BEGIN IMMEDIATE');
+    try {
+      const profile = this.read(resource);
+      if (profile.epoch !== epoch) throw new Error('Login was superseded by another login or logout');
+      this.write(resource, { ...profile, tokens, refreshAttempt: null });
+      this.data.prepare('INSERT INTO selected_resource(id, resource) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET resource = excluded.resource').run(resource);
+      this.data.exec('COMMIT');
+    } catch (error) {
+      this.data.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   close(): void { this.data.close(); this.lock.close(); }

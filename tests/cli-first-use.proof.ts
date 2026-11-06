@@ -60,6 +60,7 @@ try {
   assert(mcpMetadataRequests > 0, 'Installed login fetched MCP resource metadata');
   for (const check of [
     'native-browser-consent-and-persisted-whoami',
+    'bare-whoami-uses-saved-rest-resource',
     'mcp-started-rest-identity',
     'create-list-read',
     'update-edit-and-three-revision-history',
