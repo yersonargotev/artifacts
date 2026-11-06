@@ -16,9 +16,11 @@ collector.on('message', () => { packets++; });
 collector.bind(0, '127.0.0.1');
 await once(collector, 'listening');
 const peer = `(async () => {
+  await window.peerCheckpoint('started');
   const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:127.0.0.1:${collector.address().port}' }] });
   peer.createDataChannel('canvas-proof');
   await peer.setLocalDescription(await peer.createOffer());
+  await window.peerCheckpoint('described');
   setTimeout(() => peer.close(), 1500);
 })();`;
 const probe = (name: string) => `const report = { name: ${JSON.stringify(name)}, ran: true, origin: self.origin, viewport: innerWidth + 'x' + innerHeight, violations: [] };
@@ -63,11 +65,12 @@ const server = serve({ hostname: '127.0.0.1', port: 0, fetch(request) {
     beacons++;
     return new Response('reached');
   }
-  if (path === '/control') return new Response(`<!doctype html><script>${peer}</script>`, { headers: { 'content-type': 'text/html' } });
   if (!path.endsWith('content')) return new Response(`<!doctype html><style>body{margin:0}iframe{display:block;width:1200px;height:760px;border:0}${path === '/precision' ? 'iframe{position:absolute;left:323px;top:152.796875px;width:690px;height:700px}' : ''}</style><iframe title="Vista previa" sandbox="allow-scripts" src="${path}-content"></iframe>`, { headers: { 'content-type': 'text/html', 'content-security-policy': "frame-src 'self'" } });
   const interactive = path !== '/inert-content';
-  const snapshot = canvases[path === '/webrtc-content' || path === '/theft-content' ? path : '/content'];
-  return new Response(previewDocument({ revision: { snapshot } }, interactive), { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()', 'cross-origin-opener-policy': 'same-origin' } });
+  const snapshot = canvases[path === '/control-content' ? '/webrtc-content' : path === '/webrtc-content' || path === '/theft-content' ? path : '/content'];
+  const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'cross-origin-opener-policy': 'same-origin' };
+  if (path !== '/control-content') headers['connection-allowlist'] = '()';
+  return new Response(previewDocument({ revision: { snapshot } }, interactive), { headers });
 } });
 await once(server, 'listening');
 const address = server.address();
@@ -90,17 +93,37 @@ const observations: Record<string, unknown> = { browser: browser.version() };
 try {
   for (const path of ['/control', '/webrtc']) {
     const page = await browser.newPage();
-    let crashed = false;
-    page.on('crash', () => { crashed = true; });
+    const observation: { phase: 'not-started' | 'started' | 'described'; crashed: boolean; packets: number } = { phase: 'not-started', crashed: false, packets: 0 };
+    const errors: string[] = [];
+    let startedAt = 0;
+    let signalStart: () => void = () => {};
+    const started = new Promise<void>((resolve) => { signalStart = resolve; });
+    page.on('crash', () => { observation.crashed = true; });
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.exposeFunction('peerCheckpoint', (phase: unknown) => {
+      assert(phase === 'started' && observation.phase === 'not-started' || phase === 'described' && observation.phase === 'started', 'Peer checkpoints occur in order');
+      observation.phase = phase;
+      if (phase === 'started') {
+        startedAt = Date.now();
+        signalStart();
+      }
+    });
     packets = 0;
-    await page.goto(`${origin}${path}`).catch((error: Error) => { if (!/crash/i.test(error.message)) throw error; });
-    await new Promise((done) => setTimeout(done, 2500));
-    if (path === '/control') assert(packets > 0, 'Unrestricted control proves the UDP collector and WebRTC are active');
-    else {
-      assert.equal(packets, 0, 'A board that opens a WebRTC connection sends no packets');
-      assert.equal(crashed, true, 'Chrome ends the content renderer when a board opens WebRTC under Connection-Allowlist; if this changes, recheck board WebRTC containment');
+    await page.goto(`${origin}${path}`).catch((error: Error) => { if (!observation.crashed) throw error; });
+    await Promise.race([started, new Promise<void>((resolve) => setTimeout(resolve, 2500))]);
+    assert.notEqual(observation.phase, 'not-started', 'The board reached the WebRTC construction checkpoint');
+    await new Promise((done) => setTimeout(done, Math.max(0, 2500 - (Date.now() - startedAt))));
+    observation.packets = packets;
+    assert.deepEqual(errors, [], 'The WebRTC board has no script errors');
+    if (path === '/control') {
+      assert.equal(observation.crashed, false, 'The control renderer stays alive');
+      assert.equal(observation.phase, 'described', 'The control sets a local WebRTC description');
+      assert(observation.packets > 0, 'The nested control proves the UDP collector and WebRTC are active');
+    } else {
+      assert.equal(observation.packets, 0, 'A board that opens a WebRTC connection sends no packets');
+      if (!observation.crashed) assert.equal(observation.phase, 'described', 'The protected board sets a local WebRTC description when its renderer stays alive');
     }
-    observations[path] = { packets, crashed };
+    observations[path] = observation;
     await page.close();
   }
 
