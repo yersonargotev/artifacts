@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
+import { access, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,8 +14,8 @@ import { fixture } from './helpers.ts';
 type App = Awaited<ReturnType<typeof fixture>>;
 const cliPath = fileURLToPath(new URL('../apps/cli/src/index.ts', import.meta.url));
 
-async function setup(t: TestContext) {
-  const app = await fixture({ transport: 'rest' });
+async function setup(t: TestContext, options: Parameters<typeof fixture>[0] = {}) {
+  const app = await fixture({ transport: 'rest', ...options });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-auth-'));
   t.after(async () => { await app.close(); await rm(directory, { recursive: true, force: true }); });
   return { app, directory };
@@ -284,7 +284,7 @@ test('CLI verifies ID token signatures before saving the login', { timeout: 25_0
   await approve(app, await login.authorizationUrl());
   const result = await login.result;
   assert.equal(result.code, 1);
-  assert.deepEqual(JSON.parse(result.stderr.trim().split('\n').at(-1)!), { error: { code: 'local_error', message: 'invalid response encountered', details: {} } });
+  assert.match(result.stderr, /oauth GET .*\/jwks.*HTTP 200.*OAuth protocol validation failed/);
   const whoami = await command(t, app, directory, ['whoami']).result;
   assert.equal(whoami.code, 1);
   assert.match(whoami.stderr, /You are not signed in/);
@@ -302,6 +302,7 @@ test('CLI refuses issuer metadata with foreign, plaintext, or credential-bearing
     const rejected = await command(t, app, directory, ['login', '--no-browser']).result;
     assert.equal(rejected.code, 1);
     assert.match(rejected.stderr, /OAuth (endpoints must use the issuer origin|URLs require HTTPS)/);
+    assert.ok(rejected.stderr.includes(`oauth GET ${app.config.issuer}/.well-known/openid-configuration HTTP 200`), rejected.stderr);
   }
 });
 
@@ -447,4 +448,282 @@ test('a changed resource issuer cannot receive the previous issuer refresh token
   assert.equal(refreshesAtNewIssuer, 0);
   login.child.kill('SIGTERM');
   assert.equal((await login.result).code, 1);
+});
+
+
+test('login rejects a missing REST identity route before authorization or browser launch', { timeout: 15_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const browser = join(directory, process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'rundll32' : 'xdg-open');
+  const launched = join(directory, 'browser-launched');
+  await writeFile(browser, `#!/bin/sh\ntouch "${launched}"\n`, { mode: 0o700 });
+  let registrations = 0;
+  let authorizationRequests = 0;
+  app.setAuthHandler(async (incoming) => {
+    const path = new URL(incoming.url).pathname;
+    if (path.endsWith('/oauth2/register')) registrations++;
+    if (path.endsWith('/oauth2/authorize')) authorizationRequests++;
+    return app.authHandler(incoming);
+  });
+  app.setResourceHandler(async (incoming) => new URL(incoming.url).pathname.endsWith('/v1/identity')
+    ? new Response('SECRET_BODY', { status: 404 }) : app.resourceHandler(incoming));
+  const login = command(t, app, directory, ['login'], { PATH: `${directory}:${process.env.PATH}`, ARTIFACTS_ACCESS_TOKEN: 'SECRET_AUTOMATION' });
+  const result = await Promise.race([login.result, delay(3000).then(() => { login.child.kill('SIGTERM'); return login.result; })]);
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /rest_preflight.*GET.*identity.*404/);
+  assert.doesNotMatch(result.stderr, /SECRET_|https?:\/\/[^\s]*authorize/);
+  await assert.rejects(access(launched));
+  assert.equal(registrations, 0);
+  assert.equal(authorizationRequests, 0);
+});
+
+
+test('anonymous preflight accepts only the protected REST contract and sends no credentials', { timeout: 35_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const envelope = { error: { code: 'unauthenticated', message: 'SECRET_BODY', details: {} } };
+  const challenge = 'Bearer error="invalid_token", scope="artifacts:read"';
+  const cases: Response[] = [
+    new Response('SECRET_BODY', { status: 404 }),
+    new Response('SECRET_BODY', { status: 503 }),
+    new Response(null, { status: 302, headers: { location: 'https://example.test/?SECRET_LOCATION' } }),
+    new Response('<html>SECRET_BODY</html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+    new Response('{SECRET_BODY', { status: 401, headers: { 'content-type': 'application/json', 'www-authenticate': challenge } }),
+    Response.json({ ...envelope, error: { ...envelope.error, code: 'other' } }, { status: 401, headers: { 'www-authenticate': challenge } }),
+    Response.json(envelope, { status: 401 }),
+    Response.json(envelope, { status: 401, headers: { 'www-authenticate': `${challenge}, error="other"` } }),
+    Response.json(envelope, { status: 401, headers: { 'www-authenticate': 'Basic realm="artifacts:read"' } }),
+    Response.json({ userId: 'SECRET_BODY' }),
+  ];
+  let requests = 0;
+  let registrations = 0;
+  app.setAuthHandler(async (incoming) => { if (new URL(incoming.url).pathname.endsWith('/oauth2/register')) registrations++; return app.authHandler(incoming); });
+  for (const response of cases) {
+    app.setResourceHandler(async (incoming) => {
+      if (!new URL(incoming.url).pathname.endsWith('/v1/identity')) return app.resourceHandler(incoming);
+      requests++;
+      assert.equal(incoming.headers.get('authorization'), null);
+      assert.equal(incoming.headers.get('cookie'), null);
+      return response;
+    });
+    const result = await command(t, app, directory, ['login', '--no-browser'], { ARTIFACTS_ACCESS_TOKEN: 'SECRET_AUTOMATION' }).result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /rest_preflight.*GET.*identity.*HTTP/);
+    assert.doesNotMatch(result.stderr, /SECRET_|Authorize this login/);
+  }
+  assert.equal(requests, cases.length);
+  assert.equal(registrations, 0);
+});
+
+test('valid origin and legacy resources make anonymous and authenticated identity requests', { timeout: 35_000 }, async (t) => {
+  for (const options of [{ resourcePath: '' }, { resourcePath: '/mcp', transport: 'combined' as const }]) {
+    const { app, directory } = await setup(t, options);
+    const authorization: (string | null)[] = [];
+    app.setResourceHandler(async (incoming) => {
+      if (new URL(incoming.url).pathname.endsWith('/v1/identity')) authorization.push(incoming.headers.get('authorization'));
+      return app.resourceHandler(incoming);
+    });
+    await signIn(t, app, directory);
+    assert.equal(authorization.length, 2);
+    assert.equal(authorization[0], null);
+    assert.match(authorization[1]!, /^Bearer /);
+  }
+});
+
+test('authenticated identity failures preserve context and never save tokens', { timeout: 60_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  for (const status of [401, 403, 404, 503, 200]) {
+    app.setResourceHandler(async (incoming) => {
+      if (!new URL(incoming.url).pathname.endsWith('/v1/identity') || !incoming.headers.has('authorization')) return app.resourceHandler(incoming);
+      return status === 200 ? Response.json({ userId: 'SECRET_BODY' }) : new Response('SECRET_BODY', { status });
+    });
+    const login = command(t, app, directory, ['login', '--no-browser']);
+    await approve(app, await login.authorizationUrl());
+    const result = await login.result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, new RegExp(`authenticated_identity.*GET.*identity.*HTTP ${status}`));
+    assert.match(result.stderr, status === 401 || status === 403 ? /cannot access/ : status === 503 ? /service failed/ : status === 404 ? /unavailable/ : /Invalid REST identity/);
+    assert.doesNotMatch(result.stderr, /SECRET_BODY/);
+    assert.equal(storedProfile(directory, app.config.resource).tokens, null);
+  }
+});
+
+test('metadata and OAuth HTTP failures report safe request context', { timeout: 35_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const metadataCases = [
+    new Response('SECRET_BODY', { status: 404 }),
+    new Response('SECRET_BODY', { status: 503 }),
+    new Response(null, { status: 302, headers: { location: 'https://example.test/?SECRET_LOCATION' } }),
+    new Response('<html>SECRET_BODY</html>', { headers: { 'content-type': 'text/html' } }),
+    new Response('{SECRET_BODY', { headers: { 'content-type': 'application/json' } }),
+    Response.json({ resource: app.config.resource, authorization_servers: ['https://user:SECRET_PASSWORD@example.test/?SECRET_QUERY'] }),
+  ];
+  for (const response of metadataCases) {
+    app.setResourceHandler(async (incoming) => new URL(incoming.url).pathname.startsWith('/.well-known/') ? response : app.resourceHandler(incoming));
+    const result = await command(t, app, directory, ['login', '--no-browser']).result;
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /resource_metadata.*GET.*HTTP/);
+    assert.doesNotMatch(result.stderr, /SECRET_|Authorize this login/);
+  }
+  app.setResourceHandler(app.resourceHandler);
+  for (const [path, method] of [['/.well-known/openid-configuration', 'GET'], ['/oauth2/register', 'POST']] as const) {
+    app.setAuthHandler(async (incoming) => new URL(incoming.url).pathname.endsWith(path)
+      ? new Response('SECRET_OAUTH_BODY', { status: 503, headers: { 'x-secret': 'SECRET_HEADER' } }) : app.authHandler(incoming));
+    const result = await command(t, app, directory, ['login', '--no-browser']).result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(`oauth.*${method}.*HTTP 503`));
+    assert.doesNotMatch(result.stderr, /SECRET_|Authorize this login/);
+  }
+});
+
+test('identity preflight and authenticated identity timeouts are distinguished from access denial', { timeout: 45_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  for (const authenticated of [false, true]) {
+    app.setResourceHandler(async (incoming) => {
+      if (new URL(incoming.url).pathname.endsWith('/v1/identity') && incoming.headers.has('authorization') === authenticated) return new Promise<Response>(() => {});
+      return app.resourceHandler(incoming);
+    });
+    const login = command(t, app, directory, ['login', '--no-browser']);
+    if (authenticated) await approve(app, await login.authorizationUrl());
+    const result = await login.result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(`${authenticated ? 'authenticated_identity' : 'rest_preflight'}.*GET.*identity.*timed out`));
+    assert.doesNotMatch(result.stderr, /HTTP 0|cannot access/);
+    if (authenticated) assert.equal(storedProfile(directory, app.config.resource).tokens, null);
+  }
+});
+
+
+test('login rejects an authenticated identity that does not match the OAuth claims', { timeout: 20_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  app.setResourceHandler(async (incoming) => {
+    const response = await app.resourceHandler(incoming);
+    if (!new URL(incoming.url).pathname.endsWith('/v1/identity') || !incoming.headers.has('authorization')) return response;
+    return Response.json({ ...await response.json() as Record<string, unknown>, userId: 'different-user' });
+  });
+  const login = command(t, app, directory, ['login', '--no-browser']);
+  await approve(app, await login.authorizationUrl());
+  const result = await login.result;
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /authenticated_identity.*GET.*identity.*HTTP 200.*does not match/);
+  assert.equal(storedProfile(directory, app.config.resource).tokens, null);
+});
+
+
+test('OAuth token and signing key failures retain request context without provider secrets', { timeout: 30_000 }, async (t) => {
+  for (const [path, method] of [['/oauth2/token', 'POST'], ['/jwks', 'GET']] as const) {
+    const { app, directory } = await setup(t);
+    app.setAuthHandler(async (incoming) => new URL(incoming.url).pathname.endsWith(path)
+      ? new Response('SECRET_OAUTH_BODY', { status: 503, headers: { 'x-secret': 'SECRET_HEADER' } }) : app.authHandler(incoming));
+    const login = command(t, app, directory, ['login', '--no-browser']);
+    await approve(app, await login.authorizationUrl());
+    const result = await login.result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(`oauth.*${method}.*${path}.*HTTP 503`));
+    assert.doesNotMatch(result.stderr, /SECRET_/);
+    assert.equal(storedProfile(directory, app.config.resource).tokens, null);
+  }
+});
+
+test('authenticated identity connection failure reports network context without saving tokens', { timeout: 20_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const login = command(t, app, directory, ['login', '--no-browser']);
+  const url = await login.authorizationUrl();
+  app.dropNextResourceResponse('GET');
+  await approve(app, url);
+  const result = await login.result;
+  assert.equal(result.code, 1, result.stderr);
+  assert.match(result.stderr, /authenticated_identity.*GET.*identity.*Network request failed/);
+  assert.doesNotMatch(result.stderr, /HTTP 0|cannot access/);
+  assert.equal(storedProfile(directory, app.config.resource).tokens, null);
+});
+
+
+test('CLI help explains the REST resource and login preflight', { timeout: 10_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  const result = await command(t, app, directory, ['--help']).result;
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Exact REST OAuth resource/);
+  assert.match(result.stdout, /checks <resource>\/v1\/identity before browser authorization/);
+  assert.match(result.stdout, /confirm\nthe configured REST URL/);
+});
+
+test('login reports authorization denial without claiming a token request', { timeout: 20_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  let tokenRequests = 0;
+  app.setAuthHandler(async (incoming) => {
+    if (new URL(incoming.url).pathname.endsWith('/oauth2/token')) tokenRequests++;
+    return app.authHandler(incoming);
+  });
+  const login = command(t, app, directory, ['login', '--no-browser']);
+  const authorization = await login.authorizationUrl();
+  const callback = new URL(authorization.searchParams.get('redirect_uri')!);
+  callback.searchParams.set('state', authorization.searchParams.get('state')!);
+  callback.searchParams.set('iss', app.config.issuer);
+  callback.searchParams.set('error', 'access_denied');
+  callback.searchParams.set('error_description', 'SECRET_DESCRIPTION');
+  assert.equal((await request(callback)).status, 200);
+  const result = await login.result;
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Authorization denied/);
+  assert.doesNotMatch(result.stderr, /SECRET_DESCRIPTION|oauth.*POST.*token|oauth\/callback\?/);
+  assert.equal(tokenRequests, 0);
+});
+
+test('OAuth protocol errors identify the observed response request and status', { timeout: 40_000 }, async (t) => {
+  for (const [path, method, response] of [
+    ['/.well-known/openid-configuration', 'GET', () => new Response('{SECRET_BODY', { status: 200, headers: { 'content-type': 'application/json' } })],
+    ['/oauth2/register', 'POST', () => new Response('SECRET_BODY', { status: 201, headers: { 'content-type': 'text/html' } })],
+    ['/oauth2/register', 'POST', () => Response.json({ secret: 'SECRET_BODY' }, { status: 201 })],
+    ['/jwks', 'GET', () => Response.json({ secret: 'SECRET_BODY' })],
+  ] as const) {
+    const { app, directory } = await setup(t);
+    app.setAuthHandler(async (incoming) => new URL(incoming.url).pathname.endsWith(path) ? response() : app.authHandler(incoming));
+    const login = command(t, app, directory, ['login', '--no-browser']);
+    if (path === '/jwks') await approve(app, await login.authorizationUrl());
+    const result = await login.result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(`oauth.*${method}.*${path.replace('.', '\\.')}.*HTTP ${path === '/oauth2/register' ? 201 : 200}`));
+    assert.doesNotMatch(result.stderr, /SECRET_BODY/);
+  }
+});
+
+test('invalid public client metadata reports the registration response', { timeout: 30_000 }, async (t) => {
+  for (const invalid of [
+    { client_secret: 'SECRET_SENTINEL', client_secret_expires_at: 0 },
+    { token_endpoint_auth_method: 'client_secret_basic' },
+  ]) {
+    const { app, directory } = await setup(t);
+    let registrations = 0;
+    let authorizations = 0;
+    app.setAuthHandler(async (incoming) => {
+      const path = new URL(incoming.url).pathname;
+      if (path.endsWith('/oauth2/authorize')) authorizations++;
+      const response = await app.authHandler(incoming);
+      if (!path.endsWith('/oauth2/register')) return response;
+      registrations++;
+      assert.equal(response.status, 201);
+      return Response.json({ ...await response.json() as Record<string, unknown>, ...invalid }, { status: response.status });
+    });
+    const result = await command(t, app, directory, ['login', '--no-browser']).result;
+    assert.equal(result.code, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(registrations, 1);
+    assert.equal(authorizations, 0);
+    assert.ok(result.stderr.includes(`oauth POST ${app.config.issuer}/oauth2/register HTTP 201`), result.stderr);
+    assert.doesNotMatch(result.stderr, /SECRET_SENTINEL|Authorize this login|^https?:\/\//m);
+  }
+});
+
+test('login accepts a quoted comma and escaped characters in the Bearer realm', { timeout: 20_000 }, async (t) => {
+  const { app, directory } = await setup(t);
+  app.setResourceHandler(async (incoming) => {
+    const response = await app.resourceHandler(incoming);
+    if (!new URL(incoming.url).pathname.endsWith('/v1/identity') || incoming.headers.has('authorization')) return response;
+    const headers = new Headers(response.headers);
+    headers.set('www-authenticate', 'bEaReR ReAlM="Artifacts, \\"Inc\\"", ScOpE="artifacts:read", ErRoR="invalid_token"');
+    return new Response(response.body, { status: response.status, headers });
+  });
+  await signIn(t, app, directory);
 });
