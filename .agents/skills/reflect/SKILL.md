@@ -51,6 +51,8 @@ Present the synthesizer's full Accepted / Rejected / Backlog output and wait for
 
 Keep Backlog items in the local report. File them externally only when the user has authorized publication and the correct tracker/project is available; otherwise label them unfiled.
 
+Preserve Catalog resources, prepared trees, installed managed copies, and plugin caches. Before approval, show its destination, `.agents/skills/<skill>/` or `~/.agents/skills/<skill>/`. After approval, copy the skill folder there and edit the copy. Never open a PR or push.
+
 Follow each approved row's Routing exactly:
 
 - Trivial existing-skill edit (a one-line bullet, a tightened sentence, a stale fact corrected): parent does directly.

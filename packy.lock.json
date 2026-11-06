@@ -4,8 +4,8 @@
     {
       "pack": {
         "id": "pstack",
-        "version": "6.0.0",
-        "catalog_snapshot": "a559d34b7d3800ab7f0a3a4d534da3d55e91a7e6"
+        "version": "6.1.0",
+        "catalog_snapshot": "7c6d6cdfc5bb2fd773c81cf945f4c65ce36a6445"
       },
       "surface": "agents",
       "readiness_obligations": [
@@ -77,6 +77,14 @@
         {
           "kind": "skill",
           "id": "ketchup"
+        },
+        {
+          "kind": "skill",
+          "id": "ketchup-video"
+        },
+        {
+          "kind": "skill",
+          "id": "maintain-formal-verification-skill"
         },
         {
           "kind": "skill",
@@ -216,6 +224,10 @@
         },
         {
           "kind": "skill",
+          "id": "statechart"
+        },
+        {
+          "kind": "skill",
           "id": "swarm"
         },
         {
@@ -253,7 +265,7 @@
         {
           "id": "skill:arena",
           "target": ".agents/skills/arena",
-          "digest": "3b0dcc3f51574fa3e4cb8e28997b9f7a5cb577556b7b8a5eff7a228376aea4e7",
+          "digest": "19adff517cb868e92466d6c4f95b8b4be18e8dca5c3a9b9d13216682faf4963a",
           "file_mode": 493
         },
         {
@@ -289,7 +301,7 @@
         {
           "id": "skill:create-formal-verification-skill",
           "target": ".agents/skills/create-formal-verification-skill",
-          "digest": "71c45b821a3c70d248b0a8a04efc92c7b0474acf5b146addfd76e2e2a07db45b",
+          "digest": "d2afa234d2851175db2c7df43893a80ad85cc4391ebed0752a9d2f414f4fbc34",
           "file_mode": 493
         },
         {
@@ -319,13 +331,25 @@
         {
           "id": "skill:interrogate",
           "target": ".agents/skills/interrogate",
-          "digest": "ca46209610d2618ec452753327b47bd4085b9b2683641dd04839ded73095b7d8",
+          "digest": "a9866f34d13e20187315e8d3379ce4451732455dbe067eec45f37a0e1713852e",
           "file_mode": 493
         },
         {
           "id": "skill:ketchup",
           "target": ".agents/skills/ketchup",
           "digest": "20c8e0cacda55173ab67aa93355b887b5539628ef23ff4b3134462109a4105cd",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:ketchup-video",
+          "target": ".agents/skills/ketchup-video",
+          "digest": "7181e57d8546c090fbbc5519c4336d707cc4bb63da9b923048ffc3a336bf0766",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:maintain-formal-verification-skill",
+          "target": ".agents/skills/maintain-formal-verification-skill",
+          "digest": "b0a200e6a0ea3fb39e24fe949695ce593b0eee7edf3c816eaf6c1d59ef777aa2",
           "file_mode": 493
         },
         {
@@ -349,13 +373,13 @@
         {
           "id": "skill:poteto-help",
           "target": ".agents/skills/poteto-help",
-          "digest": "88c293abdd69e15268632db3afce333afbaf13cfe17d6ea4c55de568c5068487",
+          "digest": "db134fe7a9f3ade9a36957859bdcf23bcd98ce74e4a4ee5ac8c3fc12c280d241",
           "file_mode": 493
         },
         {
           "id": "skill:poteto-mode",
           "target": ".agents/skills/poteto-mode",
-          "digest": "bae274bf77d400f649583eb8521658ee803a64197b4fe7a628084c75040f2e31",
+          "digest": "fca9b7f69eb1c8b9e91470482029a6186d731df6a2ec8532c90b45e417251102",
           "file_mode": 493
         },
         {
@@ -397,7 +421,7 @@
         {
           "id": "skill:principle-explain-the-number",
           "target": ".agents/skills/principle-explain-the-number",
-          "digest": "8c1ddc99fb4eae186a2f87fc7a0ffadffe0c7cef8184550962fe7cdebcae0a08",
+          "digest": "96e306734cdfc5f3759fa97df561baf7e4709ed109c3b4e1ab1408a6fee979d5",
           "file_mode": 493
         },
         {
@@ -511,19 +535,19 @@
         {
           "id": "skill:reflect",
           "target": ".agents/skills/reflect",
-          "digest": "7c17f673092a9f93e2634c9f54e961142dc43f41bcf64938d86aa54342d13a37",
+          "digest": "b9c204278cf43c8dd4852f6e9ec82b2502da818fa3ae62fb4dde5bd3324d3acc",
           "file_mode": 493
         },
         {
           "id": "skill:setup-pstack",
           "target": ".agents/skills/setup-pstack",
-          "digest": "a1f9ecff9da3ef2ef9c1e916aa1290e92b182c48a88ddb7a796c0ee0037c9edc",
+          "digest": "43cf8468fb6104a597d7fc09d31f3326d2313a7c25ebc7a5baaef1adcf296dfd",
           "file_mode": 493
         },
         {
           "id": "skill:sharpen",
           "target": ".agents/skills/sharpen",
-          "digest": "6ec729c1f070a8100fc0a88a6ed01a2ed1cda008c7bce4d4a66edf8083fcb8e6",
+          "digest": "fd3d15e94a64989bff349a7dd2c8692899c42c75bafa7f7fff3327443c0b36ec",
           "file_mode": 493
         },
         {
@@ -533,9 +557,15 @@
           "file_mode": 493
         },
         {
+          "id": "skill:statechart",
+          "target": ".agents/skills/statechart",
+          "digest": "a8c0f014197f0d0199dab997c7bb7ab1e3300090dd8a6f1202bbea6930a6b0d6",
+          "file_mode": 493
+        },
+        {
           "id": "skill:swarm",
           "target": ".agents/skills/swarm",
-          "digest": "f863c2a9522b233a075b2ab4b198b82f6fac2451453ef8b11281b74e92c2b23d",
+          "digest": "0ba1bb37d72c82f2407fb900fa24eeb77534445feda901f96e88dc8c15933718",
           "file_mode": 493
         },
         {
@@ -577,7 +607,7 @@
         {
           "id": "notice:pack-pstack-agents",
           "target": "PACKY-NOTICES.md",
-          "digest": "36d2cf3db19fe2551fd005316300fe5f043294aeaf71f82e538faad2f5dca122",
+          "digest": "a71b7b95d1e4eaf81c9dd82234281102d7757807c77e2b9cad3d7de461f996c0",
           "file_mode": 420
         }
       ]
@@ -585,8 +615,8 @@
     {
       "pack": {
         "id": "pstack",
-        "version": "6.0.0",
-        "catalog_snapshot": "a559d34b7d3800ab7f0a3a4d534da3d55e91a7e6"
+        "version": "6.1.0",
+        "catalog_snapshot": "7c6d6cdfc5bb2fd773c81cf945f4c65ce36a6445"
       },
       "surface": "claude",
       "readiness_obligations": [
@@ -658,6 +688,14 @@
         {
           "kind": "skill",
           "id": "ketchup"
+        },
+        {
+          "kind": "skill",
+          "id": "ketchup-video"
+        },
+        {
+          "kind": "skill",
+          "id": "maintain-formal-verification-skill"
         },
         {
           "kind": "skill",
@@ -797,6 +835,10 @@
         },
         {
           "kind": "skill",
+          "id": "statechart"
+        },
+        {
+          "kind": "skill",
           "id": "swarm"
         },
         {
@@ -834,7 +876,7 @@
         {
           "id": "skill:arena",
           "target": ".claude/skills/arena",
-          "digest": "0c5b57dfd321fbb76ecdd919c0df612ffbdf215a2828a8f3007c085b5d3ceedc",
+          "digest": "0845805829ddf0814c5ce21e5997f242f74492f35b6f1e3b1ca03bb135fbf04a",
           "file_mode": 493
         },
         {
@@ -870,7 +912,7 @@
         {
           "id": "skill:create-formal-verification-skill",
           "target": ".claude/skills/create-formal-verification-skill",
-          "digest": "f711c9c25be84c6263848259c3055cb5d1e7ce0f06e7bccc8a79453b3f25e35b",
+          "digest": "38c0ce89f51f901db5e6c28cd048546d98f85c778f7708d307fd3683909e216b",
           "file_mode": 493
         },
         {
@@ -900,13 +942,25 @@
         {
           "id": "skill:interrogate",
           "target": ".claude/skills/interrogate",
-          "digest": "c56498d0af7d2f570d0fe1fbc1ad70176713fbbb5cb5bf2887d71fbbd63d7d45",
+          "digest": "2ad792a078f4b90de970812dc9e18a196e28cdc281bfe762f2d2f389d6b84320",
           "file_mode": 493
         },
         {
           "id": "skill:ketchup",
           "target": ".claude/skills/ketchup",
           "digest": "a58c399b0659ccc78994543909077946de8eb5bf17411060e1b86454f5dd6a14",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:ketchup-video",
+          "target": ".claude/skills/ketchup-video",
+          "digest": "ab714fa592815ee398afdec3f040dc0fd06b55660d3872821610115d077e1fdc",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:maintain-formal-verification-skill",
+          "target": ".claude/skills/maintain-formal-verification-skill",
+          "digest": "ca4231f7fcff04265a18484d660da71df13fe882e0f5705984fa52f0132ffb66",
           "file_mode": 493
         },
         {
@@ -930,13 +984,13 @@
         {
           "id": "skill:poteto-help",
           "target": ".claude/skills/poteto-help",
-          "digest": "6d66ad326be07fef2b223b79395db687ab7aac8c2d9a7e032b2661990698b313",
+          "digest": "c46dc11c9a6676191114ca510cd7a708f7e4ba8e0df2238090489fa6d3a41e23",
           "file_mode": 493
         },
         {
           "id": "skill:poteto-mode",
           "target": ".claude/skills/poteto-mode",
-          "digest": "21963a169d0e0047661791a0dcb7e0b2ff3b2fb26fe2609fc5834df59811ceca",
+          "digest": "95e682111684843fa2c4f22c689e7a1e8b671f07c3389d43e992e3abc2086ecf",
           "file_mode": 493
         },
         {
@@ -978,7 +1032,7 @@
         {
           "id": "skill:principle-explain-the-number",
           "target": ".claude/skills/principle-explain-the-number",
-          "digest": "0feec6e5f474febb9a0dc299f314e7b9ca12728200f2b9d384487607bf1c1604",
+          "digest": "5ef3ca95de26351ee53d50677d0acf70e24c5692914ed2bebc8a41877ace8896",
           "file_mode": 493
         },
         {
@@ -1092,19 +1146,19 @@
         {
           "id": "skill:reflect",
           "target": ".claude/skills/reflect",
-          "digest": "303d5519518f51288cdd3d19833e0dbcd2653e4b1e42bd9ab45d0f1a02dc7b46",
+          "digest": "567942d741eb7ad5abc4d1a2e6b58ddff8edd5fbb95cf4f5df76ef913235285d",
           "file_mode": 493
         },
         {
           "id": "skill:setup-pstack",
           "target": ".claude/skills/setup-pstack",
-          "digest": "c9f7ddc09e727394dbef6ad79f9d3c64da8e07477eb920a56833d927788d8575",
+          "digest": "ba0268c35bae4f30a9eb8c982876cbbfecf96420f53e34bf9768a353217c7285",
           "file_mode": 493
         },
         {
           "id": "skill:sharpen",
           "target": ".claude/skills/sharpen",
-          "digest": "6bb3edd9eaafd805035840529cbe312b6d81638292afe20eef810aa02c9849c5",
+          "digest": "af2b7183c149f811a279b9f6edb41d2150b14beb3d96a3b6bea488a20cd20b2e",
           "file_mode": 493
         },
         {
@@ -1114,9 +1168,15 @@
           "file_mode": 493
         },
         {
+          "id": "skill:statechart",
+          "target": ".claude/skills/statechart",
+          "digest": "a8c0f014197f0d0199dab997c7bb7ab1e3300090dd8a6f1202bbea6930a6b0d6",
+          "file_mode": 493
+        },
+        {
           "id": "skill:swarm",
           "target": ".claude/skills/swarm",
-          "digest": "db5000621c488bff35ec16c446f8479b0a62173964a5e9ba12598f8db1671779",
+          "digest": "5dbe35903650afc2f83628f16ebc150414a1c85659f330ac12a3d5f5a82cade9",
           "file_mode": 493
         },
         {
@@ -1158,7 +1218,7 @@
         {
           "id": "notice:pack-pstack-claude",
           "target": "PACKY-NOTICES.md",
-          "digest": "f36e44e4af7d3a50328e638586547bb0e95dd1aa5f9124d95949d9dc350f3ab2",
+          "digest": "9b2d7f9a738f61a927ae528f3a3d8dd70cadc419c36eb04caec9d0dd98868415",
           "file_mode": 420
         }
       ]

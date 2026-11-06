@@ -64,6 +64,10 @@ and does not change the host's own model configuration.
 4. Write the complete file atomically. Use the role names below. A panel value
    can list multiple models; each entry represents one candidate or reviewer.
    Use `inherit-parent` for a role when the host cannot select a model for it.
+   The cross-judge pool is ordered by preference and supplies one judge from
+   a different model family than the parent. `auto` and `inherit-parent` do
+   not supply that judge; without a supported different-family model, skip
+   it and disclose the missing check.
 5. Read the file back and report the active choices and any host limitation.
 
 ```text
@@ -94,3 +98,8 @@ Read this file only when `# host` matches the current host. On another host,
 ignore its model values and use `inherit-parent` until the user configures that
 host. If no subagent facility exists, run a role in the current context and
 report that the review was not independent.
+
+
+## Optional project verification
+
+Check whether the project already has an app verification skill or harness. If absent, offer once to generate one with `pstack:create-verification-skill`. Check separately for a formal verification skill. If absent, offer once to generate one with `pstack:create-formal-verification-skill`. Obtain and read a selected optional workflow before using it. Generate either only when the user accepts that offer.

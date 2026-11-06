@@ -70,11 +70,13 @@ Check state only when it changes the answer:
 
 When preferences are missing and setup matters, offer `pstack:setup-pstack` once per conversation and answer the question too. Missing preferences alone do not require setup before work can proceed.
 
+A question about a race or invariant can use the optional `pstack:create-formal-verification-skill` route when no formal check exists. When covered code changed after its recorded sync commit, suggest the optional `pstack:maintain-formal-verification-skill` route. Setup offers app and formal verification separately after model configuration. A multi-day program uses host-run orchestration; it does not require the retired orchestration scripts.
+
 ## Get set up
 
 For Packy installation questions, inspect the available CLI help and catalog version before giving an install or update command. This help skill does not install the Pack or change global settings merely to explain setup.
 
-Use [pstack:setup-pstack]({{packy.access:pstack:setup-pstack}}) to choose a reasoning budget and confirmed per-role models. It writes portable preferences that pstack reads when choosing workers; it does not configure Codex itself. Start a task with `pstack:poteto-mode`, a goal, and an observable completion check.
+Use [pstack:setup-pstack]({{packy.access:pstack:setup-pstack}}) to choose a reasoning budget and confirmed per-role models. It writes portable preferences that pstack reads when choosing workers; it does not configure Codex itself. It then offers once each to generate app and formal verification skills when the project has none. Start a task with `pstack:poteto-mode`, a goal, and an observable completion check.
 
 Extra workers and review panels consume extra tokens. A shorter configured panel uses fewer workers. A smaller reasoning budget requests a supported lower tier. `inherit-parent` and `auto` omit the model override; neither guarantees a cheaper model or lower reasoning effort. Respect each workflow's required evidence and independent-review gates.
 
@@ -92,8 +94,9 @@ Recommend `pstack:poteto-mode` for a broad workflow. Name a leaf skill when the 
 |---|---|
 | Do any non-trivial task with rigor | [pstack:poteto-mode]({{packy.access:pstack:poteto-mode}}) |
 | Check that the agent understood the goal and problem | `pstack:in-your-own-words` |
-| Sharpen the approach and task specification before starting | `pstack:sharpen` |
+| Get a prompt rewritten deeper, not bigger, before sending it. It returns the rewrite and does not execute the task | `pstack:sharpen` |
 | Catch up on what changed in this chat, with every item waiting on the user listed and decidable from the reply | `pstack:ketchup` |
+| Catch up with a short subtitled video and the waiting calls as text | `pstack:ketchup-video` |
 | Know how code works now, or where new code should live | `pstack:how` |
 | Know why code is shaped this way, or where a number came from | `pstack:why` |
 | Understand a change or subsystem, explained plainly | `pstack:teach` |
@@ -112,6 +115,8 @@ Recommend `pstack:poteto-mode` for a broad workflow. Name a leaf skill when the 
 | Give agents a scripted way to drive the app and prove behavior | `pstack:create-verification-skill` |
 | Bring a verification skill and its feature map back in line with the app | `pstack:maintain-verification-skill` |
 | Formally verify a race, invariant, or other property that tests rarely reach | `pstack:create-formal-verification-skill` |
+| Bring formal verification back in line with changed code and distinguish drift from a bug | `pstack:maintain-formal-verification-skill` |
+| Draw a TLA+ statechart with the shortest path to each state that breaks a rule | `pstack:statechart` |
 | Vet a performance number before reporting or acting on it | `pstack:benchmark-checklist` |
 | Run a large or cross-cutting change, or one to review after stepping away | `pstack:figure-it-out` |
 | Keep a decision log during a run, and review it afterward | `pstack:show-me-your-work` |
@@ -143,7 +148,7 @@ Read the Playbooks section of [pstack:poteto-mode]({{packy.access:pstack:poteto-
 - "babysit this PR" prepares it for merge; merging requires the user's instruction to merge, land, or ship.
 - "land the stack" selects Shipping; "take over this branch" selects Session pickup.
 - "pause safely" selects Pause safely.
-- "full autopilot on this queue" selects Autopilot-full; "stack them, don't ship" selects Autopilot-stack.
+- "full autopilot on this queue" selects Autopilot-full; "don't merge" selects Autopilot-stack.
 - "run the eval playbook" selects Eval.
 
 For a multi-phase plan, read the [pstack:poteto-mode]({{packy.access:pstack:poteto-mode}}) `playbooks/ACCESS-multi-phase-plan.md`. A planning-only request produces a plan without implementation. For an unresolved design question, consider Prototype or `pstack:architect` within the user's requested scope.

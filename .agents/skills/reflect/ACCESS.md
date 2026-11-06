@@ -43,7 +43,7 @@ Use accessible current-workspace history and authorized tools. Missing history, 
 
 Mine the current conversation for durable learnings, then route them into skill edits.
 
-Invoke when the user says "reflect" or "/reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.
+Invoke when the user says "reflect" or "pstack:reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.
 
 ## 1. Locate the active transcript
 
@@ -77,9 +77,7 @@ Present the synthesizer's full Accepted / Rejected / Backlog output and wait for
 
 Keep Backlog items in the local report. File them externally only when the user has authorized publication and the correct tracker/project is available; otherwise label them unfiled.
 
-For an approved on-demand skill edit, locate its editable authored source or an
-explicitly chosen target copy before writing. The prepared Catalog tree stays
-immutable. Ask for the destination if the transcript only identifies that tree.
+Preserve Catalog resources, prepared trees, installed managed copies, and plugin caches. Before approval, show its destination, `.agents/skills/<skill>/` or `~/.agents/skills/<skill>/`. After approval, copy the skill folder there and edit the copy. Never open a PR or push.
 
 Follow each approved row's Routing exactly:
 

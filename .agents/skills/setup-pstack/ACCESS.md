@@ -1,6 +1,6 @@
 ---
 name: setup-pstack
-description: Configure the models and reasoning budget used by pstack roles on the active agent host. Use for /setup-pstack, "configure pstack models", or "pstack budget".
+description: Configure the models and reasoning budget used by pstack roles on the active agent host. Use for pstack:setup-pstack, "configure pstack models", or "pstack budget".
 ---
 
 ## On-demand context
@@ -65,7 +65,7 @@ and does not change the host's own model configuration.
    record the budget as a preference, not an applied reasoning tier.
 4. Write the complete file atomically. Use the role names below. A panel value
    can list multiple models; each entry represents one candidate or reviewer.
-   Use `inherit-parent` for a role when the host cannot select a model for it.
+   Use `inherit-parent` for a role when the host cannot select a model for it. The cross-judge pool is tried in preference order and only supported models from a family other than the parent qualify; `auto` and `inherit-parent` never judge.
 5. Read the file back and report the active choices and any host limitation.
 
 ```text
@@ -96,3 +96,7 @@ Read this file only when `# host` matches the current host. On another host,
 ignore its model values and use `inherit-parent` until the user configures that
 host. If no subagent facility exists, run a role in the current context and
 report that the review was not independent.
+
+## Optional project verification
+
+After setup, check for an app-driving verification skill or harness. When absent, offer once to generate one with the optional `pstack:create-verification-skill` route. Check separately for a formal verification skill. When absent, offer once to generate one with the optional `pstack:create-formal-verification-skill` route. Read either selected route only after the user accepts; preserve its own compatibility and authorization requirements.

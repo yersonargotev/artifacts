@@ -50,3 +50,5 @@ Swap in the real paths, installed skills, and done checks. Informal wording work
 - `pstack:poteto-mode autopilot these changes but stack them, don't ship. i'll land the stack.`
 - `pstack:reflect capture what we learned so the next run doesn't repeat it.` Approve only edits that change a future decision.
 - `pstack:bro` restates the last reply in plain words.
+
+For a race or invariant, select the optional `pstack:create-formal-verification-skill` route. After code changes skip verification, use the optional `pstack:maintain-formal-verification-skill` route. `pstack:ketchup` catches up on the active chat since the user's last message. Autopilot-stack means the operator lands the PRs; stack a PR only when it depends on another.
