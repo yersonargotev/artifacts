@@ -24,6 +24,7 @@ Check state only when it changes the answer:
 
 - Read `~/.pstack/claude-models.md` when setup, cost, or model choice matters. Without confirmed preferences for this host, roles inherit the host model; there is no guaranteed model diversity.
 - Check for a project `verify-*` skill or another app harness before recommending live verification. If neither exists, suggest [create-verification-skill](../create-verification-skill/SKILL.md).
+- When a question concerns a race or invariant, check for a formal verification skill. If none exists, mention **create-formal-verification-skill**. If covered code changed after its recorded sync commit, mention **maintain-formal-verification-skill**.
 - Read sibling skills from this installation. If an optional recommendation is missing, say it is not installed and explain its purpose without pretending to load it.
 
 When preferences are missing and setup matters, offer `/setup-pstack` once per conversation and answer the question too. Missing preferences alone do not require setup before work can proceed.
@@ -32,7 +33,7 @@ When preferences are missing and setup matters, offer `/setup-pstack` once per c
 
 For Packy installation questions, inspect the available CLI help and catalog version before giving an install or update command. This help skill does not install the Pack or change global settings merely to explain setup.
 
-Use [setup-pstack](../setup-pstack/SKILL.md) to choose a reasoning budget and confirmed per-role models. It writes portable preferences that pstack reads when choosing workers; it does not configure Claude Code itself. Start a task with `/poteto-mode`, a goal, and an observable completion check.
+Use [setup-pstack](../setup-pstack/SKILL.md) to choose a reasoning budget and confirmed per-role models. It writes portable preferences that pstack reads when choosing workers; it does not configure Claude Code itself. It then offers once each to generate app and formal verification skills when the project has none. Start a task with `/poteto-mode`, a goal, and an observable completion check.
 
 Extra workers and review panels consume extra tokens. A shorter configured panel uses fewer workers. A smaller reasoning budget requests a supported lower tier. `inherit-parent` and `auto` omit the model override; neither guarantees a cheaper model or lower reasoning effort. Respect each workflow's required evidence and independent-review gates.
 
@@ -50,8 +51,9 @@ Recommend `/poteto-mode` for a broad workflow. Name a leaf skill when the user w
 |---|---|
 | Do any non-trivial task with rigor | [`/poteto-mode`](../poteto-mode/SKILL.md) |
 | Check that the agent understood the goal and problem | [`/in-your-own-words`](../in-your-own-words/SKILL.md) |
-| Sharpen the approach and task specification before starting | [`/sharpen`](../sharpen/SKILL.md) |
+| Get a prompt rewritten deeper, not bigger, before sending it. It returns the rewrite and does not execute the task | [`/sharpen`](../sharpen/SKILL.md) |
 | Catch up on what changed in this chat, with every item waiting on the user listed and decidable from the reply | [`/ketchup`](../ketchup/SKILL.md) |
+| Catch up with a short subtitled video and the waiting calls as text | [`/ketchup-video`](../ketchup-video/SKILL.md) |
 | Know how code works now, or where new code should live | [`/how`](../how/SKILL.md) |
 | Know why code is shaped this way, or where a number came from | [`/why`](../why/SKILL.md) |
 | Understand a change or subsystem, explained plainly | [`/teach`](../teach/SKILL.md) |
@@ -70,6 +72,8 @@ Recommend `/poteto-mode` for a broad workflow. Name a leaf skill when the user w
 | Give agents a scripted way to drive the app and prove behavior | [`/create-verification-skill`](../create-verification-skill/SKILL.md) |
 | Bring a verification skill and its feature map back in line with the app | [`/maintain-verification-skill`](../maintain-verification-skill/SKILL.md) |
 | Formally verify a race, invariant, or other property that tests rarely reach | [`/create-formal-verification-skill`](../create-formal-verification-skill/SKILL.md) |
+| Bring a formal verification back in line after the code it covers changed, and learn whether a failure is drift or a bug | [`/maintain-formal-verification-skill`](../maintain-formal-verification-skill/SKILL.md) |
+| Show a PM or designer what the user sees as a chart checked by a TLA+ model, with the shortest path to each state that breaks a rule | `pstack:statechart` |
 | Vet a performance number before reporting or acting on it | [`/benchmark-checklist`](../benchmark-checklist/SKILL.md) |
 | Run a large or cross-cutting change, or one to review after stepping away | [`/figure-it-out`](../figure-it-out/SKILL.md) |
 | Keep a decision log during a run, and review it afterward | [`/show-me-your-work`](../show-me-your-work/SKILL.md) |
@@ -101,7 +105,7 @@ Read the Playbooks section of [poteto-mode](../poteto-mode/SKILL.md) to select t
 - "babysit this PR" prepares it for merge; merging requires the user's instruction to merge, land, or ship.
 - "land the stack" selects Shipping; "take over this branch" selects Session pickup.
 - "pause safely" selects Pause safely.
-- "full autopilot on this queue" selects Autopilot-full; "stack them, don't ship" selects Autopilot-stack.
+- "full autopilot on this queue" selects Autopilot-full; "autopilot, don't merge" selects Autopilot-stack.
 - "run the eval playbook" selects Eval.
 
 For a multi-phase plan, read the [Multi-phase plan playbook](../poteto-mode/playbooks/multi-phase-plan.md). A planning-only request produces a plan without implementation. For an unresolved design question, consider Prototype or `/architect` within the user's requested scope.

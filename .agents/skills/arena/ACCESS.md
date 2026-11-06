@@ -1,6 +1,6 @@
 ---
 name: arena
-description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
+description: "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for pstack:arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
 ---
 
 ## On-demand context
@@ -51,7 +51,7 @@ Every candidate gets the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. The rubric is the picker's tool in Phase D. Candidates only see the task.
-3. Pick the runners. Use the `arena runners` line in `~/.pstack/codex-models.md`. If the rule or that line is missing, use two independent agents inheriting the host model. An `auto` or `inherit-parent` entry in this line or the cross-judge line means the parent model, so omit `model` for it. If a configured model is unavailable, inherit the host model and report the loss of model diversity. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+3. Pick the runners. Use the `arena runners` line in `~/.pstack/codex-models.md`. Without that line, use two independent agents inheriting the host model. For `auto` or `inherit-parent`, omit model, effort, and speed overrides. If a configured model is unavailable, use a confirmed supported equivalent from the same family or drop the seat and disclose it. If fewer than two seats remain, add independent runners on a remaining supported model, or inherit the host model when none remain. Keep one seat when the configured list has only one entry. Report any loss of model diversity. Spawn more runners when the task covers multiple design directions.
 4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the [pstack:principle-separate-before-serializing-shared-state]({{packy.access:pstack:principle-separate-before-serializing-shared-state}}).
 
 ## Phase B: Fan out
@@ -62,11 +62,11 @@ If a candidate produces no output, proceed with N-1 and note the dropout.
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, choose one model from the `arena cross-judge pool` line in `~/.pstack/codex-models.md`. If the rule or that line is missing, inherit the host model. Prefer a different model family from the parent's. Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
+After all Phase B candidates complete, try the confirmed `arena cross-judge pool` entries in `~/.pstack/codex-models.md` in preference order. The judge must use a different model family from the parent. `auto` and `inherit-parent` resolve to the parent and never qualify as a diverse judge. Use only model choices supported by the actual host. If no supported different-family model runs, skip the judge, choose the base in Phase D, and disclose the missing independent judgment. If the parent's model family cannot be established, disclose that the family check did not run. The judge reads the rubric and candidate paths, scores each criterion, and recommends a base. Run it alongside your Phase D reading, after all candidates stop writing.
 
 ## Phase D: Pick a base
 
-Read every candidate end to end before picking. Score each against the rubric criterion by criterion, not on holistic feel, and compare with the cross-judge. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding.
+Read every candidate end to end before picking. Score each against the rubric criterion by criterion, not on holistic feel, and compare with the cross-judge when Phase C ran one. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding.
 
 Pick the base a future maintainer can extend most easily without breaking invariants. When two feel tied, prefer the cleaner boundary or smaller API, per [pstack:principle-laziness-protocol]({{packy.access:pstack:principle-laziness-protocol}}).
 
@@ -82,4 +82,4 @@ Verify the synthesized artifact like any other output, per the [pstack:principle
 
 ## Outputs
 
-One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.
+One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict or that Phase C skipped the judge, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.

@@ -1,7 +1,7 @@
 <!-- packy:project:pstack:agents:notices:start -->
 ## Packy project notices
 
-Pack: pstack 6.0.0
+Pack: pstack 6.1.0
 
 Surface: agents
 
@@ -70,7 +70,7 @@ SOFTWARE.
 <!-- packy:project:pstack:claude:notices:start -->
 ## Packy project notices
 
-Pack: pstack 6.0.0
+Pack: pstack 6.1.0
 
 Surface: claude
 

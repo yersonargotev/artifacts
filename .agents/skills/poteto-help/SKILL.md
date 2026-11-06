@@ -21,6 +21,8 @@ Check state only when it changes the answer:
 
 When preferences are missing and setup matters, offer `$setup-pstack` once per conversation and answer the question too. Missing preferences alone do not require setup before work can proceed.
 
+A question about a race or invariant can use the optional `$create-formal-verification-skill` route when no formal check exists. When covered code changed after its recorded sync commit, suggest the optional `$maintain-formal-verification-skill` route. Setup offers app and formal verification separately after model configuration. A multi-day program uses host-run orchestration; it does not require the retired orchestration scripts.
+
 ## Get set up
 
 For Packy installation questions, inspect the available CLI help and catalog version before giving an install or update command. This help skill does not install the Pack or change global settings merely to explain setup.
@@ -94,7 +96,7 @@ Read the Playbooks section of [poteto-mode](../poteto-mode/SKILL.md) to select t
 - "babysit this PR" prepares it for merge; merging requires the user's instruction to merge, land, or ship.
 - "land the stack" selects Shipping; "take over this branch" selects Session pickup.
 - "pause safely" selects Pause safely.
-- "full autopilot on this queue" selects Autopilot-full; "stack them, don't ship" selects Autopilot-stack.
+- "full autopilot on this queue" selects Autopilot-full; "don't merge" selects Autopilot-stack.
 - "run the eval playbook" selects Eval.
 
 For a multi-phase plan, read the [Multi-phase plan playbook](../poteto-mode/playbooks/multi-phase-plan.md). A planning-only request produces a plan without implementation. For an unresolved design question, consider Prototype or `$architect` within the user's requested scope.
