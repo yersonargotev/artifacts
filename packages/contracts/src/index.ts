@@ -125,7 +125,8 @@ export const deleteSchema = z.strictObject({ requestId, artifactId: identifier, 
 export const deleteResultSchema = z.strictObject({ artifactId: identifier });
 export type DeleteInput = z.infer<typeof deleteSchema>;
 export type DeleteResult = z.infer<typeof deleteResultSchema>;
-export const moveSchema = z.strictObject({ requestId, artifactId: identifier, project: projectNameSchema.nullable() });
+export const moveSchema = z.strictObject({ requestId, artifactId: identifier, project: projectNameSchema.nullable().optional(), slug: slugSchema.nullable().optional() })
+  .refine((input) => input.project !== undefined || input.slug !== undefined, 'Specify project, slug, or both; null clears either');
 export const moveResultSchema = z.strictObject({ artifactId: identifier, project: z.string().nullable() });
 export type MoveResult = z.infer<typeof moveResultSchema>;
 export const shareSchema = z.strictObject({ requestId, artifactId: identifier, email: z.string().trim().toLowerCase().pipe(z.email().max(254)).meta({ format: 'email', description: 'Email address, trimmed and lowercased; at most 254 characters after trimming' }), notify: z.boolean().optional(), requireNew: z.literal(true).optional() });
