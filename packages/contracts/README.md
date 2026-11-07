@@ -6,7 +6,7 @@
 npm install @yargote/artifacts-contracts@0.1.0-beta.10
 ```
 
-The root export contains domain schemas and types. `/workflow` contains `prepareArtifactEdit`, revision comparison, and compact projections. `/serialization` contains canonical JSON and SHA-256. `/http` contains HTTP response schemas, identity, canonical resource validation, and route URL helpers.
+The root export contains domain schemas and types. `/workflow` contains `prepareArtifactEdit`, `batchCommandSchema` and `prepareBatch`, revision comparison, and compact projections. `/serialization` contains canonical JSON and SHA-256. `/http` contains HTTP response schemas, identity, canonical resource validation, and route URL helpers.
 
 `protectedResourceMetadataSchema` accepts standard protected-resource metadata and an optional `artifacts_rest_resource`. The relation names the exact absolute canonical REST OAuth resource URL. It may name the resource itself or one distinct REST resource. Metadata for the distinct resource may omit the relation or name itself, but cannot name another resource.
 

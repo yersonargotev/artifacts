@@ -69,6 +69,8 @@ Artifact reads and list items also include `slug`, a page name or null. `read({ 
 
 `prepareArtifactEdit(client, { artifactId, requestId, changes })` reads the current full snapshot and prepares an immutable update command. Metadata and content changes merge into that snapshot. An explicit `files` array replaces the attachments. The helper does not submit the update. Retain its exact output before sending it.
 
+`prepareBatch(client, { requestId, operations })` accepts the `batch` operations plus `{ op: 'edit', changes }`, addressed like an `update` by `artifactId` or `{ project?, slug }`, with the `changes` of `prepareArtifactEdit`. It reads the head of each edited page in parallel and returns a `batch` command where each edit is an `update` with that head as `expectedRevisionId`. An edit addresses a page that exists before the batch, and the server fails it with `conflict` and its `index` if the page changed or an earlier operation writes it. A read failure throws `BatchOperationError` with the operation's `index` and the original error as `cause`. Retain the prepared command before sending it.
+
 ## Errors and retries
 
 `HttpError` extends `Error` and contains `status`, `code`, and `details`. Server conflicts preserve the server's details. Transport failures use status `0` and code `network_error` or `timeout`. Rejected redirects use `redirect_refused`. Invalid response schemas use `invalid_response`. Oversized responses use `response_too_large`. A mismatched archive digest uses `archive_digest_mismatch`.
