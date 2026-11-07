@@ -75,11 +75,13 @@ Search finds owned artifacts whose head contains every term of QUERY, ignoring
 letter case and accents. It reads Markdown and text content, the visible text
 of HTML, and the title and description of every kind. Quote a QUERY with
 spaces. Results are ordered by relevance with a **bold** snippet.
-Batch applies 1 to 25 create and update operations from one command file with
+Batch applies 1 to 25 create, update, and move operations from one command file with
 a requestId and operations. All succeed or none do. A failure names the 0-based
 index of its operation. An update addresses its artifact by artifactId or by
 project and slug, including a page created earlier in the batch, and omits
-expectedRevisionId only for such a page. A batch never publishes.
+expectedRevisionId only for such a page. A move addresses its artifact by
+artifactId or by from { project, slug } and takes the move project and slug.
+Later operations address a moved page by its new slug. A batch never publishes.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.

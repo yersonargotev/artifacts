@@ -486,10 +486,19 @@ test('REST and MCP apply a batch atomically and report the failing operation', a
     await error(await call('/batch', 'POST', { ...input, operations: input.operations.slice(0, 1) }), 409, 'request_conflict');
     await error(await call('/batch', 'POST', { requestId: 'rest-batch-empty', operations: [] }), 400, 'invalid_input');
     await error(await call('/batch', 'POST', { requestId: 'rest-batch-many', operations: Array.from({ length: 26 }, () => ({ op: 'create', snapshot: page('x') })) }), 400, 'invalid_input');
-    await error(await call('/batch', 'POST', { requestId: 'rest-batch-move', operations: [{ op: 'move', artifactId: index.artifactId, project: 'Otro' }] }), 400, 'invalid_input');
+    await error(await call('/batch', 'POST', { requestId: 'rest-batch-move-empty', operations: [{ op: 'move', artifactId: index.artifactId }] }), 400, 'invalid_input');
+    const collided = await error(await call('/batch', 'POST', { requestId: 'rest-batch-move-collide', operations: [{ op: 'move', from: { project: 'Wiki', slug: 'concepts/rag' }, slug: 'index' }] }), 409, 'slug_conflict');
+    assert.deepEqual(collided.details, { index: 0, slug: 'index', project: 'Wiki', artifactId: index.artifactId });
     assert.equal((await call('/batch')).status, 405);
     await error(await api(app, (await grant(app, 'openid profile offline_access artifacts:read')).access_token)('/batch', 'POST', input), 403, 'forbidden');
     assert.equal((await (await call('/artifacts')).json()).items.length, 2, 'failed batches committed nothing');
+
+    const reorganized = await mcp(app, tokens.access_token, 'artifacts_batch', { requestId: 'rest-batch-reorganize', operations: [
+      { op: 'move', from: { project: 'Wiki', slug: 'concepts/rag' }, slug: 'concepts/retrieval' },
+      { op: 'update', project: 'Wiki', slug: 'concepts/retrieval', expectedRevisionId: result.results[0]!.revisionId, snapshot: page('Recuperación renombrada') },
+    ] });
+    assert.equal((reorganized.structuredContent as typeof result).results[1]!.artifactId, result.results[0]!.artifactId, 'MCP addresses a moved page by its new slug');
+    assert.deepEqual((await (await call('/search?query=renombrada')).json()).items.map(({ slug }: { slug: string }) => slug), ['concepts/retrieval']);
   } finally { await app.close(); }
 });
 
