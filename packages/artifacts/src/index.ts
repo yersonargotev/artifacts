@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { alias, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
@@ -7,9 +7,10 @@ import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, batchResultSchema, batchSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type BatchResult, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
-import { createAccess, writeTransaction, type Connection } from './access.ts';
+import { createAccess, isBusy, isConstraint, writeTransaction, type Connection } from './access.ts';
+import { planBatch } from './batch.ts';
 import { revision } from './revision.ts';
 import { invitation, type InvitationSender } from './invitation.ts';
 import type { SharedArtifactSummary } from './contracts.ts';
@@ -40,10 +41,18 @@ const searchBody: Record<Snapshot['content']['kind'], (text: string) => string> 
   design: () => '',
 };
 
+const searchRow = (artifactId: string, snapshot: Snapshot) => ({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: searchBody[snapshot.content.kind](snapshot.content.text) });
+
 async function indexHead(connection: Connection, artifactId: string, snapshot: Snapshot) {
   await connection.delete(artifactSearch).where(eq(artifactSearch.artifactId, artifactId));
-  await connection.insert(artifactSearch).values({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: searchBody[snapshot.content.kind](snapshot.content.text) });
+  await connection.insert(artifactSearch).values(searchRow(artifactId, snapshot));
 }
+
+type Statement = Parameters<Database['$client']['batch']>[0][number];
+const statement = (query: { toSQL(): { sql: string; params: unknown[] } }): Statement => {
+  const { sql, params } = query.toSQL();
+  return { sql, args: params as Extract<Statement, { args?: unknown }>['args'] };
+};
 
 export async function reindexSearch(db: Database): Promise<number> {
   let reindexed = 0;
@@ -73,7 +82,7 @@ const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadS
 
 export function createArtifactStore(db: Database, options: { publishOrigin: string; access: AccessPolicy; sendInvitation?: InvitationSender }) {
   const admission = createAdmission(db, options.access);
-  const { transaction, authorize, liveSession, command, receipt, projectSpelling, ownedProjects, bySlug, claimSlug, publicationUrl: urlFor, callback } = createAccess(db, options);
+  const { transaction, authorize, liveSession, command, receipt, replay, projectSpelling, ownedProjects, bySlug, claimSlug, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, slug: row.artifact.slug, publication: publication(row.artifact.id, row.publication ?? undefined) });
   const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
@@ -149,6 +158,61 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         await indexHead(connection, input.artifactId, input.snapshot);
         return readOwned(connection, actor.userId, input.artifactId);
       });
+    },
+
+    async batch(actor: Actor, value: z.input<typeof batchSchema>): Promise<BatchResult> {
+      const input = batchSchema.parse(value);
+      const payloadHash = await sha256(canonicalJson({ kind: 'batch', input }));
+      const snapshots = await Promise.all(input.operations.map(async ({ snapshot }) => {
+        const text = canonicalJson(snapshot);
+        return { text, digest: await sha256(text) };
+      }));
+      const ids = input.operations.flatMap((operation) => operation.op === 'update' && operation.artifactId !== undefined ? [operation.artifactId] : []);
+      const slugs = input.operations.flatMap((operation) => operation.slug === undefined ? [] : [operation.slug]);
+      // The writes travel as one batch request instead of an interactive transaction, so every read is repeated after a write that a stale read let through.
+      for (let conflicts = 0, busy = 0; ;) {
+        await authorize(db, actor, 'artifacts:write');
+        const [stored, projects, pages] = await Promise.all([
+          replay(db, actor.userId, input.requestId, payloadHash, batchResultSchema),
+          ownedProjects(db, actor.userId),
+          ids.length || slugs.length
+            ? db.select({ artifactId: artifact.id, project: artifact.project, slug: artifact.slug, headRevisionId: artifact.headRevisionId, sequence: artifactRevision.sequence }).from(artifact)
+              .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
+              .where(and(eq(artifact.ownerId, actor.userId), or(ids.length ? inArray(artifact.id, ids) : undefined, slugs.length ? inArray(artifact.slug, slugs) : undefined)))
+            : [],
+        ]);
+        if (stored) return stored.result;
+        const { results, writes } = planBatch(input.operations, projects.map(({ name }) => name), pages, () => crypto.randomUUID());
+        const createdAt = new Date();
+        const author = { authorUserId: actor.userId, authorClientId: actor.clientId, createdAt };
+        // Each guard fails the batch when a read no longer holds: the revision sequence index for a concurrent update, the revision foreign key for a delete, the slug index for a claimed slug, and the receipt key for a raced retry.
+        const statements = writes.flatMap((write) => {
+          const { text, digest } = snapshots[write.index]!;
+          if (write.op === 'create') return [
+            statement(db.insert(artifact).values({ id: write.artifactId, ownerId: actor.userId, headRevisionId: write.revisionId, createdAt, project: write.project, slug: write.slug })),
+            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: null, sequence: 1, ...author, sha256: digest, snapshot: text })),
+            statement(db.insert(artifactSearch).values(searchRow(write.artifactId, write.snapshot))),
+          ];
+          return [
+            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: write.parentRevisionId, sequence: write.sequence, ...author, sha256: digest, snapshot: text })),
+            statement(db.update(artifact).set({ headRevisionId: write.revisionId }).where(and(eq(artifact.id, write.artifactId), eq(artifact.ownerId, actor.userId), eq(artifact.headRevisionId, write.parentRevisionId)))),
+            statement(db.delete(artifactSearch).where(eq(artifactSearch.artifactId, write.artifactId))),
+            statement(db.insert(artifactSearch).values(searchRow(write.artifactId, write.snapshot))),
+          ];
+        });
+        statements.push(statement(db.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson({ results }), createdAt })));
+        try {
+          await db.$client.batch(statements, 'write');
+          return { results };
+        } catch (error) {
+          if (isConstraint(error) && conflicts++ < 2) continue;
+          if (isBusy(error) && busy < 5) {
+            await new Promise((resolve) => setTimeout(resolve, 10 * 2 ** busy++));
+            continue;
+          }
+          throw error;
+        }
+      }
     },
 
     async publish(actor: Actor, value: z.input<typeof publishSchema>) {
@@ -259,7 +323,8 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         if (current.headRevisionId !== input.expectedRevisionId || (current.publication?.version ?? 0) !== input.expectedPublicationVersion) {
           throw new ArtifactError('conflict', 'Artifact changed since confirmation', { currentRevisionId: current.headRevisionId, currentPublicationVersion: current.publication?.version ?? 0 });
         }
-        const matching = and(eq(artifactCommand.ownerId, actor.userId), sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`);
+        const named = or(sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`, sql`exists (select 1 from json_each(${artifactCommand.result}, '$.results') where json_extract(value, '$.artifactId') = ${input.artifactId})`);
+        const matching = and(eq(artifactCommand.ownerId, actor.userId), named);
         await connection.update(artifactCommand).set({ payloadHash: '', result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
         const removed = await connection.delete(artifact).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId))).returning({ artifactId: artifact.id });
         if (removed.length !== 1) throw new ArtifactError('not_found', 'Artifact not found');

@@ -65,13 +65,17 @@ export const snapshotSchema = z.strictObject({
 }).superRefine((snapshot, context) => {
   const paths = snapshot.files.map((file) => file.path);
   if (paths.some((path, index) => paths.some((other, otherIndex) => index !== otherIndex && (path === other || other.startsWith(`${path}/`))))) context.addIssue({ code: 'custom', path: ['files'], message: 'File paths must be unique and cannot contain another file' });
-  const bytes = Buffer.byteLength(JSON.stringify(snapshot.metadata)) + Buffer.byteLength(snapshot.content.text) + snapshot.files.reduce((total, file) => total + Buffer.byteLength(file.path) + Buffer.byteLength(file.mediaType) + decodeFile(file).length, 0);
+  const bytes = snapshotBytes(snapshot);
   if (bytes > 1_048_576) context.addIssue({ code: 'custom', message: 'A revision must fit within 1 MiB of decoded content and metadata' });
   // A request body can reach 8 MiB, so the index of an oversized design is not parsed.
   if (snapshot.content.kind !== 'design' || bytes > 1_048_576) return;
   const canvas = readCanvas(snapshot);
   if (!canvas.success) for (const issue of canvas.issues) context.addIssue({ ...issue });
 });
+
+export function snapshotBytes(snapshot: Snapshot): number {
+  return Buffer.byteLength(JSON.stringify(snapshot.metadata)) + Buffer.byteLength(snapshot.content.text) + snapshot.files.reduce((total, file) => total + Buffer.byteLength(file.path) + Buffer.byteLength(file.mediaType) + decodeFile(file).length, 0);
+}
 
 export type CanvasIndex = z.infer<typeof canvasIndexSchema>;
 export type CanvasBoard = CanvasIndex['boards'][string] & { path: string; html: string };
@@ -117,9 +121,22 @@ export const slugSchema = z.string().min(1).max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/, 'Use lowercase kebab-case segments separated by /, such as concepts/rag');
 export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, project: projectNameSchema.optional(), slug: slugSchema.optional(), response });
 export const readByIdSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
-export const readSchema = z.strictObject({ artifactId: identifier.optional(), project: projectNameSchema.optional(), slug: slugSchema.optional(), revisionId: identifier.optional(), response })
-  .refine((input) => (input.artifactId === undefined) !== (input.slug === undefined) && (input.project === undefined || input.slug !== undefined), 'Specify exactly one of artifactId or slug; project applies only with slug');
+const locator = { artifactId: identifier.optional(), project: projectNameSchema.optional(), slug: slugSchema.optional() };
+const locatorRule = [(input: { artifactId?: string; project?: string; slug?: string }) => (input.artifactId === undefined) !== (input.slug === undefined) && (input.project === undefined || input.slug !== undefined), 'Specify exactly one of artifactId or slug; project applies only with slug'] as const;
+export const readSchema = z.strictObject({ ...locator, revisionId: identifier.optional(), response }).refine(...locatorRule);
 export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema, response });
+export const batchOperationSchema = z.discriminatedUnion('op', [
+  z.strictObject({ op: z.literal('create'), snapshot: snapshotSchema, project: createSchema.shape.project, slug: createSchema.shape.slug }),
+  z.strictObject({ op: z.literal('update'), ...locator, expectedRevisionId: identifier.optional(), snapshot: snapshotSchema }).refine(...locatorRule),
+]);
+const batchCeiling = 4_194_304;
+export const batchSchema = z.strictObject({ requestId, operations: z.array(batchOperationSchema).min(1).max(25) }).superRefine((batch, context) => {
+  if (batch.operations.reduce((total, operation) => total + snapshotBytes(operation.snapshot), 0) > batchCeiling) context.addIssue({ code: 'custom', path: ['operations'], message: 'A batch must fit within the 4 MiB ceiling of decoded content and metadata across its operations' });
+});
+export const batchResultSchema = z.strictObject({ results: z.array(z.strictObject({ index: z.number().int().nonnegative(), artifactId: identifier, revisionId: identifier })) });
+export type BatchOperation = z.infer<typeof batchOperationSchema>;
+export type BatchInput = z.infer<typeof batchSchema>;
+export type BatchResult = z.infer<typeof batchResultSchema>;
 export const publishSchema = z.strictObject({ requestId, artifactId: identifier, revisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
 export const deleteSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
 export const deleteResultSchema = z.strictObject({ artifactId: identifier });
