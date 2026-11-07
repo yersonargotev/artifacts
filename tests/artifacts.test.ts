@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactCommand, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
-import { createArtifactStore, createSchema, moveSchema, projectNameSchema, readSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore, createSchema, moveSchema, projectNameSchema, readSchema, searchSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
@@ -523,5 +523,98 @@ test('grant consumption races admit once and expired sessions and grants fail cl
     await app.db.update(session).set({ expiresAt: new Date(Date.now() - 1) }).where(eq(session.id, app.actor.sessionId));
     await assert.rejects(app.store.consumePublicationGrant({ ...input, code: pending.code }), { code: 'invalid_grant' });
     await assert.rejects(app.store.read(app.actor, { artifactId: created.artifactId }), { code: 'forbidden' });
+  } finally { await app.close(); }
+});
+
+const page = (title: string, text: string, kind: Snapshot['content']['kind'] = 'markdown', description = ''): Snapshot => ({ metadata: { title, description }, content: { kind, text }, files: [] });
+
+test('search finds owned Markdown and text heads without accents and follows update, move, and delete', async () => {
+  const app = await artifactFixture();
+  try {
+    const ids = async (query: string, project?: string) => (await app.store.search(app.actor, { query, project })).items.map((item) => item.artifactId);
+    const envigado = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Viaje', 'Una tarde en Envigado con amigos.'), project: 'Wiki', slug: 'viajes/envigado' });
+    const accented = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Búsqueda', 'Notas sueltas.', 'text') });
+    const described = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Plain', 'Nothing here.', 'markdown', 'Described as zanahoria') });
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Envigado HTML', '<p>Envigado</p>', 'html') });
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: designSnapshot() });
+
+    const [hit, ...rest] = (await app.store.search(app.actor, { query: 'envigado' })).items;
+    assert.deepEqual(rest, [], 'HTML pages are not indexed');
+    assert.deepEqual({ ...hit, rank: typeof hit!.rank }, { artifactId: envigado.artifactId, project: 'Wiki', slug: 'viajes/envigado', title: 'Viaje', snippet: 'Una tarde en **Envigado** con amigos.', rank: 'number' });
+    assert.deepEqual(await ids('busqueda'), [accented.artifactId], 'the title matches without its accent');
+    assert.deepEqual(await ids('zanahoria'), [described.artifactId], 'the description is indexed');
+    assert.deepEqual(await ids('board'), [], 'design artifacts are not indexed');
+
+    const updated = await app.store.update(app.actor, { requestId: randomUUID(), artifactId: envigado.artifactId, expectedRevisionId: envigado.revision.id, snapshot: page('Viaje', 'Una tarde en Sabaneta.') });
+    assert.deepEqual(await ids('envigado'), [], 'removed text no longer finds the page');
+    assert.deepEqual(await ids('sabaneta'), [envigado.artifactId], 'new text finds the page');
+    await app.store.update(app.actor, { requestId: randomUUID(), artifactId: envigado.artifactId, expectedRevisionId: updated.revision.id, snapshot: page('Viaje', 'Sabaneta', 'html') });
+    assert.deepEqual(await ids('sabaneta'), [], 'an update to HTML drops the page from the index');
+    await app.store.update(app.actor, { requestId: randomUUID(), artifactId: accented.artifactId, expectedRevisionId: accented.revision.id, snapshot: page('Búsqueda', 'Notas sueltas.', 'text') });
+    assert.equal((await app.store.search(app.actor, { query: 'busqueda' })).items.length, 1, 'an update replaces the row instead of adding one');
+
+    await app.store.move(app.actor, { requestId: randomUUID(), artifactId: accented.artifactId, project: 'Otro', slug: 'notas' });
+    assert.deepEqual((await app.store.search(app.actor, { query: 'busqueda' })).items.map(({ project, slug }) => ({ project, slug })), [{ project: 'Otro', slug: 'notas' }]);
+    assert.deepEqual(await ids('busqueda', 'otro'), [accented.artifactId], 'the project filter uses the canonical spelling');
+    assert.deepEqual(await ids('busqueda', 'Wiki'), []);
+    assert.deepEqual(await ids('busqueda', 'Missing'), []);
+
+    const current = await app.store.read(app.actor, { artifactId: accented.artifactId });
+    await app.store.delete(app.actor, { requestId: randomUUID(), artifactId: accented.artifactId, expectedRevisionId: current.headRevisionId, expectedPublicationVersion: 0 });
+    assert.deepEqual(await ids('busqueda'), []);
+    assert.deepEqual((await app.client.execute({ sql: 'SELECT count(*) AS total FROM artifact_search WHERE artifact_id = ?', args: [accented.artifactId] })).rows[0]!.total, 0, 'the delete trigger removes the row');
+  } finally { await app.close(); }
+});
+
+test('search requires every term, treats operators as text, orders by rank then ID, and pages by cursor', async () => {
+  const app = await artifactFixture();
+  try {
+    const both = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Both', 'alpha beta') });
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Alpha only', 'alpha gamma') });
+    assert.deepEqual((await app.store.search(app.actor, { query: '  alpha   beta ' })).items.map((item) => item.artifactId), [both.artifactId]);
+    for (const query of ['"foo" OR NEAR(', '(', '"', '""', 'title:alpha', 'alph*', 'alpha NOT beta']) assert.deepEqual((await app.store.search(app.actor, { query })).items, [], query);
+    const near = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Near', 'near foo or') });
+    assert.deepEqual((await app.store.search(app.actor, { query: '"foo" OR NEAR(' })).items.map((item) => item.artifactId), [near.artifactId], 'operator words match as plain terms');
+
+    for (let index = 0; index < 4; index++) await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page(`Tie ${index}`, 'kiwi') });
+    const strong = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Kiwi', 'kiwi kiwi kiwi kiwi') });
+    const all = (await app.store.search(app.actor, { query: 'kiwi', limit: 25 })).items;
+    assert.equal(all.length, 5);
+    assert.equal(all[0]!.artifactId, strong.artifactId, 'the strongest match ranks first');
+    assert.deepEqual(all.slice(1).map((item) => item.artifactId), all.slice(1).map((item) => item.artifactId).sort(), 'equal ranks fall back to artifact ID');
+    assert(all.every((item, index) => index === 0 || all[index - 1]!.rank <= item.rank), 'rank ascends');
+
+    const first = await app.store.search(app.actor, { query: 'kiwi', limit: 2 });
+    assert.equal(first.nextCursor, '2');
+    const second = await app.store.search(app.actor, { query: 'kiwi', limit: 2, cursor: first.nextCursor! });
+    const third = await app.store.search(app.actor, { query: 'kiwi', limit: 2, cursor: second.nextCursor! });
+    assert.equal(third.nextCursor, null);
+    assert.deepEqual([...first.items, ...second.items, ...third.items], all);
+    assert.equal((await app.store.search(app.actor, { query: 'kiwi' })).items.length, 5, 'limit defaults to 10');
+
+    assert.deepEqual(searchSchema.parse({ query: '  kiwi ' }), { query: 'kiwi', limit: 10 });
+    for (const input of [{ query: '' }, { query: '   ' }, { query: 'x'.repeat(257) }, { query: 'kiwi', limit: 0 }, { query: 'kiwi', limit: 26 }, { query: 'kiwi', cursor: 'abc' }, { query: 'kiwi', cursor: '-1' }, { query: 'kiwi', cursor: '1234567' }, { query: 'kiwi', extra: true }]) {
+      assert.equal(searchSchema.safeParse(input).success, false, JSON.stringify(input));
+    }
+  } finally { await app.close(); }
+});
+
+test('search returns only the caller\'s owned artifacts and authorizes artifacts:read and the live session', async () => {
+  const app = await artifactFixture();
+  try {
+    const mine = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Mine', 'mango') });
+    const outsider = await app.auth.api.signUpEmail({ body: { name: 'Search outsider', email: 'search-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: mine.artifactId, kind: 'email', value: 'search-other@example.test', createdBy: app.ownerId, createdAt: new Date() });
+    await app.auth.api.signInEmail({ body: { email: 'search-other@example.test', password: app.password } });
+    const [outsiderSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
+    const other = { ...app.actor, userId: outsider.user.id, sessionId: outsiderSession!.id };
+    const theirs = await app.store.create(other, { requestId: randomUUID(), snapshot: page('Theirs', 'mango') });
+    await app.store.publish(app.actor, { requestId: randomUUID(), artifactId: mine.artifactId, revisionId: mine.revision.id, expectedPublicationVersion: 0 });
+    assert.deepEqual((await app.store.search(app.actor, { query: 'mango' })).items.map((item) => item.artifactId), [mine.artifactId]);
+    assert.deepEqual((await app.store.search(other, { query: 'mango' })).items.map((item) => item.artifactId), [theirs.artifactId], 'a shared artifact never appears');
+
+    await assert.rejects(app.store.search({ ...app.actor, scopes: ['artifacts:write'] }, { query: 'mango' }), { code: 'forbidden', details: { requiredScope: 'artifacts:read' } });
+    await app.db.update(session).set({ expiresAt: new Date(Date.now() - 1) }).where(eq(session.id, app.actor.sessionId));
+    await assert.rejects(app.store.search(app.actor, { query: 'mango' }), { code: 'forbidden' });
   } finally { await app.close(); }
 });

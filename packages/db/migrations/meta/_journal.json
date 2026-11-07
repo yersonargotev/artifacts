@@ -43,6 +43,13 @@
       "when": 1794017911310,
       "tag": "0005_broad_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794033459051,
+      "tag": "0006_artifact_search",
+      "breakpoints": true
     }
   ]
 }
