@@ -35,5 +35,18 @@ export async function driveSearch({ checks, call, cli, ok }: SearchDrive) {
   assert.equal(blank.code, 1, 'A blank CLI query exits 1');
   assert.match(blank.stderr, /"code":"invalid_input"/, 'A blank CLI query reports invalid_input');
 
-  checks.push('HTTP MCP create and update of a Markdown page with project and slug', 'HTTP MCP search finds the new head text without accents, with project, slug, title, and a highlighted snippet', 'Source CLI search over REST equals the MCP result', 'Removed text no longer matches through MCP or the CLI', 'Operator text returns no results instead of a syntax error', 'Blank CLI query fails with invalid_input');
+  const html = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: { metadata: { title: 'Mapa del oriente', description: '' }, content: { kind: 'html', text: '<!doctype html><html><head><style>.medellin{color:red}</style><script>var itagui = 1</script></head><body><p class="bello" data-place="caldas">Un paseo por <b>Rionegro</b></p></body></html>' }, files: [] } }));
+  assert.deepEqual(searchResultSchema.parse(await call('artifacts_search', { query: 'rionegro' })).items.map((item) => item.artifactId), [html.artifactId], 'MCP search finds the HTML page by its visible text');
+  for (const query of ['medellin', 'itagui', 'bello', 'caldas', 'class', 'script']) assert.deepEqual(searchResultSchema.parse(await call('artifacts_search', { query })).items, [], `MCP search does not find the HTML page by ${query}`);
+
+  const board = 'boards/Guarne.html';
+  const canvas = { v: 1, boards: { [board]: { x: 0, y: 0, w: 1440, h: 900, title: 'Guarne' } }, order: [board] };
+  const design = artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: { metadata: { title: 'Tablero de Guatape', description: 'Bocetos de Jardin.' }, content: { kind: 'design', text: JSON.stringify(canvas) }, files: [{ path: board, mediaType: 'text/html', encoding: 'utf8', data: '<!doctype html><html lang="es"><meta charset="utf-8"><title>Guarne</title><h1>Guarne</h1></html>' }] } }));
+  const designHits = searchResultSchema.parse(await call('artifacts_search', { query: 'guatape' }));
+  assert.deepEqual(designHits.items.map((item) => item.artifactId), [design.artifactId], 'MCP search finds the design by its title');
+  assert.deepEqual(searchResultSchema.parse(await call('artifacts_search', { query: 'jardin' })).items.map((item) => item.artifactId), [design.artifactId], 'MCP search finds the design by its description');
+  assert.deepEqual(searchResultSchema.parse(await call('artifacts_search', { query: 'guarne' })).items, [], 'MCP search does not find the design by a canvas or board word');
+  assert.deepEqual(searchResultSchema.parse(await ok('search', 'guatape')), designHits, 'CLI design search over REST equals the MCP result');
+
+  checks.push('HTTP MCP create and update of a Markdown page with project and slug', 'HTTP MCP search finds the new head text without accents, with project, slug, title, and a highlighted snippet', 'Source CLI search over REST equals the MCP result', 'Removed text no longer matches through MCP or the CLI', 'Operator text returns no results instead of a syntax error', 'Blank CLI query fails with invalid_input', 'HTTP MCP search finds an HTML page by visible text and not by a style, script, tag, or attribute word', 'HTTP MCP search finds a design by title and description and not by a canvas or board word', 'Source CLI design search over REST equals the MCP result');
 }
