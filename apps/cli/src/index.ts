@@ -6,9 +6,9 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { batchSchema, createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
-import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
+import { BatchOperationError, createArtifactHttpClient, HttpError, prepareArtifactEdit, prepareBatch } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
 import { CredentialStore } from './credentials.ts';
 import { loadOperation, retainOperation, submitOperation, type Mutation } from './operations.ts';
@@ -75,11 +75,15 @@ Search finds owned artifacts whose head contains every term of QUERY, ignoring
 letter case and accents. It reads Markdown and text content, the visible text
 of HTML, and the title and description of every kind. Quote a QUERY with
 spaces. Results are ordered by relevance with a **bold** snippet.
-Batch applies 1 to 25 create, update, and move operations from one command file with
-a requestId and operations. All succeed or none do. A failure names the 0-based
-index of its operation. An update addresses its artifact by artifactId or by
-project and slug, including a page created earlier in the batch, and omits
-expectedRevisionId only for such a page. A move addresses its artifact by
+Batch applies 1 to 25 create, update, edit, and move operations from one command
+file with a requestId and operations. All succeed or none do. A failure names the
+0-based index of its operation. An update addresses its artifact by artifactId or
+by project and slug, including a page created earlier in the batch, and omits
+expectedRevisionId only for such a page. An edit takes the same address and the
+changes of edit --changes for a page that exists before the batch. The CLI reads
+its head and sends an update with that expectedRevisionId, so a page changed
+meanwhile, or written earlier in the batch, fails with conflict; use update for
+such a page. Retry sends the prepared batch. A move addresses its artifact by
 artifactId or by from { project, slug } and takes the move project and slug.
 Later operations address a moved page by its new slug. A batch never publishes.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
@@ -224,7 +228,7 @@ async function main(): Promise<unknown> {
     const value = await jsonFile(required('command'));
     if (kind === 'create' || kind === 'batch') {
       none();
-      return kind === 'create' ? { kind, command: createSchema.parse(value) } : { kind, command: batchSchema.parse(value) };
+      return kind === 'create' ? { kind, command: createSchema.parse(value) } : { kind, command: await prepareBatch(client, value as Parameters<typeof prepareBatch>[1]) };
     }
     const mutation: Mutation = kind === 'update' ? { kind, command: updateSchema.parse(value) } : { kind, command: publishSchema.parse(value) };
     const id = argument(false);
@@ -303,15 +307,22 @@ async function main(): Promise<unknown> {
   }
 }
 
-try {
-  const result = await main();
-  if (result !== undefined) process.stdout.write(`${JSON.stringify(result)}\n`);
-} catch (error) {
-  const body = error instanceof HttpError
+function errorBody(error: unknown): { code: string; message: string; status?: number; details: Record<string, unknown> } {
+  if (error instanceof BatchOperationError) {
+    const body = errorBody(error.cause);
+    return { ...body, details: { ...body.details, index: error.index } };
+  }
+  return error instanceof HttpError
     ? { code: error.code, message: error.message, status: error.status, details: error.details }
     : error instanceof z.ZodError
       ? { code: 'invalid_input', message: 'Input does not match the artifact command schema', details: { issues: error.issues } }
       : { code: error instanceof UsageError || error instanceof TypeError || error instanceof SyntaxError ? 'invalid_arguments' : 'local_error', message: error instanceof Error ? error.message : 'Command failed', details: {} };
-  process.stderr.write(`${JSON.stringify({ error: body })}\n`);
+}
+
+try {
+  const result = await main();
+  if (result !== undefined) process.stdout.write(`${JSON.stringify(result)}\n`);
+} catch (error) {
+  process.stderr.write(`${JSON.stringify({ error: errorBody(error) })}\n`);
   process.exitCode = 1;
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ArtifactError, artifactReadSchema, createSchema, decodeFile, readByIdSchema, snapshotSchema, updateSchema, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from './index.ts';
+import { ArtifactError, artifactReadSchema, batchOperationSchema, batchSchema, createSchema, decodeFile, locator, locatorRule, readByIdSchema, snapshotSchema, updateSchema, type ArtifactRead, type BatchInput, type Revision, type Snapshot, type UpdateInput } from './index.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 
 export type { UpdateInput } from './index.ts';
@@ -89,26 +89,39 @@ export async function compareRevisions(before: Revision, after: Revision): Promi
   };
 }
 
-export type ArtifactEditClient = { read(input: { artifactId: string }): Promise<ArtifactRead> };
-export type PrepareArtifactEditInput = {
-  artifactId: string;
-  requestId: string;
-  changes: {
-    metadata?: Partial<Snapshot['metadata']>;
-    content?: Partial<Snapshot['content']>;
-    files?: Snapshot['files'];
-  };
+type ArtifactLocator = { artifactId: string } | { project?: string; slug: string };
+export type ArtifactEditClient = { read(input: ArtifactLocator): Promise<ArtifactRead> };
+export type ArtifactChanges = {
+  metadata?: Partial<Snapshot['metadata']>;
+  content?: Partial<Snapshot['content']>;
+  files?: Snapshot['files'];
 };
+export type PrepareArtifactEditInput = { artifactId: string; requestId: string; changes: ArtifactChanges };
 
-const prepareEditSchema = z.strictObject({
-  artifactId: readByIdSchema.shape.artifactId,
-  requestId: createSchema.shape.requestId,
-  changes: z.strictObject({
-    metadata: snapshotSchema.shape.metadata.partial().optional(),
-    content: snapshotSchema.shape.content.partial().optional(),
-    files: snapshotSchema.shape.files.optional(),
-  }),
+const changesSchema = z.strictObject({
+  metadata: snapshotSchema.shape.metadata.partial().optional(),
+  content: snapshotSchema.shape.content.partial().optional(),
+  files: snapshotSchema.shape.files.optional(),
 });
+const prepareEditSchema = z.strictObject({ artifactId: readByIdSchema.shape.artifactId, requestId: createSchema.shape.requestId, changes: changesSchema });
+
+export const batchCommandSchema = z.strictObject({
+  requestId: batchSchema.shape.requestId,
+  operations: z.array(z.discriminatedUnion('op', [
+    ...batchOperationSchema.options,
+    z.strictObject({ op: z.literal('edit'), ...locator, changes: changesSchema }).refine(...locatorRule),
+  ])).min(1).max(25),
+});
+export type BatchCommandInput = z.input<typeof batchCommandSchema>;
+
+export class BatchOperationError extends Error {
+  readonly index: number;
+  constructor(index: number, cause: unknown) {
+    super(cause instanceof Error ? cause.message : `Batch operation ${index} could not be prepared`, { cause });
+    this.name = 'BatchOperationError';
+    this.index = index;
+  }
+}
 
 function freezeJson<T>(value: T): T {
   if (value && typeof value === 'object') {
@@ -118,22 +131,35 @@ function freezeJson<T>(value: T): T {
   return value;
 }
 
-export async function prepareArtifactEdit(client: ArtifactEditClient, value: PrepareArtifactEditInput): Promise<UpdateInput> {
-  const input = prepareEditSchema.parse(structuredClone(value));
-  const current = artifactReadSchema.parse(structuredClone(await client.read({ artifactId: input.artifactId })));
-  if (current.artifactId !== input.artifactId) throw new TypeError('Artifact reader returned a different artifact');
+async function applyChanges(client: ArtifactEditClient, target: ArtifactLocator, changes: z.infer<typeof changesSchema>): Promise<{ headRevisionId: string; snapshot: Snapshot }> {
+  const current = artifactReadSchema.parse(structuredClone(await client.read(target)));
+  if ('artifactId' in target && current.artifactId !== target.artifactId) throw new TypeError('Artifact reader returned a different artifact');
   if (current.revision.id !== current.headRevisionId) throw new ArtifactError('conflict', 'Artifact reader did not return the current head', { currentRevisionId: current.headRevisionId });
   const snapshot = current.revision.snapshot;
-  const metadata = { ...snapshot.metadata, ...input.changes.metadata };
-  if (Object.hasOwn(input.changes.metadata ?? {}, 'custom') && input.changes.metadata?.custom === undefined) delete metadata.custom;
-  return freezeJson(updateSchema.parse({
-    artifactId: input.artifactId,
-    requestId: input.requestId,
-    expectedRevisionId: current.headRevisionId,
-    snapshot: {
-      metadata,
-      content: { ...snapshot.content, ...input.changes.content },
-      files: input.changes.files ?? snapshot.files,
-    },
+  const metadata = { ...snapshot.metadata, ...changes.metadata };
+  if (Object.hasOwn(changes.metadata ?? {}, 'custom') && changes.metadata?.custom === undefined) delete metadata.custom;
+  return {
+    headRevisionId: current.headRevisionId,
+    snapshot: { metadata, content: { ...snapshot.content, ...changes.content }, files: changes.files ?? snapshot.files },
+  };
+}
+
+export async function prepareArtifactEdit(client: ArtifactEditClient, value: PrepareArtifactEditInput): Promise<UpdateInput> {
+  const input = prepareEditSchema.parse(structuredClone(value));
+  const { headRevisionId, snapshot } = await applyChanges(client, { artifactId: input.artifactId }, input.changes);
+  return freezeJson(updateSchema.parse({ artifactId: input.artifactId, requestId: input.requestId, expectedRevisionId: headRevisionId, snapshot }));
+}
+
+// Each edit keeps its own locator so the server resolves a slug at that point in the batch, as it does for update.
+export async function prepareBatch(client: ArtifactEditClient, value: BatchCommandInput): Promise<BatchInput> {
+  const command = batchCommandSchema.parse(structuredClone(value));
+  const settled = await Promise.allSettled(command.operations.map(async (operation) => {
+    if (operation.op !== 'edit') return operation;
+    const { op, changes, ...target } = operation;
+    const { headRevisionId, snapshot } = await applyChanges(client, target as ArtifactLocator, changes);
+    return { op: 'update' as const, ...target, expectedRevisionId: headRevisionId, snapshot };
   }));
+  const failed = settled.findIndex((result) => result.status === 'rejected');
+  if (failed !== -1) throw new BatchOperationError(failed, (settled[failed] as PromiseRejectedResult).reason);
+  return freezeJson(batchSchema.parse({ requestId: command.requestId, operations: settled.map((result) => (result as PromiseFulfilledResult<BatchInput['operations'][number]>).value) }));
 }

@@ -467,6 +467,57 @@ test('CLI applies a batch command file and retries a lost batch from its retaine
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test('CLI batch edits merge into the current heads, fail stale or missing pages by index, and retry the prepared batch', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-batch-edit-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const page = (text: string) => ({ metadata: { title: text, description: '' }, content: { kind: 'markdown' as const, text }, files: [] });
+    const log = await client.create({ requestId: 'cli-batch-edit-log', project: 'Wiki', slug: 'log', snapshot: { ...snapshot, content: { kind: 'markdown', text: '- ingest 1' } } });
+    const index = await client.create({ requestId: 'cli-batch-edit-index', project: 'Wiki', slug: 'index', snapshot });
+    const commandFile = join(directory, 'batch.json');
+    const run = async (command: unknown) => { await writeFile(commandFile, JSON.stringify(command)); return cli(['batch', '--command', commandFile], environment); };
+    const retained = async (requestId: string) => JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, requestId), 'utf8')).command;
+
+    app.dropNextResourceResponse('POST');
+    failure(await run({ requestId: 'cli-batch-edit', operations: [
+      { op: 'create', project: 'Wiki', slug: 'concepts/rag', snapshot: page('RAG') },
+      { op: 'edit', project: 'wiki', slug: 'log', changes: { content: { text: '- ingest 1\n- ingest 2' } } },
+      { op: 'edit', artifactId: index.artifactId, changes: { metadata: { title: 'Índice con rag' } } },
+    ] }), 'network_error');
+    const prepared = await retained('cli-batch-edit');
+    assert.deepEqual(prepared.operations.slice(1).map(({ op, expectedRevisionId, artifactId, slug }: Record<string, string>) => [op, expectedRevisionId, artifactId ?? slug]), [['update', log.headRevisionId, 'log'], ['update', index.headRevisionId, index.artifactId]]);
+    const result = success(await cli(['retry', 'cli-batch-edit'], environment)) as { results: { index: number; artifactId: string; revisionId: string }[] };
+    assert.deepEqual(result.results.map(({ index, artifactId }) => [index, artifactId]).slice(1), [[1, log.artifactId], [2, index.artifactId]]);
+    const loggedHead = await client.read({ artifactId: log.artifactId });
+    assert.deepEqual([loggedHead.revision.parentRevisionId, loggedHead.revision.snapshot], [log.headRevisionId, { ...snapshot, content: { kind: 'markdown', text: '- ingest 1\n- ingest 2' } }]);
+    const indexHead = await client.read({ artifactId: index.artifactId });
+    assert.deepEqual([indexHead.revision.parentRevisionId, indexHead.revision.snapshot], [index.headRevisionId, { ...snapshot, metadata: { ...snapshot.metadata, title: 'Índice con rag' } }]);
+
+    app.setResourceHandler(async (request) => {
+      if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/v1/batch')) {
+        app.setResourceHandler(app.resourceHandler);
+        await client.update({ requestId: 'cli-batch-edit-racer', artifactId: log.artifactId, expectedRevisionId: loggedHead.headRevisionId, snapshot: page('Racer') });
+      }
+      return app.resourceHandler(request);
+    });
+    const stale = failure(await run({ requestId: 'cli-batch-edit-stale', operations: [{ op: 'create', project: 'Wiki', slug: 'concepts/stale', snapshot: page('Stale') }, { op: 'edit', project: 'Wiki', slug: 'log', changes: { content: { text: 'never' } } }] }), 'conflict');
+    assert.equal(stale.details.index, 1);
+    const racedHead = await client.read({ project: 'Wiki', slug: 'log' });
+    assert.equal(racedHead.revision.snapshot.metadata.title, 'Racer');
+    const sameBatch = failure(await run({ requestId: 'cli-batch-edit-chained', operations: [{ op: 'update', project: 'Wiki', slug: 'log', expectedRevisionId: racedHead.headRevisionId, snapshot: page('First') }, { op: 'edit', project: 'Wiki', slug: 'log', changes: { content: { text: 'second' } } }] }), 'conflict');
+    assert.equal(sameBatch.details.index, 1);
+    assert.equal((await client.read({ artifactId: log.artifactId })).headRevisionId, racedHead.headRevisionId);
+
+    const missing = failure(await run({ requestId: 'cli-batch-edit-missing', operations: [{ op: 'create', project: 'Wiki', slug: 'concepts/new', snapshot: page('New') }, { op: 'edit', project: 'Wiki', slug: 'concepts/new', changes: { content: { text: 'too early' } } }] }), 'not_found');
+    assert.deepEqual([missing.status, missing.details.index], [404, 1]);
+    await assert.rejects(readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-batch-edit-missing')), { code: 'ENOENT' });
+    assert.deepEqual((await client.list({ project: 'Wiki' })).items.map(({ slug }) => slug).sort(), ['concepts/rag', 'index', 'log']);
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test('CLI files, lists, and moves projects, and retries a lost move from its retained operation', async () => {
   const app = await fixture({ transport: 'rest' });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-projects-'));
@@ -667,6 +718,7 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
   assert.match(help.stdout, /retry REQUEST_ID/);
   assert.match(help.stdout, /\n  batch --command FILE\n/);
+  assert.match(help.stdout, /Batch applies 1 to 25 create, update, edit, and move operations/);
   assert.match(help.stdout, /\n  projects\n/);
   assert.match(help.stdout, /move ID \[--project NAME \| --no-project\] \[--slug SLUG \| --no-slug\]\n         \[--request-id ID\]/);
   assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);

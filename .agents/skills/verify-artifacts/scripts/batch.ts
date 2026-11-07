@@ -94,6 +94,19 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   assert.deepEqual(renamed.items.map(({ slug }) => slug), ['concepts/retrieval'], 'MCP search returns the moved page under its new slug');
   assert.deepEqual(searchResultSchema.parse(await ok('search', 'itagui', '--project', 'mi-wiki')), renamed, 'CLI search over REST equals the MCP result');
 
+  const edit = { requestId: randomUUID(), operations: [
+    { op: 'create', project: 'Mi-Wiki', slug: 'sources/sabaneta', snapshot: markdown('Sabaneta', '# Sabaneta\n\nNotas del taller.\n') },
+    { op: 'edit', project: 'mi-wiki', slug: 'log', changes: { content: { text: '# Log\n\n- Ingesta de la charla de Karpathy.\n- Ingesta del taller de Sabaneta.\n' } } },
+  ] };
+  const editFile = await command('edit', edit);
+  await record('Append to the log with a batch edit', { argv: ['batch', '--command', editFile], operations: edit.operations.length });
+  const edited = batchResultSchema.parse(await ok('batch', '--command', editFile));
+  assert.deepEqual(edited.results.map(({ index }) => index), [0, 1]);
+  assert.equal(edited.results[1]!.artifactId, log.artifactId, 'The edit addresses the log by its slug');
+  const editedLog = artifactReadSchema.parse(await call('artifacts_read', { project: 'mi-wiki', slug: 'log' }));
+  assert.deepEqual([editedLog.headRevisionId, editedLog.revision.sequence, editedLog.revision.parentRevisionId], [edited.results[1]!.revisionId, 3, applied.results[5]!.revisionId], 'The edit writes one revision on the prior log head');
+  assert.deepEqual(editedLog.revision.snapshot, markdown('Log', '# Log\n\n- Ingesta de la charla de Karpathy.\n- Ingesta del taller de Sabaneta.\n'), 'The edit changes the log text and keeps its title, description, and kind');
+
   await login(page);
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   for (const title of ['Karpathy', 'RAG', 'Agents']) assert.equal(await page.locator('.artifact-card').filter({ has: page.getByRole('link', { name: title, exact: true }) }).filter({ hasText: 'Mi-Wiki' }).count(), 1, `The library shows the batch page ${title}`);
@@ -111,5 +124,5 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px index detail does not overflow');
   await capture(page, 'batch-index-390');
 
-  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'A colliding batch move exits 1 with slug_conflict at its index and moves nothing', 'A CLI batch moves a page, updates it and the index by its new slug, and MCP and CLI search return it under that slug', 'The panel library shows the batch pages, and the index links resolve to them at desktop and 390px');
+  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'A colliding batch move exits 1 with slug_conflict at its index and moves nothing', 'A CLI batch moves a page, updates it and the index by its new slug, and MCP and CLI search return it under that slug', 'A CLI batch edit by project and slug appends to the log beside a create, and MCP reads the merged head on the prior one', 'The panel library shows the batch pages, and the index links resolve to them at desktop and 390px');
 }

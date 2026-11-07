@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createArtifactStore, createSchema, historySchema, readSchema, updateSchema, type Actor, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from '../packages/artifacts/src/index.ts';
-import { compactArtifactRead, compareRevisions, prepareArtifactEdit, summarizeRevision, type CompactArtifactRead, type RevisionSummary } from '../packages/artifacts/src/workflow.ts';
+import { BatchOperationError, compactArtifactRead, compareRevisions, prepareArtifactEdit, prepareBatch, summarizeRevision, type CompactArtifactRead, type RevisionSummary } from '../packages/artifacts/src/workflow.ts';
 import { compactArtifactReadSchema, summaryHistoryResultSchema } from '../packages/contracts/src/http.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
 
@@ -160,6 +160,40 @@ test('preparation rejects a returned non-head, another artifact and invalid snap
   await assert.rejects(prepareArtifactEdit({ read: async () => ({ ...document, revision: { ...revision, snapshot: { ...snapshot, files: [{ ...snapshot.files[0], path: '../escape' }] } } }) }, input), /normalized relative file path/);
   await assert.rejects(prepareArtifactEdit({ read: async () => document }, { ...input, changes: { content: { text: '\ud800' } } }), /well-formed Unicode/);
   await assert.rejects(prepareArtifactEdit({ read: async () => document }, { ...input, changes: { content: { text: 'x'.repeat(1_048_576) } } }), /1 MiB/);
+});
+
+test('prepared batches turn edits into updates against each read head and keep other operations', async () => {
+  const reads: unknown[] = [];
+  const move = { op: 'move' as const, artifactId: 'artifact-two', slug: 'archive/old' };
+  const create = { op: 'create' as const, slug: 'new', snapshot };
+  const prepared = await prepareBatch({ read: async (input) => { reads.push(input); return document; } }, { requestId: 'prepared-batch', operations: [
+    create,
+    { op: 'edit', project: 'Wiki', slug: 'log', changes: { content: { text: 'Appended' } } },
+    move,
+    { op: 'edit', artifactId: document.artifactId, changes: { metadata: { custom: undefined } } },
+  ] });
+  assert.deepEqual(reads, [{ project: 'Wiki', slug: 'log' }, { artifactId: document.artifactId }]);
+  assert.deepEqual(prepared, { requestId: 'prepared-batch', operations: [
+    create,
+    { op: 'update', project: 'Wiki', slug: 'log', expectedRevisionId: revision.id, snapshot: { ...snapshot, content: { kind: 'html', text: 'Appended' } } },
+    move,
+    { op: 'update', artifactId: document.artifactId, expectedRevisionId: revision.id, snapshot: { ...snapshot, metadata: { title: 'Saved title', description: 'Saved description' } } },
+  ] });
+  assert.throws(() => Object.assign(prepared.operations[1]!, { op: 'create' }), TypeError);
+});
+
+test('prepared batches name the first operation that cannot be prepared', async () => {
+  const missing = Object.assign(new Error('Artifact not found'), { code: 'not_found' });
+  const reader = { read: async (input: { artifactId: string } | { slug: string }) => {
+    if ('slug' in input) throw missing;
+    return input.artifactId === document.artifactId ? document : { ...document, artifactId: 'another-artifact' };
+  } };
+  const edit = (target: { artifactId: string } | { slug: string }) => ({ op: 'edit' as const, ...target, changes: {} });
+  await assert.rejects(prepareBatch(reader, { requestId: 'unprepared-batch', operations: [edit({ artifactId: document.artifactId }), edit({ slug: 'later' }), edit({ artifactId: 'wrong' })] }), (error: unknown) => error instanceof BatchOperationError && error.index === 1 && error.cause === missing);
+  await assert.rejects(prepareBatch(reader, { requestId: 'unprepared-batch', operations: [edit({ artifactId: 'wrong' }), edit({ slug: 'later' })] }), (error: unknown) => error instanceof BatchOperationError && error.index === 0 && /different artifact/.test(error.message));
+  await assert.rejects(prepareBatch(reader, { requestId: 'unprepared-batch', operations: [{ op: 'edit', changes: {} }] }), { name: 'ZodError' });
+  await assert.rejects(prepareBatch(reader, { requestId: 'unprepared-batch', operations: [{ op: 'edit', artifactId: document.artifactId, project: 'Wiki', changes: {} }] }), { name: 'ZodError' });
+  await assert.rejects(prepareBatch(reader, { requestId: 'unprepared-batch', operations: Array.from({ length: 5 }, () => edit({ artifactId: document.artifactId })).map((operation) => ({ ...operation, changes: { content: { text: 'x'.repeat(900_000) } } })) }), /4 MiB ceiling/);
 });
 
 test('persisted prepared edits replay an uncertain committed write and reject a stale head', async () => {

@@ -12,6 +12,7 @@ An owner maintaining a wiki applies an ingest, such as new pages plus the index 
 - `batch-search` finds the batch text through MCP `artifacts_search` and the CLI, and the replaced text no longer matches.
 - `batch-collide` applies a batch whose operation 1 moves a page onto the slug that operation 0 just took, gets exit 1 with `slug_conflict` at `index` 1, and MCP reads `concepts/rag` unmoved.
 - `batch-move` applies a three-operation reorganization with the CLI: it moves `concepts/rag` to `concepts/retrieval`, updates that page by its new slug, and points the index at it. MCP reads the page under the new slug, and MCP and CLI search return it there.
+- `batch-edit` applies a batch with the CLI that creates `Sabaneta` (`sources/sabaneta`) and edits the log by `{ project: "mi-wiki", slug: "log" }` with only new content text. MCP reads the log at sequence 3 with the ingest's log revision as parent, the appended line, and its title, description, and kind unchanged.
 - `batch-panel` sees the three new pages in the library and the reorganized index's `Enlaces` resolving to them at desktop and 390px.
 
 ## How to get to it (user POV)
@@ -41,11 +42,13 @@ Expected end state:
 - MCP and CLI search for `sabaneta` in `mi-wiki` return only `concepts/agents`. `borrador` and `todavia` return no items.
 - The colliding batch exits 1 with `"code":"slug_conflict"`, `"status":409`, and `"index":1`.
 - The reorganization prints results that name the RAG page twice and then the index. The move's `revisionId` is the RAG head from the ingest, and MCP reads `concepts/retrieval` at sequence 2. Search for `itagui` in `mi-wiki` returns only `concepts/retrieval` through MCP and the CLI.
+- The edit batch prints results 0 and 1, and result 1 names the log. MCP `artifacts_read { project: "mi-wiki", slug: "log" }` shows that revision at sequence 3, parent result 5 of the ingest, text ending in `- Ingesta del taller de Sabaneta.`, and title `Log` with description `Log wiki page.`.
 - The library shows `Karpathy`, `RAG`, and `Agents` in `Mi-Wiki`. `region "Enlaces"` on the index detail holds three links and no `[data-link-state="broken"]` item, and the 390px detail does not overflow.
 
-Evidence under `<run>/batch/` includes `actions.jsonl`, the `ingest.json`, `stale.json`, `collide.json`, and `reorganize.json` command files, `batch-library.png`, `batch-index.png`, `batch-index-390.png`, their `.aria.yml` snapshots, `trace.zip`, and `result.json`.
+Evidence under `<run>/batch/` includes `actions.jsonl`, the `ingest.json`, `stale.json`, `collide.json`, `reorganize.json`, and `edit.json` command files, `batch-library.png`, `batch-index.png`, `batch-index-390.png`, their `.aria.yml` snapshots, `trace.zip`, and `result.json`.
 
 ## Gotchas
 
 - A batch command file carries its own `requestId`. The CLI retains every submitted command and refuses a second command under a retained request ID, so a corrected batch needs a new `requestId`, and `retry` resends only the retained command.
+- An `edit` is prepared by the CLI: it reads the page head and sends an `update` with that `expectedRevisionId`, so the retained command holds the update, not the edit. An edit of a page the same batch creates or writes fails, so the drive edits only the log, which exists before the batch.
 - Raced writes, such as a competing update between the batch's reads and its write request, are covered by `tests/batch.test.ts`, not driven here.
