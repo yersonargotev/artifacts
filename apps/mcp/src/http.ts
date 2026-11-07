@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
 import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
@@ -92,6 +92,10 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           title: 'List artifacts', description: 'List owned artifacts in stable ID order with bounded cursor pagination. Each item includes its project name and slug, or null. Optional project returns only artifacts in that project, matched case-insensitively.',
           inputSchema: listSchema, annotations: readOnly,
         }, async (input) => execute(() => artifacts.list(principal, input)));
+        server.registerTool('artifacts_search', {
+          title: 'Search artifacts', description: 'Search the title, description, and content of owned Markdown and text artifacts at their head revision. The query is plain text of up to 256 characters: every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation are treated as text. HTML and design artifacts and artifacts shared with you are not searched. Results are ordered by relevance, best first, then by artifactId, and each item has artifactId, project, slug, title, a snippet with matches in **bold**, and rank, where lower is more relevant. Optional project limits results to that project, matched case-insensitively. limit is 1 to 25, default 10; pass nextCursor as cursor for the next page.',
+          inputSchema: searchSchema, annotations: readOnly,
+        }, async (input) => execute(() => artifacts.search(principal, input)));
         server.registerTool('artifacts_move', {
           title: 'Move or rename artifact', description: 'Set or clear the project and the slug of an owned artifact. Give project, slug, or both. An omitted field keeps its value, null clears it, and a value sets it. A project name is reused case-insensitively with its stored spelling, or created; a project disappears when its last artifact leaves. A move to another project keeps the slug. The move fails with slug_conflict, naming the holder, when the target project already uses the target slug, and then changes nothing. Moving never creates a revision and never changes the publication. Moving to the current project and slug succeeds without change. Requires artifacts:write. Retry with the same requestId and arguments.',
           inputSchema: moveSchema, annotations: mutation,

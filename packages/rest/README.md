@@ -34,6 +34,7 @@ Paths below are relative to `${API_URL}/v1`.
 | GET | `/artifacts` | `limit`, `cursor`, `project` |
 | GET | `/artifacts/:artifactId` | `revisionId`, `response` |
 | GET | `/lookup` | `slug`, optional `project`, `revisionId`, `response` |
+| GET | `/search` | `query`, optional `project`, `limit`, `cursor` |
 | PUT | `/artifacts/:artifactId` | Complete update command |
 | GET | `/artifacts/:artifactId/history` | `limit`, `beforeSequence`, `response` |
 | PUT | `/artifacts/:artifactId/publication` | Complete publish command |
@@ -68,6 +69,10 @@ A create command accepts an optional `slug` such as `concepts/rag`. Every artifa
 
 `GET /lookup?project=NAME&slug=SLUG` returns the same artifact read as `GET /artifacts/:artifactId`, with the same optional `revisionId` and `response`. An omitted `project` reads artifacts without a project. A lookup with no matching owned artifact returns 404 `not_found`. The lookup has its own collection because a slug such as `history` or `concepts/rag` would otherwise collide with the ID-addressed `/artifacts/:artifactId/...` routes.
 
+## Search
+
+`GET /search?query=TEXT` searches the title, description, and content of the caller's owned Markdown and text artifacts at their head revision. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. HTML and design artifacts, older revisions, and artifacts shared with the caller are not searched. Optional `project` limits results to one project, matched regardless of letter case. `limit` is 1 to 25 and defaults to 10. The response is `{ items, nextCursor }`; pass `nextCursor` as `cursor` for the next page. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. A missing or blank `query`, an unknown or repeated parameter, or a malformed `limit` or `cursor` returns 400 `invalid_input`.
+
 For an origin resource, the metadata URL is `${API_URL}/.well-known/oauth-protected-resource`. MCP metadata lives at `${API_URL}/.well-known/oauth-protected-resource/mcp`. Each document identifies its own exact OAuth resource. Check the REST document's `resource` field against the configured API origin. REST route challenges omit `resource_metadata` because those route URLs differ from the OAuth audience.
 
 ## Sharing
@@ -98,7 +103,7 @@ Each owner has 100 invitation reservations per UTC day, based on database time. 
 
 Errors have the shape `{ "error": { "code": "conflict", "message": "Artifact head changed", "details": { "currentRevisionId": "..." } } }`. Invalid input returns 400, missing authentication 401, forbidden access 403, missing owned objects 404, conflicts 409, oversized requests 413, unsupported content types 415, unsupported methods 405 with `Allow`, and unavailable dependencies 503.
 
-Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, lookups, artifact lists, and projects require `artifacts:read`. Create, update, and move require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
+Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, lookups, artifact lists, search, and projects require `artifacts:read`. Create, update, and move require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
 
 Retry a mutation with its exact complete command. Preserve omitted response fields, request ID, snapshot, and expected versions. While the artifact exists, an exact retry returns the original receipt, which can describe an older head or publication. Read fresh state separately. A conflict requires a deliberate new command, not a changed retry.
 

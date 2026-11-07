@@ -429,6 +429,36 @@ test('REST and MCP create pages with slugs and read them by project and slug', a
   } finally { await app.close(); }
 });
 
+test('REST and MCP search owned Markdown pages and follow updates and moves', async () => {
+  const app = await fixture({ transport: 'combined' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const page = (text: string): Snapshot => ({ metadata: { title: 'Viaje', description: '' }, content: { kind: 'markdown', text }, files: [] });
+    const created = await (await call('/artifacts', 'POST', { requestId: 'rest-search-create', snapshot: page('Una tarde en Envigado.'), project: 'Wiki', slug: 'viajes/envigado' })).json() as ArtifactRead;
+    const hits = await (await call('/search?query=envigado')).json();
+    assert.deepEqual(hits, { items: [{ artifactId: created.artifactId, project: 'Wiki', slug: 'viajes/envigado', title: 'Viaje', snippet: 'Una tarde en **Envigado**.', rank: hits.items[0].rank }], nextCursor: null });
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_search', { query: 'ENVIGADO', project: 'wiki' })).structuredContent, hits);
+
+    await call(`/artifacts/${created.artifactId}`, 'PUT', { requestId: 'rest-search-update', artifactId: created.artifactId, expectedRevisionId: created.headRevisionId, snapshot: page('Una tarde en Sabaneta.') });
+    await call(`/artifacts/${created.artifactId}/project`, 'PUT', { requestId: 'rest-search-move', artifactId: created.artifactId, project: 'Otro', slug: 'viajes/sabaneta' });
+    assert.deepEqual((await (await call('/search?query=envigado')).json()).items, [], 'removed text no longer matches');
+    assert.deepEqual((await (await call('/search?query=sabaneta&project=Otro&limit=1')).json()).items.map(({ project, slug }: { project: string; slug: string }) => [project, slug]), [['Otro', 'viajes/sabaneta']]);
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_search', { query: '"foo" OR NEAR(' })).structuredContent, { items: [], nextCursor: null });
+
+    await error(await call('/search'), 400, 'invalid_input');
+    await error(await call('/search?query=%20'), 400, 'invalid_input');
+    await error(await call('/search?query=x&limit=26'), 400, 'invalid_input');
+    await error(await call('/search?query=x&limit=two'), 400, 'invalid_input');
+    await error(await call('/search?query=x&cursor=abc'), 400, 'invalid_input');
+    await error(await call('/search?query=x&query=y'), 400, 'invalid_input');
+    await error(await call('/search?query=x&slug=y'), 400, 'invalid_input');
+    assert.equal((await call('/search?query=x', 'POST', {})).status, 405);
+    await error(await api(app, (await grant(app, 'openid profile offline_access artifacts:write')).access_token)('/search?query=sabaneta'), 403, 'forbidden');
+    assert.equal((await mcp(app, tokens.access_token, 'artifacts_search', { query: '' })).isError, true);
+  } finally { await app.close(); }
+});
+
 test('two independent HTTP writers produce one head winner and one conflict without an extra revision', async () => {
   const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {

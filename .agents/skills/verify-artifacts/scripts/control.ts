@@ -14,6 +14,7 @@ import { driveProjects } from './projects.ts';
 import { driveDesign } from './design.ts';
 import { driveSharing, type Account } from './sharing.ts';
 import { driveSlugs } from './slugs.ts';
+import { driveSearch } from './search.ts';
 import { driveLinks } from './links.ts';
 import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
 import { fixture, grant } from '../../../../tests/helpers.ts';
@@ -25,7 +26,7 @@ import { artifactReadSchema, publishResultSchema, shareSchema } from '../../../.
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'cli', 'projects', 'slugs', 'links', 'screens', 'preview', 'publication', 'export', 'sharing', 'design'] as const;
+const features = ['identity', 'authoring', 'cli', 'projects', 'slugs', 'links', 'search', 'screens', 'preview', 'publication', 'export', 'sharing', 'design'] as const;
 const scopes = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; api: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
@@ -364,6 +365,8 @@ async function drive(feature: Feature) {
       assert.equal(read.headRevisionId, edited.revision.id);
       assert.equal(read.publication?.revisionId, published.revisionId);
       checks.push('Source CLI whoami/create/edit/history/publish/export over local REST', 'Stale CLI update rejected with exit 1', 'Edit preserves omitted metadata and attachment', 'CLI ZIP equals MCP export bytes', 'Head and publication independently read through MCP');
+    } else if (feature === 'search') {
+      await driveSearch({ checks, call, cli, ok });
     } else {
       browser = await chromium.launch({ channel: 'chrome', headless: !args.includes('--headed') });
       context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...(feature === 'screens' && args.includes('--headed') ? { recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } } : {}) });

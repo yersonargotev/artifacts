@@ -146,6 +146,16 @@ export type Notification = z.infer<typeof notificationSchema>;
 export type UnshareResult = z.infer<typeof unshareResultSchema>;
 export const exportSchema = z.strictObject({ artifactId: identifier, revisionId: identifier });
 export const listSchema = z.strictObject({ limit: z.number().int().min(1).max(100).default(25), cursor: identifier.optional(), project: projectNameSchema.optional() });
+export const searchSchema = z.strictObject({
+  query: z.string().trim().min(1).max(256),
+  project: projectNameSchema.optional(),
+  limit: z.number().int().min(1).max(25).default(10),
+  cursor: z.string().regex(/^\d{1,6}$/, 'Use the nextCursor from a previous search').optional(),
+});
+export const searchHitSchema = z.strictObject({ artifactId: identifier, project: z.string().nullable(), slug: z.string().nullable(), title: z.string(), snippet: z.string(), rank: z.number() });
+export const searchResultSchema = z.strictObject({ items: z.array(searchHitSchema).max(25), nextCursor: z.string().nullable() });
+export type SearchHit = z.infer<typeof searchHitSchema>;
+export type SearchResult = z.infer<typeof searchResultSchema>;
 export const libraryQuerySchema = z.strictObject({
   q: z.string().trim().max(256).default(''),
   status: z.enum(['all', 'published', 'unpublished', 'pending']).default('all'),

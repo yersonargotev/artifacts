@@ -33,7 +33,7 @@ async function databases(t: TestContext) {
 }
 
 async function applicationRows(client: Client) {
-  const names = await client.execute("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name <> '__drizzle_migrations' ORDER BY name");
+  const names = await client.execute("SELECT name FROM pragma_table_list WHERE schema = 'main' AND type IN ('table', 'virtual') AND name NOT GLOB 'sqlite_*' AND name <> '__drizzle_migrations' ORDER BY name");
   const tables = [];
   for (const { name } of names.rows) {
     const result = await client.execute(`SELECT * FROM "${String(name).replaceAll('"', '""')}" ORDER BY rowid`);
@@ -160,6 +160,20 @@ test('foreign key cycles copy through one deferred destination transaction', asy
   await copy();
   assert.deepEqual((await target.client.execute('SELECT cycle_left.id, cycle_right.id FROM cycle_left JOIN cycle_right ON cycle_left.right_id = cycle_right.id AND cycle_right.left_id = cycle_left.id')).rows.map((row) => [row[0], row[1]]), [['left-id', 'right-id']]);
   assert.equal((await target.client.execute('PRAGMA foreign_key_check')).rows.length, 0);
+});
+
+test('the full-text index copies through its virtual table and searches in the target', async (t) => {
+  const { source, target, copy } = await databases(t);
+  await seedIdentity(source.client);
+  await source.client.batch([
+    'PRAGMA defer_foreign_keys = ON',
+    "INSERT INTO artifact (id, owner_id, head_revision_id, created_at) VALUES ('page-id', 'owner-id', 'revision-id', 0)",
+    "INSERT INTO artifact_revision (id, artifact_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES ('revision-id', 'page-id', 1, 'owner-id', 'client', 0, '', '{}')",
+    "INSERT INTO artifact_search (artifact_id, title, description, body) VALUES ('page-id', 'Búsqueda', '', 'Envigado')",
+  ], 'write');
+  await copy();
+  await copy();
+  assert.deepEqual((await target.client.execute("SELECT artifact_id FROM artifact_search WHERE artifact_search MATCH 'busqueda envigado'")).rows.map((row) => row[0]), ['page-id']);
 });
 
 test('verification rejects a target trigger that changes copied identity and rolls everything back', async (t) => {

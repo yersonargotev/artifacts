@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/libsql/migrator';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { migrateDatabase } from '../packages/db/src/migrate.ts';
 import { panelSession, session, user } from '../packages/db/src/schema.ts';
@@ -24,6 +26,42 @@ test('migrations are repeatable and central-session deletion cascades to panel s
     await db.delete(session).where(eq(session.id, 'central'));
     assert.deepEqual(await db.select().from(panelSession), []);
     await assert.rejects(db.insert(panelSession).values(panel), (error: Error) => error.cause instanceof Error && /FOREIGN KEY/.test(error.cause.message));
+  } finally {
+    client.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('the search migration backfills Markdown and text heads, and an owner deletion cascades out of the index', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-db-'));
+  const migrations = fileURLToPath(new URL('../packages/db/migrations', import.meta.url));
+  const before = join(directory, 'migrations');
+  await cp(migrations, before, { recursive: true });
+  const journal = JSON.parse(await readFile(join(before, 'meta/_journal.json'), 'utf8'));
+  journal.entries = journal.entries.filter((entry: { tag: string }) => entry.tag < '0006');
+  await writeFile(join(before, 'meta/_journal.json'), JSON.stringify(journal));
+  const url = `file:${join(directory, 'search.db')}`;
+  const { db, client } = await openDatabase({ url });
+  try {
+    await migrate(db, { migrationsFolder: before });
+    await client.execute("INSERT INTO user (id, name, email) VALUES ('owner', 'Owner', 'owner@example.test')");
+    const heads = [['markdown', 'Una tarde en Envigado'], ['text', 'Envigado en texto'], ['html', '<p>Envigado</p>']] as const;
+    for (const [index, [kind, text]] of heads.entries()) {
+      const snapshot = JSON.stringify({ metadata: { title: `Página ${kind}`, description: 'Búsqueda' }, content: { kind, text }, files: [] });
+      await client.batch([
+        { sql: 'INSERT INTO artifact (id, owner_id, head_revision_id, created_at) VALUES (?, ?, ?, 0)', args: [`a${index}`, 'owner', `r${index}`] },
+        { sql: "INSERT INTO artifact_revision (id, artifact_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES (?, ?, 1, 'owner', 'client', 0, '', ?)", args: [`r${index}`, `a${index}`, snapshot] },
+      ], 'write');
+    }
+    await client.execute("INSERT INTO artifact_revision (id, artifact_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES ('old', 'a0', 2, 'owner', 'client', 0, '', '{\"metadata\":{\"title\":\"Old\",\"description\":\"\"},\"content\":{\"kind\":\"markdown\",\"text\":\"Sabaneta\"},\"files\":[]}')");
+    await migrateDatabase(url);
+    await migrateDatabase(url);
+    const search = async (query: string) => (await client.execute({ sql: 'SELECT artifact_id, title, description FROM artifact_search WHERE artifact_search MATCH ? ORDER BY artifact_id', args: [query] })).rows.map((row) => ({ ...row }));
+    assert.deepEqual(await search('envigado'), [{ artifact_id: 'a0', title: 'Página markdown', description: 'Búsqueda' }, { artifact_id: 'a1', title: 'Página text', description: 'Búsqueda' }]);
+    assert.deepEqual(await search('busqueda pagina'), await search('envigado'), 'accents fold in the title and description');
+    assert.deepEqual(await search('sabaneta'), [], 'only head revisions are backfilled');
+    await db.delete(user).where(eq(user.id, 'owner'));
+    assert.equal((await client.execute('SELECT count(*) AS total FROM artifact_search')).rows[0]!.total, 0);
   } finally {
     client.close();
     await rm(directory, { recursive: true, force: true });

@@ -1,12 +1,12 @@
 import { and, asc, count, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/sqlite-core';
+import { alias, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
 import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type ShareResult, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
@@ -14,6 +14,18 @@ import { invitation, type InvitationSender } from './invitation.ts';
 import type { SharedArtifactSummary } from './contracts.ts';
 
 export * from './contracts.ts';
+
+// drizzle-kit does not model FTS5, so the table lives here instead of schema.ts and migration 0006 creates it by hand.
+const artifactSearch = sqliteTable('artifact_search', { artifactId: text('artifact_id').notNull(), title: text('title').notNull(), description: text('description').notNull(), body: text('body').notNull() });
+
+async function indexHead(connection: Connection, artifactId: string, snapshot: Snapshot) {
+  await connection.delete(artifactSearch).where(eq(artifactSearch.artifactId, artifactId));
+  if (snapshot.content.kind !== 'markdown' && snapshot.content.kind !== 'text') return;
+  await connection.insert(artifactSearch).values({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: snapshot.content.text });
+}
+
+// Quoting every whitespace-separated chunk turns FTS5 operators in user input into plain terms, and adjacent phrases mean AND.
+const matchExpression = (query: string) => query.split(/\s+/).map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
 
 const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null), slug: artifactReadSchema.shape.slug.default(null) });
 
@@ -64,6 +76,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         await claimSlug(connection, actor.userId, project, slug);
         await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt, project, slug });
         await connection.insert(artifactRevision).values({ id: revisionId, artifactId, parentRevisionId: null, sequence: 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt, sha256: digest, snapshot });
+        await indexHead(connection, artifactId, input.snapshot);
         return readOwned(connection, actor.userId, artifactId);
       });
     },
@@ -91,6 +104,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         await connection.insert(artifactRevision).values({ id: revisionId, artifactId: input.artifactId, parentRevisionId: current.headRevisionId, sequence: current.revision.sequence + 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: digest, snapshot });
         const changed = await connection.update(artifact).set({ headRevisionId: revisionId }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId), eq(artifact.headRevisionId, input.expectedRevisionId))).returning({ id: artifact.id });
         if (changed.length !== 1) throw new ArtifactError('conflict', 'Artifact head changed');
+        await indexHead(connection, input.artifactId, input.snapshot);
         return readOwned(connection, actor.userId, input.artifactId);
       });
     },
@@ -241,6 +255,21 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           .where(and(eq(artifact.ownerId, actor.userId), project, input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(input.limit + 1);
         const items = rows.slice(0, input.limit).map(summary);
         return { items, nextCursor: rows.length > input.limit ? items.at(-1)?.artifactId ?? null : null };
+      });
+    },
+
+    async search(actor: Actor, value: z.input<typeof searchSchema>): Promise<SearchResult> {
+      const input = searchSchema.parse(value);
+      const offset = Number(input.cursor ?? 0);
+      return transaction(async (connection) => {
+        await authorize(connection, actor, 'artifacts:read');
+        const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
+        const rank = sql<number>`bm25(${artifactSearch})`.mapWith(Number);
+        const rows = await connection.select({ artifactId: artifact.id, project: artifact.project, slug: artifact.slug, title: artifactSearch.title, snippet: sql<string>`snippet(${artifactSearch}, -1, '**', '**', '…', 16)`.mapWith(String), rank }).from(artifactSearch)
+          .innerJoin(artifact, eq(artifact.id, artifactSearch.artifactId))
+          .where(and(sql`${artifactSearch} MATCH ${matchExpression(input.query)}`, eq(artifact.ownerId, actor.userId), project))
+          .orderBy(rank, asc(artifact.id)).limit(input.limit + 1).offset(offset);
+        return { items: rows.slice(0, input.limit), nextCursor: rows.length > input.limit ? String(offset + input.limit) : null };
       });
     },
 

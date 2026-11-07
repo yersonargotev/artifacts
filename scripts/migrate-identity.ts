@@ -34,7 +34,8 @@ async function readTable(transaction: Transaction, name: string) {
 }
 
 async function readSnapshot(transaction: Transaction): Promise<Snapshot> {
-  const tables = await transaction.execute("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name <> '__drizzle_migrations' ORDER BY name");
+  // A full-text table is copied through its virtual table, which rebuilds the target index; its shadow tables are internal to FTS5.
+  const tables = await transaction.execute("SELECT name FROM pragma_table_list WHERE schema = 'main' AND type IN ('table', 'virtual') AND name NOT GLOB 'sqlite_*' AND name <> '__drizzle_migrations' ORDER BY name");
   const snapshot: Snapshot = { tables: [] };
   for (const table of tables.rows) snapshot.tables.push(await readTable(transaction, String(table.name)));
   return snapshot;

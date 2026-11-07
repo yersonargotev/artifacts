@@ -37,6 +37,8 @@ When the user names a project for new content, add `--project NAME` to `create`.
 
 When the user names a page, add `--slug SLUG` such as `concepts/rag` to `create`, and read it later with `read --project NAME --slug SLUG`, or `read --slug SLUG` for an unfiled page, instead of listing for its ID. Omit the `.md` suffix. A `slug_conflict` error names the `artifactId` that already holds the slug in that project. Rename a page with `move ID --slug SLUG` and clear its slug with `move ID --no-slug`. A move to another project keeps the slug, and a move into a used slug fails with `slug_conflict` without changing anything.
 
+To find a page by what it says, run `artifacts search QUERY`, optionally with `--project NAME`, instead of listing and reading every artifact. Every term must match, and letter case and accents are ignored. Read a hit by its `artifactId`, or by `--project` and `--slug` when it has a slug. Search covers only owned Markdown and text artifacts at their head revision.
+
 Use `move ID --project NAME` to file an existing artifact under a project and `move ID --no-project` to remove it from one. A move changes only the project. It creates no revision and leaves the publication unchanged. It is a retained mutation, so recover an uncertain move with `retry`. Verify it with `read` or `list --project NAME`. A project disappears when its last artifact leaves it.
 
 ## Publish deliberately

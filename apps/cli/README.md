@@ -130,6 +130,7 @@ artifacts create --snapshot FILE [--project NAME] [--slug SLUG] [--request-id ID
 artifacts create --command FILE
 artifacts list [--limit N] [--cursor CURSOR] [--project NAME]
 artifacts projects
+artifacts search QUERY [--project NAME] [--limit N] [--cursor CURSOR]
 artifacts read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
 artifacts read --slug SLUG [--project NAME] [--revision REV] [--response full|compact]
                [--out FILE [--quiet]]
@@ -233,6 +234,18 @@ artifacts move ARTIFACT_ID --no-slug
 A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace, which `read --slug` reads without `--project`. `read` takes exactly one of an ID or `--slug`, and `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId`. A locator with no artifact fails with `not_found`. Every artifact read and list item includes `slug`, a name or null. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`.
 
 `move ID --slug SLUG` renames a page in its project, and `move ID --no-slug` clears the slug. A move to another project keeps the slug. A move fails with `slug_conflict`, status 409, and the holder's `artifactId` when the target project already uses the target slug, and then changes nothing. A slug change creates no revision. Verify the new slug with `read`. The move result is unchanged, so published CLI versions keep working against this server.
+
+## Search pages
+
+`search QUERY` finds owned Markdown and text artifacts whose title, description, or content at the head revision contains every term of `QUERY`. Quote a query that contains spaces.
+
+```sh
+artifacts search envigado
+artifacts search "tarde envigado" --project mi-wiki
+artifacts search envigado --limit 5 --cursor 5
+```
+
+The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. HTML and design artifacts, older revisions, and artifacts shared with the caller are not searched. `--project NAME` limits results to one project, matched regardless of letter case. `--limit` is 1 to 25 and defaults to 10. The command prints `{ "items": [...], "nextCursor": "10" }`; pass `nextCursor` as `--cursor` for the next page, and `null` means there are no more results. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Search requires `artifacts:read`.
 
 ## Share publication access
 
