@@ -141,8 +141,7 @@ artifacts history ID [--limit N] [--before-sequence N] [--summary]
 artifacts publish ID --revision REV --expected-version N [--request-id ID]
 artifacts publish [ID] --command FILE
 artifacts export ID --revision REV --out FILE
-artifacts move ID --project NAME [--request-id ID]
-artifacts move ID --no-project [--request-id ID]
+artifacts move ID [--project NAME | --no-project] [--slug SLUG | --no-slug] [--request-id ID]
 artifacts share ID --email EMAIL [--notify] [--request-id ID]
 artifacts shares ID
 artifacts unshare ID SHARE_ID [--request-id ID]
@@ -215,7 +214,7 @@ artifacts move ARTIFACT_ID --no-project
 
 Every artifact read and list item includes `project`, a name or null. `projects` prints `{ "items": [{ "name": "Alpha", "artifactCount": 1 }] }`, ordered by name without regard to letter case. A project exists only while it contains an artifact.
 
-`move ID` requires exactly one of `--project NAME` or `--no-project`. It prints `{ "artifactId": "...", "project": "Beta" }` with the stored spelling, or `null` after `--no-project`. Move never creates a revision or changes the publication. Moving to the current project succeeds without change. Move is a retained mutation like the others, so `retry` recovers a lost response.
+`move ID` requires at least one of `--project NAME`, `--no-project`, `--slug SLUG`, or `--no-slug`, and accepts at most one from each pair. An option left out keeps that value. It prints `{ "artifactId": "...", "project": "Beta" }` with the stored spelling, or `null` after `--no-project`. Move never creates a revision or changes the publication. Moving to the current project succeeds without change. Move is a retained mutation like the others, so `retry` recovers a lost response.
 
 Version `0.1.0-beta.4` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
 
@@ -227,9 +226,13 @@ A slug names a page within its project, so `read` can find it without its ID. `c
 artifacts create --snapshot snapshot.json --project Mi-Wiki --slug concepts/rag
 artifacts read --project mi-wiki --slug concepts/rag
 artifacts read --slug index
+artifacts move ARTIFACT_ID --slug concepts/retrieval
+artifacts move ARTIFACT_ID --no-slug
 ```
 
 A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace, which `read --slug` reads without `--project`. `read` takes exactly one of an ID or `--slug`, and `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId`. A locator with no artifact fails with `not_found`. Every artifact read and list item includes `slug`, a name or null. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`.
+
+`move ID --slug SLUG` renames a page in its project, and `move ID --no-slug` clears the slug. A move to another project keeps the slug. A move fails with `slug_conflict`, status 409, and the holder's `artifactId` when the target project already uses the target slug, and then changes nothing. A slug change creates no revision. Verify the new slug with `read`. The move result is unchanged, so published CLI versions keep working against this server.
 
 ## Share publication access
 

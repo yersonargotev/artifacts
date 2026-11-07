@@ -49,7 +49,7 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 | `artifacts_update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` | Artifact and new complete revision |
 | `artifacts_publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | `artifactId`, `revisionId`, `version`, and `url` |
 | `artifacts_list` | Optional `limit`, optional `cursor`, optional `project` | `items` and `nextCursor` |
-| `artifacts_move` | `requestId`, `artifactId`, `project` name or null | `artifactId` and stored `project` |
+| `artifacts_move` | `requestId`, `artifactId`, and at least one of `project` (name or null) and `slug` (slug or null) | `artifactId` and stored `project` |
 | `projects_list` | `{}` | `items` with `name` and `artifactCount` |
 | `artifacts_history` | `artifactId`, optional `limit`, optional `beforeSequence` | `items` and `nextBeforeSequence` |
 | `artifacts_export` | `artifactId`, `revisionId` | `filename`, `mediaType`, `base64`, and `sha256` |

@@ -104,7 +104,7 @@ artifacts move ARTIFACT_ID --no-project
 
 A project name contains 1 to 80 characters after trimming and NFC normalization, without control characters. A name that matches an existing project regardless of letter case joins it and keeps its stored spelling. Every read and list item includes `project`, a name or null. `projects` prints `{ "items": [{ "name": "Client onboarding", "artifactCount": 1 }] }`, ordered by name without regard to letter case. A project exists only while it contains an artifact.
 
-`move` takes exactly one of `--project NAME` or `--no-project` and prints `{ "artifactId": "...", "project": "Archive" }`, or `null` for the project after `--no-project`. It creates no revision and leaves the publication unchanged. Moving to the current project succeeds without change. A lost move response is recovered with `retry REQUEST_ID` like any other retained mutation.
+`move` takes at least one of `--project NAME`, `--no-project`, `--slug SLUG`, or `--no-slug`, and at most one from each pair. It prints `{ "artifactId": "...", "project": "Archive" }`, or `null` for the project after `--no-project`. An option left out keeps that value. It creates no revision and leaves the publication unchanged. Moving to the current project succeeds without change. A lost move response is recovered with `retry REQUEST_ID` like any other retained mutation.
 
 ## Name pages with slugs
 
@@ -114,11 +114,13 @@ Check that installed help lists `--slug` before using it.
 artifacts create --snapshot snapshot.json --project "Mi wiki" --slug concepts/rag
 artifacts read --project "mi wiki" --slug concepts/rag
 artifacts read --slug index
+artifacts move ARTIFACT_ID --slug concepts/retrieval
+artifacts move ARTIFACT_ID --no-slug
 ```
 
 A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, such as `concepts/rag` or `index`. It is never normalized, and a trailing `.md` is rejected with a hint to remove it. A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace, which `read --slug` without `--project` reads. Every read and list item includes `slug`, a name or null.
 
-`read` takes exactly one of an ID or `--slug`. `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId` in `details`. A locator with no artifact fails with `not_found`. A move keeps the slug and fails with `slug_conflict` when the destination project already uses it.
+`read` takes exactly one of an ID or `--slug`. `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId` in `details`. A locator with no artifact fails with `not_found`. `move ID --slug SLUG` renames a page in its project, and `move ID --no-slug` clears the slug. A move to another project keeps the slug unless `--slug` or `--no-slug` changes it. A move fails with `slug_conflict` and changes nothing when the target project already uses the target slug. A slug change creates no revision.
 
 ## Edit without losing retained data
 

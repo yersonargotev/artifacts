@@ -1,6 +1,6 @@
 # Wiki pages: stable slugs, search, and batch commands
 
-Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move), links [#90](https://github.com/yersonargotev/artifacts/issues/90), search [#91](https://github.com/yersonargotev/artifacts/issues/91), [#92](https://github.com/yersonargotev/artifacts/issues/92), and [#93](https://github.com/yersonargotev/artifacts/issues/93), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
+Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move, shipped), links [#90](https://github.com/yersonargotev/artifacts/issues/90), search [#91](https://github.com/yersonargotev/artifacts/issues/91), [#92](https://github.com/yersonargotev/artifacts/issues/92), and [#93](https://github.com/yersonargotev/artifacts/issues/93), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
 
 ## Problem and decision
 
@@ -41,7 +41,16 @@ What shipped in [#88](https://github.com/yersonargotev/artifacts/issues/88):
 - The CLI adds `create --slug SLUG` and `read --slug SLUG [--project NAME]`, which takes exactly one of an ID or `--slug`. The panel shows the slug on library cards and under Información.
 - Create inputs without a slug keep their receipt fingerprints, and receipts written before slugs replay with `slug: null`.
 
-Setting or clearing the slug on `move` ([#89](https://github.com/yersonargotev/artifacts/issues/89)) and link resolution ([#90](https://github.com/yersonargotev/artifacts/issues/90)) follow in later tickets.
+What shipped in [#89](https://github.com/yersonargotev/artifacts/issues/89):
+
+- `moveSchema` makes `project` optional and adds an optional, nullable `slug`. A refinement requires at least one of them, so the schema stays one top-level object for MCP. An absent field keeps its value, `null` clears it, and a value sets it. `move ID --slug x` renames without restating the project. Move inputs without a slug keep their receipt fingerprints because the parsed input never gains defaults.
+- The store resolves the target project and slug, runs the same `slug_conflict` check against the target pair, and updates both columns. A slug change creates no revision and leaves the publication alone.
+- The panel's bulk move checks every selected artifact before it fails. Its single `slug_conflict` names the destination `project` and lists `conflicts: [{ artifactId, slug }]`: both members of a duplicate inside the selection and each mover whose slug the destination already holds. Nothing moves, and no receipt is written, so the same request ID can retry another destination.
+- The panel's move page answers that error with 409 and an alert that names the destination and lists each conflicting artifact by title and slug, then shows the move form again. The single-artifact move reaches the same page and no longer shows the generic 409 error page.
+- REST keeps `PUT /v1/artifacts/:id/project` for the slug change. `artifacts_move` and the typed client take the same input. The CLI adds `move ID [--project NAME | --no-project] [--slug SLUG | --no-slug]`, which needs at least one option and rejects both options of a pair.
+- The move result stays `{ artifactId, project }`. Published clients up to `0.1.0-beta.8` parse it strictly, so an unchanged result keeps them working. Callers read the artifact to see its new slug.
+
+Link resolution ([#90](https://github.com/yersonargotev/artifacts/issues/90)) follows in a later ticket.
 
 Link resolution: in a Markdown page, a relative link without a scheme (`../concepts/rag.md`, `rag.md#history`) is resolved against the page's own slug as a path, its `.md` suffix is dropped, and it is looked up in the same project. The owner panel renders a resolved link as a navigation to the target artifact, and an unresolved link as marked plain text. This keeps the same link syntax valid in a Git checkout of the wiki and in Artifacts, which is what makes two-way sync possible. Publication keeps its current inert rendering in this decision. Rendering links for viewers requires deciding what a viewer sees when the target is unpublished or not shared, which is out of scope.
 

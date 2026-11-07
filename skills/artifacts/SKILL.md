@@ -49,7 +49,7 @@ When the user names a project for new content, pass it as `project` to `artifact
 
 When the user names a page, such as a wiki page, pass a `slug` like `concepts/rag` to `artifacts_create` and read it later with `artifacts_read` and `{ project, slug }` instead of listing for its ID. Omit the `.md` suffix. A `slug_conflict` result names the `artifactId` that already holds the slug in that project; read that artifact and update it rather than creating another.
 
-To file an existing artifact under a project, or to take it out of one, call `artifacts_move` with a new `requestId`, the `artifactId`, and the project name or `null`. A move changes only the artifact's project. It creates no revision and leaves the publication unchanged, so do not follow it with an update or publication. Verify the move with `artifacts_read` or `artifacts_list` and its `project` filter. A project disappears when its last artifact leaves it.
+To file an existing artifact under a project, or to take it out of one, call `artifacts_move` with a new `requestId`, the `artifactId`, and the project name or `null`. To rename a page, pass `slug` instead, or `slug: null` to clear it. An omitted field keeps its value, so a move to another project keeps the slug. A move into a slug the target project already uses fails with `slug_conflict` and changes nothing. A move changes only the artifact's project and slug. It creates no revision and leaves the publication unchanged, so do not follow it with an update or publication. Verify the move with `artifacts_read` or `artifacts_list` and its `project` filter. A project disappears when its last artifact leaves it.
 
 ## Publish the selected revision
 
