@@ -13,10 +13,12 @@ const deletedReceiptSchema = z.strictObject({ kind: z.literal('artifact_deleted'
 
 export const projectOrder = (left: string, right: string) => left.localeCompare(right, 'en') || (left < right ? -1 : 1);
 
-function isBusy(error: unknown): boolean {
+function hasCode(error: unknown, pattern: RegExp): boolean {
   if (!(error instanceof Error)) return false;
-  return ('code' in error && typeof error.code === 'string' && /SQLITE_BUSY|SQLITE_LOCKED/.test(error.code)) || isBusy(error.cause);
+  return ('code' in error && typeof error.code === 'string' && pattern.test(error.code)) || hasCode(error.cause, pattern);
 }
+export const isBusy = (error: unknown) => hasCode(error, /SQLITE_BUSY|SQLITE_LOCKED/);
+export const isConstraint = (error: unknown) => hasCode(error, /^SQLITE_CONSTRAINT/);
 
 export async function writeTransaction<T>(db: Database, work: (connection: Connection) => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
@@ -66,17 +68,21 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
 
   const transaction = <T>(work: (connection: Connection) => Promise<T>) => writeTransaction(db, work);
 
+  async function replay<T>(connection: Connection, ownerId: string, requestId: string, payloadHash: string, output: z.ZodType<T>): Promise<{ result: T } | undefined> {
+    const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, ownerId), eq(artifactCommand.requestId, requestId))).limit(1);
+    if (!receipt) return undefined;
+    const result: unknown = JSON.parse(receipt.result);
+    if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
+    if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
+    return { result: output.parse(result) };
+  }
+
   async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<{ result: T; fresh: boolean }> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
     return transaction(async (connection) => {
       await authorize(connection, actor, scope);
-      const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, actor.userId), eq(artifactCommand.requestId, input.requestId))).limit(1);
-      if (receipt) {
-        const result: unknown = JSON.parse(receipt.result);
-        if (deletedReceiptSchema.safeParse(result).success) throw new ArtifactError('not_found', 'Artifact deleted');
-        if (receipt.payloadHash !== payloadHash) throw new ArtifactError('request_conflict', 'Request ID already used with different arguments');
-        return { result: output.parse(result), fresh: false };
-      }
+      const stored = await replay(connection, actor.userId, input.requestId, payloadHash, output);
+      if (stored) return { result: stored.result, fresh: false };
       const result = await work(connection);
       await connection.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson(result), createdAt: new Date() });
       return { result, fresh: true };
@@ -91,5 +97,5 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
     return receipt(actor, 'artifacts:write', 'panel_move', input, output, work).then(({ result }) => result);
   }
 
-  return { transaction, authorize, liveSession, command, receipt, panelMove, projectSpelling, ownedProjects, bySlug, claimSlug, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
+  return { transaction, authorize, liveSession, command, receipt, replay, panelMove, projectSpelling, ownedProjects, bySlug, claimSlug, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
 }

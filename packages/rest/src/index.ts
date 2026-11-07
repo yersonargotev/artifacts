@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
@@ -18,6 +18,7 @@ const routePolicies = {
   projects: { GET: 'artifacts:read' },
   lookup: { GET: 'artifacts:read' },
   search: { GET: 'artifacts:read' },
+  batch: { POST: 'artifacts:write' },
   collection: { GET: 'artifacts:read', POST: 'artifacts:write' },
   artifact: { GET: 'artifacts:read', PUT: 'artifacts:write' },
   history: { GET: 'artifacts:read' },
@@ -101,6 +102,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         : collection === 'projects' && segments.length === 1 ? 'projects'
         : collection === 'lookup' && segments.length === 1 ? 'lookup'
         : collection === 'search' && segments.length === 1 ? 'search'
+        : collection === 'batch' && segments.length === 1 ? 'batch'
         : collection !== 'artifacts' ? null
         : segments.length === 1 ? 'collection'
         : segments.length === 2 && artifactId ? 'artifact'
@@ -148,6 +150,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
         const result = await artifacts.export(actor, exportSchema.parse({ artifactId, revisionId: itemId }));
         return new Response(Buffer.from(result.base64, 'base64'), { headers: { 'cache-control': 'no-store', 'content-type': result.mediaType, 'content-disposition': `attachment; filename="${result.filename}"`, 'x-artifact-sha256': result.sha256, 'x-content-type-options': 'nosniff' } });
       }
+      if (route === 'batch') return json(await artifacts.batch(actor, batchSchema.parse(await body(request))));
       if (route === 'collection') {
         const input = createSchema.parse(await body(request));
         const result = await artifacts.create(actor, input);

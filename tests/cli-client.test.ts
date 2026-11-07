@@ -262,6 +262,22 @@ test('typed client searches owned Markdown pages over real REST', async () => {
   } finally { await app.close(); }
 });
 
+test('typed client applies a batch over real REST and surfaces the failing index', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: (await grant(app, fullScope)).access_token });
+    const page = (text: string): Snapshot => ({ metadata: { title: text, description: '' }, content: { kind: 'markdown', text }, files: [] });
+    const input = { requestId: 'client-batch', operations: [{ op: 'create' as const, project: 'Wiki', slug: 'log', snapshot: page('Registro') }, { op: 'update' as const, project: 'wiki', slug: 'log', snapshot: page('Registro con ingesta') }] };
+    const result = await client.batch(input);
+    assert.deepEqual(result.results.map(({ index, artifactId }) => [index, artifactId]), [[0, result.results[0]!.artifactId], [1, result.results[0]!.artifactId]]);
+    assert.deepEqual(await client.batch(input), result);
+    const read = await client.read({ project: 'Wiki', slug: 'log' });
+    assert.deepEqual([read.headRevisionId, read.revision.sequence], [result.results[1]!.revisionId, 2]);
+    await assert.rejects(client.batch({ requestId: 'client-batch-stale', operations: [{ op: 'update', artifactId: read.artifactId, snapshot: page('x') }] }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'conflict' && error.details.index === 0 && error.details.currentRevisionId === read.headRevisionId);
+    assert.throws(() => client.batch({ requestId: 'client-batch-empty', operations: [] }), { name: 'ZodError' });
+  } finally { await app.close(); }
+});
+
 test('typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry', async () => {
   const app = await fixture({ transport: 'rest' });
   try {
@@ -420,6 +436,34 @@ test('CLI searches owned pages by plain text and pages through the results', asy
     for (const args of [['search'], ['search', 'one', 'two']]) assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'search requires one positional argument', args.join(' '));
     failure(await cli(['search', 'envigado', '--limit', '26'], environment), 'invalid_input');
     assert.equal(failure(await cli(['search', 'envigado', '--slug', 'x'], environment), 'invalid_arguments').message, 'Option --slug is not supported by search');
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI applies a batch command file and retries a lost batch from its retained operation', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-batch-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const page = (text: string) => ({ metadata: { title: text, description: '' }, content: { kind: 'markdown', text }, files: [] });
+    const commandFile = join(directory, 'batch.json');
+    const command = { requestId: 'cli-lost-batch', operations: [{ op: 'create', project: 'Wiki', slug: 'index', snapshot: page('Índice') }, { op: 'create', project: 'Wiki', slug: 'concepts/rag', snapshot: page('Recuperación en Envigado') }, { op: 'update', project: 'Wiki', slug: 'index', snapshot: page('Índice con rag') }] };
+    await writeFile(commandFile, JSON.stringify(command));
+    app.dropNextResourceResponse('POST');
+    failure(await cli(['batch', '--command', commandFile], environment), 'network_error');
+    assert.deepEqual(JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-lost-batch'), 'utf8')), { version: 1, resource: app.config.resource, ownerId: app.ownerId, kind: 'batch', command });
+    const result = success(await cli(['retry', 'cli-lost-batch'], environment)) as { results: { index: number; artifactId: string; revisionId: string }[] };
+    assert.deepEqual(result.results.map(({ index }) => index), [0, 1, 2]);
+    assert.equal((success(await cli(['read', '--slug', 'index', '--project', 'wiki'], environment)) as ArtifactRead).headRevisionId, result.results[2]!.revisionId);
+    assert.deepEqual((success(await cli(['search', 'envigado'], environment)) as { items: { slug: string }[] }).items.map(({ slug }) => slug), ['concepts/rag']);
+
+    await writeFile(commandFile, JSON.stringify({ requestId: 'cli-batch-conflict', operations: [{ op: 'create', project: 'Wiki', slug: 'log', snapshot: page('Log') }, { op: 'create', project: 'Wiki', slug: 'index', snapshot: page('Otra') }] }));
+    const conflict = failure(await cli(['batch', '--command', commandFile], environment), 'slug_conflict');
+    assert.deepEqual(conflict.details, { index: 1, slug: 'index', project: 'Wiki', artifactId: result.results[0]!.artifactId });
+    assert.equal((success(await cli(['list'], environment)) as { items: unknown[] }).items.length, 2);
+    assert.equal(failure(await cli(['batch'], environment), 'invalid_arguments').message, 'Specify --command');
+    failure(await cli(['batch', '--command', commandFile, '--request-id', 'x'], environment), 'invalid_arguments');
+    failure(await cli(['batch', 'extra', '--command', commandFile], environment), 'invalid_arguments');
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -622,6 +666,7 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.equal(help.code, 0);
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
   assert.match(help.stdout, /retry REQUEST_ID/);
+  assert.match(help.stdout, /\n  batch --command FILE\n/);
   assert.match(help.stdout, /\n  projects\n/);
   assert.match(help.stdout, /move ID \[--project NAME \| --no-project\] \[--slug SLUG \| --no-slug\]\n         \[--request-id ID\]/);
   assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);

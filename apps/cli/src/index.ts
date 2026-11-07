@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { batchSchema, createSchema, listSharesSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import { createArtifactHttpClient, HttpError, prepareArtifactEdit } from '@yargote/artifacts-client';
 import { accessToken, login, logout } from './auth.ts';
@@ -46,6 +46,7 @@ Commands:
          [--response full|compact]
   update [ID] --command FILE
   edit ID --changes FILE [--request-id ID]
+  batch --command FILE
   history ID [--limit N] [--before-sequence N] [--summary]
   publish ID --revision REV --expected-version N [--request-id ID]
   publish [ID] --command FILE
@@ -57,7 +58,8 @@ Commands:
   unshare ID SHARE_ID [--request-id ID]
   retry REQUEST_ID
 
-Mutation command files contain the complete create, update, or publish JSON.
+Mutation command files contain the complete create, update, publish, or batch
+JSON.
 Mutation request IDs default to a random UUID. Commands are retained before
 submission. Retry sends the exact retained command for the same server and owner.
 Projects group artifacts by name without regard to letter case. A project
@@ -73,6 +75,11 @@ Search finds owned artifacts whose head contains every term of QUERY, ignoring
 letter case and accents. It reads Markdown and text content, the visible text
 of HTML, and the title and description of every kind. Quote a QUERY with
 spaces. Results are ordered by relevance with a **bold** snippet.
+Batch applies 1 to 25 create and update operations from one command file with
+a requestId and operations. All succeed or none do. A failure names the 0-based
+index of its operation. An update addresses its artifact by artifactId or by
+project and slug, including a page created earlier in the batch, and omits
+expectedRevisionId only for such a page. A batch never publishes.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
@@ -104,7 +111,7 @@ const commandOptions: Record<string, readonly string[]> = {
   create: ['snapshot', 'project', 'slug', 'request-id', 'response', 'command'],
   list: ['limit', 'cursor', 'project'], projects: [], search: ['project', 'limit', 'cursor'], read: ['slug', 'project', 'revision', 'response', 'out', 'quiet'],
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
-  edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
+  edit: ['changes', 'request-id'], batch: ['command'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
   share: ['email', 'notify', 'request-id'], shares: [], unshare: ['request-id'],
   export: ['revision', 'out'], move: ['project', 'no-project', 'slug', 'no-slug', 'request-id'], retry: [],
@@ -209,13 +216,13 @@ async function main(): Promise<unknown> {
     process.stderr.write(`Retained operation ${operation.command.requestId}. Recover with artifacts retry ${operation.command.requestId} using the same server and state directory.\n`);
     return submitOperation(client, operation);
   }
-  async function commandFile(kind: 'create' | 'update' | 'publish'): Promise<Mutation> {
+  async function commandFile(kind: 'create' | 'update' | 'publish' | 'batch'): Promise<Mutation> {
     const extra = [...seen].filter((option) => !['server', 'state-dir', 'command'].includes(option));
     if (extra.length) throw new UsageError('--command cannot be combined with mutation options');
     const value = await jsonFile(required('command'));
-    if (kind === 'create') {
+    if (kind === 'create' || kind === 'batch') {
       none();
-      return { kind, command: createSchema.parse(value) };
+      return kind === 'create' ? { kind, command: createSchema.parse(value) } : { kind, command: batchSchema.parse(value) };
     }
     const mutation: Mutation = kind === 'update' ? { kind, command: updateSchema.parse(value) } : { kind, command: publishSchema.parse(value) };
     const id = argument(false);
@@ -258,6 +265,7 @@ async function main(): Promise<unknown> {
       const input = await prepareArtifactEdit(client, { artifactId, requestId: values['request-id'] ?? randomUUID(), changes: changes as Parameters<typeof prepareArtifactEdit>[1]['changes'] });
       return mutate({ kind: 'update', command: updateSchema.parse(input) });
     }
+    case 'batch': return mutate(await commandFile('batch'));
     case 'history': return client.history({ artifactId: argument()!, ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values['before-sequence'] === undefined ? {} : { beforeSequence: integer('before-sequence') }), ...(values.summary ? { response: 'summary' as const } : {}) });
     case 'publish': {
       if (values.command) return mutate(await commandFile('publish'));

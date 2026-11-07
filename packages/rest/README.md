@@ -35,6 +35,7 @@ Paths below are relative to `${API_URL}/v1`.
 | GET | `/artifacts/:artifactId` | `revisionId`, `response` |
 | GET | `/lookup` | `slug`, optional `project`, `revisionId`, `response` |
 | GET | `/search` | `query`, optional `project`, `limit`, `cursor` |
+| POST | `/batch` | Complete batch command |
 | PUT | `/artifacts/:artifactId` | Complete update command |
 | GET | `/artifacts/:artifactId/history` | `limit`, `beforeSequence`, `response` |
 | PUT | `/artifacts/:artifactId/publication` | Complete publish command |
@@ -75,6 +76,10 @@ A create command accepts an optional `slug` such as `concepts/rag`. Every artifa
 
 For an origin resource, the metadata URL is `${API_URL}/.well-known/oauth-protected-resource`. MCP metadata lives at `${API_URL}/.well-known/oauth-protected-resource/mcp`. Each document identifies its own exact OAuth resource. Check the REST document's `resource` field against the configured API origin. REST route challenges omit `resource_metadata` because those route URLs differ from the OAuth audience.
 
+## Batch
+
+`POST /batch` applies 1 to 25 create and update operations as one all-or-nothing command and answers 200 with the receipt. Each operation is `{ op: 'create', snapshot, project?, slug? }` or `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`. A slug may name a page created earlier in the same batch. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes. The error's `details` carry the `index` with the usual status for its code.
+
 ## Sharing
 
 Only an artifact's owner can create, list, or revoke its shares. All three routes require `artifacts:publish`, including GET. An email is trimmed and lowercased. Sharing the same email again returns the existing share. A share has `shareId`, `artifactId`, `kind: "email"`, `value`, and `createdAt`. Listing returns `{ "items": [share] }`.
@@ -103,7 +108,7 @@ Each owner has 100 invitation reservations per UTC day, based on database time. 
 
 Errors have the shape `{ "error": { "code": "conflict", "message": "Artifact head changed", "details": { "currentRevisionId": "..." } } }`. Invalid input returns 400, missing authentication 401, forbidden access 403, missing owned objects 404, conflicts 409, oversized requests 413, unsupported content types 415, unsupported methods 405 with `Allow`, and unavailable dependencies 503.
 
-Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, lookups, artifact lists, search, and projects require `artifacts:read`. Create, update, and move require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
+Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, lookups, artifact lists, search, and projects require `artifacts:read`. Create, update, move, and batch require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
 
 Retry a mutation with its exact complete command. Preserve omitted response fields, request ID, snapshot, and expected versions. While the artifact exists, an exact retry returns the original receipt, which can describe an older head or publication. Read fresh state separately. A conflict requires a deliberate new command, not a changed retry.
 

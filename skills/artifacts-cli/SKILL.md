@@ -39,6 +39,8 @@ When the user names a page, add `--slug SLUG` such as `concepts/rag` to `create`
 
 To find a page by what it says, run `artifacts search QUERY`, optionally with `--project NAME`, instead of listing and reading every artifact. Every term must match, and letter case and accents are ignored. Read a hit by its `artifactId`, or by `--project` and `--slug` when it has a slug. Search covers owned artifacts at their head revision. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. Attachments, older revisions, and shared artifacts are not searched.
 
+To change several pages together, such as an ingest that creates pages and updates the index and log, write one batch command file and run `artifacts batch --command FILE` instead of one command per page. All operations commit or none do, and a failure names the 0-based `index` of the failing operation. Fix that operation and send the corrected batch in a file with a new `requestId`, because the CLI already retained the failed one. A batch never publishes.
+
 Use `move ID --project NAME` to file an existing artifact under a project and `move ID --no-project` to remove it from one. A move changes only the project. It creates no revision and leaves the publication unchanged. It is a retained mutation, so recover an uncertain move with `retry`. Verify it with `read` or `list --project NAME`. A project disappears when its last artifact leaves it.
 
 ## Publish deliberately
