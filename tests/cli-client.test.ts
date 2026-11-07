@@ -332,6 +332,37 @@ test('CLI subprocesses retain exact operations and recover lost create, update, 
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
+test('CLI creates a slugged page and reads it by project and slug without its ID', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-slugs-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const snapshotFile = join(directory, 'snapshot.json');
+    await writeFile(snapshotFile, JSON.stringify(snapshot));
+    const rag = success(await cli(['create', '--snapshot', snapshotFile, '--project', 'Mi-Wiki', '--slug', 'concepts/rag', '--request-id', 'cli-slug-rag'], environment)) as ArtifactRead;
+    assert.deepEqual([rag.project, rag.slug], ['Mi-Wiki', 'concepts/rag']);
+    const retained = JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-slug-rag'), 'utf8'));
+    assert.equal(retained.command.slug, 'concepts/rag');
+    const index = success(await cli(['create', '--snapshot', snapshotFile, '--slug', 'index'], environment)) as ArtifactRead;
+    assert.deepEqual(success(await cli(['read', '--project', 'mi-wiki', '--slug', 'concepts/rag'], environment)), rag);
+    assert.equal((success(await cli(['read', '--slug', 'index'], environment)) as ArtifactRead).artifactId, index.artifactId);
+    assert.equal((success(await cli(['read', '--slug', 'concepts/rag', '--project', 'Mi-Wiki', '--response', 'compact'], environment)) as { revision: { content: { utf8Bytes: number } } }).revision.content.utf8Bytes, Buffer.byteLength(snapshot.content.text));
+    const out = join(directory, 'rag.json');
+    assert.equal((await cli(['read', '--project', 'Mi-Wiki', '--slug', 'concepts/rag', '--out', out, '--quiet'], environment)).stdout, '');
+    assert.deepEqual(JSON.parse(await readFile(out, 'utf8')), rag);
+
+    const conflict = failure(await cli(['create', '--snapshot', snapshotFile, '--project', 'MI-WIKI', '--slug', 'concepts/rag'], environment), 'slug_conflict');
+    assert.deepEqual([conflict.status, conflict.details.artifactId], [409, rag.artifactId]);
+    assert.equal(failure(await cli(['read', '--project', 'Mi-Wiki', '--slug', 'index'], environment), 'not_found').status, 404);
+    failure(await cli(['create', '--snapshot', snapshotFile, '--slug', 'concepts/rag.md'], environment), 'invalid_input');
+    failure(await cli(['read', '--slug', 'Concepts'], environment), 'invalid_input');
+    for (const args of [['read'], ['read', rag.artifactId, '--slug', 'concepts/rag'], ['read', 'one', 'two']]) assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'read requires exactly one of an artifact ID or --slug SLUG', args.join(' '));
+    assert.equal(failure(await cli(['read', rag.artifactId, '--project', 'Mi-Wiki'], environment), 'invalid_arguments').message, 'read --project requires --slug');
+    assert.equal(failure(await cli(['list', '--slug', 'index'], environment), 'invalid_arguments').message, 'Option --slug is not supported by list');
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test('CLI files, lists, and moves projects, and retries a lost move from its retained operation', async () => {
   const app = await fixture({ transport: 'rest' });
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-projects-'));
