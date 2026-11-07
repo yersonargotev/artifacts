@@ -434,6 +434,12 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
 .revision-list p { margin: 3px 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .history-compare { display: inline-flex; min-height: 28px; align-items: center; color: var(--blue); font-size: 12px; }
 .compare-history, .older-history { display: flex; align-items: center; min-height: 44px; padding-top: 6px; border-top: 1px solid var(--divider); color: var(--blue); font-size: 13px; font-weight: 600; text-decoration: none; }
+.links-card { margin-top: 18px; }
+.links-card ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.links-card li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; padding: 10px 0; border-top: 1px solid var(--divider); }
+.links-card li > a { color: var(--blue); }
+.links-card code { min-width: 0; padding: 0; background: transparent; color: var(--muted); overflow-wrap: anywhere; }
+.links-card [data-link-state=broken] .badge { color: var(--red); }
 .facts-card { padding-bottom: 10px; }
 .facts-card h2 { margin-bottom: 10px; }
 .facts-card dl { display: block; margin: 0; font-size: 12px; }

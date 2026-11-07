@@ -1,0 +1,20 @@
+---
+import type { PageLink, PageLinkTarget } from '@artifacts/artifacts/panel/model';
+interface Props { links: readonly PageLink[] }
+const { links } = Astro.props;
+const brokenLabels: Record<Extract<PageLinkTarget, { state: 'broken' }>['reason'], string> = {
+  missing: 'No existe',
+  outside: 'Sale del proyecto',
+  unslugged: 'La página no tiene slug',
+};
+---
+<section class="detail-card links-card" aria-labelledby="links-title">
+  <h2 id="links-title">Enlaces</h2>
+  {links.length === 0 ? <p class="muted">Esta página no tiene enlaces relativos.</p> : (
+    <ul>
+      {links.map(({ href, text, target }) => target.state === 'resolved'
+        ? <li data-link-state="resolved"><a href={`/artifacts/${encodeURIComponent(target.artifactId)}`}>{text || target.title}</a><code>{target.slug}</code></li>
+        : <li data-link-state="broken"><span>{text || href}</span><span class="badge">{brokenLabels[target.reason]}</span><code>{href}</code></li>)}
+    </ul>
+  )}
+</section>

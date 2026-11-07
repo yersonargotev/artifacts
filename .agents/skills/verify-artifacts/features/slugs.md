@@ -14,7 +14,7 @@ An owner names a page with a slug such as `concepts/rag` and reads it back by `{
 - `slugs-move-cli` renames the page with `move ID --slug concepts/retrieval`, reads it with `read --slug concepts/retrieval`, fails a move into a used slug with `slug_conflict`, and clears the slug with `move ID --no-slug`.
 - `slugs-move-panel` selects two drafts in `Borradores`, moves them to `Mi-Wiki`, which already uses both slugs, and sees the conflict alert at 1440x900 and 390x844 while nothing moves.
 
-Link resolution, search, and batch commands are later tickets of the wiki pages program and are not driven here.
+[Link resolution](./links.md) has its own drive. Search and batch commands are later tickets of the wiki pages program and are not driven here.
 
 ## How to get to it (user POV)
 
