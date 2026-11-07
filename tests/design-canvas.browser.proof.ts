@@ -37,8 +37,9 @@ fetch('/beacon').then(() => 'allowed', () => 'blocked').then((result) => {
   output.textContent = JSON.stringify(report);
   document.body.append(output);
 });`;
-const thief = `addEventListener('keydown', (event) => { document.getElementById('keys').textContent += event.key; });
-setInterval(() => { document.querySelector('input').focus(); parent.postMessage({ type: 'zoom', scale: 9 }, '*'); }, 50);`;
+const thief = `addEventListener('focusin', () => { document.getElementById('keys').dataset.focused = 'true'; });
+addEventListener('keydown', (event) => { document.getElementById('keys').textContent += event.key; });
+setInterval(() => { document.querySelector('input').focus(); window.focus(); parent.postMessage({ type: 'zoom', scale: 9 }, '*'); }, 50);`;
 
 function design(boards: Board[], extra: object = {}): Pick<Snapshot, 'content' | 'files'> {
   return snapshotSchema.parse({
@@ -273,10 +274,8 @@ try {
   const theft = await browser.newPage({ viewport: { width: 1200, height: 760 } });
   await theft.goto(`${origin}/theft`);
   const host = theft.frameLocator('iframe');
-  await host.locator('.controls button:focus').waitFor();
-  const initialZoom = await host.locator('.zoom-level').textContent() ?? '';
-  await theft.keyboard.press('Enter');
-  await host.locator('.zoom-level').filter({ hasNotText: initialZoom }).waitFor();
+  const thiefKeys = host.frameLocator('iframe[title="boards/Thief.html"]').locator('#keys');
+  await thiefKeys.waitFor({ state: 'attached' });
   const zoomIn = host.getByRole('button', { name: 'Acercar' });
   await zoomIn.focus();
   const untouched = await transform(host);
@@ -290,12 +289,13 @@ try {
   await theft.waitForTimeout(300);
   await theft.keyboard.press('Escape');
   await host.locator('.zoom').waitFor();
-  assert.equal(await host.frameLocator('iframe[title="boards/Thief.html"]').locator('#keys').textContent(), '', 'No keystroke reached the focus-stealing board');
+  assert.equal(await thiefKeys.textContent(), '', 'No keystroke reached the focus-stealing board');
+  assert.equal(await thiefKeys.getAttribute('data-focused'), null, 'A board on the canvas never receives focus, even when its script calls focus() in a loop');
   await theft.close();
 
   await mkdir('.test-artifacts', { recursive: true });
   await writeFile('.test-artifacts/design-canvas.json', JSON.stringify(observations, null, 2));
-  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, WebRTC packets; focus recovery, pan, zoom, focus, pages, and the inert listing work.');
+  console.log('Design canvas proof passed: boards run scripts in opaque srcdoc frames under the unchanged preview policy without fetch, popups, parent access, WebRTC packets; boards cannot take focus on the canvas; pan, zoom, focus, pages, and the inert listing work.');
 } finally {
   await browser.close();
   await new Promise<void>((done) => server.close(() => done()));

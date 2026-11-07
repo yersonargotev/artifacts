@@ -71,7 +71,9 @@ function render() {
   for (const item of items) item.hidden = state.page !== null && item.dataset.page !== state.page;
   for (const board of boards) {
     board.toggleAttribute('data-focused', board === focused);
-    board.querySelector('iframe').inert = board !== focused;
+    const frame = board.querySelector('iframe');
+    frame.inert = board !== focused;
+    syncLock(frame);
   }
   for (const button of pages) button.setAttribute('aria-pressed', String(button.dataset.page === state.page));
   if (focused) {
@@ -81,6 +83,9 @@ function render() {
   }
   place();
 }
+
+const syncLock = (frame) => frame.contentWindow.postMessage({ type: 'artifacts:board-inert', inert: frame.inert }, '*');
+for (const board of boards) board.querySelector('iframe').addEventListener('load', (event) => syncLock(event.target));
 
 function move(change) {
   state.view = change(state.view ?? fitted());
@@ -128,22 +133,7 @@ addEventListener('resize', () => {
   if (state.view === null) place();
 });
 
-let hostFocus = null;
-document.addEventListener('focusin', (event) => { hostFocus = event.target; });
-// Inert does not stop a board's own script from taking focus, so the host returns focus that lands in an inert board.
-function recoverFocus() {
-  if (!document.hasFocus()) return;
-  const frame = document.activeElement;
-  if (frame instanceof HTMLIFrameElement && frame.inert) refocus(hostFocus ?? controls.querySelector('button'));
-}
-requestAnimationFrame(function initialFocus() {
-  recoverFocus();
-  if (hostFocus === null) requestAnimationFrame(initialFocus);
-});
-addEventListener('blur', () => {
-  mouse = null;
-  setTimeout(recoverFocus);
-});
+addEventListener('blur', () => { mouse = null; });
 
 canvas.addEventListener('focusin', (event) => {
   if (state.focus !== null || !event.target.matches(':focus-visible')) return;
@@ -189,6 +179,17 @@ canvas.addEventListener('lostpointercapture', (event) => pointers.delete(event.p
 render();
 `;
 
+// Chrome does not carry an iframe's inert into the board's own document, so a board script could still take focus and the keys meant for the host.
+// Each board document therefore starts inert, and only the host's message for the focus view lifts it.
+const lock = `<script>{
+document.documentElement.inert = true;
+const focusWindow = window.focus;
+window.focus = () => { if (!document.documentElement.inert) focusWindow.call(window); };
+addEventListener('message', (event) => { if (event.source === parent && event.data?.type === 'artifacts:board-inert') document.documentElement.inert = event.data.inert; });
+}</script>`;
+// The lock goes after any doctype, since markup before it would switch the board to quirks mode.
+const locked = (html: string) => html.replace(/^(?:\s*<!--[\s\S]*?-->)*\s*(?:<!doctype[^>]*>)?/i, (prefix) => prefix + lock);
+
 export function canvasDocument(snapshot: Pick<Snapshot, 'content' | 'files'>, interactive: boolean) {
   const { index, boards } = parseCanvas(snapshot);
   const name = (board: { title?: string; path: string }) => escapeHtml(board.title ?? board.path);
@@ -200,7 +201,7 @@ export function canvasDocument(snapshot: Pick<Snapshot, 'content' | 'files'>, in
   const pageBar = pages.length ? `<nav class="pages" aria-label="Páginas">${pages.map((item, position) => `<button type="button" data-action="page" data-page="${escapeHtml(item.id)}" aria-label="Página ${escapeHtml(item.name)}" aria-pressed="${position === 0}">${escapeHtml(item.name)}</button>`).join('')}</nav>` : '';
   const focusBar = `<header class="focus-bar"><button type="button" data-action="close" aria-label="Volver al lienzo">${icons.back}<span>Volver al lienzo</span></button><p><span class="focus-name"></span><span class="focus-size"></span></p></header>`;
   // Boards stay inert on the canvas so pointer input and Tab reach the host; the focus view makes one board interactive.
-  const boardMarkup = boards.map((board) => `<section class="board"${page(board.page)} style="--x:${board.x};--y:${board.y};--w:${board.w};--h:${board.h}"><button class="board-name" type="button" data-action="open" aria-label="Abrir ${name(board)} a tamaño real"><span>${name(board)}</span>${icons.open}</button><iframe title="${name(board)}" sandbox="allow-scripts" inert srcdoc="${escapeHtml(board.html)}"></iframe></section>`).join('');
+  const boardMarkup = boards.map((board) => `<section class="board"${page(board.page)} style="--x:${board.x};--y:${board.y};--w:${board.w};--h:${board.h}"><button class="board-name" type="button" data-action="open" aria-label="Abrir ${name(board)} a tamaño real"><span>${name(board)}</span>${icons.open}</button><iframe title="${name(board)}" sandbox="allow-scripts" inert srcdoc="${escapeHtml(locked(board.html))}"></iframe></section>`).join('');
   const noteMarkup = notes.map((note) => `<p class="note"${page(note.page)} style="--x:${note.x};--y:${note.y}${note.w === undefined ? '' : `;--w:${note.w}`}">${escapeHtml(note.text)}</p>`).join('');
   const zoomBar = `<div class="zoom" role="group" aria-label="Zoom del lienzo"><button type="button" data-action="zoom-out" aria-label="Alejar">${icons.minus}</button><span class="zoom-level">100 %</span><button type="button" data-action="zoom-in" aria-label="Acercar">${icons.plus}</button><button type="button" data-action="fit" aria-label="Ajustar a la vista">${icons.fit}<span>Ajustar</span></button></div>`;
   return `<style>${style}</style><div class="controls">${pageBar}${zoomBar}</div>${focusBar}<main class="canvas" aria-label="Lienzo"><div class="world">${boardMarkup}${noteMarkup}</div></main><script>${script}</script>`;

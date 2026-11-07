@@ -210,7 +210,12 @@ test('service admission precedes browser Origin exemption and OIDC return paths 
 test('canvasDocument renders indexed boards as escaped srcdoc frames and notes as escaped text', () => {
   const canvas = canvasDocument(design, true);
   assert.equal(canvas.match(/<iframe /g)?.length, 3, 'one frame per indexed board, and board markup cannot open or close frames');
-  assert(canvas.includes(`sandbox="allow-scripts" inert srcdoc="${escapeHtml(hostileBoard)}"`));
+  const lock = escapeHtml('<script>{\ndocument.documentElement.inert = true;');
+  const srcdocs = [...canvas.matchAll(/sandbox="allow-scripts" inert srcdoc="([^"]*)"/g)].map(([, srcdoc]) => srcdoc);
+  assert.equal(srcdocs.length, 3);
+  for (const srcdoc of srcdocs) assert.equal(srcdoc.split(lock).length, 2, 'every board document starts inert exactly once');
+  const hostile = srcdocs.find((srcdoc) => srcdoc.endsWith(escapeHtml(hostileBoard.slice('<!doctype html>'.length))));
+  assert(hostile?.startsWith(escapeHtml('<!doctype html>') + lock), 'the lock follows the doctype so the board keeps standards mode');
   assert(canvas.includes('&lt;/iframe&gt;&lt;script&gt;parent.document.title = 1&lt;/script&gt;'));
   assert(canvas.includes('a&amp;quot;b') && canvas.includes('Board &quot;quoted&quot;'));
   assert(!canvas.includes('</iframe><script>parent'));
