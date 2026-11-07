@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
 import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
@@ -9,7 +9,7 @@ export type { CompactArtifactRead, RevisionSummary } from '@yargote/artifacts-co
 export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 
 export type CreateInput = z.input<typeof createSchema>;
-export type ReadInput = z.input<typeof readSchema>;
+export type ReadInput = z.input<typeof readByIdSchema>;
 export type PublishInput = z.input<typeof publishSchema>;
 export type ShareInput = z.input<typeof shareSchema>;
 export type UnshareInput = z.input<typeof unshareSchema>;
@@ -182,7 +182,7 @@ export function createArtifactHttpClient(options: {
     },
     projects: () => json('/projects', 'GET', projectsResultSchema),
     read(value: ReadInput) {
-      const { artifactId, ...parameters } = readSchema.parse(value);
+      const { artifactId, ...parameters } = readByIdSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(artifactId)}${query(parameters)}`, 'GET', parameters.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema);
     },
     update(value: UpdateInput) {

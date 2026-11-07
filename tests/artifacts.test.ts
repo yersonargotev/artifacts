@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
-import { createArtifactStore, projectNameSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore, createSchema, projectNameSchema, readSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
 
@@ -245,6 +246,74 @@ test('project names are NFC-normalized, trimmed, bounded, and free of control ch
   assert.equal(projectNameSchema.parse('  Cafe\u0301 '), 'Café');
   assert.equal(projectNameSchema.parse('a'.repeat(80)), 'a'.repeat(80));
   for (const name of ['', '   ', 'a'.repeat(81), 'bell\u0007', 'line\nbreak', 'lone\uD800']) assert.equal(projectNameSchema.safeParse(name).success, false, JSON.stringify(name));
+});
+
+test('slugs are strict lowercase kebab-case paths, and a .md suffix gets its own hint', () => {
+  for (const slug of ['index', 'concepts/rag', 'a-b/c-d-1', 'history', 'x'.repeat(160)]) assert.equal(slugSchema.parse(slug), slug);
+  for (const slug of ['', 'Concepts/rag', ' concepts', 'concepts/', '/concepts', 'a//b', 'a-', '-a', 'a--b', 'a_b', 'café', 'x'.repeat(161)]) assert.equal(slugSchema.safeParse(slug).success, false, JSON.stringify(slug));
+  assert.deepEqual(slugSchema.safeParse('concepts/rag.md').error?.issues.map((issue) => issue.message), ['Remove the .md suffix: a slug names a page, not a file']);
+  assert.equal(createSchema.safeParse({ ...createInput(), slug: 'Concepts' }).success, false);
+  for (const locator of [{}, { artifactId: 'a', slug: 'b' }, { artifactId: 'a', project: 'P' }, { project: 'P' }]) assert.equal(readSchema.safeParse(locator).success, false, JSON.stringify(locator));
+  for (const locator of [{ artifactId: 'a' }, { slug: 'index' }, { project: 'Wiki', slug: 'index', revisionId: 'r', response: 'compact' }]) assert.deepEqual(readSchema.parse(locator), locator);
+});
+
+test('slugs are unique per owner and canonical project, and read back by project and slug', async () => {
+  const app = await artifactFixture();
+  try {
+    const rag = await app.store.create(app.actor, { ...createInput(), project: 'Mi-Wiki', slug: 'concepts/rag' });
+    assert.deepEqual([rag.project, rag.slug], ['Mi-Wiki', 'concepts/rag']);
+    const conflict = { code: 'slug_conflict', details: { slug: 'concepts/rag', project: 'Mi-Wiki', artifactId: rag.artifactId } };
+    await assert.rejects(app.store.create(app.actor, { ...createInput(), project: 'Mi-Wiki', slug: 'concepts/rag' }), conflict);
+    await assert.rejects(app.store.create(app.actor, { ...createInput(), project: 'mi-wiki', slug: 'concepts/rag' }), conflict);
+    const elsewhere = await app.store.create(app.actor, { ...createInput(), project: 'Other', slug: 'concepts/rag' });
+    const unfiled = await app.store.create(app.actor, { ...createInput(), slug: 'concepts/rag' });
+    await assert.rejects(app.store.create(app.actor, { ...createInput(), slug: 'concepts/rag' }), { code: 'slug_conflict', details: { slug: 'concepts/rag', project: null, artifactId: unfiled.artifactId } });
+    const plain = await app.store.create(app.actor, createInput());
+    assert.equal(plain.slug, null);
+    assert.equal((await app.store.create(app.actor, createInput())).slug, null, 'artifacts without a slug never conflict');
+
+    assert.deepEqual(await app.store.read(app.actor, { project: 'MI-WIKI', slug: 'concepts/rag' }), rag);
+    assert.equal((await app.store.read(app.actor, { project: 'Other', slug: 'concepts/rag' })).artifactId, elsewhere.artifactId);
+    assert.equal((await app.store.read(app.actor, { slug: 'concepts/rag' })).artifactId, unfiled.artifactId, 'an absent project reads the unfiled namespace');
+    const second = await app.store.update(app.actor, { requestId: randomUUID(), artifactId: rag.artifactId, expectedRevisionId: rag.revision.id, snapshot: { ...snapshot, files: [] } });
+    assert.equal(second.slug, 'concepts/rag', 'an update keeps the slug');
+    assert.equal((await app.store.read(app.actor, { project: 'Mi-Wiki', slug: 'concepts/rag', revisionId: rag.revision.id })).revision.id, rag.revision.id);
+    for (const locator of [{ project: 'Mi-Wiki', slug: 'concepts/missing' }, { project: 'Missing', slug: 'concepts/rag' }, { project: 'Mi-Wiki', slug: 'index' }]) await assert.rejects(app.store.read(app.actor, locator), { code: 'not_found' });
+    await assert.rejects(app.store.read({ ...app.actor, scopes: ['artifacts:write'] }, { project: 'Mi-Wiki', slug: 'concepts/rag' }), { code: 'forbidden' });
+
+    const listed = (await app.store.list(app.actor, { limit: 100 })).items;
+    assert.equal(listed.find((item) => item.artifactId === rag.artifactId)?.slug, 'concepts/rag');
+    assert.equal(listed.find((item) => item.artifactId === plain.artifactId)?.slug, null);
+
+    await assert.rejects(app.store.move(app.actor, { requestId: randomUUID(), artifactId: elsewhere.artifactId, project: 'mi-wiki' }), { ...conflict, details: { ...conflict.details, project: 'Mi-Wiki' } });
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: rag.artifactId, project: 'Mi-Wiki' }), { artifactId: rag.artifactId, project: 'Mi-Wiki' }, 'a move to the current project keeps its own slug');
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: elsewhere.artifactId, project: 'Third' }), { artifactId: elsewhere.artifactId, project: 'Third' });
+    assert.equal((await app.store.read(app.actor, { project: 'Third', slug: 'concepts/rag' })).artifactId, elsewhere.artifactId, 'a move keeps the slug');
+
+    const outsider = await app.auth.api.signUpEmail({ body: { name: 'Slug outsider', email: 'slugs-other@example.test', password: app.password } });
+    await app.db.insert(artifactShare).values({ id: randomUUID(), artifactId: rag.artifactId, kind: 'email', value: 'slugs-other@example.test', createdBy: app.ownerId, createdAt: new Date() });
+    await app.auth.api.signInEmail({ body: { email: 'slugs-other@example.test', password: app.password } });
+    const [outsiderSession] = await app.db.select().from(session).where(eq(session.userId, outsider.user.id));
+    const other = { ...app.actor, userId: outsider.user.id, sessionId: outsiderSession!.id };
+    await assert.rejects(app.store.read(other, { project: 'Mi-Wiki', slug: 'concepts/rag' }), { code: 'not_found' });
+    assert.equal((await app.store.create(other, { ...createInput(), project: 'Mi-Wiki', slug: 'concepts/rag' })).slug, 'concepts/rag', 'another owner has its own namespace');
+  } finally { await app.close(); }
+});
+
+test('a slug changes no digest, export, or receipt fingerprint of inputs without one', async () => {
+  const app = await artifactFixture();
+  try {
+    const plain = await app.store.create(app.actor, createInput());
+    const slugged = await app.store.create(app.actor, { ...createInput(), slug: 'index' });
+    assert.equal(slugged.revision.sha256, plain.revision.sha256);
+    const archive = await app.store.export(app.actor, { artifactId: slugged.artifactId, revisionId: slugged.revision.id });
+    const files = unzipSync(Buffer.from(archive.base64, 'base64'));
+    assert.deepEqual(Object.keys(files), ['artifact.json', 'content.html', 'files/bytes.bin', 'files/notes/hello.txt']);
+    assert.doesNotMatch(strFromU8(files['artifact.json']!), /slug|"index"/);
+
+    const legacy = { requestId: 'legacy-create-request', snapshot: { metadata: { title: 'Legacy', description: '' }, content: { kind: 'text' as const, text: 'Legacy payload' }, files: [] } };
+    assert.equal(await sha256(canonicalJson({ kind: 'create', input: createSchema.parse(legacy) })), 'cf00e97db6e580c4143fb3df098d97f68dfb7ba83657833203b9a2a74c53cf5b', 'the receipt hash recorded before slugs existed');
+  } finally { await app.close(); }
 });
 
 test('MCP artifact tools use verified OAuth identity and individual operation scopes', async () => {

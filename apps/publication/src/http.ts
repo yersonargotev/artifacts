@@ -1,7 +1,7 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
 import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
-import { artifactReadSchema, consumeGrantSchema, readSchema, sharedReadSchema, viewerSchema } from '@artifacts/artifacts/contracts';
+import { artifactReadSchema, consumeGrantSchema, readByIdSchema, sharedReadSchema, viewerSchema } from '@artifacts/artifacts/contracts';
 import type { Viewer } from '@artifacts/artifacts/contracts';
 import { attachmentResponse, documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
 
@@ -85,7 +85,7 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       }
       const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/(content|files\/(.+)))?$/.exec(url.pathname);
       if (!route || url.search) return new Response('No encontrado', { status: 404, headers: privateHeaders });
-      const { artifactId, revisionId } = readSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) });
+      const { artifactId, revisionId } = readByIdSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) });
       const contentRequest = route[3] === 'content';
       const path = route[4] ? decodeURIComponent(route[4]) : undefined;
       const viewer = await admit(request, artifactId);

@@ -117,3 +117,19 @@ test('a genuine receipt INSERT failure rolls back every selected row and identic
     assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, input.requestId))).length, 1);
   } finally { await app.close(); }
 });
+
+test('a panel move that would reuse a slug in its destination moves nothing', async () => {
+  const { app, actor, store, panel } = await setup();
+  try {
+    const page = (project?: string) => store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'Page', description: '' }, content: { kind: 'markdown', text: '# Page' }, files: [] }, project, slug: 'index' });
+    const wiki = await page('Wiki');
+    const other = await page('Other');
+    const loose = await page();
+    const before = await app.db.select().from(artifact);
+    await assert.rejects(panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId], project: 'wiki' }), { code: 'slug_conflict', details: { slug: 'index', project: 'Wiki', artifactId: wiki.artifactId } });
+    await assert.rejects(panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId, loose.artifactId], project: 'Fresh' }), { code: 'slug_conflict', details: { slug: 'index', project: 'Fresh' } });
+    assert.deepEqual(await app.db.select().from(artifact), before);
+    assert.deepEqual(await panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId], project: 'Fresh' }), { project: 'Fresh', moved: 1, unchanged: 0, missing: [] });
+    assert.equal((await store.read(actor, { project: 'fresh', slug: 'index' })).artifactId, other.artifactId);
+  } finally { await app.close(); }
+});

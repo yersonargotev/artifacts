@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
-import { ArtifactError, historySchema, moveSchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
+import { ArtifactError, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
 import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject } from './model.ts';
 import { revision } from '../revision.ts';
@@ -22,16 +22,16 @@ export const panelLibraryQuerySchema = z.strictObject({
 });
 
 export const panelDetailQuerySchema = z.strictObject({
-  artifactId: readSchema.shape.artifactId,
-  revisionId: readSchema.shape.revisionId,
-  compareTo: readSchema.shape.revisionId,
+  artifactId: readByIdSchema.shape.artifactId,
+  revisionId: readByIdSchema.shape.revisionId,
+  compareTo: readByIdSchema.shape.revisionId,
   before: historySchema.shape.beforeSequence,
   includeComparison: z.boolean(),
 });
 
-export const panelMoveIdsSchema = z.array(readSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readSchema.shape.artifactId).max(25));
+export const panelMoveIdsSchema = z.array(readByIdSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readByIdSchema.shape.artifactId).max(25));
 export const panelMoveSchema = z.strictObject({ requestId: moveSchema.shape.requestId, artifactIds: panelMoveIdsSchema, project: projectNameSchema.nullable() });
-const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readSchema.shape.artifactId) });
+const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readByIdSchema.shape.artifactId) });
 
 const publishedRevision = alias(artifactRevision, 'published_revision');
 const headJoin = and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId));
@@ -71,9 +71,17 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       const input = panelMoveSchema.parse(value);
       return access.panelMove(actor, input, panelMoveResultSchema, async (connection) => {
         const project = input.project === null ? null : await access.projectSpelling(connection, actor.userId, input.project);
-        const found = await connection.select({ id: artifact.id, project: artifact.project }).from(artifact)
+        const found = await connection.select({ id: artifact.id, project: artifact.project, slug: artifact.slug }).from(artifact)
           .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, input.artifactIds)));
-        const changing = found.filter((row) => row.project !== project).map((row) => row.id);
+        const moving = found.filter((row) => row.project !== project);
+        const changing = moving.map((row) => row.id);
+        const slugs = new Set<string>();
+        for (const row of moving) {
+          if (row.slug === null) continue;
+          if (slugs.has(row.slug)) throw new ArtifactError('slug_conflict', 'Two moved artifacts share a slug', { slug: row.slug, project });
+          slugs.add(row.slug);
+          await access.claimSlug(connection, actor.userId, project, row.slug, row.id);
+        }
         if (changing.length) await connection.update(artifact).set({ project }).where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, changing)));
         const owned = new Set(found.map((row) => row.id));
         return { project, moved: changing.length, unchanged: found.length - changing.length, missing: input.artifactIds.filter((id) => !owned.has(id)) };

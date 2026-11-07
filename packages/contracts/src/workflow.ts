@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ArtifactError, artifactReadSchema, createSchema, decodeFile, readSchema, snapshotSchema, updateSchema, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from './index.ts';
+import { ArtifactError, artifactReadSchema, createSchema, decodeFile, readByIdSchema, snapshotSchema, updateSchema, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from './index.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 
 export type { UpdateInput } from './index.ts';
@@ -101,7 +101,7 @@ export type PrepareArtifactEditInput = {
 };
 
 const prepareEditSchema = z.strictObject({
-  artifactId: readSchema.shape.artifactId,
+  artifactId: readByIdSchema.shape.artifactId,
   requestId: createSchema.shape.requestId,
   changes: z.strictObject({
     metadata: snapshotSchema.shape.metadata.partial().optional(),

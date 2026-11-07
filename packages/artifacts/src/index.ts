@@ -6,7 +6,7 @@ import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type ShareResult, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
+import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type Share, type ShareResult, type SharedRead, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, type Connection } from './access.ts';
 import { revision } from './revision.ts';
@@ -15,13 +15,13 @@ import type { SharedArtifactSummary } from './contracts.ts';
 
 export * from './contracts.ts';
 
-const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null) });
+const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadSchema.shape.project.default(null), slug: artifactReadSchema.shape.slug.default(null) });
 
 export function createArtifactStore(db: Database, options: { publishOrigin: string; access: AccessPolicy; sendInvitation?: InvitationSender }) {
   const admission = createAdmission(db, options.access);
-  const { transaction, authorize, liveSession, command, receipt, projectSpelling, ownedProjects, publicationUrl: urlFor, callback } = createAccess(db, options);
+  const { transaction, authorize, liveSession, command, receipt, projectSpelling, ownedProjects, bySlug, claimSlug, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
-  const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, publication: publication(row.artifact.id, row.publication ?? undefined) });
+  const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, slug: row.artifact.slug, publication: publication(row.artifact.id, row.publication ?? undefined) });
   const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
   const displayName = (name: string) => name.trim() || 'Usuario de Artifacts';
 
@@ -43,7 +43,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     const [row] = await connection.select().from(artifactRevision).where(and(eq(artifactRevision.artifactId, found.id), eq(artifactRevision.id, revisionId))).limit(1);
     if (!row) throw new ArtifactError('not_found', 'Revision not found');
     const [selected] = await connection.select().from(artifactPublication).where(eq(artifactPublication.artifactId, found.id)).limit(1);
-    return { artifactId: found.id, ownerId: found.ownerId, headRevisionId: found.headRevisionId, project: found.project, publication: publication(found.id, selected), revision: revision(row) };
+    return { artifactId: found.id, ownerId: found.ownerId, headRevisionId: found.headRevisionId, project: found.project, slug: found.slug, publication: publication(found.id, selected), revision: revision(row) };
   }
 
   async function readOwned(connection: Connection, ownerId: string, artifactId: string, revisionId?: string): Promise<ArtifactRead> {
@@ -60,7 +60,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         const revisionId = crypto.randomUUID();
         const createdAt = new Date();
         const project = input.project === undefined ? null : await projectSpelling(connection, actor.userId, input.project);
-        await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt, project });
+        const slug = input.slug ?? null;
+        await claimSlug(connection, actor.userId, project, slug);
+        await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt, project, slug });
         await connection.insert(artifactRevision).values({ id: revisionId, artifactId, parentRevisionId: null, sequence: 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt, sha256: digest, snapshot });
         return readOwned(connection, actor.userId, artifactId);
       });
@@ -70,7 +72,11 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const input = readSchema.parse(value);
       return transaction(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
-        return readOwned(connection, actor.userId, input.artifactId, input.revisionId);
+        if (input.artifactId !== undefined) return readOwned(connection, actor.userId, input.artifactId, input.revisionId);
+        const project = input.project === undefined ? null : await projectSpelling(connection, actor.userId, input.project);
+        const found = await bySlug(connection, actor.userId, project, input.slug!);
+        if (!found) throw new ArtifactError('not_found', 'Artifact not found');
+        return readArtifact(connection, found, input.revisionId);
       });
     },
 
@@ -208,8 +214,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     async move(actor: Actor, value: z.input<typeof moveSchema>): Promise<MoveResult> {
       const input = moveSchema.parse(value);
       return command(actor, 'artifacts:write', 'move', input, moveResultSchema, async (connection) => {
-        await owned(connection, actor.userId, input.artifactId);
+        const current = await owned(connection, actor.userId, input.artifactId);
         const project = input.project === null ? null : await projectSpelling(connection, actor.userId, input.project);
+        await claimSlug(connection, actor.userId, project, current.slug, current.id);
         await connection.update(artifact).set({ project }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId)));
         return { artifactId: input.artifactId, project };
       });
@@ -293,9 +300,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       });
     },
 
-    async readPublished(viewerValue: Viewer, value: z.input<typeof readSchema>): Promise<ArtifactRead | SharedRead> {
+    async readPublished(viewerValue: Viewer, value: z.input<typeof readByIdSchema>): Promise<ArtifactRead | SharedRead> {
       const viewer = viewerSchema.parse(viewerValue);
-      const input = readSchema.parse(value);
+      const input = readByIdSchema.parse(value);
       if (viewer.artifactId !== input.artifactId || viewer.expiresAt <= Date.now()) throw new ArtifactError('forbidden', 'Publication viewer is invalid or expired');
       return transaction(async (connection) => {
         await liveSession(connection, viewer.userId, viewer.sessionId);

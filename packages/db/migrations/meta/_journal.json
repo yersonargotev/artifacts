@@ -36,6 +36,13 @@
       "when": 1792932059022,
       "tag": "0004_sweet_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794017911310,
+      "tag": "0005_broad_bastion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readByIdSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
@@ -123,7 +123,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       if (route === 'identity') { query(url, []); return json({ userId: actor.userId, sessionId: actor.sessionId, clientId: actor.clientId, scopes: actor.scopes }); }
       if (route === 'collection' && request.method === 'GET') return json(await artifacts.list(actor, listSchema.parse(query(url, ['limit', 'cursor', 'project'], ['limit']))));
       if (route === 'artifact' && request.method === 'GET') {
-        const input = readSchema.parse({ artifactId, ...query(url, ['revisionId', 'response']) });
+        const input = readByIdSchema.parse({ artifactId, ...query(url, ['revisionId', 'response']) });
         const result = await artifacts.read(actor, input);
         return json(input.response === 'compact' ? await compactArtifactRead(result) : result);
       }

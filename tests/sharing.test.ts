@@ -175,7 +175,7 @@ test('deleting the artifact deletes its shares and scrubs the share receipts and
 test('a guest whose verified email matches a share reads the published revision without owner-only fields', async () => {
   const app = await setup();
   try {
-    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot, project: 'Clientes' });
+    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot, project: 'Clientes', slug: 'plans/quarterly' });
     await app.publish(first.artifactId, first.revision.id);
     await app.store.update(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, snapshot: { ...publishedSnapshot, content: { kind: 'html', text: '<h1>Unpublished draft</h1>' } } });
     await app.share(app.owner, first.artifactId, 'guest@example.test');
@@ -189,6 +189,9 @@ test('a guest whose verified email matches a share reads the published revision 
     };
     assert.deepEqual(await app.store.readPublished(viewer, { artifactId: first.artifactId }), expected);
     assert.deepEqual(await app.store.readPublished(viewer, { artifactId: first.artifactId, revisionId: first.revision.id }), expected);
+    assert.deepEqual(await app.store.listSharedWithMe(app.guest), { items: [{ artifactId: first.artifactId, title: publishedSnapshot.metadata.title, ownerName: 'Test owner', url: `${publishOrigin}/a/${first.artifactId}` }] });
+    await assert.rejects(app.store.read(app.guest, { project: 'Clientes', slug: 'plans/quarterly' }), { code: 'not_found' });
+    await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId, slug: 'plans/quarterly' } as never), { name: 'ZodError' });
   } finally { await app.close(); }
 });
 
@@ -326,7 +329,7 @@ test('the owner path is unchanged: an owner reads the full ArtifactRead whether 
   try {
     const [owner] = await app.db.select().from(user).where(eq(user.id, app.ownerId));
     assert.equal(owner.emailVerified, false);
-    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot, project: 'Clientes' });
+    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot, project: 'Clientes', slug: 'plans/quarterly' });
     await assert.rejects(app.admit(app.owner, first.artifactId), { code: 'not_found', message: 'Artifact is not published' });
     await app.publish(first.artifactId, first.revision.id);
     await app.store.update(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, snapshot });
@@ -334,7 +337,7 @@ test('the owner path is unchanged: an owner reads the full ArtifactRead whether 
     const published = await app.store.readPublished(await app.admit(app.owner, first.artifactId), { artifactId: first.artifactId });
     assert.deepEqual(published, full);
     assert.equal(JSON.stringify(published), JSON.stringify(full), 'owner JSON matches the owner read byte for byte');
-    assert.deepEqual(Object.keys(published), ['artifactId', 'ownerId', 'headRevisionId', 'project', 'publication', 'revision'], 'owner top-level key order matches S1');
+    assert.deepEqual(Object.keys(published), ['artifactId', 'ownerId', 'headRevisionId', 'project', 'slug', 'publication', 'revision'], 'owner top-level key order matches S1 with the slug after the project');
     assert.deepEqual(Object.keys(published.publication!), ['revisionId', 'version', 'url'], 'owner publication key order matches S1');
     assert.deepEqual(Object.keys(published.revision), ['id', 'parentRevisionId', 'sequence', 'authorUserId', 'authorClientId', 'createdAt', 'sha256', 'snapshot'], 'owner revision key order matches S1');
     await app.verify(app.owner, true);
@@ -345,7 +348,7 @@ test('the owner path is unchanged: an owner reads the full ArtifactRead whether 
 
 test('owner publication responses preserve current main document, content and attachment bytes', async () => {
   const fixture = {
-    artifactId: 'artifact-a', ownerId: 'owner-a', headRevisionId: 'revision-2', project: 'Clientes', publication: { revisionId: 'revision-1', version: 2, url: 'https://publication.example.test/a/artifact-a' },
+    artifactId: 'artifact-a', ownerId: 'owner-a', headRevisionId: 'revision-2', project: 'Clientes', slug: 'plans/quarterly', publication: { revisionId: 'revision-1', version: 2, url: 'https://publication.example.test/a/artifact-a' },
     revision: { id: 'revision-1', parentRevisionId: null, sequence: 1, authorUserId: 'owner-a', authorClientId: 'client-a', createdAt: '2026-01-01T00:00:00.000Z', sha256: 'a'.repeat(64), snapshot: { metadata: { title: 'Owner document', description: 'Owner bytes', custom: { audience: 'owner' } }, content: { kind: 'html', text: '<h1>Owner bytes</h1>' }, files: [{ path: 'notes.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Owner attachment.\n' }] } },
   };
   const { worker, open } = stubbedWorker(async () => Response.json(fixture));
@@ -369,12 +372,13 @@ test('owner publication responses preserve current main document, content and at
 
 test('the publication Worker fails closed on a guest-shaped response with owner fields or an owner-shaped response for another user', async () => {
   const shared = { artifactId: 'artifact-a', publication: { revisionId: 'revision-1', version: 1, url: 'https://publication.example.test/a/artifact-a' }, revision: { id: 'revision-1', createdAt: '2026-01-01T00:00:00.000Z', sha256: 'a'.repeat(64), snapshot: publishedSnapshot } };
-  const owned = { ...shared, ownerId: 'owner-a', headRevisionId: 'revision-1', project: null, revision: { ...shared.revision, parentRevisionId: null, sequence: 1, authorUserId: 'owner-a', authorClientId: 'client-a' } };
+  const owned = { ...shared, ownerId: 'owner-a', headRevisionId: 'revision-1', project: null, slug: null, revision: { ...shared.revision, parentRevisionId: null, sequence: 1, authorUserId: 'owner-a', authorClientId: 'client-a' } };
   const cases = {
     'guest shape': [shared, 200],
     'owner shape for the viewer': [owned, 200],
     'guest shape with ownerId': [{ ...shared, ownerId: 'owner-a' }, 503],
     'guest shape with project': [{ ...shared, project: 'Clientes' }, 503],
+    'guest shape with slug': [{ ...shared, slug: 'plans/quarterly' }, 503],
     'guest shape with email': [{ ...shared, email: 'owner@example.test' }, 503],
     'guest shape with authorUserId': [{ ...shared, revision: { ...shared.revision, authorUserId: 'owner-a' } }, 503],
     'owner shape for another user': [{ ...owned, ownerId: 'owner-b' }, 503],

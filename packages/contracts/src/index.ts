@@ -111,8 +111,14 @@ export function parseCanvas(snapshot: Pick<Snapshot, 'content' | 'files'>): Canv
 
 export const projectNameSchema = z.string().normalize('NFC').trim().min(1).max(80).refine((name) => name.isWellFormed() && !/\p{Cc}/u.test(name), 'Use a project name without control characters');
 const response = z.enum(['full', 'compact']).optional();
-export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, project: projectNameSchema.optional(), response });
-export const readSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
+// The .md check aborts so a file-style name gets the suffix hint instead of the generic pattern message.
+export const slugSchema = z.string().min(1).max(160)
+  .refine((slug) => !slug.endsWith('.md'), { message: 'Remove the .md suffix: a slug names a page, not a file', abort: true })
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/, 'Use lowercase kebab-case segments separated by /, such as concepts/rag');
+export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, project: projectNameSchema.optional(), slug: slugSchema.optional(), response });
+export const readByIdSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
+export const readSchema = z.strictObject({ artifactId: identifier.optional(), project: projectNameSchema.optional(), slug: slugSchema.optional(), revisionId: identifier.optional(), response })
+  .refine((input) => (input.artifactId === undefined) !== (input.slug === undefined) && (input.project === undefined || input.slug !== undefined), 'Specify exactly one of artifactId or slug; project applies only with slug');
 export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema, response });
 export const publishSchema = z.strictObject({ requestId, artifactId: identifier, revisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
 export const deleteSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, expectedPublicationVersion: z.number().int().nonnegative() });
@@ -170,7 +176,7 @@ export type Revision = z.infer<typeof revisionSchema>;
 export type ArtifactRead = z.infer<typeof artifactReadSchema>;
 export type SharedRead = z.infer<typeof sharedReadSchema>;
 export type SharedArtifactSummary = Readonly<{ artifactId: string; title: string; ownerName: string; url: string }>;
-export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; project: string | null; publication: Publication | null };
+export type ArtifactSummary = { artifactId: string; title: string; headRevisionId: string; createdAt: string; project: string | null; slug: string | null; publication: Publication | null };
 export type ProjectSummary = { name: string; artifactCount: number };
 export type ArtifactLibraryQuery = z.infer<typeof libraryQuerySchema>;
 export type ArtifactLibraryPage = {
@@ -179,7 +185,7 @@ export type ArtifactLibraryPage = {
   counts: { all: number; published: number; unpublished: number; pending: number };
 };
 export type Archive = { filename: string; mediaType: 'application/zip'; base64: string; sha256: string };
-export type ArtifactErrorCode = 'forbidden' | 'not_found' | 'conflict' | 'request_conflict' | 'invalid_grant';
+export type ArtifactErrorCode = 'forbidden' | 'not_found' | 'conflict' | 'request_conflict' | 'slug_conflict' | 'invalid_grant';
 export class ArtifactError extends Error {
   readonly code: ArtifactErrorCode;
   readonly details: Record<string, unknown>;
@@ -196,6 +202,6 @@ export function decodeFile(file: { encoding: 'utf8' | 'base64'; data: string }):
 
 export const publicationSchema = z.strictObject({ revisionId: identifier, version: z.number().int().positive(), url: z.url() });
 export const revisionSchema = z.strictObject({ id: identifier, parentRevisionId: identifier.nullable(), sequence: z.number().int().positive(), authorUserId: identifier, authorClientId: identifier, createdAt: z.iso.datetime(), sha256: z.string().regex(/^[a-f0-9]{64}$/), snapshot: snapshotSchema });
-export const artifactReadSchema = z.strictObject({ artifactId: identifier, ownerId: identifier, headRevisionId: identifier, project: z.string().nullable(), publication: publicationSchema.nullable(), revision: revisionSchema });
+export const artifactReadSchema = z.strictObject({ artifactId: identifier, ownerId: identifier, headRevisionId: identifier, project: z.string().nullable(), slug: z.string().nullable(), publication: publicationSchema.nullable(), revision: revisionSchema });
 export const sharedReadSchema = z.strictObject({ artifactId: identifier, ownerName: z.string().default('Usuario de Artifacts'), publication: publicationSchema, revision: revisionSchema.pick({ id: true, createdAt: true, sha256: true, snapshot: true }) });
 export const publishResultSchema = publicationSchema.extend({ artifactId: identifier });
