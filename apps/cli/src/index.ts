@@ -69,9 +69,10 @@ project keeps the slug.
 A slug such as concepts/rag names an artifact within its project, or within
 the unfiled artifacts without --project. Read --slug finds it without its ID.
 Create or move fails with slug_conflict when the project already uses the slug.
-Search finds owned Markdown and text artifacts whose title, description, or
-content contains every term of QUERY, ignoring letter case and accents. Quote a
-QUERY with spaces. Results are ordered by relevance with a **bold** snippet.
+Search finds owned artifacts whose head contains every term of QUERY, ignoring
+letter case and accents. It reads Markdown and text content, the visible text
+of HTML, and the title and description of every kind. Quote a QUERY with
+spaces. Results are ordered by relevance with a **bold** snippet.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.

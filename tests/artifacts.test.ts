@@ -540,21 +540,19 @@ test('search finds owned Markdown and text heads without accents and follows upd
     const envigado = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Viaje', 'Una tarde en Envigado con amigos.'), project: 'Wiki', slug: 'viajes/envigado' });
     const accented = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Búsqueda', 'Notas sueltas.', 'text') });
     const described = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Plain', 'Nothing here.', 'markdown', 'Described as zanahoria') });
-    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Envigado HTML', '<p>Envigado</p>', 'html') });
-    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: designSnapshot() });
 
     const [hit, ...rest] = (await app.store.search(app.actor, { query: 'envigado' })).items;
-    assert.deepEqual(rest, [], 'HTML pages are not indexed');
+    assert.deepEqual(rest, []);
     assert.deepEqual({ ...hit, rank: typeof hit!.rank }, { artifactId: envigado.artifactId, project: 'Wiki', slug: 'viajes/envigado', title: 'Viaje', snippet: 'Una tarde en **Envigado** con amigos.', rank: 'number' });
     assert.deepEqual(await ids('busqueda'), [accented.artifactId], 'the title matches without its accent');
     assert.deepEqual(await ids('zanahoria'), [described.artifactId], 'the description is indexed');
-    assert.deepEqual(await ids('board'), [], 'design artifacts are not indexed');
 
     const updated = await app.store.update(app.actor, { requestId: randomUUID(), artifactId: envigado.artifactId, expectedRevisionId: envigado.revision.id, snapshot: page('Viaje', 'Una tarde en Sabaneta.') });
     assert.deepEqual(await ids('envigado'), [], 'removed text no longer finds the page');
     assert.deepEqual(await ids('sabaneta'), [envigado.artifactId], 'new text finds the page');
-    await app.store.update(app.actor, { requestId: randomUUID(), artifactId: envigado.artifactId, expectedRevisionId: updated.revision.id, snapshot: page('Viaje', 'Sabaneta', 'html') });
-    assert.deepEqual(await ids('sabaneta'), [], 'an update to HTML drops the page from the index');
+    await app.store.update(app.actor, { requestId: randomUUID(), artifactId: envigado.artifactId, expectedRevisionId: updated.revision.id, snapshot: page('Viaje', '<p class="sabaneta">Rionegro</p>', 'html') });
+    assert.deepEqual(await ids('sabaneta'), [], 'an update to HTML replaces the Markdown body');
+    assert.deepEqual(await ids('rionegro'), [envigado.artifactId], 'an update to HTML indexes its visible text');
     await app.store.update(app.actor, { requestId: randomUUID(), artifactId: accented.artifactId, expectedRevisionId: accented.revision.id, snapshot: page('Búsqueda', 'Notas sueltas.', 'text') });
     assert.equal((await app.store.search(app.actor, { query: 'busqueda' })).items.length, 1, 'an update replaces the row instead of adding one');
 
@@ -568,6 +566,34 @@ test('search finds owned Markdown and text heads without accents and follows upd
     await app.store.delete(app.actor, { requestId: randomUUID(), artifactId: accented.artifactId, expectedRevisionId: current.headRevisionId, expectedPublicationVersion: 0 });
     assert.deepEqual(await ids('busqueda'), []);
     assert.deepEqual((await app.client.execute({ sql: 'SELECT count(*) AS total FROM artifact_search WHERE artifact_id = ?', args: [accented.artifactId] })).rows[0]!.total, 0, 'the delete trigger removes the row');
+  } finally { await app.close(); }
+});
+
+test('search finds HTML by visible text only and design by metadata only, and never reads attachments', async () => {
+  const app = await artifactFixture();
+  try {
+    const ids = async (query: string) => (await app.store.search(app.actor, { query })).items.map((item) => item.artifactId);
+    const html = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Paseo', '<html><head><title>x</title><style>.medellin{color:red}</style><script>var sabaneta = 1</script></head><body><p class="itagui" data-place="bello">Una tarde en <b>Envigado</b> &amp; Rionegro</p><p>Caldas</p></body></html>', 'html') });
+    for (const query of ['envigado', 'rionegro', 'caldas']) assert.deepEqual(await ids(query), [html.artifactId], query);
+    for (const query of ['medellin', 'sabaneta', 'itagui', 'bello', 'class', 'script', 'body', 'amp']) assert.deepEqual(await ids(query), [], query);
+    const [hit] = (await app.store.search(app.actor, { query: 'caldas' })).items;
+    assert(!hit!.snippet.includes('<'), hit!.snippet);
+    assert.match(hit!.snippet, /Envigado & Rionegro \*\*Caldas\*\*/);
+
+    const design = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: { ...designSnapshot(), metadata: { title: 'Tablero Guatape', description: 'Bocetos de Jardin' } } });
+    assert.deepEqual(await ids('guatape'), [design.artifactId], 'the design title is indexed');
+    assert.deepEqual(await ids('jardin'), [design.artifactId], 'the design description is indexed');
+    for (const query of ['board', 'boards', 'order']) assert.deepEqual(await ids(query), [], `the canvas word ${query} is not indexed`);
+
+    const attachment = { path: 'notes/extra.txt', mediaType: 'text/plain', encoding: 'utf8', data: 'Solo en Copacabana' } as const;
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: { ...page('Adjunto', 'Texto propio'), files: [attachment] } });
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: { ...page('Adjunto HTML', '<p>Texto propio</p>', 'html'), files: [attachment] } });
+    assert.deepEqual(await ids('copacabana'), [], 'attachments are not indexed');
+    assert.equal((await ids('propio')).length, 2);
+
+    await app.store.update(app.actor, { requestId: randomUUID(), artifactId: html.artifactId, expectedRevisionId: html.revision.id, snapshot: { ...designSnapshot(), metadata: { title: 'Paseo dibujado', description: '' } } });
+    assert.deepEqual(await ids('caldas'), [], 'an update to design drops the HTML text');
+    assert.deepEqual(await ids('dibujado'), [html.artifactId], 'an update to design indexes the new title');
   } finally { await app.close(); }
 });
 

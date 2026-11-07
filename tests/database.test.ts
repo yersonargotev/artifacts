@@ -9,6 +9,8 @@ import { migrate } from 'drizzle-orm/libsql/migrator';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { migrateDatabase } from '../packages/db/src/migrate.ts';
 import { panelSession, session, user } from '../packages/db/src/schema.ts';
+import { reindexSearch, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { designSnapshot } from './helpers.ts';
 
 test('migrations are repeatable and central-session deletion cascades to panel sessions', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-db-'));
@@ -62,6 +64,42 @@ test('the search migration backfills Markdown and text heads, and an owner delet
     assert.deepEqual(await search('sabaneta'), [], 'only head revisions are backfilled');
     await db.delete(user).where(eq(user.id, 'owner'));
     assert.equal((await client.execute('SELECT count(*) AS total FROM artifact_search')).rows[0]!.total, 0);
+  } finally {
+    client.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('reindexSearch rebuilds one row per head for every kind and converges when run again', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-db-'));
+  const url = `file:${join(directory, 'reindex.db')}`;
+  await migrateDatabase(url);
+  const { db, client } = await openDatabase({ url });
+  try {
+    await client.execute("INSERT INTO user (id, name, email) VALUES ('owner', 'Owner', 'owner@example.test')");
+    const heads: Snapshot[] = [
+      { metadata: { title: 'Página html', description: '' }, content: { kind: 'html', text: '<p class="itagui">Una tarde en Envigado</p>' }, files: [] },
+      { ...designSnapshot(), metadata: { title: 'Tablero Guatape', description: '' } },
+      { metadata: { title: 'Página markdown', description: '' }, content: { kind: 'markdown', text: 'Caldas' }, files: [] },
+    ];
+    for (const [index, snapshot] of heads.entries()) {
+      await client.batch([
+        { sql: 'INSERT INTO artifact (id, owner_id, head_revision_id, created_at) VALUES (?, ?, ?, 0)', args: [`a${index}`, 'owner', `r${index}`] },
+        { sql: "INSERT INTO artifact_revision (id, artifact_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES (?, ?, 1, 'owner', 'client', 0, '', ?)", args: [`r${index}`, `a${index}`, JSON.stringify(snapshot)] },
+      ], 'write');
+    }
+    await client.execute("INSERT INTO artifact_search (artifact_id, title, description, body) VALUES ('a2', 'Stale', '', 'obsoleto')");
+    const search = async (query: string) => (await client.execute({ sql: 'SELECT artifact_id FROM artifact_search WHERE artifact_search MATCH ? ORDER BY artifact_id', args: [query] })).rows.map((row) => row.artifact_id);
+
+    assert.equal(await reindexSearch(db), 3);
+    assert.equal(await reindexSearch(db), 3);
+    assert.deepEqual(await search('envigado'), ['a0'], 'HTML is found by its visible text');
+    assert.deepEqual(await search('itagui'), [], 'HTML attributes are not indexed');
+    assert.deepEqual(await search('guatape'), ['a1'], 'design is found by its title');
+    assert.deepEqual(await search('board'), [], 'the canvas is not indexed');
+    assert.deepEqual(await search('caldas'), ['a2']);
+    assert.deepEqual(await search('obsoleto'), [], 'a drifted row is replaced');
+    assert.deepEqual((await client.execute('SELECT artifact_id, count(*) AS total FROM artifact_search GROUP BY artifact_id ORDER BY artifact_id')).rows.map((row) => [row.artifact_id, row.total]), [['a0', 1], ['a1', 1], ['a2', 1]]);
   } finally {
     client.close();
     await rm(directory, { recursive: true, force: true });
