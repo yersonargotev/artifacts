@@ -237,7 +237,7 @@ A slug is unique within the owner's project, matched by the project's stored spe
 
 ## Search pages
 
-`search QUERY` finds owned Markdown and text artifacts whose title, description, or content at the head revision contains every term of `QUERY`. Quote a query that contains spaces.
+`search QUERY` finds owned artifacts whose head revision contains every term of `QUERY`. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. Quote a query that contains spaces.
 
 ```sh
 artifacts search envigado
@@ -245,7 +245,7 @@ artifacts search "tarde envigado" --project mi-wiki
 artifacts search envigado --limit 5 --cursor 5
 ```
 
-The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. HTML and design artifacts, older revisions, and artifacts shared with the caller are not searched. `--project NAME` limits results to one project, matched regardless of letter case. `--limit` is 1 to 25 and defaults to 10. The command prints `{ "items": [...], "nextCursor": "10" }`; pass `nextCursor` as `--cursor` for the next page, and `null` means there are no more results. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Search requires `artifacts:read`.
+The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. Attachments, older revisions, and artifacts shared with the caller are not searched. `--project NAME` limits results to one project, matched regardless of letter case. `--limit` is 1 to 25 and defaults to 10. The command prints `{ "items": [...], "nextCursor": "10" }`; pass `nextCursor` as `--cursor` for the next page, and `null` means there are no more results. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Search requires `artifacts:read`.
 
 ## Share publication access
 

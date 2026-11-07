@@ -1,6 +1,6 @@
 # Wiki pages: stable slugs, search, and batch commands
 
-Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move, shipped), links [#90](https://github.com/yersonargotev/artifacts/issues/90) (shipped), search [#91](https://github.com/yersonargotev/artifacts/issues/91) (FTS5 spike, done), [#92](https://github.com/yersonargotev/artifacts/issues/92) (Markdown and text, shipped), and [#93](https://github.com/yersonargotev/artifacts/issues/93), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
+Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move, shipped), links [#90](https://github.com/yersonargotev/artifacts/issues/90) (shipped), search [#91](https://github.com/yersonargotev/artifacts/issues/91) (FTS5 spike, done), [#92](https://github.com/yersonargotev/artifacts/issues/92) (Markdown and text, shipped), and [#93](https://github.com/yersonargotev/artifacts/issues/93) (HTML and design, shipped), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
 
 ## Problem and decision
 
@@ -87,6 +87,15 @@ What shipped in [#92](https://github.com/yersonargotev/artifacts/issues/92):
 - Search runs inside the store transaction after `authorize(connection, actor, 'artifacts:read')`, like `list`, and writes no receipt. The project filter resolves to its stored spelling with the same helper as `list`. Shared-with-me artifacts never appear.
 - MCP adds `artifacts_search`, REST adds `GET /v1/search?query=&project=&limit=&cursor=`, the typed client adds `search()`, and the CLI adds `artifacts search QUERY [--project NAME] [--limit N] [--cursor CURSOR]`.
 - The identity copy (`scripts/migrate-identity.ts`) now lists tables through `pragma_table_list`, keeps `table` and `virtual` entries, and skips FTS5 shadow tables. It copies the index by inserting into the virtual table, which rebuilds the target's index. Copying the shadow tables directly would corrupt it.
+
+What shipped in [#93](https://github.com/yersonargotev/artifacts/issues/93):
+
+- Every head now has a row. The store maps each content kind to its indexed body in one table typed as a record over the kind, so a new kind fails to compile until it chooses a body. Markdown and text index their content, HTML indexes its visible text, and design indexes an empty body.
+- HTML text comes from `htmlparser2` callbacks in the store module. Text inside `script` and `style` is skipped, and every open and close tag adds a space, so `<p>a</p><p>b</p>` yields two words. Entities are decoded, whitespace collapses, and the result is trimmed. Tag names, attribute names, and attribute values never reach the index, and the snippet therefore holds no markup. The library is pure JavaScript and bundles into the Workers.
+- A design is found by its title and description only. Its canvas JSON is layout, not prose, and its boards are attachments.
+- Attachments are never read for any kind.
+- No migration backfills HTML and design. SQL cannot remove HTML markup without duplicating the extraction rule, and a migration that ran before the new code deployed would be undone, because the old code drops the row of an HTML head on every update. Instead `reindexSearch(db)` rebuilds the index from the store's own rule, and an operator runs it with `pnpm search:reindex` after the deploy.
+- `reindexSearch` pages over artifact IDs in order and rewrites each artifact's row in its own write transaction, rereading the head inside it. A crash leaves every finished artifact indexed, a rerun converges to one row per artifact, and a concurrent update is never overwritten with a stale head. It reindexes every kind, so it also repairs any drifted row, and it returns the number of artifacts it indexed.
 
 ## Batch commands
 
