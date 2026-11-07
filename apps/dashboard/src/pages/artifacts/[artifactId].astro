@@ -14,6 +14,7 @@ import InformationPanel from '../../components/detail/InformationPanel.astro';
 import PublicationCard from '../../components/detail/PublicationCard.astro';
 import HistoryCard from '../../components/detail/HistoryCard.astro';
 import FactsCard from '../../components/detail/FactsCard.astro';
+import LinksCard from '../../components/detail/LinksCard.astro';
 if (!Astro.locals.identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
 const { panel } = await getRuntime();
 const result = await (async () => {
@@ -32,6 +33,7 @@ const summary = url.tab === 'files' ? await summarizeRevision(detail.selected.re
     <div class="detail-body">
       <div class="detail-main">
         {url.tab === 'preview' && <PreviewCard detail={detail} />}
+        {url.tab === 'preview' && detail.links !== null && <LinksCard links={detail.links} />}
         {summary && <FilesPanel files={summary.files} sequence={detail.selected.revision.sequence} />}
         {url.tab === 'compare' && <ComparePanel detail={detail} url={url} />}
         {url.tab === 'information' && <InformationPanel detail={detail} />}
