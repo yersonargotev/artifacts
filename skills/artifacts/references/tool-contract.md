@@ -51,6 +51,7 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 | `artifacts_list` | Optional `limit`, optional `cursor`, optional `project` | `items` and `nextCursor` |
 | `artifacts_move` | `requestId`, `artifactId`, and at least one of `project` (name or null) and `slug` (slug or null) | `artifactId` and stored `project` |
 | `artifacts_search` | `query`, optional `project`, optional `limit`, optional `cursor` | `items` with `artifactId`, `project`, `slug`, `title`, `snippet`, and `rank`, and `nextCursor` |
+| `artifacts_batch` | `requestId`, 1 to 25 `operations` of `create` or `update` | `results` with `index`, `artifactId`, and `revisionId` per operation |
 | `projects_list` | `{}` | `items` with `name` and `artifactCount` |
 | `artifacts_history` | `artifactId`, optional `limit`, optional `beforeSequence` | `items` and `nextBeforeSequence` |
 | `artifacts_export` | `artifactId`, `revisionId` | `filename`, `mediaType`, `base64`, and `sha256` |
@@ -64,11 +65,13 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 
 `artifacts_search` searches the caller's owned artifacts at their head revision. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. The `query` is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. Attachments, older revisions, and artifacts shared with the caller are not searched. Optional `project` matches regardless of letter case. `limit` is 1 to 25 and defaults to 10. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Pass `nextCursor` as `cursor` for the next page; `null` means there are no more results. It requires `artifacts:read`.
 
+`artifacts_batch` applies its operations as one all-or-nothing command. Each operation is `{ op: 'create', snapshot, project?, slug? }` or `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`. A slug may name a page created earlier in the same batch. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes.
+
 `revision.id` identifies the saved revision. Other revision fields include `parentRevisionId`, `sequence`, `sha256`, and `snapshot`. `headRevisionId` identifies the draft head. `publication` is null or contains `revisionId`, `version`, and `url`.
 
 Lists default to 25 items and allow at most 100 per page. History defaults to 5 revisions and allows at most 10 per page.
 
-Create, update, and move require `artifacts:write`. Publication, share, unshare, and the share list require `artifacts:publish`. Reads, lists, projects, history, and export require `artifacts:read`. Ownership and live session checks apply to every operation.
+Create, update, move, and batch require `artifacts:write`. Publication, share, unshare, and the share list require `artifacts:publish`. Reads, lists, projects, history, and export require `artifacts:read`. Ownership and live session checks apply to every operation.
 
 Mutations return their original result for a retry with the same owner-scoped `requestId` and exact arguments. Reuse with different arguments fails. Stale expected revision or publication versions fail with `conflict`.
 

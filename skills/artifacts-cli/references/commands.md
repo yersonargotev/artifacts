@@ -134,6 +134,16 @@ artifacts search envigado --limit 5 --cursor 5
 
 `search QUERY` finds owned artifacts whose head revision contains every term. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. Quote a query with spaces. The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. Attachments, older revisions, and artifacts shared with the caller are not searched. `--project` matches regardless of letter case. `--limit` is 1 to 25 and defaults to 10. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Pass `nextCursor` as `--cursor` for the next page; `null` means there are no more results.
 
+## Apply a batch
+
+Check that installed help lists `batch` before using it.
+
+```sh
+artifacts batch --command ingest.json
+```
+
+The file holds `{ requestId, operations }`. Each operation is `{ op: 'create', snapshot, project?, slug? }` or `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`. A slug may name a page created earlier in the same batch. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes. The CLI retains the command before submission, so `artifacts retry REQUEST_ID` replays a lost batch.
+
 ## Edit without losing retained data
 
 For a title change, save `changes.json` with only the requested field.

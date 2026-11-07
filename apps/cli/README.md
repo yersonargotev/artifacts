@@ -131,6 +131,7 @@ artifacts create --command FILE
 artifacts list [--limit N] [--cursor CURSOR] [--project NAME]
 artifacts projects
 artifacts search QUERY [--project NAME] [--limit N] [--cursor CURSOR]
+artifacts batch --command FILE
 artifacts read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
 artifacts read --slug SLUG [--project NAME] [--revision REV] [--response full|compact]
                [--out FILE [--quiet]]
@@ -246,6 +247,22 @@ artifacts search envigado --limit 5 --cursor 5
 ```
 
 The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. Attachments, older revisions, and artifacts shared with the caller are not searched. `--project NAME` limits results to one project, matched regardless of letter case. `--limit` is 1 to 25 and defaults to 10. The command prints `{ "items": [...], "nextCursor": "10" }`; pass `nextCursor` as `--cursor` for the next page, and `null` means there are no more results. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Search requires `artifacts:read`.
+
+## Apply a batch
+
+`batch --command FILE` applies 1 to 25 create and update operations as one all-or-nothing command. The file holds the complete command with its `requestId`, and the CLI retains it before submission like the other `--command` mutations, so `artifacts retry REQUEST_ID` replays a lost batch.
+
+```json
+{
+  "requestId": "ingest-2026-11-07",
+  "operations": [
+    { "op": "create", "project": "mi-wiki", "slug": "concepts/rag", "snapshot": { "metadata": { "title": "RAG", "description": "" }, "content": { "kind": "markdown", "text": "# RAG" }, "files": [] } },
+    { "op": "update", "project": "mi-wiki", "slug": "index", "expectedRevisionId": "REV", "snapshot": { "metadata": { "title": "Index", "description": "" }, "content": { "kind": "markdown", "text": "- [RAG](concepts/rag.md)" }, "files": [] } }
+  ]
+}
+```
+
+Each operation is `{ op: 'create', snapshot, project?, slug? }` or `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`. A slug may name a page created earlier in the same batch. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes. Batch requires `artifacts:write`.
 
 ## Share publication access
 
