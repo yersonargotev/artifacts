@@ -98,5 +98,6 @@ export const isSelectedPublished = (detail: ArtifactDetail) => detail.publicatio
 export const isPending = (detail: ArtifactDetail) => detail.publication !== null && detail.publication.revision.revisionId !== detail.head.revisionId;
 
 export type PanelMoveInput = { readonly requestId: string; readonly artifactIds: readonly string[]; readonly project: string | null };
+export type SlugConflict = { readonly artifactId: string; readonly slug: string };
 export type PanelMoveResult = { readonly project: string | null; readonly moved: number; readonly unchanged: number; readonly missing: string[] };
 export type MoveSubject = { readonly workspace: Workspace; readonly items: readonly { readonly artifactId: string; readonly title: string; readonly project: ProjectName | null }[] };

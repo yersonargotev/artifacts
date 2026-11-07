@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { Panel } from '@artifacts/artifacts/panel';
-import type { MoveSubject, PanelMoveResult } from '@artifacts/artifacts/panel/model';
+import { panelSlugConflictSchema, type Panel } from '@artifacts/artifacts/panel';
+import type { MoveSubject, PanelMoveResult, SlugConflict } from '@artifacts/artifacts/panel/model';
 import { ArtifactError, moveSchema, projectNameSchema, type Actor } from '@artifacts/artifacts/contracts';
 import { readForm } from './form.ts';
 import { moveHref, readMoveUrl, scopeHref } from './urls.ts';
@@ -9,6 +9,7 @@ export type MoveForm = { artifactIds: string[]; requestId: string; project: stri
 export type MoveOutcome =
   | { kind: 'moved'; location: string }
   | { kind: 'partial'; result: PanelMoveResult; location: string }
+  | { kind: 'slug_conflict'; project: string | null; conflicts: SlugConflict[] }
   | { kind: 'invalid' | 'conflict' | 'uncertain' };
 export type MovePage =
   | { kind: 'redirect'; location: string }
@@ -38,8 +39,10 @@ export async function submitMove(panel: Pick<Panel, 'move'>, actor: Actor, form:
     return result.missing.length ? { kind: 'partial', result, location } : { kind: 'moved', location };
   } catch (error) {
     if (!(error instanceof ArtifactError)) return { kind: 'uncertain' };
-    if (error.code !== 'request_conflict') throw error;
-    return { kind: 'conflict' };
+    if (error.code === 'request_conflict') return { kind: 'conflict' };
+    const conflict = error.code === 'slug_conflict' ? panelSlugConflictSchema.safeParse(error.details) : undefined;
+    if (!conflict?.success) throw error;
+    return { kind: 'slug_conflict', ...conflict.data };
   }
 }
 
@@ -53,5 +56,5 @@ export async function prepareMovePage(panel: Pick<Panel, 'move' | 'moveSubject'>
     return undefined;
   });
   const form = submitted ?? { artifactIds: ids, requestId: crypto.randomUUID(), project: subject?.items.length === 1 ? subject.items[0].project ?? '' : '', intent: 'move' as const };
-  return { kind: 'render', form, outcome, subject, status: { confirm: 200, partial: 200, invalid: 400, conflict: 409, uncertain: 503 }[outcome.kind], freshHref: moveHref(form.artifactIds) };
+  return { kind: 'render', form, outcome, subject, status: { confirm: 200, partial: 200, invalid: 400, conflict: 409, slug_conflict: 409, uncertain: 503 }[outcome.kind], freshHref: moveHref(form.artifactIds) };
 }

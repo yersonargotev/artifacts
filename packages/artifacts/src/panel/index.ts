@@ -6,7 +6,7 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
 import { ArtifactError, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject } from './model.ts';
+import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict } from './model.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
@@ -31,6 +31,7 @@ export const panelDetailQuerySchema = z.strictObject({
 
 export const panelMoveIdsSchema = z.array(readByIdSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readByIdSchema.shape.artifactId).max(25));
 export const panelMoveSchema = z.strictObject({ requestId: moveSchema.shape.requestId, artifactIds: panelMoveIdsSchema, project: projectNameSchema.nullable() });
+export const panelSlugConflictSchema = z.strictObject({ project: z.string().nullable(), conflicts: z.array(z.strictObject({ artifactId: readByIdSchema.shape.artifactId, slug: z.string() })).min(1) });
 const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readByIdSchema.shape.artifactId) });
 
 const publishedRevision = alias(artifactRevision, 'published_revision');
@@ -75,13 +76,13 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, input.artifactIds)));
         const moving = found.filter((row) => row.project !== project);
         const changing = moving.map((row) => row.id);
-        const slugs = new Set<string>();
+        const conflicts: SlugConflict[] = [];
         for (const row of moving) {
           if (row.slug === null) continue;
-          if (slugs.has(row.slug)) throw new ArtifactError('slug_conflict', 'Two moved artifacts share a slug', { slug: row.slug, project });
-          slugs.add(row.slug);
-          await access.claimSlug(connection, actor.userId, project, row.slug, row.id);
+          const shared = moving.some((other) => other.id !== row.id && other.slug === row.slug);
+          if (shared || await access.bySlug(connection, actor.userId, project, row.slug)) conflicts.push({ artifactId: row.id, slug: row.slug });
         }
+        if (conflicts.length) throw new ArtifactError('slug_conflict', 'Moved artifacts would reuse slugs in the destination', { project, conflicts: conflicts.sort((left, right) => left.artifactId.localeCompare(right.artifactId)) });
         if (changing.length) await connection.update(artifact).set({ project }).where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, changing)));
         const owned = new Set(found.map((row) => row.id));
         return { project, moved: changing.length, unchanged: found.length - changing.length, missing: input.artifactIds.filter((id) => !owned.has(id)) };
