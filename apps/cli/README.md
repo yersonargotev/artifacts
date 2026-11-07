@@ -11,9 +11,9 @@ Use Node 24 or later. The beta targets macOS and Linux. Windows has not been ver
 Choose one persistent installation:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.7
+npm install --global @yargote/artifacts-cli@0.1.0-beta.8
 # Or, with pnpm and an existing global bin directory on PATH:
-pnpm add --global @yargote/artifacts-cli@0.1.0-beta.7
+pnpm add --global @yargote/artifacts-cli@0.1.0-beta.8
 artifacts --version
 ```
 
@@ -22,8 +22,8 @@ If pnpm reports that no global bin directory exists, run `pnpm setup` and reopen
 For one-off execution, pin the same version:
 
 ```sh
-npx --yes @yargote/artifacts-cli@0.1.0-beta.7 --help
-pnpm dlx @yargote/artifacts-cli@0.1.0-beta.7 --help
+npx --yes @yargote/artifacts-cli@0.1.0-beta.8 --help
+pnpm dlx @yargote/artifacts-cli@0.1.0-beta.8 --help
 ```
 
 `@beta` follows future prereleases. Exact versions remain reproducible. No stable `latest` release is part of this beta. An organization's pnpm minimum release age or trust policy can delay a new release. Follow that policy rather than disabling it globally.
@@ -125,12 +125,14 @@ The private `credentials.sqlite` file stores credentials. The separate `credenti
 artifacts login [--no-browser]
 artifacts logout
 artifacts whoami
-artifacts create --snapshot FILE [--project NAME] [--request-id ID]
+artifacts create --snapshot FILE [--project NAME] [--slug SLUG] [--request-id ID]
                  [--response full|compact]
 artifacts create --command FILE
 artifacts list [--limit N] [--cursor CURSOR] [--project NAME]
 artifacts projects
 artifacts read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
+artifacts read --slug SLUG [--project NAME] [--revision REV] [--response full|compact]
+               [--out FILE [--quiet]]
 artifacts update ID --snapshot FILE --expected-revision REV [--request-id ID]
                  [--response full|compact]
 artifacts update [ID] --command FILE
@@ -216,6 +218,18 @@ Every artifact read and list item includes `project`, a name or null. `projects`
 `move ID` requires exactly one of `--project NAME` or `--no-project`. It prints `{ "artifactId": "...", "project": "Beta" }` with the stored spelling, or `null` after `--no-project`. Move never creates a revision or changes the publication. Moving to the current project succeeds without change. Move is a retained mutation like the others, so `retry` recovers a lost response.
 
 Version `0.1.0-beta.4` and earlier parse artifact responses strictly and fail with `invalid_response` against a server that returns `project`. Upgrade the CLI together with the server.
+
+## Slugs
+
+A slug names a page within its project, so `read` can find it without its ID. `create --slug SLUG` sets it. A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, such as `concepts/rag` or `index`. It is never normalized, and a trailing `.md` is rejected with a hint to remove it. A complete create command file can include the same optional `slug` field.
+
+```sh
+artifacts create --snapshot snapshot.json --project Mi-Wiki --slug concepts/rag
+artifacts read --project mi-wiki --slug concepts/rag
+artifacts read --slug index
+```
+
+A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace, which `read --slug` reads without `--project`. `read` takes exactly one of an ID or `--slug`, and `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId`. A locator with no artifact fails with `not_found`. Every artifact read and list item includes `slug`, a name or null. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`.
 
 ## Share publication access
 

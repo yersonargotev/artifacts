@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { foreignKey, index, integer, primaryKey, sqliteTable, text, uniqueIndex, type SQLiteTableExtraConfigValue } from 'drizzle-orm/sqlite-core';
 import { session, user } from './auth-schema.ts';
 
@@ -28,9 +29,11 @@ export const artifact = sqliteTable('artifact', {
   headRevisionId: text('head_revision_id').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   project: text('project'),
+  slug: text('slug'),
 }, (table): SQLiteTableExtraConfigValue[] => [
   index('artifact_owner_idx').on(table.ownerId, table.id),
   index('artifact_owner_project_idx').on(table.ownerId, table.project),
+  uniqueIndex('artifact_owner_project_slug_idx').on(table.ownerId, sql`coalesce(project, '')`, table.slug).where(sql`slug is not null`),
   foreignKey({ columns: [table.id, table.headRevisionId], foreignColumns: [artifactRevision.artifactId, artifactRevision.id], name: 'artifact_head_membership_fk' }),
 ]);
 

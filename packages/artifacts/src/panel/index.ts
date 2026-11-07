@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
-import { ArtifactError, historySchema, moveSchema, projectNameSchema, readSchema, type Actor } from '../contracts.ts';
+import { ArtifactError, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
 import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject } from './model.ts';
 import { revision } from '../revision.ts';
@@ -22,16 +22,16 @@ export const panelLibraryQuerySchema = z.strictObject({
 });
 
 export const panelDetailQuerySchema = z.strictObject({
-  artifactId: readSchema.shape.artifactId,
-  revisionId: readSchema.shape.revisionId,
-  compareTo: readSchema.shape.revisionId,
+  artifactId: readByIdSchema.shape.artifactId,
+  revisionId: readByIdSchema.shape.revisionId,
+  compareTo: readByIdSchema.shape.revisionId,
   before: historySchema.shape.beforeSequence,
   includeComparison: z.boolean(),
 });
 
-export const panelMoveIdsSchema = z.array(readSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readSchema.shape.artifactId).max(25));
+export const panelMoveIdsSchema = z.array(readByIdSchema.shape.artifactId).min(1).transform((ids) => [...new Set(ids)].sort()).pipe(z.array(readByIdSchema.shape.artifactId).max(25));
 export const panelMoveSchema = z.strictObject({ requestId: moveSchema.shape.requestId, artifactIds: panelMoveIdsSchema, project: projectNameSchema.nullable() });
-const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readSchema.shape.artifactId) });
+const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), moved: z.number().int().nonnegative(), unchanged: z.number().int().nonnegative(), missing: z.array(readByIdSchema.shape.artifactId) });
 
 const publishedRevision = alias(artifactRevision, 'published_revision');
 const headJoin = and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId));
@@ -71,9 +71,17 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       const input = panelMoveSchema.parse(value);
       return access.panelMove(actor, input, panelMoveResultSchema, async (connection) => {
         const project = input.project === null ? null : await access.projectSpelling(connection, actor.userId, input.project);
-        const found = await connection.select({ id: artifact.id, project: artifact.project }).from(artifact)
+        const found = await connection.select({ id: artifact.id, project: artifact.project, slug: artifact.slug }).from(artifact)
           .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, input.artifactIds)));
-        const changing = found.filter((row) => row.project !== project).map((row) => row.id);
+        const moving = found.filter((row) => row.project !== project);
+        const changing = moving.map((row) => row.id);
+        const slugs = new Set<string>();
+        for (const row of moving) {
+          if (row.slug === null) continue;
+          if (slugs.has(row.slug)) throw new ArtifactError('slug_conflict', 'Two moved artifacts share a slug', { slug: row.slug, project });
+          slugs.add(row.slug);
+          await access.claimSlug(connection, actor.userId, project, row.slug, row.id);
+        }
         if (changing.length) await connection.update(artifact).set({ project }).where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, changing)));
         const owned = new Set(found.map((row) => row.id));
         return { project, moved: changing.length, unchanged: found.length - changing.length, missing: input.artifactIds.filter((id) => !owned.has(id)) };
@@ -115,7 +123,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       return access.transaction(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const [owned] = await connection.select({
-          artifactId: artifact.id, project: artifact.project, createdAt: artifact.createdAt,
+          artifactId: artifact.id, project: artifact.project, slug: artifact.slug, createdAt: artifact.createdAt,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
@@ -151,7 +159,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           comparison = await compareRevisions(revision(row!), selectedRevision);
         }
         return { workspace: await readWorkspace(connection, actor.userId), detail: {
-          artifactId: owned.artifactId, project: owned.project as ProjectName | null, createdAt: owned.createdAt,
+          artifactId: owned.artifactId, project: owned.project as ProjectName | null, slug: owned.slug, createdAt: owned.createdAt,
           selected: { revision: selectedRevision, author: { clientId: selectedRevision.authorClientId, name: selected.name } },
           head: owned.head, publication: owned.publication && owned.published ? { revision: owned.published, version: owned.publication.version, url: access.publicationUrl(owned.artifactId) } : null,
           history: { entries, before: input.before ?? null, olderBefore: history.length > 5 ? entries.at(-1)!.sequence : null },
@@ -178,7 +186,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
         const before = ms === undefined ? undefined : or(lt(artifactRevision.createdAt, new Date(Number(ms))), and(eq(artifactRevision.createdAt, new Date(Number(ms))), lt(artifact.id, cursorId)));
         const rows = await connection.select({
           artifactId: artifact.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
-          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project,
+          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project, slug: artifact.slug,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version, revisionId: artifactPublication.revisionId },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },

@@ -56,7 +56,7 @@ try {
   const snapshot = { metadata: { title: 'Revisión de entrega', description: 'Documento de trabajo con autoría y archivos retenidos.' }, content: { kind: 'html' as const, text: documentHtml('Entrega inicial') }, files: [{ path: 'notas.txt', mediaType: 'text/plain', encoding: 'utf8' as const, data: 'Notas originales.\n' }] };
   const snapshotFile = join(temporary, 'snapshot.json');
   await writeFile(snapshotFile, JSON.stringify(snapshot));
-  const created = artifactReadSchema.parse(await cli(['create', '--snapshot', snapshotFile, '--project', 'Entregas', '--request-id', randomUUID()]));
+  const created = artifactReadSchema.parse(await cli(['create', '--snapshot', snapshotFile, '--project', 'Entregas', '--slug', 'entregas/revision-inicial', '--request-id', randomUUID()]));
   const tokens = await grant(app, 'openid profile offline_access artifacts:read artifacts:write artifacts:publish');
   async function mcp(name: string, input: unknown) {
     const response = await fetch(app.config.resource, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${tokens.access_token}`, 'mcp-protocol-version': '2025-11-25' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: input } }) });
@@ -129,6 +129,7 @@ try {
       await page.locator(selector).waitFor();
       assert.equal(new URL(page.url()).searchParams.get('revisionId'), updated.revision.id);
       assert.equal(await page.locator('.preview').count(), tab === 'preview' ? 1 : 0);
+      if (tab === 'information') assert.equal(await page.locator('#information dt:text-is("Slug") + dd').textContent(), 'entregas/revision-inicial');
       await capture(`${tab}-${width}`);
       await page.waitForTimeout(1200);
     }

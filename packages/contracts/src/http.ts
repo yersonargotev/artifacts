@@ -12,7 +12,7 @@ export const revisionSummarySchema = revisionSchema.omit({ snapshot: true }).ext
   files: z.array(attachmentSummarySchema).max(32),
 });
 export const compactArtifactReadSchema = artifactReadSchema.omit({ revision: true }).extend({ revision: revisionSummarySchema });
-export const artifactSummarySchema = z.strictObject({ artifactId: identifier, title: z.string(), headRevisionId: identifier, createdAt: z.iso.datetime(), project: z.string().nullable(), publication: publicationSchema.nullable() });
+export const artifactSummarySchema = z.strictObject({ artifactId: identifier, title: z.string(), headRevisionId: identifier, createdAt: z.iso.datetime(), project: z.string().nullable(), slug: z.string().nullable(), publication: publicationSchema.nullable() });
 export const listResultSchema = z.strictObject({ items: z.array(artifactSummarySchema).max(100), nextCursor: identifier.nullable() });
 export const projectSummarySchema = z.strictObject({ name: z.string(), artifactCount: z.number().int().positive() });
 export const projectsResultSchema = z.strictObject({ items: z.array(projectSummarySchema) });

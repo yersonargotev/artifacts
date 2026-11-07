@@ -106,6 +106,20 @@ A project name contains 1 to 80 characters after trimming and NFC normalization,
 
 `move` takes exactly one of `--project NAME` or `--no-project` and prints `{ "artifactId": "...", "project": "Archive" }`, or `null` for the project after `--no-project`. It creates no revision and leaves the publication unchanged. Moving to the current project succeeds without change. A lost move response is recovered with `retry REQUEST_ID` like any other retained mutation.
 
+## Name pages with slugs
+
+Check that installed help lists `--slug` before using it.
+
+```sh
+artifacts create --snapshot snapshot.json --project "Mi wiki" --slug concepts/rag
+artifacts read --project "mi wiki" --slug concepts/rag
+artifacts read --slug index
+```
+
+A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, such as `concepts/rag` or `index`. It is never normalized, and a trailing `.md` is rejected with a hint to remove it. A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace, which `read --slug` without `--project` reads. Every read and list item includes `slug`, a name or null.
+
+`read` takes exactly one of an ID or `--slug`. `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId` in `details`. A locator with no artifact fails with `not_found`. A move keeps the slug and fails with `slug_conflict` when the destination project already uses it.
+
 ## Edit without losing retained data
 
 For a title change, save `changes.json` with only the requested field.
@@ -135,7 +149,7 @@ Command files contain the command itself, without the CLI's retained-operation w
 | `update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` |
 | `publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` |
 
-`requestId` is a caller-chosen string of 8 to 128 characters. Create and update also accept optional `response` with value `full` or `compact`. Create also accepts an optional `project` name. This complete update example replaces a snapshot. Substitute the observed IDs and preserve all required content and attachments in its `snapshot`.
+`requestId` is a caller-chosen string of 8 to 128 characters. Create and update also accept optional `response` with value `full` or `compact`. Create also accepts an optional `project` name and an optional `slug`. This complete update example replaces a snapshot. Substitute the observed IDs and preserve all required content and attachments in its `snapshot`.
 
 ```json
 {

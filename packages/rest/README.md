@@ -33,6 +33,7 @@ Paths below are relative to `${API_URL}/v1`.
 | POST | `/artifacts` | Complete create command |
 | GET | `/artifacts` | `limit`, `cursor`, `project` |
 | GET | `/artifacts/:artifactId` | `revisionId`, `response` |
+| GET | `/lookup` | `slug`, optional `project`, `revisionId`, `response` |
 | PUT | `/artifacts/:artifactId` | Complete update command |
 | GET | `/artifacts/:artifactId/history` | `limit`, `beforeSequence`, `response` |
 | PUT | `/artifacts/:artifactId/publication` | Complete publish command |
@@ -60,6 +61,12 @@ A create command accepts an optional `project` name. Every artifact response and
 A move command is `{ "requestId": "...", "artifactId": "...", "project": "Beta" }`. Use `"project": null` to remove the artifact from its project. The result is `{ "artifactId": "...", "project": "Beta" }` with the stored spelling. A move never creates a revision or changes the publication. Moving to the current project succeeds without change.
 
 `GET /projects` returns `{ "items": [{ "name": "Beta", "artifactCount": 1 }] }`, ordered by name without regard to letter case. Projects exist only while they contain artifacts, so the list has no empty entries and no pagination.
+
+## Slugs
+
+A create command accepts an optional `slug` such as `concepts/rag`. Every artifact response and list item includes `slug`, a name or null. A used slug in the same project fails with 409 `slug_conflict`, and `details` names `slug`, the stored `project`, and the holder's `artifactId`.
+
+`GET /lookup?project=NAME&slug=SLUG` returns the same artifact read as `GET /artifacts/:artifactId`, with the same optional `revisionId` and `response`. An omitted `project` reads artifacts without a project. A lookup with no matching owned artifact returns 404 `not_found`. The lookup has its own collection because a slug such as `history` or `concepts/rag` would otherwise collide with the ID-addressed `/artifacts/:artifactId/...` routes.
 
 For an origin resource, the metadata URL is `${API_URL}/.well-known/oauth-protected-resource`. MCP metadata lives at `${API_URL}/.well-known/oauth-protected-resource/mcp`. Each document identifies its own exact OAuth resource. Check the REST document's `resource` field against the configured API origin. REST route challenges omit `resource_metadata` because those route URLs differ from the OAuth audience.
 
@@ -91,7 +98,7 @@ Each owner has 100 invitation reservations per UTC day, based on database time. 
 
 Errors have the shape `{ "error": { "code": "conflict", "message": "Artifact head changed", "details": { "currentRevisionId": "..." } } }`. Invalid input returns 400, missing authentication 401, forbidden access 403, missing owned objects 404, conflicts 409, oversized requests 413, unsupported content types 415, unsupported methods 405 with `Allow`, and unavailable dependencies 503.
 
-Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, artifact lists, and projects require `artifacts:read`. Create, update, and move require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
+Every bearer request verifies signature, claims, and fresh introspection. Artifact reads, lookups, artifact lists, and projects require `artifacts:read`. Create, update, and move require `artifacts:write`. Publication and every sharing route require `artifacts:publish`. A missing scope returns 403 with JSON code `forbidden`, `details.requiredScopes`, and a `WWW-Authenticate` challenge containing `insufficient_scope`. The store independently verifies scopes and live sessions before receipt lookup.
 
 Retry a mutation with its exact complete command. Preserve omitted response fields, request ID, snapshot, and expected versions. While the artifact exists, an exact retry returns the original receipt, which can describe an older head or publication. Read fresh state separately. A conflict requires a deliberate new command, not a changed retry.
 

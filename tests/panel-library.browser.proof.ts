@@ -95,10 +95,11 @@ try {
   const longTitle = 'L'.repeat(256);
   const longDescription = 'D'.repeat(8192);
   const longProject = 'P'.repeat(80);
+  const longSlug = `${'pagina-larga/'.repeat(12)}fin`;
   for (let index = 0; index < 30; index++) {
     const snapshot = { metadata: { title: index === 29 ? longTitle : `Documento ${String(index).padStart(2, '0')}`, description: index === 29 ? longDescription : `Notas y decisiones de la entrega ${index}.` }, content: { kind: index % 2 ? 'markdown' : 'text', text: `Contenido de la entrega ${index}.` }, files: [] };
     const project = index === 29 ? longProject : index % 3 === 0 ? undefined : index % 2 ? 'Entregas' : 'Investigación';
-    let artifact = artifactReadSchema.parse(await mcp('artifacts_create', { requestId: randomUUID(), snapshot, ...(project ? { project } : {}) }));
+    let artifact = artifactReadSchema.parse(await mcp('artifacts_create', { requestId: randomUUID(), snapshot, ...(project ? { project } : {}), ...(index === 29 ? { slug: longSlug } : {}) }));
     if (index < 3) await mcp('artifacts_publish', { requestId: randomUUID(), artifactId: artifact.artifactId, revisionId: artifact.revision.id, expectedPublicationVersion: 0 });
     if (index === 1) artifact = artifactReadSchema.parse(await mcp('artifacts_update', { requestId: randomUUID(), artifactId: artifact.artifactId, expectedRevisionId: artifact.headRevisionId, snapshot: { ...snapshot, content: { ...snapshot.content, text: 'Contenido revisado de la entrega 1.' } } }));
     seeded.push(artifact);
@@ -171,9 +172,11 @@ try {
   const clipping = await long.evaluate((card) => {
     const title = card.querySelector('h2 a') as HTMLElement;
     const description = card.querySelector('.artifact-description') as HTMLElement;
-    return { titleLength: title.textContent!.length, titleClips: title.scrollWidth > title.clientWidth, titleOverflow: getComputedStyle(title).textOverflow, descriptionLength: description.textContent!.length, descriptionClips: description.scrollHeight > description.clientHeight, descriptionClamp: getComputedStyle(description).webkitLineClamp, columns: getComputedStyle(card.parentElement!).gridTemplateColumns.split(' ').length };
+    const slug = card.querySelector('.artifact-slug') as HTMLElement;
+    return { slug: slug.textContent, slugClips: slug.scrollWidth > slug.clientWidth, slugOverflow: getComputedStyle(slug).textOverflow, titleLength: title.textContent!.length, titleClips: title.scrollWidth > title.clientWidth, titleOverflow: getComputedStyle(title).textOverflow, descriptionLength: description.textContent!.length, descriptionClips: description.scrollHeight > description.clientHeight, descriptionClamp: getComputedStyle(description).webkitLineClamp, columns: getComputedStyle(card.parentElement!).gridTemplateColumns.split(' ').length };
   });
-  assert.deepEqual(clipping, { titleLength: 256, titleClips: true, titleOverflow: 'ellipsis', descriptionLength: 8192, descriptionClips: true, descriptionClamp: '3', columns: 1 });
+  assert.equal(await page.locator('.artifact-slug').count(), 1, 'only the slugged card shows a slug');
+  assert.deepEqual(clipping, { slug: longSlug, slugClips: true, slugOverflow: 'ellipsis', titleLength: 256, titleClips: true, titleOverflow: 'ellipsis', descriptionLength: 8192, descriptionClips: true, descriptionClamp: '3', columns: 1 });
   await capture('long-card-390');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(app.dashboard);

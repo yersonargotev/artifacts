@@ -41,14 +41,14 @@ For login, you can also pass the MCP URL with `artifacts login --server "$MCP_UR
 Use Node 24 or later. The public beta uses three MIT packages under `@yargote`; the application repository remains private. Install the CLI and its dependencies from npm:
 
 ```sh
-npm install --global @yargote/artifacts-cli@0.1.0-beta.7
+npm install --global @yargote/artifacts-cli@0.1.0-beta.8
 artifacts --version
 export ARTIFACTS_SERVER='https://artifacts-api.yersonargotev.workers.dev'
 artifacts login
 artifacts whoami
 ```
 
-The three packages share version `0.1.0-beta.7`. The [first beta release report](.audit/npm-beta-verification.md) records registry installation and authenticated operations for `0.1.0-beta.1`. The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
+The three packages share version `0.1.0-beta.8`. The [first beta release report](.audit/npm-beta-verification.md) records registry installation and authenticated operations for `0.1.0-beta.1`. The [CLI installation and first-use guide](apps/cli/README.md) includes pnpm global, pinned `npx`, pinned `pnpm dlx`, artifact creation, and recovery. `@beta` follows prereleases. `latest` points to npm's empty `0.0.0-stage` reservation. Use an exact version or `@beta`.
 
 The CLI has no implicit hosted default. Select the exact resource for your deployment. Local services also include REST. `pnpm dev:rest` is a REST-only listener and does not start MCP. It reads explicit environment variables. The [REST reference](packages/rest/README.md) lists configuration, direct HTTP examples, and errors.
 
@@ -69,7 +69,7 @@ Share with `--notify` to request one email attempt. Access succeeds when mail is
 
 Owners can reserve 100 invitations per UTC day. Revoke, deletion, and failed delivery do not refund reservations. New access is limited to 100 people per artifact and 1000 grants per owner. Existing access remains listable and revocable.
 
-Library consumers install `@yargote/artifacts-client@0.1.0-beta.7` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.7`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. The default portable graph retains its known native statement-retention defect. `pnpm build:packages:native` adds a target-qualified private server distribution in `dist/packages-native-fixed`; its DB tarball bundles the corrected native graph for ordinary `npm install --ignore-scripts`. See the [native guide](native/libsql/README.md) for build requirements and unverified targets. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
+Library consumers install `@yargote/artifacts-client@0.1.0-beta.8` and, when needed directly, `@yargote/artifacts-contracts@0.1.0-beta.8`. The [client reference](packages/client/README.md) shows typed Fetch calls. Client-only installation has no database dependency. `pnpm build:packages` still produces the seven-package local distribution for workspace and server consumers. Its generated `dist/packages/manifest.json` identifies exact tarballs. The default portable graph retains its known native statement-retention defect. `pnpm build:packages:native` adds a target-qualified private server distribution in `dist/packages-native-fixed`; its DB tarball bundles the corrected native graph for ordinary `npm install --ignore-scripts`. See the [native guide](native/libsql/README.md) for build requirements and unverified targets. Only CLI, client, and contracts are public. The [contracts reference](packages/contracts/README.md) describes the preserved exports. The [npm release guide](docs/npm-release.md) describes inspection, publication, and registry verification.
 
 ## Install the Artifacts skill
 
@@ -121,6 +121,8 @@ Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve arti
 `artifacts_share` grants publication access to an exact email, `artifacts_shares_list` lists current grants, and `artifacts_unshare` revokes an observed share. Only the owner manages shares under `artifacts:publish`. Email values are trimmed and lowercased. Guests need a matching verified email and receive only the published revision and attachments.
 
 Pass an optional `project` name to `artifacts_create` to group artifacts. A name that matches an existing project regardless of letter case joins it. `artifacts_list` accepts the same `project` filter, `projects_list` returns each project with its artifact count, and `artifacts_move` changes or clears the project without creating a revision. The panel sidebar lists the projects, and `Mover a proyecto` in an artifact's menu moves it to a project or removes it from one. [The projects decision](docs/decisions/projects.md) records the model.
+
+Pass an optional `slug` such as `concepts/rag` to `artifacts_create` to name a page within its project, then read it with `artifacts_read` and `{ project, slug }` instead of its ID. The CLI uses `create --slug SLUG` and `read --project NAME --slug SLUG`, and REST uses `GET /v1/lookup`. The panel shows the slug on library cards and under Información. [The wiki pages decision](docs/decisions/wiki-pages.md) records the rules.
 
 Matching mutation retries use the same `requestId` and arguments. Changed arguments under that ID fail. Concurrent updates and publication changes reject stale expected versions. [The store contract](packages/artifacts/README.md) describes the schemas, limits, pagination, permissions, and archive format.
 

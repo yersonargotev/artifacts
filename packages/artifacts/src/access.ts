@@ -1,4 +1,4 @@
-import { and, count, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { and, count, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
@@ -43,6 +43,17 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
     return (await ownedProjects(connection, ownerId)).find((project) => projectKey(project.name) === key)?.name ?? name;
   }
 
+  async function bySlug(connection: Connection, ownerId: string, project: string | null, slug: string) {
+    const [found] = await connection.select().from(artifact).where(and(eq(artifact.ownerId, ownerId), project === null ? isNull(artifact.project) : eq(artifact.project, project), eq(artifact.slug, slug))).limit(1);
+    return found;
+  }
+
+  async function claimSlug(connection: Connection, ownerId: string, project: string | null, slug: string | null, artifactId?: string) {
+    if (slug === null) return;
+    const found = await bySlug(connection, ownerId, project, slug);
+    if (found && found.id !== artifactId) throw new ArtifactError('slug_conflict', 'The slug already names an artifact in this project', { slug, project, artifactId: found.id });
+  }
+
   async function transaction<T>(work: (connection: Connection) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try { return await db.transaction(work); }
@@ -78,5 +89,5 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
     return receipt(actor, 'artifacts:write', 'panel_move', input, output, work).then(({ result }) => result);
   }
 
-  return { transaction, authorize, liveSession, command, receipt, panelMove, projectSpelling, ownedProjects, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
+  return { transaction, authorize, liveSession, command, receipt, panelMove, projectSpelling, ownedProjects, bySlug, claimSlug, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
 }

@@ -26,6 +26,7 @@ const status = publicationStates[card.publication.state];
   <p class="artifact-description">{card.description}</p>
   <div class="artifact-card-labels">
     <a class="project-chip" data-tone={card.project ? projectTone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a>
+    {card.slug && <span class="artifact-slug" title={`Slug ${card.slug}`}>{card.slug}</span>}
     <span class="artifact-status" data-state={card.publication.state}>{status.label}</span>
   </div>
   <div class="artifact-card-footer"><span class="artifact-kind">{contentLabels[card.kind]}</span><p>Revisión {card.head.sequence} · Actualizado <time datetime={card.head.createdAt.toISOString()} title={absoluteTime(card.head.createdAt)}>{relativeTime(card.head.createdAt, now)}</time></p></div>

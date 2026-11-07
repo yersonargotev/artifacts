@@ -216,6 +216,7 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .artifact-status[data-state=pending] { border-color: var(--warning-border); background: var(--warning-surface); color: var(--yellow); }
 .artifact-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 14px; border-top: 1px solid var(--divider); }
 .artifact-kind { color: var(--subtle); font-size: 11px; }
+.artifact-slug { min-width: 0; max-width: 100%; overflow: hidden; color: var(--muted); font: 11px/1.4 ui-monospace, SFMono-Regular, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .artifact-card-footer p { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .library-pagination { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .library-pagination a { font-size: 12px; font-weight: 500; }

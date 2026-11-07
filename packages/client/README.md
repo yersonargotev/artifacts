@@ -3,7 +3,7 @@
 `@yargote/artifacts-client` is a typed Fetch client for the Artifacts REST API. It depends on `@yargote/artifacts-contracts` and Zod. It does not install the artifact store or a database driver. Node 24 or later is required.
 
 ```sh
-npm install @yargote/artifacts-client@0.1.0-beta.7
+npm install @yargote/artifacts-client@0.1.0-beta.8
 ```
 
 ```ts
@@ -38,10 +38,10 @@ Every method makes one HTTP request. The client does not retry, follow redirects
 | Method | Input | Result |
 | --- | --- | --- |
 | `identity()` | None | Verified user, session, client, and scopes |
-| `create(command)` | `requestId`, complete `snapshot`, optional `project` and `response` | Artifact receipt |
+| `create(command)` | `requestId`, complete `snapshot`, optional `project`, `slug`, and `response` | Artifact receipt |
 | `list(query?)` | Optional `limit`, `cursor`, and `project` | Artifact summaries and `nextCursor` |
 | `projects()` | None | `{ items: [{ name, artifactCount }] }` |
-| `read(query)` | `artifactId`, optional `revisionId` and `response` | Artifact revision |
+| `read(query)` | Exactly one of `artifactId` or `slug` with optional `project`, optional `revisionId` and `response` | Artifact revision |
 | `update(command)` | `requestId`, `artifactId`, `expectedRevisionId`, complete `snapshot`, optional `response` | Artifact receipt |
 | `history(query)` | `artifactId`, optional `limit`, `beforeSequence`, and `response` | Revisions and `nextBeforeSequence` |
 | `publish(command)` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | Publication receipt |
@@ -58,6 +58,8 @@ All commands and JSON responses pass the strict domain schemas. An omitted mutat
 All sharing methods require `artifacts:publish` and artifact ownership. `share` trims and lowercases the email. The client places identifiers in encoded URL segments and sends `{ requestId, email }` plus any explicitly supplied `notify` or `requireNew` for share or `{ requestId }` for unshare. `unshare` resolves with `undefined` and requires no JSON content type on its empty response.
 
 Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.4` and earlier reject responses from such a server with `invalid_response`.
+
+Artifact reads and list items also include `slug`, a page name or null. `read({ project, slug })` calls `GET /lookup` and `read({ artifactId })` calls `GET /artifacts/:artifactId`. An omitted `project` reads the unfiled namespace. A used slug fails `create` with an `HttpError` whose code is `slug_conflict`, status 409, and whose details name the holder's `artifactId`. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`.
 
 `prepareArtifactEdit(client, { artifactId, requestId, changes })` reads the current full snapshot and prepares an immutable update command. Metadata and content changes merge into that snapshot. An explicit `files` array replaces the attachments. The helper does not submit the update. Retain its exact output before sending it.
 

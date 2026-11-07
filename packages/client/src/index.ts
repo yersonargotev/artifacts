@@ -183,7 +183,7 @@ export function createArtifactHttpClient(options: {
     projects: () => json('/projects', 'GET', projectsResultSchema),
     read(value: ReadInput) {
       const { artifactId, ...parameters } = readSchema.parse(value);
-      return json(`/artifacts/${encodeURIComponent(artifactId)}${query(parameters)}`, 'GET', parameters.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema);
+      return json(`${artifactId === undefined ? '/lookup' : `/artifacts/${encodeURIComponent(artifactId)}`}${query(parameters)}`, 'GET', parameters.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema);
     },
     update(value: UpdateInput) {
       const input = updateSchema.parse(value);

@@ -25,7 +25,7 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
     const store = createArtifactStore(app.db, options);
     const panel = createPanel(app.db, options);
     const draft = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha draft'), project: 'Álpha' });
-    const pending = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha pending'), project: 'álpha' });
+    const pending = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Alpha pending'), project: 'álpha', slug: 'alpha/pending' });
     await store.publish(actor, { requestId: randomUUID(), artifactId: pending.artifactId, revisionId: pending.revision.id, expectedPublicationVersion: 0 });
     const updated = await store.update(actor, { requestId: randomUUID(), artifactId: pending.artifactId, expectedRevisionId: pending.revision.id, snapshot: snapshot('Alpha revised') });
     const published = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Beta published'), project: 'Beta' });
@@ -40,7 +40,7 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
     const publishedCard = all.page.cards.find(({ artifactId }) => artifactId === published.artifactId)!;
     assert.deepEqual(publishedCard.publication, { state: 'published', url: `https://published.example.test/a/${published.artifactId}`, version: 1, revision: { revisionId: publishedHead.revision.id, sequence: 2, createdAt: new Date(publishedHead.revision.createdAt) } });
     const card = all.page.cards.find(({ artifactId }) => artifactId === pending.artifactId)!;
-    assert.deepEqual(card, { artifactId: pending.artifactId, title: 'Alpha revised', description: 'Description for Alpha revised', kind: 'text', project: 'Álpha', head: { revisionId: updated.revision.id, sequence: 2, createdAt: new Date(updated.revision.createdAt) }, publication: { state: 'pending', url: `https://published.example.test/a/${pending.artifactId}`, version: 1, revision: { revisionId: pending.revision.id, sequence: 1, createdAt: new Date(pending.revision.createdAt) } } });
+    assert.deepEqual(card, { artifactId: pending.artifactId, title: 'Alpha revised', description: 'Description for Alpha revised', kind: 'text', project: 'Álpha', slug: 'alpha/pending', head: { revisionId: updated.revision.id, sequence: 2, createdAt: new Date(updated.revision.createdAt) }, publication: { state: 'pending', url: `https://published.example.test/a/${pending.artifactId}`, version: 1, revision: { revisionId: pending.revision.id, sequence: 1, createdAt: new Date(pending.revision.createdAt) } } });
     const alpha = await panel.library(actor, { scope: { kind: 'project', name: 'ÁLPHA' } });
     assert.deepEqual(alpha.page.scope, { kind: 'project', project: all.workspace.projects[0] });
     assert.deepEqual(alpha.page.counts, { all: 2, published: 0, unpublished: 1, pending: 1 });
@@ -260,6 +260,7 @@ test('detail reads one selected snapshot, light history and real client names in
     assert.deepEqual(result.workspace.total, { count: 1, published: 1, pending: 1 });
     assert.deepEqual(result.detail.selected, { revision: revisions[1], author: { clientId: actor.clientId, name: 'Authoring client' } });
     assert.equal(result.detail.createdAt.toISOString(), first.revision.createdAt);
+    assert.equal(result.detail.slug, null);
     assert.equal(result.detail.head.revisionId, revisions[6].id);
     assert.deepEqual(result.detail.publication, { revision: { revisionId: first.revision.id, sequence: 1, createdAt: new Date(first.revision.createdAt) }, version: 1, url: `https://published.example.test/a/${first.artifactId}` });
     assert.deepEqual(result.detail.history.entries.map(({ sequence }) => sequence), [7, 6, 5, 4, 3]);

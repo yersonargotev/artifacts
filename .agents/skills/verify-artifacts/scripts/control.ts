@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 import { driveProjects } from './projects.ts';
 import { driveDesign } from './design.ts';
 import { driveSharing, type Account } from './sharing.ts';
+import { driveSlugs } from './slugs.ts';
 import { observeMoveReadiness, waitForMoveReadiness } from './move-readiness.ts';
 import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createArtifactStore } from '../../../../packages/artifacts/src/index.ts';
@@ -23,7 +24,7 @@ import { artifactReadSchema, publishResultSchema, shareSchema } from '../../../.
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');
 const script = resolve(import.meta.filename);
-const features = ['identity', 'authoring', 'cli', 'projects', 'screens', 'preview', 'publication', 'export', 'sharing', 'design'] as const;
+const features = ['identity', 'authoring', 'cli', 'projects', 'slugs', 'screens', 'preview', 'publication', 'export', 'sharing', 'design'] as const;
 const scopes = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
 type Feature = typeof features[number];
 type Instance = { id: string; pid: number; panelPid: number; build: string; ownerId: string; auth: string; api: string; mcp: string; panel: string; view: string; control: string; expiresAt: string };
@@ -489,6 +490,8 @@ async function drive(feature: Feature) {
         await driveDesign({ page, context, instance, directory, checks, call, login, capture: (page, label) => capture(page, label, false), record, json });
       } else if (feature === 'projects') {
         await driveProjects({ page, browser, context, instance, directory, root, cliEnv: { PATH: process.env.PATH, HOME: cliState, ARTIFACTS_SERVER: instance.api, ARTIFACTS_STATE_DIR: cliState, ARTIFACTS_ACCESS_TOKEN: credentials.restAccessToken }, firstSnapshot, secondSnapshot, recordVideo: args.includes('--record-video'), checks, call, ok, login, capture, checkScreen, record, json });
+      } else if (feature === 'slugs') {
+        await driveSlugs({ page, panel: instance.panel, directory, firstSnapshot, checks, call, cli, ok, login, capture, record });
       } else if (feature === 'sharing') {
         await driveSharing({ page, browser, firstSnapshot, checks, call, account, login, capture, record });
       } else {

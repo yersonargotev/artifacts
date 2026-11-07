@@ -33,12 +33,14 @@ Commands:
   login [--no-browser]
   logout
   whoami
-  create --snapshot FILE [--project NAME] [--request-id ID]
+  create --snapshot FILE [--project NAME] [--slug SLUG] [--request-id ID]
          [--response full|compact]
   create --command FILE
   list [--limit N] [--cursor CURSOR] [--project NAME]
   projects
   read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
+  read --slug SLUG [--project NAME] [--revision REV] [--response full|compact]
+         [--out FILE [--quiet]]
   update ID --snapshot FILE --expected-revision REV [--request-id ID]
          [--response full|compact]
   update [ID] --command FILE
@@ -60,6 +62,8 @@ submission. Retry sends the exact retained command for the same server and owner
 Projects group artifacts by name without regard to letter case. A project
 exists while it contains an artifact. Move changes the project of an artifact
 without creating a revision; --no-project removes it from its project.
+A slug such as concepts/rag names an artifact within its project, or within
+the unfiled artifacts without --project. Read --slug finds it without its ID.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
@@ -88,8 +92,8 @@ class UsageError extends Error {}
 
 const commandOptions: Record<string, readonly string[]> = {
   login: ['no-browser'], logout: [], whoami: [],
-  create: ['snapshot', 'project', 'request-id', 'response', 'command'],
-  list: ['limit', 'cursor', 'project'], projects: [], read: ['revision', 'response', 'out', 'quiet'],
+  create: ['snapshot', 'project', 'slug', 'request-id', 'response', 'command'],
+  list: ['limit', 'cursor', 'project'], projects: [], read: ['slug', 'project', 'revision', 'response', 'out', 'quiet'],
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
@@ -131,7 +135,7 @@ async function main(): Promise<unknown> {
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
       full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
       global: { type: 'boolean' }, force: { type: 'boolean' },
-      project: { type: 'string' }, 'no-project': { type: 'boolean' }, email: { type: 'string' }, notify: { type: 'boolean' },
+      project: { type: 'string' }, 'no-project': { type: 'boolean' }, slug: { type: 'string' }, email: { type: 'string' }, notify: { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -218,12 +222,15 @@ async function main(): Promise<unknown> {
     case 'create': {
       if (values.command) return mutate(await commandFile('create'));
       none();
-      return mutate({ kind: 'create', command: createSchema.parse({ requestId: values['request-id'] ?? randomUUID(), snapshot: await jsonFile(required('snapshot')), ...(values.project === undefined ? {} : { project: values.project }), ...(response === undefined ? {} : { response }) }) });
+      return mutate({ kind: 'create', command: createSchema.parse({ requestId: values['request-id'] ?? randomUUID(), snapshot: await jsonFile(required('snapshot')), ...(values.project === undefined ? {} : { project: values.project }), ...(values.slug === undefined ? {} : { slug: values.slug }), ...(response === undefined ? {} : { response }) }) });
     }
     case 'list': none(); return client.list({ ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values.cursor === undefined ? {} : { cursor: values.cursor }), ...(values.project === undefined ? {} : { project: values.project }) });
     case 'projects': none(); return client.projects();
     case 'read': {
-      const result = await client.read({ artifactId: argument()!, ...(values.revision === undefined ? {} : { revisionId: values.revision }), ...(response === undefined ? {} : { response }) });
+      if (values.slug === undefined && values.project !== undefined) throw new UsageError('read --project requires --slug');
+      if ((values.slug === undefined) !== (arguments_.length === 1) || arguments_.length > 1) throw new UsageError('read requires exactly one of an artifact ID or --slug SLUG');
+      const target = values.slug === undefined ? { artifactId: arguments_[0]! } : { slug: values.slug, ...(values.project === undefined ? {} : { project: values.project }) };
+      const result = await client.read({ ...target, ...(values.revision === undefined ? {} : { revisionId: values.revision }), ...(response === undefined ? {} : { response }) });
       if (values.out) await writeOutput(values.out, `${JSON.stringify(result, null, 2)}\n`);
       return quiet ? undefined : result;
     }
