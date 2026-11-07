@@ -416,6 +416,16 @@ test('REST and MCP create pages with slugs and read them by project and slug', a
     const listed = (await (await call('/artifacts?project=Mi-Wiki')).json()).items as { artifactId: string; slug: string | null }[];
     assert.deepEqual(listed.map(({ artifactId, slug }) => [artifactId, slug]).sort(), [[rag.artifactId, 'concepts/rag'], [history.artifactId, 'history']].sort());
     await error(await api(app, (await grant(app, 'openid profile offline_access artifacts:write')).access_token)('/lookup?slug=index'), 403, 'forbidden');
+
+    const renamed = await call(`/artifacts/${rag.artifactId}/project`, 'PUT', { requestId: 'rest-slug-rename', artifactId: rag.artifactId, slug: 'concepts/retrieval' });
+    assert.deepEqual(await renamed.json(), { artifactId: rag.artifactId, project: 'Mi-Wiki' }, 'a slug-only move keeps the project');
+    assert.equal((await (await call('/lookup?project=Mi-Wiki&slug=concepts/retrieval')).json()).artifactId, rag.artifactId);
+    const moveConflict = await error(await call(`/artifacts/${rag.artifactId}/project`, 'PUT', { requestId: 'rest-slug-move-conflict', artifactId: rag.artifactId, slug: 'history' }), 409, 'slug_conflict');
+    assert.deepEqual(moveConflict.details, { slug: 'history', project: 'Mi-Wiki', artifactId: history.artifactId });
+    await error(await call(`/artifacts/${rag.artifactId}/project`, 'PUT', { requestId: 'rest-slug-move-suffix', artifactId: rag.artifactId, slug: 'concepts/rag.md' }), 400, 'invalid_input');
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_move', { requestId: 'mcp-slug-clear', artifactId: history.artifactId, project: 'Other', slug: null })).structuredContent, { artifactId: history.artifactId, project: 'Other' });
+    assert.equal(((await mcp(app, tokens.access_token, 'artifacts_read', { artifactId: history.artifactId })).structuredContent as ArtifactRead).slug, null);
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_move', { requestId: 'mcp-slug-move-conflict', artifactId: history.artifactId, project: 'Mi-Wiki', slug: 'concepts/retrieval' })).structuredContent, { error: 'slug_conflict', message: 'The slug already names an artifact in this project', slug: 'concepts/retrieval', project: 'Mi-Wiki', artifactId: rag.artifactId });
   } finally { await app.close(); }
 });
 

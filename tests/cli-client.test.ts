@@ -235,6 +235,12 @@ test('typed client creates slugged pages and reads them by project and slug over
     await assert.rejects(client.read({ project: 'Mi-Wiki', slug: 'index' }), (error: unknown) => error instanceof HttpError && error.status === 404 && error.code === 'not_found');
     assert.throws(() => client.read({ project: 'Mi-Wiki' }), { name: 'ZodError' });
     assert.deepEqual((await client.list({ project: 'Mi-Wiki' })).items.map((item) => item.slug), ['concepts/rag']);
+    assert.deepEqual(await client.move({ requestId: 'client-slug-rename', artifactId: unfiled.artifactId, project: 'Mi-Wiki', slug: 'concepts/retrieval' }), { artifactId: unfiled.artifactId, project: 'Mi-Wiki' });
+    assert.equal((await client.read({ project: 'Mi-Wiki', slug: 'concepts/retrieval' })).artifactId, unfiled.artifactId);
+    await assert.rejects(client.move({ requestId: 'client-slug-taken', artifactId: unfiled.artifactId, slug: 'concepts/rag' }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'slug_conflict' && error.details.artifactId === rag.artifactId);
+    assert.deepEqual(await client.move({ requestId: 'client-slug-clear', artifactId: unfiled.artifactId, slug: null }), { artifactId: unfiled.artifactId, project: 'Mi-Wiki' });
+    assert.equal((await client.read({ artifactId: unfiled.artifactId })).slug, null);
+    assert.throws(() => client.move({ requestId: 'client-move-empty', artifactId: unfiled.artifactId }), { name: 'ZodError' });
   } finally { await app.close(); }
 });
 
