@@ -103,6 +103,7 @@ test('all non-redirect outcomes survive failed optional subject reads with exact
     { form: sample, move: async () => partial, outcome: { kind: 'partial', result: partial, location: '/?project=Historical+destination' }, status: 200 },
     { form: { ...sample, project: '   ' }, move: async () => { throw new Error('must not call invalid command'); }, outcome: { kind: 'invalid' }, status: 400 },
     { form: sample, move: async () => { throw new ArtifactError('request_conflict', 'Changed'); }, outcome: { kind: 'conflict' }, status: 409 },
+    { form: sample, move: async () => { throw new ArtifactError('slug_conflict', 'Taken', { project: 'Wiki', conflicts: [{ artifactId: 'artifact-one', slug: 'index' }] }); }, outcome: { kind: 'slug_conflict', project: 'Wiki', conflicts: [{ artifactId: 'artifact-one', slug: 'index' }] }, status: 409 },
     { form: sample, move: async () => { throw new Error('command unavailable'); }, outcome: { kind: 'uncertain' }, status: 503 },
     { form: { ...sample, intent: 'remove' as const, project: undefined }, move: async () => { throw new Error('command unavailable'); }, outcome: { kind: 'uncertain' }, status: 503 },
   ];
@@ -121,6 +122,7 @@ test('successful POST redirects without enrichment while GET and explicit author
   await assert.rejects(prepareMovePage({ move, moveSubject: unavailable }, actor, new Request('https://panel.example.test/move?artifactId=one')), /subject unavailable/);
   await assert.rejects(prepareMovePage({ move, moveSubject: async () => { throw new ArtifactError('forbidden', 'Revoked'); } }, actor, request(encode({ ...sample, project: '' }))), { code: 'forbidden' });
   await assert.rejects(prepareMovePage({ move: async () => { throw new ArtifactError('forbidden', 'Revoked'); }, moveSubject: unavailable }, actor, request(encode(sample))), { code: 'forbidden' });
+  await assert.rejects(prepareMovePage({ move: async () => { throw new ArtifactError('slug_conflict', 'Taken', { slug: 'index', project: 'Wiki', artifactId: 'holder' }); }, moveSubject: unavailable }, actor, request(encode(sample))), { code: 'slug_conflict' }, 'a single-move conflict shape is not a panel outcome');
 });
 
 test('publication and deletion keep strict singleton fields after the parser migration', async () => {

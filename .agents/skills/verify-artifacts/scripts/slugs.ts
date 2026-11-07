@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Page } from 'playwright';
 import { artifactReadSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { waitForMoveReadiness } from './move-readiness.ts';
 
 type Snapshot = ReturnType<typeof artifactReadSchema.parse>['revision']['snapshot'];
 type CliResult = { code: number | null; stdout: string; stderr: string };
@@ -61,5 +62,48 @@ export async function driveSlugs({ page, panel, directory, firstSnapshot, checks
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px detail does not overflow');
   await capture(page, 'detail-information-slug-390');
 
-  checks.push('HTTP MCP create with project and slug', 'HTTP MCP read by { project, slug } with a case-variant project', 'Source CLI read --project --slug over REST equals the MCP create result', 'MCP slug_conflict for a case-variant project with the holder artifactId', 'CLI create slug_conflict with 409', 'CLI not_found for an unknown slug', 'Unfiled namespace holds the same slug', 'Library card and detail Información show the slug at 1440 and 390');
+  assert.deepEqual(await ok('move', rag.artifactId, '--slug', 'concepts/retrieval'), { artifactId: rag.artifactId, project: 'Mi-Wiki' }, 'CLI move --slug renames in place');
+  const renamed = artifactReadSchema.parse(await ok('read', '--project', 'Mi-Wiki', '--slug', 'concepts/retrieval'));
+  assert.equal(renamed.artifactId, rag.artifactId, 'CLI read --slug finds the new slug');
+  assert.equal(renamed.headRevisionId, rag.headRevisionId, 'A slug change creates no revision');
+  const oldSlug = await cli('read', '--project', 'Mi-Wiki', '--slug', 'concepts/rag');
+  assert.match(oldSlug.stderr, /"code":"not_found".*"status":404/, 'The old slug no longer resolves');
+  const taken = await cli('move', unfiled.artifactId, '--project', 'Mi-Wiki', '--slug', 'concepts/retrieval');
+  assert.equal(taken.code, 1, 'CLI move to a used slug exits 1');
+  assert.match(taken.stderr, /"code":"slug_conflict".*"status":409/, 'CLI move to a used slug reports slug_conflict with 409');
+  assert.equal(artifactReadSchema.parse(await call('artifacts_read', { artifactId: unfiled.artifactId })).project, null, 'A conflicting CLI move changes nothing');
+  assert.deepEqual(await ok('move', rag.artifactId, '--no-slug'), { artifactId: rag.artifactId, project: 'Mi-Wiki' });
+  assert.equal(artifactReadSchema.parse(await call('artifacts_read', { artifactId: rag.artifactId })).slug, null, 'CLI move --no-slug clears the slug');
+  assert.equal((await ok('history', rag.artifactId)).items.length, 1, 'Slug moves leave one revision');
+
+  const titled = (title: string) => ({ ...page1, metadata: { title, description: 'Slug conflict page.' }, content: { kind: 'markdown' as const, text: `# ${title}\n` } });
+  const create = async (title: string, project: string, slug: string) => artifactReadSchema.parse(await call('artifacts_create', { requestId: randomUUID(), snapshot: titled(title), project, slug }));
+  await create('Portada', 'Mi-Wiki', 'index');
+  await create('Bitácora', 'Mi-Wiki', 'log');
+  const drafts = [await create('Índice borrador', 'Borradores', 'index'), await create('Registro borrador', 'Borradores', 'log')];
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await record('Open Borradores, select both drafts, and move them to Mi-Wiki', { artifactIds: drafts.map(({ artifactId }) => artifactId) });
+  await page.goto(`${panel}/?project=Borradores`);
+  for (const draft of drafts) await page.getByRole('checkbox', { name: `Seleccionar ${draft.revision.snapshot.metadata.title}`, exact: true }).check();
+  await waitForMoveReadiness(page);
+  await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
+  await page.getByRole('dialog').waitFor();
+  await page.getByLabel('Proyecto', { exact: true }).fill('mi-wiki');
+  await page.getByLabel('Proyecto', { exact: true }).press('Tab');
+  const response = page.waitForResponse((candidate) => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === '/move');
+  await page.getByRole('dialog').getByRole('button', { name: 'Mover', exact: true }).press('Enter');
+  assert.equal((await response).status(), 409, 'The bulk move answers 409');
+  await page.getByRole('heading', { level: 1, name: 'Hay slugs en conflicto', exact: true }).waitFor();
+  const alert = page.getByRole('alert');
+  assert.match(await alert.innerText(), /No se movió ningún artefacto\. Estos slugs chocarían en Mi-Wiki/, 'The alert names the destination');
+  const listed = (await alert.locator('.move-conflicts li').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()).sort();
+  assert.deepEqual(listed, ['Registro borrador log', 'Índice borrador index'].sort(), 'The alert lists each conflicting artifact with its slug');
+  await capture(page, 'bulk-slug-conflict');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px conflict page does not overflow');
+  await capture(page, 'bulk-slug-conflict-390');
+  const after = await Promise.all(drafts.map(async ({ artifactId }) => artifactReadSchema.parse(await call('artifacts_read', { artifactId }))));
+  assert.deepEqual(after, drafts, 'Nothing moved');
+
+  checks.push('HTTP MCP create with project and slug', 'HTTP MCP read by { project, slug } with a case-variant project', 'Source CLI read --project --slug over REST equals the MCP create result', 'MCP slug_conflict for a case-variant project with the holder artifactId', 'CLI create slug_conflict with 409', 'CLI not_found for an unknown slug', 'Unfiled namespace holds the same slug', 'Library card and detail Información show the slug at 1440 and 390', 'CLI move --slug renames in place and read --slug finds the new slug with the same head revision', 'CLI move into a used slug reports slug_conflict with 409 and changes nothing', 'CLI move --no-slug clears the slug without a revision', 'Panel bulk move into a project that holds both slugs answers 409, lists both drafts with their slugs at 1440 and 390, and moves nothing');
 }

@@ -215,9 +215,10 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const input = moveSchema.parse(value);
       return command(actor, 'artifacts:write', 'move', input, moveResultSchema, async (connection) => {
         const current = await owned(connection, actor.userId, input.artifactId);
-        const project = input.project === null ? null : await projectSpelling(connection, actor.userId, input.project);
-        await claimSlug(connection, actor.userId, project, current.slug, current.id);
-        await connection.update(artifact).set({ project }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId)));
+        const project = input.project === undefined ? current.project : input.project === null ? null : await projectSpelling(connection, actor.userId, input.project);
+        const slug = input.slug === undefined ? current.slug : input.slug;
+        await claimSlug(connection, actor.userId, project, slug, current.id);
+        await connection.update(artifact).set({ project, slug }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId)));
         return { artifactId: input.artifactId, project };
       });
     },

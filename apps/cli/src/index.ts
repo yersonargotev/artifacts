@@ -49,8 +49,8 @@ Commands:
   publish ID --revision REV --expected-version N [--request-id ID]
   publish [ID] --command FILE
   export ID --revision REV --out FILE
-  move ID --project NAME [--request-id ID]
-  move ID --no-project [--request-id ID]
+  move ID [--project NAME | --no-project] [--slug SLUG | --no-slug]
+         [--request-id ID]
   share ID --email EMAIL [--notify] [--request-id ID]
   shares ID
   unshare ID SHARE_ID [--request-id ID]
@@ -60,10 +60,14 @@ Mutation command files contain the complete create, update, or publish JSON.
 Mutation request IDs default to a random UUID. Commands are retained before
 submission. Retry sends the exact retained command for the same server and owner.
 Projects group artifacts by name without regard to letter case. A project
-exists while it contains an artifact. Move changes the project of an artifact
-without creating a revision; --no-project removes it from its project.
+exists while it contains an artifact. Move changes the project or the slug of
+an artifact without creating a revision. It needs at least one of its four
+options. --no-project removes the artifact from its project, and --no-slug
+clears its slug. An option left out keeps that value, so a move to another
+project keeps the slug.
 A slug such as concepts/rag names an artifact within its project, or within
 the unfiled artifacts without --project. Read --slug finds it without its ID.
+Create or move fails with slug_conflict when the project already uses the slug.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
@@ -98,7 +102,7 @@ const commandOptions: Record<string, readonly string[]> = {
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
   share: ['email', 'notify', 'request-id'], shares: [], unshare: ['request-id'],
-  export: ['revision', 'out'], move: ['project', 'no-project', 'request-id'], retry: [],
+  export: ['revision', 'out'], move: ['project', 'no-project', 'slug', 'no-slug', 'request-id'], retry: [],
   skills: ['full', 'all', 'agent', 'global', 'force'],
 };
 
@@ -135,7 +139,7 @@ async function main(): Promise<unknown> {
       summary: { type: 'boolean' }, out: { type: 'string' }, quiet: { type: 'boolean' },
       full: { type: 'boolean' }, all: { type: 'boolean' }, agent: { type: 'string' },
       global: { type: 'boolean' }, force: { type: 'boolean' },
-      project: { type: 'string' }, 'no-project': { type: 'boolean' }, slug: { type: 'string' }, email: { type: 'string' }, notify: { type: 'boolean' },
+      project: { type: 'string' }, 'no-project': { type: 'boolean' }, slug: { type: 'string' }, 'no-slug': { type: 'boolean' }, email: { type: 'string' }, notify: { type: 'boolean' },
     },
   });
   const seen = new Set<string>();
@@ -183,6 +187,10 @@ async function main(): Promise<unknown> {
     if (value === undefined) return undefined;
     if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value))) throw new UsageError(`--${name} requires a nonnegative safe integer`);
     return Number(value);
+  }
+  function cleared(name: string, value: string | undefined, clear: boolean | undefined): string | null | undefined {
+    if (value !== undefined && clear) throw new UsageError(`Specify at most one of --${name} or --no-${name}`);
+    return clear ? null : value;
   }
   const response = values.response;
   if (response !== undefined && response !== 'full' && response !== 'compact') throw new UsageError('--response requires full or compact');
@@ -258,8 +266,10 @@ async function main(): Promise<unknown> {
     }
     case 'move': {
       const artifactId = argument()!;
-      if ((values.project !== undefined) === (values['no-project'] ?? false)) throw new UsageError('Specify exactly one of --project NAME or --no-project');
-      return mutate({ kind: 'move', command: moveSchema.parse({ artifactId, requestId: values['request-id'] ?? randomUUID(), project: values.project ?? null }) });
+      const project = cleared('project', values.project, values['no-project']);
+      const slug = cleared('slug', values.slug, values['no-slug']);
+      if (project === undefined && slug === undefined) throw new UsageError('move requires --project NAME, --no-project, --slug SLUG, or --no-slug');
+      return mutate({ kind: 'move', command: moveSchema.parse({ artifactId, requestId: values['request-id'] ?? randomUUID(), ...(project === undefined ? {} : { project }), ...(slug === undefined ? {} : { slug }) }) });
     }
     case 'share': return mutate({ kind: 'share', command: shareSchema.parse({ artifactId: argument()!, requestId: values['request-id'] ?? randomUUID(), email: required('email'), ...(values.notify === undefined ? {} : { notify: values.notify }) }) });
     case 'shares': return client.listShares(listSharesSchema.parse({ artifactId: argument()! }));

@@ -93,7 +93,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           inputSchema: listSchema, annotations: readOnly,
         }, async (input) => execute(() => artifacts.list(principal, input)));
         server.registerTool('artifacts_move', {
-          title: 'Move artifact to project', description: 'Set or clear the project of an owned artifact. A project name is reused case-insensitively with its stored spelling, or created; null removes the artifact from its project. A project disappears when its last artifact leaves. The artifact keeps its slug, so a move fails with slug_conflict when the destination already uses it. Moving never creates a revision and never changes the publication. Moving to the current project succeeds without change. Requires artifacts:write. Retry with the same requestId and arguments.',
+          title: 'Move or rename artifact', description: 'Set or clear the project and the slug of an owned artifact. Give project, slug, or both. An omitted field keeps its value, null clears it, and a value sets it. A project name is reused case-insensitively with its stored spelling, or created; a project disappears when its last artifact leaves. A move to another project keeps the slug. The move fails with slug_conflict, naming the holder, when the target project already uses the target slug, and then changes nothing. Moving never creates a revision and never changes the publication. Moving to the current project and slug succeeds without change. Requires artifacts:write. Retry with the same requestId and arguments.',
           inputSchema: moveSchema, annotations: mutation,
         }, async (input) => execute(() => artifacts.move(principal, input)));
         server.registerTool('projects_list', {

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { artifact, artifactCommand, artifactPublication, artifactRevision, session } from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
+import { prepareMovePage } from '../apps/dashboard/src/move.ts';
 import { fixture } from './helpers.ts';
 
 async function setup() {
@@ -118,18 +119,41 @@ test('a genuine receipt INSERT failure rolls back every selected row and identic
   } finally { await app.close(); }
 });
 
-test('a panel move that would reuse a slug in its destination moves nothing', async () => {
+test('a panel move that would reuse a slug in its destination lists every conflict and moves nothing', async () => {
   const { app, actor, store, panel } = await setup();
   try {
-    const page = (project?: string) => store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: 'Page', description: '' }, content: { kind: 'markdown', text: '# Page' }, files: [] }, project, slug: 'index' });
-    const wiki = await page('Wiki');
-    const other = await page('Other');
-    const loose = await page();
+    const page = (slug: string | undefined, project?: string) => store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title: slug ?? 'Plain', description: '' }, content: { kind: 'markdown', text: '# Page' }, files: [] }, project, slug });
+    const wiki = await page('index', 'Wiki');
+    const other = await page('index', 'Other');
+    const first = await page('log', 'Other');
+    const second = await page('log');
+    const plain = await page(undefined);
+    const free = await page('about', 'Other');
     const before = await app.db.select().from(artifact);
-    await assert.rejects(panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId], project: 'wiki' }), { code: 'slug_conflict', details: { slug: 'index', project: 'Wiki', artifactId: wiki.artifactId } });
-    await assert.rejects(panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId, loose.artifactId], project: 'Fresh' }), { code: 'slug_conflict', details: { slug: 'index', project: 'Fresh' } });
-    assert.deepEqual(await app.db.select().from(artifact), before);
-    assert.deepEqual(await panel.move(actor, { requestId: randomUUID(), artifactIds: [other.artifactId], project: 'Fresh' }), { project: 'Fresh', moved: 1, unchanged: 0, missing: [] });
+    const requestId = randomUUID();
+    const conflicts = [{ artifactId: other.artifactId, slug: 'index' }, { artifactId: first.artifactId, slug: 'log' }, { artifactId: second.artifactId, slug: 'log' }].sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+    await assert.rejects(panel.move(actor, { requestId, artifactIds: [other.artifactId, first.artifactId, second.artifactId, plain.artifactId, free.artifactId], project: 'wiki' }), { code: 'slug_conflict', details: { project: 'Wiki', conflicts } });
+    await assert.rejects(panel.move(actor, { requestId: randomUUID(), artifactIds: [wiki.artifactId, other.artifactId], project: 'Wiki' }), { code: 'slug_conflict', details: { project: 'Wiki', conflicts: [{ artifactId: other.artifactId, slug: 'index' }] } }, 'a selected holder already in the destination still blocks the mover');
+    assert.deepEqual(await app.db.select().from(artifact), before, 'nothing moves');
+    assert.equal((await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, requestId))).length, 0, 'a failed move writes no receipt');
+    assert.deepEqual(await panel.move(actor, { requestId, artifactIds: [other.artifactId, plain.artifactId, free.artifactId], project: 'Fresh' }), { project: 'Fresh', moved: 3, unchanged: 0, missing: [] }, 'the request ID stays usable');
     assert.equal((await store.read(actor, { project: 'fresh', slug: 'index' })).artifactId, other.artifactId);
+  } finally { await app.close(); }
+});
+
+test('the move page answers a bulk slug conflict with 409, the conflicting titles and slugs, and the same request', async () => {
+  const { actor, store, panel, app } = await setup();
+  try {
+    const page = (title: string, project: string) => store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title, description: '' }, content: { kind: 'markdown', text: `# ${title}` }, files: [] }, project, slug: 'index' });
+    await page('Wiki index', 'Wiki');
+    const other = await page('Other index', 'Other');
+    const body = new URLSearchParams([['artifactId', other.artifactId], ['requestId', 'bulk-slug-conflict'], ['project', 'Wiki'], ['intent', 'move']]);
+    const result = await prepareMovePage(panel, actor, new Request('https://panel.example.test/move', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body }));
+    assert.equal(result.kind, 'render');
+    assert(result.kind === 'render');
+    assert.equal(result.status, 409);
+    assert.deepEqual(result.outcome, { kind: 'slug_conflict', project: 'Wiki', conflicts: [{ artifactId: other.artifactId, slug: 'index' }] });
+    assert.equal(result.form.requestId, 'bulk-slug-conflict');
+    assert.deepEqual(result.subject?.items.map(({ artifactId, title }) => [artifactId, title]), [[other.artifactId, 'Other index']]);
   } finally { await app.close(); }
 });

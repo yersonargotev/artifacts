@@ -48,7 +48,7 @@ Every method makes one HTTP request. The client does not retry, follow redirects
 | `share(command)` | `requestId`, `artifactId`, `email`, optional `notify` and `requireNew: true` | Share receipt with optional notification disposition |
 | `listShares(query)` | `artifactId` | `{ items: Share[] }` |
 | `unshare(command)` | `requestId`, `artifactId`, `shareId` | `void` after an empty HTTP 204 |
-| `move(command)` | `requestId`, `artifactId`, `project` name or null | `{ artifactId, project }` |
+| `move(command)` | `requestId`, `artifactId`, and at least one of `project` (name or null) and `slug` (slug or null) | `{ artifactId, project }` |
 | `export(query)` | `artifactId`, `revisionId` | `{ filename, mediaType, bytes, sha256 }` |
 
 Create, read, and update accept `response: 'compact'`. The returned revision contains metadata and file summaries. Omitted response and `response: 'full'` return the complete snapshot. History accepts `response: 'summary'` or `response: 'full'`. Its page limit is ten revisions. Overloads reflect these projections in the return type.
@@ -59,7 +59,7 @@ All sharing methods require `artifacts:publish` and artifact ownership. `share` 
 
 Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.4` and earlier reject responses from such a server with `invalid_response`.
 
-Artifact reads and list items also include `slug`, a page name or null. `read({ project, slug })` calls `GET /lookup` and `read({ artifactId })` calls `GET /artifacts/:artifactId`. An omitted `project` reads the unfiled namespace. A used slug fails `create` with an `HttpError` whose code is `slug_conflict`, status 409, and whose details name the holder's `artifactId`. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`.
+Artifact reads and list items also include `slug`, a page name or null. `read({ project, slug })` calls `GET /lookup` and `read({ artifactId })` calls `GET /artifacts/:artifactId`. An omitted `project` reads the unfiled namespace. A used slug fails `create` with an `HttpError` whose code is `slug_conflict`, status 409, and whose details name the holder's `artifactId`. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`. `move` sets, changes, or clears the slug: an omitted field keeps its value and `null` clears it. A move into a used slug fails with the same `slug_conflict`. The move result is unchanged, so published clients keep parsing it. Read the artifact to see its new slug.
 
 `prepareArtifactEdit(client, { artifactId, requestId, changes })` reads the current full snapshot and prepares an immutable update command. Metadata and content changes merge into that snapshot. An explicit `files` array replaces the attachments. The helper does not submit the update. Retain its exact output before sending it.
 

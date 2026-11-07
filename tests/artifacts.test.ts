@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
-import { artifact, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
-import { createArtifactStore, createSchema, projectNameSchema, readSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { artifact, artifactCommand, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
+import { createArtifactStore, createSchema, moveSchema, projectNameSchema, readSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
@@ -300,6 +300,50 @@ test('slugs are unique per owner and canonical project, and read back by project
   } finally { await app.close(); }
 });
 
+test('move sets, changes, or clears the slug and keeps the project unless it is given', async () => {
+  const app = await artifactFixture();
+  try {
+    const page = await app.store.create(app.actor, { ...createInput(), project: 'Wiki' });
+    const taken = await app.store.create(app.actor, { ...createInput(), project: 'Wiki', slug: 'index' });
+    const elsewhere = await app.store.create(app.actor, { ...createInput(), project: 'Other', slug: 'concepts/rag' });
+    const revisions = async () => (await app.db.select({ id: artifactRevision.id }).from(artifactRevision)).length;
+    const before = await revisions();
+
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, slug: 'concepts/rag' }), { artifactId: page.artifactId, project: 'Wiki' }, 'a slug-only move keeps the project');
+    assert.equal((await app.store.read(app.actor, { project: 'Wiki', slug: 'concepts/rag' })).artifactId, page.artifactId);
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, slug: 'concepts/retrieval' }), { artifactId: page.artifactId, project: 'Wiki' });
+    assert.equal((await app.store.read(app.actor, { project: 'Wiki', slug: 'concepts/retrieval' })).artifactId, page.artifactId);
+    await assert.rejects(app.store.read(app.actor, { project: 'Wiki', slug: 'concepts/rag' }), { code: 'not_found' }, 'the old slug is free after a rename');
+
+    const unchanged = await app.db.select().from(artifact);
+    await assert.rejects(app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, slug: 'index' }), { code: 'slug_conflict', details: { slug: 'index', project: 'Wiki', artifactId: taken.artifactId } });
+    await assert.rejects(app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, project: 'other', slug: 'concepts/rag' }), { code: 'slug_conflict', details: { slug: 'concepts/rag', project: 'Other', artifactId: elsewhere.artifactId } });
+    assert.deepEqual(await app.db.select().from(artifact), unchanged, 'a conflicting move changes nothing');
+
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: taken.artifactId, project: 'Other' }), { artifactId: taken.artifactId, project: 'Other' });
+    assert.equal((await app.store.read(app.actor, { project: 'Other', slug: 'index' })).artifactId, taken.artifactId, 'a move to another project keeps the slug');
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, project: null, slug: 'concepts/rag' }), { artifactId: page.artifactId, project: null });
+    assert.equal((await app.store.read(app.actor, { slug: 'concepts/rag' })).artifactId, page.artifactId);
+    assert.deepEqual(await app.store.move(app.actor, { requestId: randomUUID(), artifactId: page.artifactId, slug: null }), { artifactId: page.artifactId, project: null });
+    assert.equal((await app.store.read(app.actor, { artifactId: page.artifactId })).slug, null);
+    assert.equal(await revisions(), before, 'slug changes create no revisions');
+    assert.deepEqual((await app.store.history(app.actor, { artifactId: page.artifactId })).items.map((item) => item.id), [page.revision.id]);
+
+    for (const input of [{ requestId: 'r', artifactId: 'a' }, { requestId: 'r', artifactId: 'a', slug: 'Index' }, { requestId: 'r', artifactId: 'a', slug: 'index.md' }]) assert.equal(moveSchema.safeParse(input).success, false, JSON.stringify(input));
+  } finally { await app.close(); }
+});
+
+test('move inputs without a slug keep their receipt fingerprint', async () => {
+  const app = await artifactFixture();
+  try {
+    const created = await app.store.create(app.actor, createInput());
+    const legacy = { requestId: 'legacy-move-request', artifactId: created.artifactId, project: 'Alpha' };
+    assert.deepEqual(await app.store.move(app.actor, legacy), { artifactId: created.artifactId, project: 'Alpha' });
+    const [row] = await app.db.select().from(artifactCommand).where(eq(artifactCommand.requestId, legacy.requestId));
+    assert.equal(row!.payloadHash, await sha256(canonicalJson({ kind: 'move', input: { requestId: legacy.requestId, artifactId: created.artifactId, project: 'Alpha' } })));
+  } finally { await app.close(); }
+});
+
 test('a slug changes no digest, export, or receipt fingerprint of inputs without one', async () => {
   const app = await artifactFixture();
   try {
@@ -340,6 +384,9 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     assert.deepEqual(Object.keys(locator.properties).sort(), ['artifactId', 'project', 'response', 'revisionId', 'slug']);
     assert.equal(locator.properties.slug.pattern, slugSchema.toJSONSchema().pattern);
     assert.equal(listed('artifacts_create').inputSchema.properties.slug.maxLength, 160);
+    const move = listed('artifacts_move').inputSchema;
+    assert.deepEqual(move.required.sort(), ['artifactId', 'requestId'], 'project and slug are each optional, and at least one is required');
+    assert.deepEqual(Object.keys(move.properties).sort(), ['artifactId', 'project', 'requestId', 'slug']);
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);

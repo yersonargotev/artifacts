@@ -235,6 +235,12 @@ test('typed client creates slugged pages and reads them by project and slug over
     await assert.rejects(client.read({ project: 'Mi-Wiki', slug: 'index' }), (error: unknown) => error instanceof HttpError && error.status === 404 && error.code === 'not_found');
     assert.throws(() => client.read({ project: 'Mi-Wiki' }), { name: 'ZodError' });
     assert.deepEqual((await client.list({ project: 'Mi-Wiki' })).items.map((item) => item.slug), ['concepts/rag']);
+    assert.deepEqual(await client.move({ requestId: 'client-slug-rename', artifactId: unfiled.artifactId, project: 'Mi-Wiki', slug: 'concepts/retrieval' }), { artifactId: unfiled.artifactId, project: 'Mi-Wiki' });
+    assert.equal((await client.read({ project: 'Mi-Wiki', slug: 'concepts/retrieval' })).artifactId, unfiled.artifactId);
+    await assert.rejects(client.move({ requestId: 'client-slug-taken', artifactId: unfiled.artifactId, slug: 'concepts/rag' }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'slug_conflict' && error.details.artifactId === rag.artifactId);
+    assert.deepEqual(await client.move({ requestId: 'client-slug-clear', artifactId: unfiled.artifactId, slug: null }), { artifactId: unfiled.artifactId, project: 'Mi-Wiki' });
+    assert.equal((await client.read({ artifactId: unfiled.artifactId })).slug, null);
+    assert.throws(() => client.move({ requestId: 'client-move-empty', artifactId: unfiled.artifactId }), { name: 'ZodError' });
   } finally { await app.close(); }
 });
 
@@ -360,6 +366,19 @@ test('CLI creates a slugged page and reads it by project and slug without its ID
     for (const args of [['read'], ['read', rag.artifactId, '--slug', 'concepts/rag'], ['read', 'one', 'two']]) assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'read requires exactly one of an artifact ID or --slug SLUG', args.join(' '));
     assert.equal(failure(await cli(['read', rag.artifactId, '--project', 'Mi-Wiki'], environment), 'invalid_arguments').message, 'read --project requires --slug');
     assert.equal(failure(await cli(['list', '--slug', 'index'], environment), 'invalid_arguments').message, 'Option --slug is not supported by list');
+
+    assert.deepEqual(success(await cli(['move', rag.artifactId, '--slug', 'concepts/retrieval', '--request-id', 'cli-slug-rename'], environment)), { artifactId: rag.artifactId, project: 'Mi-Wiki' });
+    const renameRetained = JSON.parse(await readFile(operationPath(environment.ARTIFACTS_STATE_DIR, app.config.resource, 'cli-slug-rename'), 'utf8'));
+    assert.deepEqual(renameRetained.command, { requestId: 'cli-slug-rename', artifactId: rag.artifactId, slug: 'concepts/retrieval' }, 'an omitted --project is not retained');
+    assert.equal((success(await cli(['read', '--project', 'Mi-Wiki', '--slug', 'concepts/retrieval'], environment)) as ArtifactRead).artifactId, rag.artifactId);
+    const moveConflict = failure(await cli(['move', rag.artifactId, '--no-project', '--slug', 'index'], environment), 'slug_conflict');
+    assert.deepEqual([moveConflict.status, moveConflict.details.artifactId], [409, index.artifactId]);
+    assert.deepEqual(success(await cli(['move', rag.artifactId, '--no-project'], environment)), { artifactId: rag.artifactId, project: null });
+    assert.equal((success(await cli(['read', '--slug', 'concepts/retrieval'], environment)) as ArtifactRead).artifactId, rag.artifactId, 'a move to another project keeps the slug');
+    assert.deepEqual(success(await cli(['move', rag.artifactId, '--project', 'Mi-Wiki', '--no-slug'], environment)), { artifactId: rag.artifactId, project: 'Mi-Wiki' });
+    assert.equal((success(await cli(['read', rag.artifactId], environment)) as ArtifactRead).slug, null);
+    assert.equal((success(await cli(['history', rag.artifactId], environment)) as { items: unknown[] }).items.length, 1, 'slug moves create no revisions');
+    failure(await cli(['move', rag.artifactId, '--slug', 'concepts/rag.md'], environment), 'invalid_input');
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -391,9 +410,9 @@ test('CLI files, lists, and moves projects, and retries a lost move from its ret
     assert.deepEqual(success(await cli(['move', alpha.artifactId, '--no-project'], environment)), { artifactId: alpha.artifactId, project: null });
     assert.deepEqual(success(await cli(['projects'], environment)), { items: [{ name: 'Beta', artifactCount: 1 }] });
 
-    for (const args of [['move', alpha.artifactId], ['move', alpha.artifactId, '--project', 'Gamma', '--no-project']]) {
-      assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'Specify exactly one of --project NAME or --no-project');
-    }
+    assert.equal(failure(await cli(['move', alpha.artifactId], environment), 'invalid_arguments').message, 'move requires --project NAME, --no-project, --slug SLUG, or --no-slug');
+    assert.equal(failure(await cli(['move', alpha.artifactId, '--project', 'Gamma', '--no-project'], environment), 'invalid_arguments').message, 'Specify at most one of --project or --no-project');
+    assert.equal(failure(await cli(['move', alpha.artifactId, '--slug', 'index', '--no-slug'], environment), 'invalid_arguments').message, 'Specify at most one of --slug or --no-slug');
     assert.equal(failure(await cli(['move', '--project', 'Gamma'], environment), 'invalid_arguments').message, 'move requires one positional argument');
     assert.equal(failure(await cli(['projects', 'Beta'], environment), 'invalid_arguments').message, 'projects does not accept positional arguments');
     assert.equal(failure(await cli(['list', '--no-project'], environment), 'invalid_arguments').message, 'Option --no-project is not supported by list');
@@ -563,7 +582,7 @@ test('CLI help works without configuration and invalid options fail before autho
   assert.match(help.stdout, /^Usage: artifacts COMMAND \[OPTIONS\]\n/);
   assert.match(help.stdout, /retry REQUEST_ID/);
   assert.match(help.stdout, /\n  projects\n/);
-  assert.match(help.stdout, /move ID --project NAME \[--request-id ID\]\n  move ID --no-project \[--request-id ID\]/);
+  assert.match(help.stdout, /move ID \[--project NAME \| --no-project\] \[--slug SLUG \| --no-slug\]\n         \[--request-id ID\]/);
   assert.match(help.stdout, /Read --quiet requires --out and suppresses successful JSON stdout\./);
   assert.equal(failure(await cli(['whoami'], { ARTIFACTS_STATE_DIR: directory }), 'invalid_arguments').message, 'No server is saved. Run artifacts login --server RESOURCE or set ARTIFACTS_SERVER.');
   failure(await cli(['create', '--snapshot', 'missing', '--server', 'https://example.test/mcp', '--server', 'https://other.test/mcp']), 'invalid_arguments');

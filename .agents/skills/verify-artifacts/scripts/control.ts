@@ -366,7 +366,7 @@ async function drive(feature: Feature) {
     } else {
       browser = await chromium.launch({ channel: 'chrome', headless: !args.includes('--headed') });
       context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...(feature === 'screens' && args.includes('--headed') ? { recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } } : {}) });
-      if (feature === 'screens' || feature === 'projects') await observeMoveReadiness(context);
+      if (feature === 'screens' || feature === 'projects' || feature === 'slugs') await observeMoveReadiness(context);
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
       const browserVersion = browser.version();

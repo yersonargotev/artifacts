@@ -64,7 +64,7 @@ A move command is `{ "requestId": "...", "artifactId": "...", "project": "Beta" 
 
 ## Slugs
 
-A create command accepts an optional `slug` such as `concepts/rag`. Every artifact response and list item includes `slug`, a name or null. A used slug in the same project fails with 409 `slug_conflict`, and `details` names `slug`, the stored `project`, and the holder's `artifactId`.
+A create command accepts an optional `slug` such as `concepts/rag`. Every artifact response and list item includes `slug`, a name or null. A used slug in the same project fails with 409 `slug_conflict`, and `details` names `slug`, the stored `project`, and the holder's `artifactId`. The move body of `PUT /artifacts/:artifactId/project` takes `project`, `slug`, or both. An omitted field keeps its value and `null` clears it. The move still returns `{ artifactId, project }` and fails with the same 409 `slug_conflict` when the target project already uses the target slug.
 
 `GET /lookup?project=NAME&slug=SLUG` returns the same artifact read as `GET /artifacts/:artifactId`, with the same optional `revisionId` and `response`. An omitted `project` reads artifacts without a project. A lookup with no matching owned artifact returns 404 `not_found`. The lookup has its own collection because a slug such as `history` or `concepts/rag` would otherwise collide with the ID-addressed `/artifacts/:artifactId/...` routes.
 

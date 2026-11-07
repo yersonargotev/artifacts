@@ -12,7 +12,7 @@ if (page instanceof Response) return page;
 if (page.kind === 'redirect') return Astro.redirect(page.location, 303);
 Astro.response.status = page.status;
 const { form, outcome, subject, freshHref } = page;
-const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto completado parcialmente', invalid: 'Mover a proyecto', conflict: 'La solicitud cambió', uncertain: 'No pudimos confirmar el cambio de proyecto' }[outcome.kind];
+const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto completado parcialmente', invalid: 'Mover a proyecto', conflict: 'La solicitud cambió', slug_conflict: 'Hay slugs en conflicto', uncertain: 'No pudimos confirmar el cambio de proyecto' }[outcome.kind];
 ---
 <Panel title={heading} workspace={subject?.workspace}>
   <section class="move-card" data-move-result={outcome.kind}>
@@ -27,6 +27,13 @@ const heading = { confirm: 'Mover a proyecto', partial: 'Cambio de proyecto comp
     </> : outcome.kind === 'conflict' ? <>
       <p role="alert">Esta solicitud ya se usó para otro cambio de proyecto. Abre un formulario nuevo para revisar la selección.</p>
       <div class="move-actions"><a class="button secondary" href={freshHref}>Revisar el proyecto actual</a><a class="button secondary" href="/">Cancelar</a></div>
+    </> : outcome.kind === 'slug_conflict' ? <>
+      <div role="alert">
+        <p>No se movió ningún artefacto. Estos slugs chocarían en <strong>{outcome.project ?? 'Sin proyecto'}</strong>:</p>
+        <ul class="move-conflicts">{outcome.conflicts.map(({ artifactId, slug }) => <li>{subject?.items.find((item) => item.artifactId === artifactId)?.title ?? artifactId} <code>{slug}</code></li>)}</ul>
+        <p>Elige otro proyecto o cambia esos slugs antes de mover.</p>
+      </div>
+      <MovePageForm data={JSON.stringify({ form, projects: subject?.workspace.projects.map(({ name }) => name) ?? [], canRemove: !subject || subject.items.some(({ project }) => project !== null), invalid: false })} client:load />
     </> : outcome.kind === 'uncertain' ? <>
       <p role="alert">La solicitud pudo haberse completado. Reintenta la misma acción para confirmar el resultado.</p>
       <form method="post" action="/move">
