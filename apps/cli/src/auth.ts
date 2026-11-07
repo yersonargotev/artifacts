@@ -75,10 +75,10 @@ async function discoverResource(resource: string, terminal = false): Promise<{ i
   const response = await boundedFetch(context);
   if (!response.ok) throw authFailure(context, response.status >= 500 ? 'service_error' : 'incompatible_resource', response.status >= 500 ? 'Resource metadata service failed' : 'Cannot discover the protected resource. Confirm the configured REST URL', response.status);
   const document = await jsonResponse(response, context);
-  if (terminal && typeof document === 'object' && document !== null && Object.hasOwn(document, 'artifacts_rest_resource')) throw authFailure(context, 'invalid_response', 'REST resource metadata must not advertise another artifacts_rest_resource', response.status);
   const parsed = protectedResourceMetadataSchema.safeParse(document);
   if (!parsed.success) throw authFailure(context, 'invalid_response', 'Invalid protected resource metadata', response.status);
   if (parsed.data.resource !== resource) throw authFailure(context, 'invalid_response', 'Protected resource metadata does not match the exact server URL', response.status);
+  if (terminal && parsed.data.artifacts_rest_resource !== undefined && parsed.data.artifacts_rest_resource !== resource) throw authFailure(context, 'invalid_response', 'REST resource metadata must not advertise another artifacts_rest_resource', response.status);
   const issuer = parsed.data.authorization_servers[0]!;
   try { endpoint(issuer); } catch { throw authFailure(context, 'invalid_response', 'Invalid authorization server URL in protected resource metadata', response.status); }
   return { issuer, ...(parsed.data.artifacts_rest_resource === undefined ? {} : { restResource: parsed.data.artifacts_rest_resource }) };
@@ -263,7 +263,7 @@ export async function login(options: { resource: string; stateDir: string; noBro
   const source = canonicalResource(options.resource);
   const metadata = await discoverResource(source);
   const resource = metadata.restResource ?? source;
-  const { issuer } = metadata.restResource === undefined ? metadata : await discoverResource(resource, true);
+  const { issuer } = resource === source ? metadata : await discoverResource(resource, true);
   await checkIdentity(resource, { kind: 'anonymous' });
   const store = await CredentialStore.open(options.stateDir);
   let listener: Awaited<ReturnType<typeof callback>> | undefined;

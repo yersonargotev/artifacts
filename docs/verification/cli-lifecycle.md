@@ -45,6 +45,8 @@ Both may print `0.1.0-beta.1`. That version does not make a locally packaged can
 
 The runner uses an allowlisted environment. HOME, XDG directories, CLI state, npm user/global configuration, npm cache, input fixtures, and CLI working directory are private temporary paths. It never inherits an access token or a real browser session. Fixture source locations resolve from `import.meta.url`, so the evaluator itself can run outside the repository.
 
+The installed fixture runs the full first-use proof with a distinct REST resource whose metadata has no further relation, and with a shared resource that advertises itself. Each run uses a fresh report and the installed binary.
+
 The installed first-use proof can pass `--login-server` to start login from MCP while `--server` identifies the expected REST resource. It checks the browser authorization resource against the REST URL. After consent it removes `ARTIFACTS_SERVER` and runs bare `whoami` in a new process to verify the saved REST connection. The native `login --no-browser` process supplies its authorization URL in memory. A fresh Playwright context fills the known disposable email/password into the actual sign-in page and approves consent. The evaluator does not inject a bearer token or export storage state.
 
 Retained evidence contains sanitized reports, skill source copies, synthetic historical ZIPs, policy checks, and screenshots. It does not retain a HAR, trace, credentials, OAuth query URLs, cookies, viewer grants, or browser storage. Cleanup waits for owned CLI subprocesses, closes the browser, closes fixture services/database, and removes private CLI state in that order. Cleanup failure makes the run fail.

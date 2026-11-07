@@ -741,16 +741,53 @@ test('login accepts a quoted comma and escaped characters in the Bearer realm', 
 test('login accepts a shared resource that advertises itself', { timeout: 30_000 }, async (t) => {
   const { app, directory } = await setup(t, { transport: 'combined' });
   let metadataReads = 0;
+  let anonymousIdentity = 0;
+  let authenticatedIdentity = 0;
+  let grantResource: string | null = null;
+  interceptTokens(app, async (body, response) => {
+    if (body.get('grant_type') === 'authorization_code') grantResource = body.get('resource');
+    return response;
+  });
   app.setResourceHandler(async (incoming) => {
-    if (new URL(incoming.url).pathname === '/.well-known/oauth-protected-resource/mcp') {
+    const path = new URL(incoming.url).pathname;
+    if (path === '/.well-known/oauth-protected-resource/mcp') {
       metadataReads++;
+      assert.equal(incoming.headers.get('authorization'), null);
+      assert.equal(incoming.headers.get('cookie'), null);
       return Response.json({ resource: app.config.resource, authorization_servers: [app.config.issuer], artifacts_rest_resource: app.config.resource });
+    }
+    if (path === '/mcp/v1/identity') {
+      assert.equal(incoming.headers.get('cookie'), null);
+      if (incoming.headers.has('authorization')) {
+        authenticatedIdentity++;
+        if (authenticatedIdentity === 1) {
+          const db = new DatabaseSync(join(directory, 'credentials.sqlite'), { readOnly: true });
+          try {
+            assert.equal(db.prepare('SELECT resource FROM selected_resource').get(), undefined);
+            const row = db.prepare('SELECT profile FROM profiles WHERE resource = ?').get(app.config.resource)!;
+            assert.equal(JSON.parse(String(row.profile)).tokens, null);
+          } finally { db.close(); }
+        }
+      } else {
+        anonymousIdentity++;
+        await assert.rejects(access(join(directory, 'credentials.sqlite')));
+      }
     }
     return app.resourceHandler(incoming);
   });
-  const { identity, url } = await signIn(t, app, directory);
+  const login = command(t, app, directory, ['login', '--no-browser'], { ARTIFACTS_ACCESS_TOKEN: 'SECRET_AUTOMATION' });
+  const url = await login.authorizationUrl();
+  await approve(app, url);
+  const result = await login.result;
+  assert.equal(result.code, 0, result.stderr);
+  const identity = JSON.parse(result.stdout);
+  assert.equal(identity.userId, app.ownerId);
   assert.equal(url.searchParams.get('resource'), app.config.resource);
+  assert.equal(grantResource, app.config.resource);
   assert.equal(metadataReads, 1);
+  assert.equal(anonymousIdentity, 1);
+  assert.equal(authenticatedIdentity, 1);
+  assert(storedProfile(directory, app.config.resource).tokens.accessToken);
   const whoami = await command(t, app, directory, ['whoami'], {}, false).result;
   assert.equal(whoami.code, 0, whoami.stderr);
   assert.deepEqual(JSON.parse(whoami.stdout), identity);
@@ -794,6 +831,48 @@ test('MCP login uses the advertised REST audience and stores only its verified c
   assert.deepEqual(JSON.parse(whoami.stdout), JSON.parse(result.stdout));
 });
 
+test('terminal self-reference uses the target issuer and leaves the source profile intact', { timeout: 30_000 }, async (t) => {
+  const { app, directory } = await setup(t, { transport: 'combined' });
+  const target = await fixture({ transport: 'combined' });
+  t.after(() => target.close());
+  const sourceProfile = { epoch: 7, registration: { issuer: app.config.issuer, clientId: 'source-client' }, tokens: { accessToken: 'source-token', expiresAt: Date.now() + 60_000 }, refreshAttempt: null };
+  const store = await CredentialStore.open(directory);
+  await store.exclusive(() => store.write(app.config.resource, sourceProfile));
+  store.close();
+  app.setResourceHandler(async (incoming) => {
+    assert.equal(incoming.headers.get('authorization'), null);
+    assert.equal(incoming.headers.get('cookie'), null);
+    return Response.json({ resource: app.config.resource, authorization_servers: [app.config.issuer], artifacts_rest_resource: target.config.resource });
+  });
+  target.setResourceHandler(async (incoming) => {
+    if (new URL(incoming.url).pathname === '/.well-known/oauth-protected-resource/mcp') {
+      assert.equal(incoming.headers.get('authorization'), null);
+      assert.equal(incoming.headers.get('cookie'), null);
+      return Response.json({ resource: target.config.resource, authorization_servers: [target.config.issuer], artifacts_rest_resource: target.config.resource });
+    }
+    return target.resourceHandler(incoming);
+  });
+  let grantResource: string | null = null;
+  interceptTokens(target, async (body, response) => {
+    if (body.get('grant_type') === 'authorization_code') grantResource = body.get('resource');
+    return response;
+  });
+  const login = command(t, app, directory, ['login', '--no-browser']);
+  const url = await login.authorizationUrl();
+  assert.equal(url.origin, target.config.origin);
+  assert.equal(url.searchParams.get('resource'), target.config.resource);
+  await approve(target, url);
+  const result = await login.result;
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).userId, target.ownerId);
+  assert.equal(grantResource, target.config.resource);
+  assert.equal(storedProfile(directory, target.config.resource).registration.issuer, target.config.issuer);
+  assert.deepEqual(storedProfile(directory, app.config.resource), sourceProfile);
+  const whoami = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.equal(whoami.code, 0, whoami.stderr);
+  assert.deepEqual(JSON.parse(whoami.stdout), JSON.parse(result.stdout));
+});
+
 test('login rejects unsafe or invalid REST relations without authorization or credential access', { timeout: 45_000 }, async (t) => {
   const { app, directory } = await setup(t, { transport: 'combined', apiResource: true });
   const source = app.config.resource;
@@ -806,9 +885,10 @@ test('login rejects unsafe or invalid REST relations without authorization or cr
     { link: 'https://example.test/path/' }, { link: 'not a URL' }, { link: null },
     { sourceResource: `${source}/wrong`, link: rest },
     { link: rest, target: { resource: `${rest}/wrong`, authorization_servers: [app.config.issuer] } },
-    { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: rest } },
     { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: source } },
-    { link: source, target: { resource: source, authorization_servers: [app.config.issuer], artifacts_rest_resource: source } },
+    { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: `${rest}/third` } },
+    { link: rest, target: { resource: rest, authorization_servers: [app.config.issuer], artifacts_rest_resource: null } },
+    { link: rest, target: { resource: `${rest}/wrong`, authorization_servers: [app.config.issuer], artifacts_rest_resource: rest } },
     { link: rest, target: new Response(null, { status: 302, headers: { location: 'https://example.test/?SECRET_LOCATION' } }) },
   ];
   for (const scenario of relationCases) {
