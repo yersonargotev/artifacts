@@ -396,7 +396,9 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     const batch = listed('artifacts_batch').inputSchema;
     assert.deepEqual(batch.required.sort(), ['operations', 'requestId']);
     assert.deepEqual([batch.properties.operations.minItems, batch.properties.operations.maxItems], [1, 25]);
-    assert.deepEqual(batch.properties.operations.items.oneOf.map((operation: { properties: { op: { const: string } } }) => operation.properties.op.const), ['create', 'update']);
+    assert.deepEqual(batch.properties.operations.items.oneOf.map((operation: { properties: { op: { const: string } } }) => operation.properties.op.const), ['create', 'update', 'move']);
+    const batchMove = batch.properties.operations.items.oneOf[2];
+    assert.deepEqual([batchMove.properties.from.required, batchMove.properties.slug.anyOf.map(({ type }: { type: string }) => type)], [['slug'], ['string', 'null']], 'MCP describes the move locator and the nullable destination');
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);

@@ -10,7 +10,9 @@ An owner maintaining a wiki applies an ingest, such as new pages plus the index 
 - `batch-retry` replays the batch with CLI `retry REQUEST_ID` and gets the same receipt.
 - `batch-stale` applies a batch whose operation 1 carries the old index head, gets exit 1 with `conflict` at `index` 1, and MCP `artifacts_list` shows that nothing from it committed.
 - `batch-search` finds the batch text through MCP `artifacts_search` and the CLI, and the replaced text no longer matches.
-- `batch-panel` sees the three new pages in the library and the index's `Enlaces` resolving to them at desktop and 390px.
+- `batch-collide` applies a batch whose operation 1 moves a page onto the slug that operation 0 just took, gets exit 1 with `slug_conflict` at `index` 1, and MCP reads `concepts/rag` unmoved.
+- `batch-move` applies a three-operation reorganization with the CLI: it moves `concepts/rag` to `concepts/retrieval`, updates that page by its new slug, and points the index at it. MCP reads the page under the new slug, and MCP and CLI search return it there.
+- `batch-panel` sees the three new pages in the library and the reorganized index's `Enlaces` resolving to them at desktop and 390px.
 
 ## How to get to it (user POV)
 
@@ -37,9 +39,11 @@ Expected end state:
 - CLI `retry REQUEST_ID` prints the same result.
 - The stale batch exits 1 with `"code":"conflict"`, `"status":409`, and `"index":1`, and `Mi-Wiki` still holds five artifacts.
 - MCP and CLI search for `sabaneta` in `mi-wiki` return only `concepts/agents`. `borrador` and `todavia` return no items.
+- The colliding batch exits 1 with `"code":"slug_conflict"`, `"status":409`, and `"index":1`.
+- The reorganization prints results that name the RAG page twice and then the index. The move's `revisionId` is the RAG head from the ingest, and MCP reads `concepts/retrieval` at sequence 2. Search for `itagui` in `mi-wiki` returns only `concepts/retrieval` through MCP and the CLI.
 - The library shows `Karpathy`, `RAG`, and `Agents` in `Mi-Wiki`. `region "Enlaces"` on the index detail holds three links and no `[data-link-state="broken"]` item, and the 390px detail does not overflow.
 
-Evidence under `<run>/batch/` includes `actions.jsonl`, the `ingest.json` and `stale.json` command files, `batch-library.png`, `batch-index.png`, `batch-index-390.png`, their `.aria.yml` snapshots, `trace.zip`, and `result.json`.
+Evidence under `<run>/batch/` includes `actions.jsonl`, the `ingest.json`, `stale.json`, `collide.json`, and `reorganize.json` command files, `batch-library.png`, `batch-index.png`, `batch-index-390.png`, their `.aria.yml` snapshots, `trace.zip`, and `result.json`.
 
 ## Gotchas
 

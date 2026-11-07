@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, inArray, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { alias, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
@@ -53,6 +53,12 @@ const statement = (query: { toSQL(): { sql: string; params: unknown[] } }): Stat
   const { sql, params } = query.toSQL();
   return { sql, args: params as Extract<Statement, { args?: unknown }>['args'] };
 };
+// A write batch cannot branch on a row count, so a move that left its artifact elsewhere or under another head fails a NOT NULL constraint and the store plans again. changes() is no substitute, because an FTS5 insert earlier in the batch keeps a later unmatched update from resetting it.
+const moved = (ownerId: string, write: { artifactId: string; revisionId: string; project: string | null; slug: string | null }): Statement => ({
+  sql: 'insert into artifact_command (owner_id) select null where not exists (select 1 from artifact where id = ? and owner_id = ? and head_revision_id = ? and project is ? and slug is ?)',
+  args: [write.artifactId, ownerId, write.revisionId, write.project, write.slug],
+});
+const held = alias(artifact, 'held');
 
 export async function reindexSearch(db: Database): Promise<number> {
   let reindexed = 0;
@@ -163,12 +169,13 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     async batch(actor: Actor, value: z.input<typeof batchSchema>): Promise<BatchResult> {
       const input = batchSchema.parse(value);
       const payloadHash = await sha256(canonicalJson({ kind: 'batch', input }));
-      const snapshots = await Promise.all(input.operations.map(async ({ snapshot }) => {
-        const text = canonicalJson(snapshot);
+      const snapshots = await Promise.all(input.operations.map(async (operation) => {
+        if (operation.op === 'move') return undefined;
+        const text = canonicalJson(operation.snapshot);
         return { text, digest: await sha256(text) };
       }));
-      const ids = input.operations.flatMap((operation) => operation.op === 'update' && operation.artifactId !== undefined ? [operation.artifactId] : []);
-      const slugs = input.operations.flatMap((operation) => operation.slug === undefined ? [] : [operation.slug]);
+      const ids = input.operations.flatMap((operation) => operation.op !== 'create' && operation.artifactId !== undefined ? [operation.artifactId] : []);
+      const slugs = input.operations.flatMap((operation) => [operation.slug, operation.op === 'move' ? operation.from?.slug : undefined].filter((slug) => typeof slug === 'string'));
       // The writes travel as one batch request instead of an interactive transaction, so every read is repeated after a write that a stale read let through.
       for (let conflicts = 0, busy = 0; ;) {
         await authorize(db, actor, 'artifacts:write');
@@ -178,15 +185,20 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           ids.length || slugs.length
             ? db.select({ artifactId: artifact.id, project: artifact.project, slug: artifact.slug, headRevisionId: artifact.headRevisionId, sequence: artifactRevision.sequence }).from(artifact)
               .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
-              .where(and(eq(artifact.ownerId, actor.userId), or(ids.length ? inArray(artifact.id, ids) : undefined, slugs.length ? inArray(artifact.slug, slugs) : undefined)))
+              // A move that keeps its slug checks the destination under the slug that its artifact already holds.
+              .where(and(eq(artifact.ownerId, actor.userId), or(ids.length ? inArray(artifact.id, ids) : undefined, slugs.length ? inArray(artifact.slug, slugs) : undefined, ids.length ? inArray(artifact.slug, db.select({ slug: held.slug }).from(held).where(and(eq(held.ownerId, actor.userId), inArray(held.id, ids)))) : undefined)))
             : [],
         ]);
         if (stored) return stored.result;
         const { results, writes } = planBatch(input.operations, projects.map(({ name }) => name), pages, () => crypto.randomUUID());
         const createdAt = new Date();
         const author = { authorUserId: actor.userId, authorClientId: actor.clientId, createdAt };
-        // Each guard fails the batch when a read no longer holds: the revision sequence index for a concurrent update, the revision foreign key for a delete, the slug index for a claimed slug, and the receipt key for a raced retry.
+        // Each guard fails the batch when a read no longer holds: the revision sequence index for a concurrent update, the revision foreign key for a delete, the slug index for a claimed slug, the moved check for a concurrent move, update, or delete, and the receipt key for a raced retry.
         const statements = writes.flatMap((write) => {
+          if (write.op === 'move') return [
+            statement(db.update(artifact).set({ project: write.project, slug: write.slug }).where(and(eq(artifact.id, write.artifactId), eq(artifact.ownerId, actor.userId), write.from.project === null ? isNull(artifact.project) : eq(artifact.project, write.from.project), write.from.slug === null ? isNull(artifact.slug) : eq(artifact.slug, write.from.slug)))),
+            moved(actor.userId, write),
+          ];
           const { text, digest } = snapshots[write.index]!;
           if (write.op === 'create') return [
             statement(db.insert(artifact).values({ id: write.artifactId, ownerId: actor.userId, headRevisionId: write.revisionId, createdAt, project: write.project, slug: write.slug })),

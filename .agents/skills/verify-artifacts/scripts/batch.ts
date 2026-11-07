@@ -69,6 +69,31 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   assert.deepEqual(searchResultSchema.parse(await call('artifacts_search', { query: 'borrador' })).items, [], 'Text the batch replaced no longer matches');
   assert.deepEqual(searchResultSchema.parse(await ok('search', 'todavia')).items, [], 'The old index text no longer matches');
 
+  const collide = { requestId: randomUUID(), operations: [
+    { op: 'move', from: { project: 'Mi-Wiki', slug: 'concepts/rag' }, slug: 'concepts/retrieval' },
+    { op: 'move', from: { project: 'Mi-Wiki', slug: 'concepts/agents' }, slug: 'concepts/retrieval' },
+  ] };
+  const collided = await cli('batch', '--command', await command('collide', collide));
+  assert.equal(collided.code, 1, 'A colliding move exits 1');
+  assert.match(collided.stderr, /"code":"slug_conflict".*"status":409.*"index":1/, 'The colliding move reports slug_conflict at operation 1');
+  assert.equal(artifactReadSchema.parse(await call('artifacts_read', { project: 'mi-wiki', slug: 'concepts/rag' })).artifactId, applied.results[1]!.artifactId, 'The colliding batch moved nothing');
+
+  const reorganize = { requestId: randomUUID(), operations: [
+    { op: 'move', from: { project: 'mi-wiki', slug: 'concepts/rag' }, slug: 'concepts/retrieval' },
+    { op: 'update', project: 'Mi-Wiki', slug: 'concepts/retrieval', expectedRevisionId: applied.results[1]!.revisionId, snapshot: markdown('RAG', '# RAG\n\nRecuperación aumentada, renombrada en Itagüí.\n') },
+    { op: 'update', artifactId: index.artifactId, expectedRevisionId: newIndex.headRevisionId, snapshot: markdown('Index', '# Index\n\n- [Karpathy](sources/karpathy.md)\n- [RAG](concepts/retrieval.md)\n- [Agents](concepts/agents.md)\n') },
+  ] };
+  const reorganizeFile = await command('reorganize', reorganize);
+  await record('Reorganize the wiki with a batch move', { argv: ['batch', '--command', reorganizeFile], operations: reorganize.operations.length });
+  const moved = batchResultSchema.parse(await ok('batch', '--command', reorganizeFile));
+  assert.deepEqual(moved.results.map(({ artifactId }) => artifactId), [applied.results[1]!.artifactId, applied.results[1]!.artifactId, index.artifactId], 'A later operation addresses the moved page by its new slug');
+  assert.equal(moved.results[0]!.revisionId, applied.results[1]!.revisionId, 'The move reports the head it left in place');
+  const retrieval = artifactReadSchema.parse(await call('artifacts_read', { project: 'mi-wiki', slug: 'concepts/retrieval' }));
+  assert.deepEqual([retrieval.artifactId, retrieval.slug, retrieval.revision.sequence], [applied.results[1]!.artifactId, 'concepts/retrieval', 2], 'MCP reads the moved page under its new slug with one new revision');
+  const renamed = searchResultSchema.parse(await call('artifacts_search', { query: 'itagui', project: 'mi-wiki' }));
+  assert.deepEqual(renamed.items.map(({ slug }) => slug), ['concepts/retrieval'], 'MCP search returns the moved page under its new slug');
+  assert.deepEqual(searchResultSchema.parse(await ok('search', 'itagui', '--project', 'mi-wiki')), renamed, 'CLI search over REST equals the MCP result');
+
   await login(page);
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   for (const title of ['Karpathy', 'RAG', 'Agents']) assert.equal(await page.locator('.artifact-card').filter({ has: page.getByRole('link', { name: title, exact: true }) }).filter({ hasText: 'Mi-Wiki' }).count(), 1, `The library shows the batch page ${title}`);
@@ -77,7 +102,7 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   await page.goto(`${panel}/artifacts/${encodeURIComponent(index.artifactId)}`);
   const section = page.getByRole('region', { name: 'Enlaces', exact: true });
   await section.waitFor();
-  assert.equal(await section.getByRole('link').count(), 3, 'The batch index links resolve to the three pages the same batch created');
+  assert.equal(await section.getByRole('link').count(), 3, 'The reorganized index links resolve to the three batch pages, including the moved one');
   assert.equal(await section.locator('[data-link-state="broken"]').count(), 0, 'No index link is broken');
   await capture(page, 'batch-index');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -86,5 +111,5 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px index detail does not overflow');
   await capture(page, 'batch-index-390');
 
-  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'The panel library shows the batch pages, and the index links resolve to them at desktop and 390px');
+  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'A colliding batch move exits 1 with slug_conflict at its index and moves nothing', 'A CLI batch moves a page, updates it and the index by its new slug, and MCP and CLI search return it under that slug', 'The panel library shows the batch pages, and the index links resolve to them at desktop and 390px');
 }

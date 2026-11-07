@@ -39,12 +39,12 @@ async function batchFixture() {
   return { ...app, store, actor, index, log, racing };
 }
 
-const ingest = (index: { artifactId: string; headRevisionId: string }, log: { headRevisionId: string }): BatchInput['operations'] => [
+const ingest = (index: { artifactId: string; headRevisionId: string }, log: { headRevisionId: string }) => [
   ...Array.from({ length: 9 }, (_, position) => ({ op: 'create' as const, project: 'wiki', slug: `concepts/c${position}`, snapshot: page(`Concepto ${position}`, `Ingesta de Envigado ${position}`) })),
   { op: 'update', project: 'WIKI', slug: 'concepts/c0', snapshot: page('Concepto 0', 'Ingesta revisada de Sabaneta') },
   { op: 'update', artifactId: index.artifactId, expectedRevisionId: index.headRevisionId, snapshot: page('Index', 'Catálogo con nueve conceptos') },
   { op: 'update', project: 'Wiki', slug: 'log', expectedRevisionId: log.headRevisionId, snapshot: page('Log', 'Una ingesta') },
-];
+] satisfies BatchInput['operations'];
 
 test('a batch creates and updates pages atomically under one receipt', async () => {
   const app = await batchFixture();
@@ -177,5 +177,92 @@ test('a write that a stale read let through re-plans into the precise error', as
     let first: unknown;
     const retried = app.racing(async () => { first = await app.store.batch(app.actor, input); });
     assert.deepEqual(await retried.batch(app.actor, input), first, 'a raced receipt returns the committed result');
+  } finally { await app.close(); }
+});
+
+test('a batch moves pages and later operations address them by their new slug', async () => {
+  const app = await batchFixture();
+  try {
+    const archive = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Archivo', 'Notas de Itagüí'), project: 'Archive', slug: 'notes' });
+    const input = { requestId: randomUUID(), operations: [
+      { op: 'create', project: 'Wiki', slug: 'drafts/rag', snapshot: page('RAG', 'Borrador') },
+      { op: 'move', from: { project: 'wiki', slug: 'drafts/rag' }, slug: 'concepts/rag' },
+      { op: 'update', project: 'Wiki', slug: 'concepts/rag', snapshot: page('RAG', 'Recuperación aumentada') },
+      { op: 'move', artifactId: app.log.artifactId, slug: 'journal' },
+      { op: 'create', project: 'Wiki', slug: 'log', snapshot: page('Log', 'Bitácora nueva') },
+      { op: 'move', artifactId: archive.artifactId, project: 'WIKI' },
+      { op: 'move', from: { project: 'Wiki', slug: 'index' }, project: null, slug: null },
+      { op: 'update', artifactId: app.index.artifactId, expectedRevisionId: app.index.headRevisionId, snapshot: page('Index', 'Índice sin proyecto') },
+    ] satisfies BatchInput['operations'] };
+    const batch = await app.store.batch(app.actor, input);
+    assert.equal(batch.results[1]!.artifactId, batch.results[0]!.artifactId, 'a move addresses a page created earlier by its slug');
+    assert.equal(batch.results[2]!.artifactId, batch.results[0]!.artifactId, 'an update addresses a moved page by its new slug');
+    assert.equal(batch.results[1]!.revisionId, batch.results[0]!.revisionId, 'a move reports the head it left in place');
+    assert.equal(batch.results[3]!.revisionId, app.log.headRevisionId);
+
+    const rag = await app.store.read(app.actor, { project: 'Wiki', slug: 'concepts/rag' });
+    assert.equal(rag.revision.sequence, 2);
+    await assert.rejects(app.store.read(app.actor, { project: 'Wiki', slug: 'drafts/rag' }), { code: 'not_found' });
+    const journal = await app.store.read(app.actor, { project: 'Wiki', slug: 'journal' });
+    assert.equal(journal.artifactId, app.log.artifactId);
+    assert.equal(journal.revision.sequence, 1, 'a move creates no revision');
+    assert.notEqual((await app.store.read(app.actor, { project: 'Wiki', slug: 'log' })).artifactId, app.log.artifactId, 'a later create takes the slug a move freed');
+    const moved = await app.store.read(app.actor, { project: 'Wiki', slug: 'notes' });
+    assert.equal(moved.artifactId, archive.artifactId, 'a move to another project keeps the slug');
+    assert.equal(moved.project, 'Wiki', 'a move reuses the stored project spelling');
+    const index = await app.store.read(app.actor, { artifactId: app.index.artifactId });
+    assert.deepEqual([index.project, index.slug, index.revision.sequence], [null, null, 2]);
+
+    const found = async (query: string, project?: string) => (await app.store.search(app.actor, { query, project })).items.map(({ project, slug }) => [project, slug]);
+    assert.deepEqual(await found('itagui', 'Wiki'), [['Wiki', 'notes']]);
+    assert.deepEqual(await found('itagui', 'Archive'), []);
+    assert.deepEqual(await found('recuperacion'), [['Wiki', 'concepts/rag']]);
+    assert.deepEqual(await found('indice sin proyecto'), [[null, null]]);
+    assert.deepEqual(await app.store.batch(app.actor, input), batch, 'an exact retry returns the original result');
+  } finally { await app.close(); }
+});
+
+test('a move that collides with a slug fails at its index and commits nothing', async () => {
+  const app = await batchFixture();
+  try {
+    const other = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('Otro', 'o'), project: 'Other', slug: 'index' });
+    const committed = await app.store.list(app.actor);
+    const cases: [BatchInput['operations'], Record<string, unknown>][] = [
+      [[{ op: 'create', project: 'Wiki', slug: 'a', snapshot: page('A', 'a') }, { op: 'move', artifactId: app.log.artifactId, slug: 'index' }], { index: 1, slug: 'index', project: 'Wiki', artifactId: app.index.artifactId }],
+      [[{ op: 'move', artifactId: other.artifactId, project: 'wiki' }], { index: 0, slug: 'index', project: 'Wiki', artifactId: app.index.artifactId }],
+      [[{ op: 'create', project: 'Wiki', slug: 'b', snapshot: page('B', 'b') }, { op: 'move', from: { project: 'Wiki', slug: 'log' }, slug: 'b' }], { index: 1, slug: 'b', project: 'Wiki' }],
+      [[{ op: 'move', artifactId: app.index.artifactId, slug: 'home' }, { op: 'move', artifactId: app.log.artifactId, slug: 'home' }], { index: 1, slug: 'home', project: 'Wiki', artifactId: app.index.artifactId }],
+    ];
+    for (const [operations, details] of cases) await assert.rejects(app.store.batch(app.actor, { requestId: randomUUID(), operations }), (error: { code: string; details: Record<string, unknown> }) => {
+      assert.equal(error.code, 'slug_conflict');
+      assert.deepEqual(Object.fromEntries(Object.keys(details).map((key) => [key, error.details[key]])), details);
+      return true;
+    });
+    await assert.rejects(app.store.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', from: { project: 'Wiki', slug: 'missing' }, slug: 'x' }] }), { code: 'not_found', details: { index: 0 } });
+    assert.deepEqual(await app.store.list(app.actor), committed);
+    assert.equal((await app.store.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', artifactId: app.index.artifactId, slug: 'index' }] })).results[0]!.artifactId, app.index.artifactId, 'a move onto its own slug is no conflict');
+
+    for (const operation of [{ slug: 'x' }, { artifactId: 'a', from: { slug: 'b' }, slug: 'x' }, { artifactId: 'a' }]) {
+      assert.throws(() => batchSchema.parse({ requestId: randomUUID(), operations: [{ op: 'move', ...operation }] }), (error: { issues: { path: unknown[] }[] }) => error.issues.some(({ path }) => path.join('.') === 'operations.0'));
+    }
+  } finally { await app.close(); }
+});
+
+test('a move that a stale read let through re-plans against the current location', async () => {
+  const app = await batchFixture();
+  try {
+    const deleted = app.racing(() => app.store.delete(app.actor, { requestId: randomUUID(), artifactId: app.log.artifactId, expectedRevisionId: app.log.headRevisionId, expectedPublicationVersion: 0 }));
+    await assert.rejects(deleted.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'create', slug: 'a', snapshot: page('A', 'a') }, { op: 'move', artifactId: app.log.artifactId, slug: 'journal' }] }), { code: 'not_found', details: { index: 1 } });
+    assert.deepEqual((await app.store.list(app.actor)).items.map(({ slug }) => slug), ['index']);
+
+    const relocated = app.racing(() => app.store.move(app.actor, { requestId: randomUUID(), artifactId: app.index.artifactId, project: 'Archive' }));
+    await relocated.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', artifactId: app.index.artifactId, slug: 'home' }] });
+    const index = await app.store.read(app.actor, { artifactId: app.index.artifactId });
+    assert.deepEqual([index.project, index.slug], ['Archive', 'home'], 'a move that keeps the project keeps the one a concurrent move set');
+
+    let competitor = '';
+    const updated = app.racing(async () => { competitor = (await app.store.update(app.actor, { requestId: randomUUID(), artifactId: app.index.artifactId, expectedRevisionId: app.index.headRevisionId, snapshot: page('Index', 'competitor') })).headRevisionId; });
+    const result = await updated.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', artifactId: app.index.artifactId, slug: 'start' }] });
+    assert.equal(result.results[0]!.revisionId, competitor, 'a move reports the head a concurrent update left in place');
   } finally { await app.close(); }
 });
