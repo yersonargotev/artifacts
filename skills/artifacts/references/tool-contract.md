@@ -44,8 +44,8 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 | Tool | Input | Successful result |
 | --- | --- | --- |
 | `whoami` | `{}` | Verified account, central session, OAuth client, and scopes |
-| `artifacts_create` | `requestId`, `snapshot`, optional `project` | Artifact with `artifactId`, `headRevisionId`, `project`, `publication`, and `revision` |
-| `artifacts_read` | `artifactId`, optional `revisionId` | Artifact and selected complete revision |
+| `artifacts_create` | `requestId`, `snapshot`, optional `project`, optional `slug` | Artifact with `artifactId`, `headRevisionId`, `project`, `slug`, `publication`, and `revision` |
+| `artifacts_read` | Exactly one of `artifactId` or `slug` with optional `project`, optional `revisionId` | Artifact and selected complete revision |
 | `artifacts_update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` | Artifact and new complete revision |
 | `artifacts_publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | `artifactId`, `revisionId`, `version`, and `url` |
 | `artifacts_list` | Optional `limit`, optional `cursor`, optional `project` | `items` and `nextCursor` |
@@ -58,6 +58,8 @@ The names below omit host-specific prefixes. Mutation `requestId` values contain
 | `artifacts_shares_list` | `artifactId` | `items` with every share of the artifact |
 
 `project` is the artifact's project name or null. Every list item also includes it. A project name contains 1 to 80 characters after trimming and NFC normalization, without control characters. Create and move reuse an existing project whose name matches regardless of letter case and return its stored spelling. Otherwise they create the project. The `artifacts_list` filter matches the same way. A move with `project: null` removes the artifact from its project. A move never creates a revision or changes the publication, and moving to the current project succeeds without change. `projects_list` returns only projects that contain artifacts, ordered by name without regard to letter case, without pagination.
+
+`slug` is the artifact's page name within its project, or null. Every list item also includes it. A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, such as `concepts/rag` or `index`. It is never normalized, and a trailing `.md` is rejected with a hint to remove it. A slug is unique within the owner's project, matched by the project's stored spelling, and artifacts without a project share one unfiled namespace. Creating a used slug fails with `slug_conflict` and the `artifactId` that holds it. A move keeps the slug and fails with `slug_conflict` when the destination project already uses it. `artifacts_read` with `{ project, slug }` resolves only among the caller's owned artifacts; an omitted `project` reads the unfiled namespace, and a locator with no artifact fails with `not_found`. The slug lives outside the snapshot, so it never changes a digest, export, or publication, and viewers of a shared publication never see it.
 
 `revision.id` identifies the saved revision. Other revision fields include `parentRevisionId`, `sequence`, `sha256`, and `snapshot`. `headRevisionId` identifies the draft head. `publication` is null or contains `revisionId`, `version`, and `url`.
 

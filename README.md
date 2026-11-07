@@ -122,6 +122,8 @@ Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve arti
 
 Pass an optional `project` name to `artifacts_create` to group artifacts. A name that matches an existing project regardless of letter case joins it. `artifacts_list` accepts the same `project` filter, `projects_list` returns each project with its artifact count, and `artifacts_move` changes or clears the project without creating a revision. The panel sidebar lists the projects, and `Mover a proyecto` in an artifact's menu moves it to a project or removes it from one. [The projects decision](docs/decisions/projects.md) records the model.
 
+Pass an optional `slug` such as `concepts/rag` to `artifacts_create` to name a page within its project, then read it with `artifacts_read` and `{ project, slug }` instead of its ID. The CLI uses `create --slug SLUG` and `read --project NAME --slug SLUG`, and REST uses `GET /v1/lookup`. The panel shows the slug on library cards and under Información. [The wiki pages decision](docs/decisions/wiki-pages.md) records the rules.
+
 Matching mutation retries use the same `requestId` and arguments. Changed arguments under that ID fail. Concurrent updates and publication changes reject stale expected versions. [The store contract](packages/artifacts/README.md) describes the schemas, limits, pagination, permissions, and archive format.
 
 Snapshots support self-contained HTML, Markdown, and text, plus downloadable attachments. The initial limit is 1 MiB decoded total and 32 files per revision. Relative executable assets and multi-file websites are outside this increment. Markdown and text display as inert text.

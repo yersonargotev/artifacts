@@ -10,6 +10,8 @@ The root export contains domain schemas and types. `/workflow` contains `prepare
 
 `protectedResourceMetadataSchema` accepts standard protected-resource metadata and an optional `artifacts_rest_resource`. The relation names the exact absolute canonical REST OAuth resource URL. It may name the resource itself or one distinct REST resource. Metadata for the distinct resource may omit the relation or name itself, but cannot name another resource.
 
+`slugSchema` validates page slugs such as `concepts/rag` without normalizing them. `readSchema` takes exactly one of `artifactId` or a `{ project, slug }` locator, and `readByIdSchema` takes only an ID. `ArtifactRead` and the HTTP summary schema include `slug`, and `ArtifactErrorCode` includes `slug_conflict`.
+
 The existing `@artifacts/artifacts` root, `/contracts`, and `/workflow` exports re-export these implementations. Store and REST packages share one `ArtifactError` runtime.
 
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.

@@ -1,6 +1,6 @@
 # Wiki pages: stable slugs, search, and batch commands
 
-Status: proposed, 2026-11-06. Each part is validated and implemented through its own issue before this decision is accepted: slugs [#80](https://github.com/yersonargotev/artifacts/issues/80), search [#81](https://github.com/yersonargotev/artifacts/issues/81), batch [#82](https://github.com/yersonargotev/artifacts/issues/82).
+Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move), links [#90](https://github.com/yersonargotev/artifacts/issues/90), search [#91](https://github.com/yersonargotev/artifacts/issues/91), [#92](https://github.com/yersonargotev/artifacts/issues/92), and [#93](https://github.com/yersonargotev/artifacts/issues/93), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
 
 ## Problem and decision
 
@@ -29,7 +29,19 @@ Rules:
 - A slug is 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, for example `concepts/rag` or `index`. A trailing `.md` is rejected on input. It is not part of the name.
 - The pair `(owner_id, project, slug)` is unique when `slug` is not null. Artifacts without a project share one unfiled namespace. A unique index on `(owner_id, coalesce(project, ''), slug)` enforces this. The project component uses the stored canonical spelling the store already resolves.
 - `create` and `move` accept an optional `slug`. Moving to another project keeps the slug and fails with `slug_conflict` if the destination already uses it. `move --no-slug` clears it. Both commands keep their existing receipts. Inputs without `slug` keep their current receipt fingerprints.
-- `artifacts_read`, `GET /v1/artifacts/:id`, and `artifacts read` also accept a locator `{ project, slug }` in place of the ID. Summaries and `ArtifactRead` gain a `slug` field.
+- `artifacts_read`, REST, and `artifacts read` also accept a locator `{ project, slug }` in place of the ID. Summaries and `ArtifactRead` gain a `slug` field.
+
+What shipped in [#88](https://github.com/yersonargotev/artifacts/issues/88):
+
+- `slugSchema` validates the rule above without normalizing, and a trailing `.md` gets its own message that suggests removing it. `create` accepts an optional `slug`, and `ArtifactRead` and `ArtifactSummary` carry `slug: string | null` for the owner. Shared reads, the shared-with-me list, publications, exports, and digests never carry it.
+- Migration `0005` adds the nullable `slug` column and the partial unique index `artifact_owner_project_slug_idx`. drizzle-kit 0.31 splits the `coalesce` expression on its comma, so the generated SQL is hand-corrected and the snapshot matches the schema.
+- The store checks the slug inside the create transaction and fails with `slug_conflict`, whose details name the `slug`, the stored `project`, and the holder's `artifactId`. The index is the backstop, not the reported error. Because the slug moves with its artifact, the existing project move and the panel's bulk move run the same check against the destination and fail with `slug_conflict` instead of reaching the index. REST maps the code to 409.
+- `readSchema` is one strict object with an `artifactId`, `project`, and `slug` plus a refinement: exactly one of `artifactId` or `slug`, and `project` only with `slug`. MCP needs a top-level object schema, so a union is not used. An omitted `project` reads the unfiled namespace. The project resolves to its stored spelling, and the locator matches only the caller's owned artifacts, so an unknown locator and an unknown ID both fail with `not_found`. Publication reads keep a separate ID-only `readByIdSchema`.
+- REST reads a locator at `GET /v1/lookup?project=NAME&slug=SLUG`, with the same optional `revisionId` and `response` as `GET /v1/artifacts/:id`. `GET /v1/artifacts/:id` cannot take the locator because IDs are arbitrary strings and a slug may contain `/` or equal a subroute such as `history`. A query on the collection would overload `GET /v1/artifacts`, which lists. A separate collection keeps both routes unambiguous. The typed client's `read()` picks the route from its input.
+- The CLI adds `create --slug SLUG` and `read --slug SLUG [--project NAME]`, which takes exactly one of an ID or `--slug`. The panel shows the slug on library cards and under Información.
+- Create inputs without a slug keep their receipt fingerprints, and receipts written before slugs replay with `slug: null`.
+
+Setting or clearing the slug on `move` ([#89](https://github.com/yersonargotev/artifacts/issues/89)) and link resolution ([#90](https://github.com/yersonargotev/artifacts/issues/90)) follow in later tickets.
 
 Link resolution: in a Markdown page, a relative link without a scheme (`../concepts/rag.md`, `rag.md#history`) is resolved against the page's own slug as a path, its `.md` suffix is dropped, and it is looked up in the same project. The owner panel renders a resolved link as a navigation to the target artifact, and an unresolved link as marked plain text. This keeps the same link syntax valid in a Git checkout of the wiki and in Artifacts, which is what makes two-way sync possible. Publication keeps its current inert rendering in this decision. Rendering links for viewers requires deciding what a viewer sees when the target is unpublished or not shared, which is out of scope.
 
@@ -63,7 +75,7 @@ The store maintains one FTS5 row per artifact for its **head revision only**. Hi
 
 ## Compatibility and rollout
 
-The new `slug` field on `ArtifactRead` and summaries is a strict-schema change. As with `project`, published clients reject unknown fields, so a new client and CLI beta ship with the server, and the panel and publication Workers release together after the migrations.
+The new `slug` field on `ArtifactRead` and summaries is a strict-schema change. As with `project`, published clients reject unknown fields, so a new client and CLI beta (`0.1.0-beta.8` for slugs) ship with the server, and the panel and publication Workers release together after the migrations.
 
 The three parts ship in order: slugs first, because search results and batch operations address pages by slug, then search, then batch. Each part is independently useful.
 

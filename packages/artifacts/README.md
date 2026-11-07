@@ -12,8 +12,8 @@ Every method checks a live central session. An actor contains `userId`, `session
 
 | Method | Arguments after actor | Required scope | Result |
 | --- | --- | --- | --- |
-| `create` | `requestId`, `snapshot`, optional `project` | `artifacts:write` | Complete artifact and revision |
-| `read` | `artifactId`, optional `revisionId` | `artifacts:read` | Complete artifact and selected revision |
+| `create` | `requestId`, `snapshot`, optional `project` and `slug` | `artifacts:write` | Complete artifact and revision |
+| `read` | Exactly one of `artifactId` or `slug` with optional `project`, optional `revisionId` | `artifacts:read` | Complete artifact and selected revision |
 | `update` | `requestId`, `artifactId`, `expectedRevisionId`, `snapshot` | `artifacts:write` | Complete artifact and new revision |
 | `publish` | `requestId`, `artifactId`, `revisionId`, `expectedPublicationVersion` | `artifacts:publish` | Artifact ID, revision ID, version, and URL |
 | `list` | Optional `limit`, `cursor`, and `project` | `artifacts:read` | Summaries and `nextCursor` |
@@ -26,6 +26,8 @@ Every method checks a live central session. An actor contains `userId`, `session
 | `listShares` | `artifactId` | `artifacts:publish` | `items` with the shares ordered by kind and value |
 
 Every artifact read and summary includes `project`, a name or null. A project is a label on the artifact, outside the immutable snapshot. It exists while at least one owned artifact carries it. Names are NFC-normalized, trimmed, 1 to 80 characters, and free of control characters. Create and move reuse an existing project name of the same owner regardless of letter case and keep its stored spelling. Otherwise they store the given name. The `project` filter of `list` and the panel library matches the same way. `projects` returns `{ items: [{ name, artifactCount }] }` ordered by name without regard to letter case. Moving never creates a revision or changes the publication, and moving to the current project succeeds without change.
+
+Every artifact read and summary also includes `slug`, a page name or null. A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separated by `/`, such as `concepts/rag` or `index`. It is never normalized, and a trailing `.md` is rejected with a hint to remove it. Like the project, it is a label on the artifact row outside the snapshot, so it changes no digest, export, or publication, and shared reads and the shared-with-me list omit it. A partial unique index on `(owner_id, coalesce(project, ''), slug)` backs a check inside the create and move transactions, which fail with `slug_conflict` and the holder's `artifactId` when the canonical project already uses the slug. `read` with a slug resolves `project` to its stored spelling, or to the unfiled namespace when omitted, among the caller's owned artifacts. `readPublished` takes only an artifact ID. Create inputs without a slug keep their receipt fingerprints, and receipts written before slugs replay with `slug: null`.
 
 Lists default to 25 summaries and allow at most 100 per page. History defaults to 5 complete revisions and allows at most 10 per page. Callers use the returned cursor to request the next page.
 
