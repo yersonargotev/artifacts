@@ -10,12 +10,13 @@
     "./workflow": "./src/workflow.ts"
   },
   "dependencies": {
+    "@artifacts/config": "workspace:*",
     "@artifacts/db": "workspace:*",
+    "@yargote/artifacts-contracts": "workspace:*",
     "drizzle-orm": "0.45.4",
     "fflate": "0.8.3",
+    "htmlparser2": "12.0.0",
     "marked": "18.1.1",
-    "zod": "4.6.5",
-    "@yargote/artifacts-contracts": "workspace:*",
-    "@artifacts/config": "workspace:*"
+    "zod": "4.6.5"
   }
 }

@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, exists, gt, lt, ne, or, sql } from 'drizzle-
 import { alias, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
+import { Parser } from 'htmlparser2';
 import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
@@ -18,10 +19,30 @@ export * from './contracts.ts';
 // drizzle-kit does not model FTS5, so the table lives here instead of schema.ts and migration 0006 creates it by hand.
 const artifactSearch = sqliteTable('artifact_search', { artifactId: text('artifact_id').notNull(), title: text('title').notNull(), description: text('description').notNull(), body: text('body').notNull() });
 
+function htmlText(html: string): string {
+  const chunks: string[] = [];
+  let hidden = 0;
+  // A space at every tag boundary keeps <p>a</p><p>b</p> as two words.
+  const parser = new Parser({
+    onopentagname(name) { chunks.push(' '); if (name === 'script' || name === 'style') hidden++; },
+    onclosetag(name) { chunks.push(' '); if ((name === 'script' || name === 'style') && hidden > 0) hidden--; },
+    ontext(text) { if (hidden === 0) chunks.push(text); },
+  });
+  parser.end(html);
+  return chunks.join('').replace(/\s+/g, ' ').trim();
+}
+
+// The canvas JSON of a design is layout, not prose, so a design is found by its metadata alone.
+const searchBody: Record<Snapshot['content']['kind'], (text: string) => string> = {
+  markdown: (text) => text,
+  text: (text) => text,
+  html: htmlText,
+  design: () => '',
+};
+
 async function indexHead(connection: Connection, artifactId: string, snapshot: Snapshot) {
   await connection.delete(artifactSearch).where(eq(artifactSearch.artifactId, artifactId));
-  if (snapshot.content.kind !== 'markdown' && snapshot.content.kind !== 'text') return;
-  await connection.insert(artifactSearch).values({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: snapshot.content.text });
+  await connection.insert(artifactSearch).values({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: searchBody[snapshot.content.kind](snapshot.content.text) });
 }
 
 // Quoting every whitespace-separated chunk turns FTS5 operators in user input into plain terms, and adjacent phrases mean AND.
