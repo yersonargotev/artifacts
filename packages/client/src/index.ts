@@ -6,7 +6,7 @@ import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow'
 export type { ArtifactRead, Share, Snapshot, UpdateInput } from '@yargote/artifacts-contracts';
 export type { Identity } from '@yargote/artifacts-contracts/http';
 export type { CompactArtifactRead, RevisionSummary } from '@yargote/artifacts-contracts/workflow';
-export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
+export { BatchOperationError, prepareArtifactEdit, prepareBatch, type BatchCommandInput } from '@yargote/artifacts-contracts/workflow';
 
 export type CreateInput = z.input<typeof createSchema>;
 export type BatchInput = z.input<typeof batchSchema>;

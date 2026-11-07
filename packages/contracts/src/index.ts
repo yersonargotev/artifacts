@@ -121,8 +121,8 @@ export const slugSchema = z.string().min(1).max(160)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/, 'Use lowercase kebab-case segments separated by /, such as concepts/rag');
 export const createSchema = z.strictObject({ requestId, snapshot: snapshotSchema, project: projectNameSchema.optional(), slug: slugSchema.optional(), response });
 export const readByIdSchema = z.strictObject({ artifactId: identifier, revisionId: identifier.optional(), response });
-const locator = { artifactId: identifier.optional(), project: projectNameSchema.optional(), slug: slugSchema.optional() };
-const locatorRule = [(input: { artifactId?: string; project?: string; slug?: string }) => (input.artifactId === undefined) !== (input.slug === undefined) && (input.project === undefined || input.slug !== undefined), 'Specify exactly one of artifactId or slug; project applies only with slug'] as const;
+export const locator = { artifactId: identifier.optional(), project: projectNameSchema.optional(), slug: slugSchema.optional() };
+export const locatorRule = [(input: { artifactId?: string; project?: string; slug?: string }) => (input.artifactId === undefined) !== (input.slug === undefined) && (input.project === undefined || input.slug !== undefined), 'Specify exactly one of artifactId or slug; project applies only with slug'] as const;
 export const readSchema = z.strictObject({ ...locator, revisionId: identifier.optional(), response }).refine(...locatorRule);
 export const updateSchema = z.strictObject({ requestId, artifactId: identifier, expectedRevisionId: identifier, snapshot: snapshotSchema, response });
 export const batchOperationSchema = z.discriminatedUnion('op', [
