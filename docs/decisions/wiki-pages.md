@@ -1,6 +1,6 @@
 # Wiki pages: stable slugs, search, and batch commands
 
-Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move, shipped), links [#90](https://github.com/yersonargotev/artifacts/issues/90) (shipped), search [#91](https://github.com/yersonargotev/artifacts/issues/91) (FTS5 spike, done), [#92](https://github.com/yersonargotev/artifacts/issues/92) (Markdown and text, shipped), and [#93](https://github.com/yersonargotev/artifacts/issues/93) (HTML and design, shipped), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
+Status: proposed, 2026-11-06. Spec [#87](https://github.com/yersonargotev/artifacts/issues/87) implements this decision through its tickets, and the decision is accepted when the last one lands: slugs [#88](https://github.com/yersonargotev/artifacts/issues/88) (create and read, shipped) and [#89](https://github.com/yersonargotev/artifacts/issues/89) (move, shipped), links [#90](https://github.com/yersonargotev/artifacts/issues/90) (shipped), search [#91](https://github.com/yersonargotev/artifacts/issues/91) (FTS5 spike, done), [#92](https://github.com/yersonargotev/artifacts/issues/92) (Markdown and text, shipped), and [#93](https://github.com/yersonargotev/artifacts/issues/93) (HTML and design, shipped), and batch [#94](https://github.com/yersonargotev/artifacts/issues/94) (payload spike, done), [#95](https://github.com/yersonargotev/artifacts/issues/95), [#96](https://github.com/yersonargotev/artifacts/issues/96), and [#97](https://github.com/yersonargotev/artifacts/issues/97).
 
 ## Problem and decision
 
@@ -101,11 +101,32 @@ What shipped in [#93](https://github.com/yersonargotev/artifacts/issues/93):
 
 `artifacts_batch { requestId, operations[1..25] }` (`POST /v1/batch`, `artifacts batch --command FILE`) runs every operation in one owner-authorized transaction and persists one receipt. The `panel_move` command already uses this shape.
 
+The writes travel as one libSQL `batch(..., 'write')` request, not as an interactive `transaction('write')`. An interactive transaction sends every statement as its own HTTP exchange. A create costs about 8 exchanges, so 25 operations need about 200 subrequests from the Worker. The reads that decide a batch (receipt, live session, slugs, expected revisions) happen before the write request, and the write statements must fail the whole batch when a read no longer holds. The unique index on owner, project, and slug already fails a raced slug claim.
+
 - Each operation is one of `create`, `update` (with `expectedRevisionId`), `edit` (prepared changes with an expected revision), or `move`. Operations address existing artifacts by ID or by `{ project, slug }`. A `create` earlier in the batch can be addressed by its slug from later operations.
 - The batch is all-or-nothing. The first failure aborts the transaction and returns its operation index and domain error, such as `revision_conflict` or `slug_conflict`. Nothing is committed.
-- Each operation obeys the existing per-revision limits (1 MiB decoded, 32 attachments). The whole batch has a decoded payload ceiling, proposed at 4 MiB. The validation issue measures it against Worker request limits and libSQL transaction time.
+- Each operation obeys the existing per-revision limits (1 MiB decoded, 32 attachments). The whole batch has a ceiling of 4 MiB of decoded content and metadata, counted as the per-revision limit counts it. A 4 MiB batch of base64 attachments encodes to a 5.6 MB request, within the 8 MiB REST and MCP limit. 6 MiB of attachments encodes to 8,396,005 bytes and exceeds it.
 - The receipt records `{ results: [{ index, id, revisionId }] }`. An exact retry returns it. The same request ID with a changed batch fails with `request_conflict`. Deleting an artifact scrubs it from receipts that name it, as for other content-bearing receipts.
 - Batches never publish. Publication stays a separate, deliberate command per artifact.
+
+The ceiling was measured on 2026-11-07 with a throwaway Worker (`artifacts-batch-spike`) and Turso database (`batch-spike`), both since destroyed. The Worker bundled the store's `receipt`, `authorize`, and create logic with the production Worker database client, and Workers Observability reported CPU per invocation. Each scenario ran 25 creates with a project and slug, at least 5 successful runs for every 4 MiB case. Medians with ranges follow.
+
+| Batch | Request bytes | CPU ms | Write request ms |
+| --- | --- | --- | --- |
+| Typical ingest, 13 operations (200 KiB source, 10 pages of 6 KiB, index, log) | 277,328 | 16 (13–19) | 248 (120–325) |
+| 25 × 1 KiB Markdown | 31,315 | 10 (10–45) | 387 (142–745) |
+| 4 MiB Markdown | 4,200,040 | 93 (86–119) | 1,355 (1,054–1,782) |
+| 4 MiB HTML | 4,202,615 | 260 (207–268) | 1,670 (1,066–2,293) |
+| 4 MiB base64 attachments | 5,599,805 | 108 (75–110) | 772 (526–1,293) |
+| 6 MiB Markdown | 6,297,640 | 170 (113–260) | 2,283 (1,870–2,986) |
+
+- CPU grows with bytes. Markdown and attachments cost about 25 ms per MiB, and HTML about 65 ms per MiB because the search index extracts its text with `htmlparser2`.
+- Write time also grows with bytes sent to Turso. Text travels twice, once in the snapshot and once in the search row. From a local client, the same 4 MiB batch took a median of 2,093 ms with the search row and 1,165 ms without it.
+- The Worker database client aborts any HTTP exchange after 5 seconds. A 4 MiB batch peaked at 2.3 seconds, and 6 MiB at 3.0 seconds, so 4 MiB keeps about twice the headroom.
+- The interactive form of the same transaction failed with `Too many subrequests by single Worker invocation` at its 50th subrequest, on the sixth operation. Five operations fit, in 47 exchanges and 1.6 seconds. The aborted transaction kept the database write lock for 6 to 10 seconds, and other writes in that window timed out.
+- The 13-operation ingest used about half of the 25-operation limit and 7% of the byte ceiling, so 25 operations cover a typical ingest.
+
+The account runs on the Workers Free plan, whose CPU limit is 10 ms per invocation. Cloudflare let the spike Worker exceed it in short bursts. After about 35 requests in three minutes, most of them using 40 to 270 ms of CPU, it failed every request with `exceededCpu` at 10 ms, including the 31 KB batch, and recovered within three minutes. A paced run hit the limit again on one 6 MiB batch. Every batch measured, the typical ingest included, needs more than 10 ms of CPU. Batch commands therefore require the Workers Paid plan, which allows up to 5 minutes of CPU per request. The account moved to Workers Paid on 2026-11-07, after the spike. The record is in [#94](https://github.com/yersonargotev/artifacts/issues/94).
 
 ## Alternatives considered
 
@@ -122,5 +143,4 @@ The three parts ship in order: slugs first, because search results and batch ope
 
 ## Open questions for validation
 
-- What batch payload ceiling stays within Worker CPU and request limits and libSQL transaction time?
 - Should link resolution in the panel reach across projects (`../../other-project/...`)? The proposal says no.
