@@ -128,10 +128,13 @@ export const updateSchema = z.strictObject({ requestId, artifactId: identifier, 
 export const batchOperationSchema = z.discriminatedUnion('op', [
   z.strictObject({ op: z.literal('create'), snapshot: snapshotSchema, project: createSchema.shape.project, slug: createSchema.shape.slug }),
   z.strictObject({ op: z.literal('update'), ...locator, expectedRevisionId: identifier.optional(), snapshot: snapshotSchema }).refine(...locatorRule),
+  z.strictObject({ op: z.literal('move'), artifactId: identifier.optional(), from: z.strictObject({ project: projectNameSchema.optional(), slug: slugSchema }).optional(), project: projectNameSchema.nullable().optional(), slug: slugSchema.nullable().optional() })
+    .refine((input) => (input.artifactId === undefined) !== (input.from === undefined), 'Specify exactly one of artifactId or from')
+    .refine((input) => input.project !== undefined || input.slug !== undefined, 'Specify project, slug, or both; null clears either'),
 ]);
 const batchCeiling = 4_194_304;
 export const batchSchema = z.strictObject({ requestId, operations: z.array(batchOperationSchema).min(1).max(25) }).superRefine((batch, context) => {
-  if (batch.operations.reduce((total, operation) => total + snapshotBytes(operation.snapshot), 0) > batchCeiling) context.addIssue({ code: 'custom', path: ['operations'], message: 'A batch must fit within the 4 MiB ceiling of decoded content and metadata across its operations' });
+  if (batch.operations.reduce((total, operation) => total + (operation.op === 'move' ? 0 : snapshotBytes(operation.snapshot)), 0) > batchCeiling) context.addIssue({ code: 'custom', path: ['operations'], message: 'A batch must fit within the 4 MiB ceiling of decoded content and metadata across its operations' });
 });
 export const batchResultSchema = z.strictObject({ results: z.array(z.strictObject({ index: z.number().int().nonnegative(), artifactId: identifier, revisionId: identifier })) });
 export type BatchOperation = z.infer<typeof batchOperationSchema>;
