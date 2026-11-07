@@ -62,7 +62,17 @@ try {
     const document = path === '/control' ? page : page.frameLocator('iframe');
     if (path !== '/fallback') {
       await document.locator('#ready').filter({ hasText: 'executed' }).waitFor();
-      await document.getByRole('button', { name: 'Try interaction', exact: true }).click();
+      const trigger = document.getByRole('button', { name: 'Try interaction', exact: true });
+      // Chrome routes input to the parent until a freshly loaded out-of-process frame reports its hit-test region, so a click sent too early never reaches the button.
+      await trigger.evaluate((button) => button.addEventListener('pointermove', () => button.setAttribute('data-pointer', ''), { once: true }));
+      const target = await trigger.boundingBox();
+      assert(target, 'Try interaction has a layout box');
+      const deadline = Date.now() + 10_000;
+      for (let step = 0; !await trigger.evaluate((button) => button.hasAttribute('data-pointer')); step++) {
+        assert(Date.now() < deadline, `${path} routes pointer input into the document`);
+        await page.mouse.move(target.x + target.width / 2 + step % 2, target.y + target.height / 2);
+      }
+      await trigger.click();
       await document.getByRole('button', { name: 'Interaction works', exact: true }).waitFor();
     } else {
       assert.equal(await document.locator('script').count(), 0);
