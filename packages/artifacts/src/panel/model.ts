@@ -79,6 +79,10 @@ export type DetailQuery = {
   readonly includeComparison: boolean;
 };
 export type RevisionEntry = RevisionRef & { readonly author: ClientRef };
+export type PageLinkTarget =
+  | { readonly state: 'resolved'; readonly artifactId: string; readonly slug: string; readonly title: string }
+  | { readonly state: 'broken'; readonly reason: 'missing' | 'outside' | 'unslugged' };
+export type PageLink = { readonly href: string; readonly text: string; readonly target: PageLinkTarget };
 export type ArtifactDetail = {
   readonly artifactId: string;
   readonly project: ProjectName | null;
@@ -91,6 +95,7 @@ export type ArtifactDetail = {
   readonly choices: readonly RevisionRef[];
   readonly compared: RevisionRef | null;
   readonly comparison: RevisionComparison | null;
+  readonly links: readonly PageLink[] | null;
 };
 export type DetailSnapshot = { readonly workspace: Workspace; readonly detail: ArtifactDetail };
 

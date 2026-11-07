@@ -6,7 +6,8 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
 import { ArtifactError, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict } from './model.ts';
+import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink } from './model.ts';
+import { pageLinks } from './links.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
@@ -159,12 +160,25 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
             .where(and(eq(artifactRevision.artifactId, owned.artifactId), eq(artifactRevision.id, compared.revisionId))).limit(1);
           comparison = await compareRevisions(revision(row!), selectedRevision);
         }
+        let links: PageLink[] | null = null;
+        if (selectedRevision.snapshot.content.kind === 'markdown') {
+          const candidates = pageLinks(selectedRevision.snapshot.content.text, owned.slug);
+          const slugs = [...new Set(candidates.flatMap(({ candidate }) => candidate.kind === 'slug' ? [candidate.slug] : []))];
+          const targets = slugs.length === 0 ? [] : await connection.select({ artifactId: artifact.id, slug: artifact.slug, title }).from(artifact).innerJoin(artifactRevision, headJoin)
+            .where(and(eq(artifact.ownerId, actor.userId), owned.project === null ? isNull(artifact.project) : eq(artifact.project, owned.project), inArray(artifact.slug, slugs)));
+          const bySlug = new Map(targets.map((target) => [target.slug, target]));
+          links = candidates.map(({ href, text, candidate }) => {
+            if (candidate.kind === 'broken') return { href, text, target: { state: 'broken', reason: candidate.reason } };
+            const found = bySlug.get(candidate.slug);
+            return { href, text, target: found ? { state: 'resolved', artifactId: found.artifactId, slug: candidate.slug, title: found.title } : { state: 'broken', reason: 'missing' } };
+          });
+        }
         return { workspace: await readWorkspace(connection, actor.userId), detail: {
           artifactId: owned.artifactId, project: owned.project as ProjectName | null, slug: owned.slug, createdAt: owned.createdAt,
           selected: { revision: selectedRevision, author: { clientId: selectedRevision.authorClientId, name: selected.name } },
           head: owned.head, publication: owned.publication && owned.published ? { revision: owned.published, version: owned.publication.version, url: access.publicationUrl(owned.artifactId) } : null,
           history: { entries, before: input.before ?? null, olderBefore: history.length > 5 ? entries.at(-1)!.sequence : null },
-          choices: [...choices.values()].sort((left, right) => right.sequence - left.sequence), compared: compared ?? null, comparison,
+          choices: [...choices.values()].sort((left, right) => right.sequence - left.sequence), compared: compared ?? null, comparison, links,
         } };
       });
     },
