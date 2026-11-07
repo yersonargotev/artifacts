@@ -250,7 +250,7 @@ The query is plain text of 1 to 256 characters. Every whitespace-separated term 
 
 ## Apply a batch
 
-`batch --command FILE` applies 1 to 25 create and update operations as one all-or-nothing command. The file holds the complete command with its `requestId`, and the CLI retains it before submission like the other `--command` mutations, so `artifacts retry REQUEST_ID` replays a lost batch.
+`batch --command FILE` applies 1 to 25 create, update, and move operations as one all-or-nothing command. The file holds the complete command with its `requestId`, and the CLI retains it before submission like the other `--command` mutations, so `artifacts retry REQUEST_ID` replays a lost batch.
 
 ```json
 {
@@ -262,7 +262,7 @@ The query is plain text of 1 to 256 characters. Every whitespace-separated term 
 }
 ```
 
-Each operation is `{ op: 'create', snapshot, project?, slug? }` or `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`. A slug may name a page created earlier in the same batch. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes. Batch requires `artifacts:write`.
+Each operation is `{ op: 'create', snapshot, project?, slug? }`, `{ op: 'update', snapshot, expectedRevisionId? }` addressed by exactly one of `artifactId` or `slug`, with `project` only alongside `slug`, or `{ op: 'move', project?, slug? }` addressed by exactly one of `artifactId` or `from: { project?, slug }`. A move takes the `move` fields: it needs `project`, `slug`, or both, an absent field keeps its value, and `null` clears it. A slug may name a page created earlier in the same batch, and later operations address a moved page by its new slug. `expectedRevisionId` must equal the head at that point in the batch, and it may be omitted only for a page that an earlier operation in the batch created or updated, whose revision ID the caller cannot know. Operations run in order, and the first failure commits nothing: its error, such as `conflict` with `currentRevisionId`, `slug_conflict`, or `not_found`, carries `index`, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result is `{ results: [{ index, artifactId, revisionId }] }`, one entry per operation. A move creates no revision, so its `revisionId` is the head it left in place. The batch writes one receipt: the same `requestId` returns it, and a changed batch fails with `request_conflict`. Search reflects the batch when it commits. A batch never publishes. Batch requires `artifacts:write`.
 
 ## Share publication access
 
