@@ -46,6 +46,7 @@ export type ArtifactCard = {
   readonly description: string;
   readonly kind: ContentKind;
   readonly project: ProjectName | null;
+  readonly slug: string | null;
   readonly head: RevisionRef;
   readonly publication: CardPublication;
 };
@@ -81,6 +82,7 @@ export type RevisionEntry = RevisionRef & { readonly author: ClientRef };
 export type ArtifactDetail = {
   readonly artifactId: string;
   readonly project: ProjectName | null;
+  readonly slug: string | null;
   readonly createdAt: Date;
   readonly selected: { readonly revision: Revision; readonly author: ClientRef };
   readonly head: RevisionRef;

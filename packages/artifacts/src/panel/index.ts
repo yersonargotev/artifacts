@@ -123,7 +123,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       return access.transaction(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const [owned] = await connection.select({
-          artifactId: artifact.id, project: artifact.project, createdAt: artifact.createdAt,
+          artifactId: artifact.id, project: artifact.project, slug: artifact.slug, createdAt: artifact.createdAt,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
@@ -159,7 +159,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           comparison = await compareRevisions(revision(row!), selectedRevision);
         }
         return { workspace: await readWorkspace(connection, actor.userId), detail: {
-          artifactId: owned.artifactId, project: owned.project as ProjectName | null, createdAt: owned.createdAt,
+          artifactId: owned.artifactId, project: owned.project as ProjectName | null, slug: owned.slug, createdAt: owned.createdAt,
           selected: { revision: selectedRevision, author: { clientId: selectedRevision.authorClientId, name: selected.name } },
           head: owned.head, publication: owned.publication && owned.published ? { revision: owned.published, version: owned.publication.version, url: access.publicationUrl(owned.artifactId) } : null,
           history: { entries, before: input.before ?? null, olderBefore: history.length > 5 ? entries.at(-1)!.sequence : null },
@@ -186,7 +186,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
         const before = ms === undefined ? undefined : or(lt(artifactRevision.createdAt, new Date(Number(ms))), and(eq(artifactRevision.createdAt, new Date(Number(ms))), lt(artifact.id, cursorId)));
         const rows = await connection.select({
           artifactId: artifact.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
-          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project,
+          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project, slug: artifact.slug,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version, revisionId: artifactPublication.revisionId },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
