@@ -738,6 +738,24 @@ test('login accepts a quoted comma and escaped characters in the Bearer realm', 
   await signIn(t, app, directory);
 });
 
+test('login accepts a shared resource that advertises itself', { timeout: 30_000 }, async (t) => {
+  const { app, directory } = await setup(t, { transport: 'combined' });
+  let metadataReads = 0;
+  app.setResourceHandler(async (incoming) => {
+    if (new URL(incoming.url).pathname === '/.well-known/oauth-protected-resource/mcp') {
+      metadataReads++;
+      return Response.json({ resource: app.config.resource, authorization_servers: [app.config.issuer], artifacts_rest_resource: app.config.resource });
+    }
+    return app.resourceHandler(incoming);
+  });
+  const { identity, url } = await signIn(t, app, directory);
+  assert.equal(url.searchParams.get('resource'), app.config.resource);
+  assert.equal(metadataReads, 1);
+  const whoami = await command(t, app, directory, ['whoami'], {}, false).result;
+  assert.equal(whoami.code, 0, whoami.stderr);
+  assert.deepEqual(JSON.parse(whoami.stdout), identity);
+});
+
 test('MCP login uses the advertised REST audience and stores only its verified credentials', { timeout: 35_000 }, async (t) => {
   const { app, directory } = await setup(t, { transport: 'combined', apiResource: true });
   const rest = app.config.apiResource!;
