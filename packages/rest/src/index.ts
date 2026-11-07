@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { scopes } from '@artifacts/config';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readByIdSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readByIdSchema, readSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
@@ -16,6 +16,7 @@ type Scope = 'artifacts:read' | 'artifacts:write' | 'artifacts:publish';
 const routePolicies = {
   identity: { GET: 'artifacts:read' },
   projects: { GET: 'artifacts:read' },
+  lookup: { GET: 'artifacts:read' },
   collection: { GET: 'artifacts:read', POST: 'artifacts:write' },
   artifact: { GET: 'artifacts:read', PUT: 'artifacts:write' },
   history: { GET: 'artifacts:read' },
@@ -97,6 +98,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       const [collection, artifactId, section, itemId, action] = segments;
       const route: RouteName | null = collection === 'identity' && segments.length === 1 ? 'identity'
         : collection === 'projects' && segments.length === 1 ? 'projects'
+        : collection === 'lookup' && segments.length === 1 ? 'lookup'
         : collection !== 'artifacts' ? null
         : segments.length === 1 ? 'collection'
         : segments.length === 2 && artifactId ? 'artifact'
@@ -124,6 +126,11 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       if (route === 'collection' && request.method === 'GET') return json(await artifacts.list(actor, listSchema.parse(query(url, ['limit', 'cursor', 'project'], ['limit']))));
       if (route === 'artifact' && request.method === 'GET') {
         const input = readByIdSchema.parse({ artifactId, ...query(url, ['revisionId', 'response']) });
+        const result = await artifacts.read(actor, input);
+        return json(input.response === 'compact' ? await compactArtifactRead(result) : result);
+      }
+      if (route === 'lookup') {
+        const input = readSchema.parse(query(url, ['project', 'slug', 'revisionId', 'response']));
         const result = await artifacts.read(actor, input);
         return json(input.response === 'compact' ? await compactArtifactRead(result) : result);
       }

@@ -378,6 +378,47 @@ test('REST and MCP share project creation, filtering, listing, and route-bound m
   } finally { await app.close(); }
 });
 
+test('REST and MCP create pages with slugs and read them by project and slug', async () => {
+  const app = await fixture({ allowGuests: true, transport: 'combined' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const call = api(app, tokens.access_token);
+    const created = await call('/artifacts', 'POST', { requestId: 'rest-slug-rag', snapshot, project: 'Mi-Wiki', slug: 'concepts/rag' });
+    assert.equal(created.status, 201);
+    const rag = await created.json() as ArtifactRead;
+    assert.equal(rag.slug, 'concepts/rag');
+    const history = (await mcp(app, tokens.access_token, 'artifacts_create', { requestId: 'mcp-slug-history', snapshot, project: 'mi-wiki', slug: 'history' })).structuredContent as ArtifactRead;
+    assert.deepEqual([history.project, history.slug], ['Mi-Wiki', 'history']);
+
+    const conflict = await error(await call('/artifacts', 'POST', { requestId: 'rest-slug-conflict', snapshot, project: 'MI-WIKI', slug: 'concepts/rag' }), 409, 'slug_conflict');
+    assert.deepEqual(conflict.details, { slug: 'concepts/rag', project: 'Mi-Wiki', artifactId: rag.artifactId });
+    const mcpConflict = await mcp(app, tokens.access_token, 'artifacts_create', { requestId: 'mcp-slug-conflict', snapshot, project: 'Mi-Wiki', slug: 'history' });
+    assert.equal(mcpConflict.isError, true);
+    assert.deepEqual(mcpConflict.structuredContent, { error: 'slug_conflict', message: 'The slug already names an artifact in this project', slug: 'history', project: 'Mi-Wiki', artifactId: history.artifactId });
+    const suffix = await error(await call('/artifacts', 'POST', { requestId: 'rest-slug-suffix', snapshot, slug: 'concepts/rag.md' }), 400, 'invalid_input');
+    assert.deepEqual((suffix.details.issues as { message: string }[]).map(({ message }) => message), ['Remove the .md suffix: a slug names a page, not a file']);
+
+    assert.deepEqual(await (await call('/lookup?project=mi-wiki&slug=concepts/rag')).json(), rag);
+    assert.deepEqual(await (await call(`/lookup?project=Mi-Wiki&slug=history&revisionId=${history.revision.id}`)).json(), history, 'a slug named like an artifact subroute resolves through lookup');
+    assert.deepEqual((await (await call('/lookup?project=Mi-Wiki&slug=concepts%2Frag&response=compact')).json()).revision.content, { kind: 'html', utf8Bytes: Buffer.byteLength(snapshot.content.text) });
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_read', { project: 'MI-WIKI', slug: 'concepts/rag' })).structuredContent, rag);
+    await error(await call('/lookup?project=Mi-Wiki&slug=concepts/missing'), 404, 'not_found');
+    await error(await call('/lookup?slug=concepts/rag'), 404, 'not_found');
+    await error(await call('/lookup?project=Mi-Wiki'), 400, 'invalid_input');
+    await error(await call(`/lookup?artifactId=${rag.artifactId}`), 400, 'invalid_input');
+    await error(await call('/lookup?slug=a&slug=b'), 400, 'invalid_input');
+    const wrongMethod = await call('/lookup?slug=index', 'POST', {});
+    await error(wrongMethod, 405, 'method_not_allowed');
+    assert.equal(wrongMethod.headers.get('allow'), 'GET');
+    assert.deepEqual((await mcp(app, tokens.access_token, 'artifacts_read', { project: 'Mi-Wiki', slug: 'missing' })).structuredContent, { error: 'not_found', message: 'Artifact not found' });
+    assert.equal((await mcp(app, tokens.access_token, 'artifacts_read', { artifactId: rag.artifactId, slug: 'concepts/rag' })).isError, true);
+
+    const listed = (await (await call('/artifacts?project=Mi-Wiki')).json()).items as { artifactId: string; slug: string | null }[];
+    assert.deepEqual(listed.map(({ artifactId, slug }) => [artifactId, slug]).sort(), [[rag.artifactId, 'concepts/rag'], [history.artifactId, 'history']].sort());
+    await error(await api(app, (await grant(app, 'openid profile offline_access artifacts:write')).access_token)('/lookup?slug=index'), 403, 'forbidden');
+  } finally { await app.close(); }
+});
+
 test('two independent HTTP writers produce one head winner and one conflict without an extra revision', async () => {
   const app = await fixture({ allowGuests: true, transport: 'rest' });
   try {

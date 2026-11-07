@@ -334,6 +334,12 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     assert.deepEqual(listed('artifacts_share').inputSchema.properties.email, { type: 'string', format: 'email', description: 'Email address, trimmed and lowercased; at most 254 characters after trimming' });
     assert.deepEqual(listed('artifacts_unshare').inputSchema.required.sort(), ['artifactId', 'requestId', 'shareId']);
     assert.deepEqual(listed('artifacts_shares_list').inputSchema.required, ['artifactId']);
+    const locator = listed('artifacts_read').inputSchema;
+    assert.equal(locator.type, 'object');
+    assert.equal(locator.required, undefined, 'artifactId and slug are alternatives');
+    assert.deepEqual(Object.keys(locator.properties).sort(), ['artifactId', 'project', 'response', 'revisionId', 'slug']);
+    assert.equal(locator.properties.slug.pattern, slugSchema.toJSONSchema().pattern);
+    assert.equal(listed('artifacts_create').inputSchema.properties.slug.maxLength, 160);
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);

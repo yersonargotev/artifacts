@@ -219,6 +219,25 @@ test('typed client files, filters, lists, and moves projects over real REST', as
   } finally { await app.close(); }
 });
 
+test('typed client creates slugged pages and reads them by project and slug over real REST', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const rag = await client.create({ requestId: 'client-slug-rag', snapshot, project: 'Mi-Wiki', slug: 'concepts/rag' });
+    const unfiled = await client.create({ requestId: 'client-slug-unfiled', snapshot, slug: 'concepts/rag' });
+    assert.equal(rag.slug, 'concepts/rag');
+    assert.deepEqual(await client.read({ project: 'mi-wiki', slug: 'concepts/rag' }), rag);
+    assert.equal((await client.read({ slug: 'concepts/rag' })).artifactId, unfiled.artifactId);
+    assert.equal((await client.read({ project: 'Mi-Wiki', slug: 'concepts/rag', response: 'compact' })).revision.content.utf8Bytes, Buffer.byteLength(snapshot.content.text));
+    assert.equal((await client.read({ artifactId: rag.artifactId })).slug, 'concepts/rag');
+    await assert.rejects(client.create({ requestId: 'client-slug-conflict', snapshot, project: 'MI-WIKI', slug: 'concepts/rag' }), (error: unknown) => error instanceof HttpError && error.status === 409 && error.code === 'slug_conflict' && error.details.artifactId === rag.artifactId);
+    await assert.rejects(client.read({ project: 'Mi-Wiki', slug: 'index' }), (error: unknown) => error instanceof HttpError && error.status === 404 && error.code === 'not_found');
+    assert.throws(() => client.read({ project: 'Mi-Wiki' }), { name: 'ZodError' });
+    assert.deepEqual((await client.list({ project: 'Mi-Wiki' })).items.map((item) => item.slug), ['concepts/rag']);
+  } finally { await app.close(); }
+});
+
 test('typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry', async () => {
   const app = await fixture({ transport: 'rest' });
   try {
