@@ -244,6 +244,24 @@ test('typed client creates slugged pages and reads them by project and slug over
   } finally { await app.close(); }
 });
 
+test('typed client searches owned Markdown pages over real REST', async () => {
+  const app = await fixture({ transport: 'rest' });
+  try {
+    const tokens = await grant(app, fullScope);
+    const client = createArtifactHttpClient({ resource: app.config.resource, accessToken: tokens.access_token });
+    const pages = [];
+    for (const name of ['uno', 'dos', 'tres']) pages.push(await client.create({ requestId: `client-search-${name}`, snapshot: { metadata: { title: name, description: '' }, content: { kind: 'markdown', text: `Búsqueda ${name}` }, files: [] }, project: 'Wiki', slug: name }));
+    const first = await client.search({ query: 'busqueda', limit: 2 });
+    assert.equal(first.nextCursor, '2');
+    const second = await client.search({ query: 'busqueda', project: 'wiki', limit: 2, cursor: first.nextCursor! });
+    assert.deepEqual([...first.items, ...second.items].map((item) => item.artifactId).sort(), pages.map((page) => page.artifactId).sort());
+    assert.equal(second.nextCursor, null);
+    assert.deepEqual((await client.search({ query: 'busqueda dos' })).items.map(({ slug, snippet }) => [slug, snippet]), [['dos', '**Búsqueda** **dos**']]);
+    assert.throws(() => client.search({ query: ' ' }), { name: 'ZodError' });
+    await assert.rejects(createArtifactHttpClient({ resource: app.config.resource, accessToken: (await grant(app, 'openid profile offline_access artifacts:write')).access_token }).search({ query: 'busqueda' }), (error: unknown) => error instanceof HttpError && error.status === 403 && error.code === 'forbidden');
+  } finally { await app.close(); }
+});
+
 test('typed client rejects malformed HTTP, redirects, oversized streams, and mismatched ZIP bytes without retry', async () => {
   const app = await fixture({ transport: 'rest' });
   try {
@@ -379,6 +397,29 @@ test('CLI creates a slugged page and reads it by project and slug without its ID
     assert.equal((success(await cli(['read', rag.artifactId], environment)) as ArtifactRead).slug, null);
     assert.equal((success(await cli(['history', rag.artifactId], environment)) as { items: unknown[] }).items.length, 1, 'slug moves create no revisions');
     failure(await cli(['move', rag.artifactId, '--slug', 'concepts/rag.md'], environment), 'invalid_input');
+  } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('CLI searches owned pages by plain text and pages through the results', async () => {
+  const app = await fixture({ transport: 'rest' });
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-cli-search-'));
+  try {
+    const tokens = await grant(app, fullScope);
+    const environment = { ARTIFACTS_SERVER: app.config.resource, ARTIFACTS_STATE_DIR: join(directory, 'state'), ARTIFACTS_ACCESS_TOKEN: tokens.access_token };
+    const snapshotFile = join(directory, 'page.json');
+    await writeFile(snapshotFile, JSON.stringify({ metadata: { title: 'Viaje', description: '' }, content: { kind: 'markdown', text: 'Una tarde en Envigado.' }, files: [] }));
+    const page = success(await cli(['create', '--snapshot', snapshotFile, '--project', 'Wiki', '--slug', 'viajes/envigado'], environment)) as ArtifactRead;
+    success(await cli(['create', '--snapshot', snapshotFile], environment));
+    const found = success(await cli(['search', 'tarde envigado', '--project', 'wiki'], environment)) as { items: { artifactId: string; slug: string; snippet: string }[]; nextCursor: string | null };
+    assert.deepEqual([found.items.map(({ artifactId, slug, snippet }) => [artifactId, slug, snippet]), found.nextCursor], [[[page.artifactId, 'viajes/envigado', 'Una **tarde** en **Envigado**.']], null]);
+    const first = success(await cli(['search', 'envigado', '--limit', '1'], environment)) as typeof found;
+    assert.equal(first.nextCursor, '1');
+    const second = success(await cli(['search', 'envigado', '--limit', '1', '--cursor', first.nextCursor!], environment)) as typeof found;
+    assert.deepEqual([second.items.length, second.nextCursor, second.items[0]!.artifactId === first.items[0]!.artifactId], [1, null, false]);
+    assert.deepEqual((success(await cli(['search', '"foo" OR NEAR('], environment)) as typeof found).items, []);
+    for (const args of [['search'], ['search', 'one', 'two']]) assert.equal(failure(await cli(args, environment), 'invalid_arguments').message, 'search requires one positional argument', args.join(' '));
+    failure(await cli(['search', 'envigado', '--limit', '26'], environment), 'invalid_input');
+    assert.equal(failure(await cli(['search', 'envigado', '--slug', 'x'], environment), 'invalid_arguments').message, 'Option --slug is not supported by search');
   } finally { await app.close(); await rm(directory, { recursive: true, force: true }); }
 });
 

@@ -12,6 +12,8 @@ The root export contains domain schemas and types. `/workflow` contains `prepare
 
 `slugSchema` validates page slugs such as `concepts/rag` without normalizing them. `readSchema` takes exactly one of `artifactId` or a `{ project, slug }` locator, and `readByIdSchema` takes only an ID. `moveSchema` takes `project`, `slug`, or both, each optional and nullable. `moveResultSchema` is unchanged. `ArtifactRead` and the HTTP summary schema include `slug`, and `ArtifactErrorCode` includes `slug_conflict`.
 
+`searchSchema` takes a trimmed `query` of 1 to 256 characters, optional `project`, `limit` from 1 to 25 with default 10, and an opaque decimal `cursor`. `searchResultSchema` holds `items` of `searchHitSchema`, `{ artifactId, project, slug, title, snippet, rank }`, and a nullable `nextCursor`.
+
 The existing `@artifacts/artifacts` root, `/contracts`, and `/workflow` exports re-export these implementations. Store and REST packages share one `ArtifactError` runtime.
 
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.

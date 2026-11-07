@@ -41,6 +41,7 @@ Every method makes one HTTP request. The client does not retry, follow redirects
 | `create(command)` | `requestId`, complete `snapshot`, optional `project`, `slug`, and `response` | Artifact receipt |
 | `list(query?)` | Optional `limit`, `cursor`, and `project` | Artifact summaries and `nextCursor` |
 | `projects()` | None | `{ items: [{ name, artifactCount }] }` |
+| `search(query)` | `query`, optional `project`, `limit`, and `cursor` | `{ items: SearchHit[], nextCursor }` |
 | `read(query)` | Exactly one of `artifactId` or `slug` with optional `project`, optional `revisionId` and `response` | Artifact revision |
 | `update(command)` | `requestId`, `artifactId`, `expectedRevisionId`, complete `snapshot`, optional `response` | Artifact receipt |
 | `history(query)` | `artifactId`, optional `limit`, `beforeSequence`, and `response` | Revisions and `nextBeforeSequence` |
@@ -60,6 +61,8 @@ All sharing methods require `artifacts:publish` and artifact ownership. `share` 
 Artifact reads and list items include `project`, a name or null. A project name matches an existing project regardless of letter case and keeps its stored spelling. `move` never creates a revision or changes the publication. `projects()` lists only projects that contain artifacts, ordered by name. Because response schemas are strict, this client requires a server that returns `project`. Version `0.1.0-beta.4` and earlier reject responses from such a server with `invalid_response`.
 
 Artifact reads and list items also include `slug`, a page name or null. `read({ project, slug })` calls `GET /lookup` and `read({ artifactId })` calls `GET /artifacts/:artifactId`. An omitted `project` reads the unfiled namespace. A used slug fails `create` with an `HttpError` whose code is `slug_conflict`, status 409, and whose details name the holder's `artifactId`. Version `0.1.0-beta.7` and earlier reject responses that include `slug` with `invalid_response`. `move` sets, changes, or clears the slug: an omitted field keeps its value and `null` clears it. A move into a used slug fails with the same `slug_conflict`. The move result is unchanged, so published clients keep parsing it. Read the artifact to see its new slug.
+
+`search({ query, project?, limit?, cursor? })` calls `GET /search` and searches the caller's owned Markdown and text artifacts at their head revision. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. HTML and design artifacts, older revisions, and artifacts shared with the caller are not searched. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Pass `nextCursor` as `cursor` for the next page. `limit` is 1 to 25 and defaults to 10.
 
 `prepareArtifactEdit(client, { artifactId, requestId, changes })` reads the current full snapshot and prepares an immutable update command. Metadata and content changes merge into that snapshot. An explicit `files` array replaces the attachments. The helper does not submit the update. Retain its exact output before sending it.
 

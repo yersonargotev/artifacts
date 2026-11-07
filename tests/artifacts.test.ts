@@ -366,7 +366,7 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     const tokens = await grant(app, allScopes);
     const tool = (name: string, input: unknown, token = tokens.access_token) => mcp(app.config.resource, token, 'tools/call', { name, arguments: input });
     const { tools } = await mcp(app.config.resource, tokens.access_token, 'tools/list', {});
-    assert.deepEqual(tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_move', 'artifacts_publish', 'artifacts_read', 'artifacts_share', 'artifacts_shares_list', 'artifacts_unshare', 'artifacts_update', 'projects_list', 'whoami']);
+    assert.deepEqual(tools.map((tool: { name: string }) => tool.name).sort(), ['artifacts_create', 'artifacts_export', 'artifacts_history', 'artifacts_list', 'artifacts_move', 'artifacts_publish', 'artifacts_read', 'artifacts_search', 'artifacts_share', 'artifacts_shares_list', 'artifacts_unshare', 'artifacts_update', 'projects_list', 'whoami']);
     const listed = (name: string) => tools.find((tool: { name: string }) => tool.name === name);
     const annotations = (name: string) => listed(name).annotations;
     assert.deepEqual(annotations('artifacts_move'), { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
@@ -387,6 +387,11 @@ test('MCP artifact tools use verified OAuth identity and individual operation sc
     const move = listed('artifacts_move').inputSchema;
     assert.deepEqual(move.required.sort(), ['artifactId', 'requestId'], 'project and slug are each optional, and at least one is required');
     assert.deepEqual(Object.keys(move.properties).sort(), ['artifactId', 'project', 'requestId', 'slug']);
+    assert.deepEqual(annotations('artifacts_search'), { readOnlyHint: true, destructiveHint: false, openWorldHint: false });
+    const search = listed('artifacts_search').inputSchema;
+    assert.deepEqual(search.required, ['query']);
+    assert.deepEqual(Object.keys(search.properties).sort(), ['cursor', 'limit', 'project', 'query']);
+    assert.deepEqual([search.properties.query.maxLength, search.properties.limit.maximum, search.properties.limit.default], [256, 25, 10]);
     const created = await tool('artifacts_create', createInput());
     assert.equal(created.structuredContent.ownerId, app.ownerId);
     assert.equal(created.structuredContent.revision.authorClientId, tokens.clientId);

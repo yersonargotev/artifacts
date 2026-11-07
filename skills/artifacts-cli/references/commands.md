@@ -122,6 +122,18 @@ A slug contains 1 to 160 characters of lowercase ASCII kebab-case segments separ
 
 `read` takes exactly one of an ID or `--slug`. `--project` applies only with `--slug`. A used slug fails `create` with `slug_conflict`, status 409, and the holder's `artifactId` in `details`. A locator with no artifact fails with `not_found`. `move ID --slug SLUG` renames a page in its project, and `move ID --no-slug` clears the slug. A move to another project keeps the slug unless `--slug` or `--no-slug` changes it. A move fails with `slug_conflict` and changes nothing when the target project already uses the target slug. A slug change creates no revision.
 
+## Search pages
+
+Check that installed help lists `search` before using it.
+
+```sh
+artifacts search envigado
+artifacts search "tarde envigado" --project "mi wiki"
+artifacts search envigado --limit 5 --cursor 5
+```
+
+`search QUERY` finds owned Markdown and text artifacts whose title, description, or content at the head revision contains every term. Quote a query with spaces. The query is plain text of 1 to 256 characters. Every whitespace-separated term must match, letter case and accents are ignored, and operators or punctuation in the query are treated as text, so input such as `"foo" OR NEAR(` never fails with a syntax error. HTML and design artifacts, older revisions, and artifacts shared with the caller are not searched. `--project` matches regardless of letter case. `--limit` is 1 to 25 and defaults to 10. Items are `{ artifactId, project, slug, title, snippet, rank }`, ordered by `rank` and then `artifactId`. `rank` is the FTS5 `bm25` score, where lower is more relevant, and `snippet` is an excerpt with each match wrapped in `**`. Pass `nextCursor` as `--cursor` for the next page; `null` means there are no more results.
+
 ## Edit without losing retained data
 
 For a title change, save `changes.json` with only the requested field.

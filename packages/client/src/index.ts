@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
+import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, searchResultSchema, searchSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type SearchResult, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
 import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
@@ -16,6 +16,8 @@ export type UnshareInput = z.input<typeof unshareSchema>;
 export type ListSharesInput = z.input<typeof listSharesSchema>;
 export type ListSharesResult = { items: Share[] };
 export type ListInput = z.input<typeof listSchema>;
+export type SearchInput = z.input<typeof searchSchema>;
+export type { SearchResult };
 export type MoveInput = z.input<typeof moveSchema>;
 export type MoveResult = z.infer<typeof moveResultSchema>;
 export type ProjectsResult = z.infer<typeof projectsResultSchema>;
@@ -46,6 +48,7 @@ export interface ArtifactHttpClient {
   create(input: CreateInput): Promise<ArtifactRead | CompactArtifactRead>;
   list(input?: ListInput): Promise<z.infer<typeof listResultSchema>>;
   projects(): Promise<ProjectsResult>;
+  search(input: SearchInput): Promise<SearchResult>;
   read(input: ReadInput & { response: 'compact' }): Promise<CompactArtifactRead>;
   read(input: ReadInput & { response?: 'full' }): Promise<ArtifactRead>;
   read(input: ReadInput): Promise<ArtifactRead | CompactArtifactRead>;
@@ -181,6 +184,9 @@ export function createArtifactHttpClient(options: {
       return json(`/artifacts${query(listSchema.parse(value))}`, 'GET', listResultSchema);
     },
     projects: () => json('/projects', 'GET', projectsResultSchema),
+    search(value: SearchInput) {
+      return json(`/search${query(searchSchema.parse(value))}`, 'GET', searchResultSchema);
+    },
     read(value: ReadInput) {
       const { artifactId, ...parameters } = readSchema.parse(value);
       return json(`${artifactId === undefined ? '/lookup' : `/artifacts/${encodeURIComponent(artifactId)}`}${query(parameters)}`, 'GET', parameters.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema);

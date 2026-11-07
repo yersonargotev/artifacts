@@ -38,6 +38,7 @@ Commands:
   create --command FILE
   list [--limit N] [--cursor CURSOR] [--project NAME]
   projects
+  search QUERY [--project NAME] [--limit N] [--cursor CURSOR]
   read ID [--revision REV] [--response full|compact] [--out FILE [--quiet]]
   read --slug SLUG [--project NAME] [--revision REV] [--response full|compact]
          [--out FILE [--quiet]]
@@ -68,6 +69,9 @@ project keeps the slug.
 A slug such as concepts/rag names an artifact within its project, or within
 the unfiled artifacts without --project. Read --slug finds it without its ID.
 Create or move fails with slug_conflict when the project already uses the slug.
+Search finds owned Markdown and text artifacts whose title, description, or
+content contains every term of QUERY, ignoring letter case and accents. Quote a
+QUERY with spaces. Results are ordered by relevance with a **bold** snippet.
 Read --out saves the returned artifact JSON. Export --out saves the ZIP.
 Read --quiet requires --out and suppresses successful JSON stdout.
 Output files are created exclusively and never overwrite an existing path.
@@ -97,7 +101,7 @@ class UsageError extends Error {}
 const commandOptions: Record<string, readonly string[]> = {
   login: ['no-browser'], logout: [], whoami: [],
   create: ['snapshot', 'project', 'slug', 'request-id', 'response', 'command'],
-  list: ['limit', 'cursor', 'project'], projects: [], read: ['slug', 'project', 'revision', 'response', 'out', 'quiet'],
+  list: ['limit', 'cursor', 'project'], projects: [], search: ['project', 'limit', 'cursor'], read: ['slug', 'project', 'revision', 'response', 'out', 'quiet'],
   update: ['snapshot', 'expected-revision', 'request-id', 'response', 'command'],
   edit: ['changes', 'request-id'], history: ['limit', 'before-sequence', 'summary'],
   publish: ['revision', 'expected-version', 'request-id', 'command'],
@@ -234,6 +238,7 @@ async function main(): Promise<unknown> {
     }
     case 'list': none(); return client.list({ ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values.cursor === undefined ? {} : { cursor: values.cursor }), ...(values.project === undefined ? {} : { project: values.project }) });
     case 'projects': none(); return client.projects();
+    case 'search': return client.search({ query: argument()!, ...(values.project === undefined ? {} : { project: values.project }), ...(values.limit === undefined ? {} : { limit: integer('limit') }), ...(values.cursor === undefined ? {} : { cursor: values.cursor }) });
     case 'read': {
       if (values.slug === undefined && values.project !== undefined) throw new UsageError('read --project requires --slug');
       if ((values.slug === undefined) !== (arguments_.length === 1) || arguments_.length > 1) throw new UsageError('read requires exactly one of an artifact ID or --slug SLUG');
