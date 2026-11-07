@@ -9,7 +9,7 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
 import { ArtifactError, artifactReadSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
 import { canonicalJson, sha256 } from './serialization.ts';
-import { createAccess, type Connection } from './access.ts';
+import { createAccess, writeTransaction, type Connection } from './access.ts';
 import { revision } from './revision.ts';
 import { invitation, type InvitationSender } from './invitation.ts';
 import type { SharedArtifactSummary } from './contracts.ts';
@@ -43,6 +43,27 @@ const searchBody: Record<Snapshot['content']['kind'], (text: string) => string> 
 async function indexHead(connection: Connection, artifactId: string, snapshot: Snapshot) {
   await connection.delete(artifactSearch).where(eq(artifactSearch.artifactId, artifactId));
   await connection.insert(artifactSearch).values({ artifactId, title: snapshot.metadata.title, description: snapshot.metadata.description, body: searchBody[snapshot.content.kind](snapshot.content.text) });
+}
+
+export async function reindexSearch(db: Database): Promise<number> {
+  let reindexed = 0;
+  for (let last = ''; ;) {
+    const page = await db.select({ id: artifact.id }).from(artifact).where(gt(artifact.id, last)).orderBy(asc(artifact.id)).limit(100);
+    // One transaction per artifact rereads its head, so a concurrent update is never overwritten with a stale snapshot.
+    for (const { id } of page) {
+      const indexed = await writeTransaction(db, async (connection) => {
+        const [head] = await connection.select({ revision: artifactRevision }).from(artifact)
+          .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
+          .where(eq(artifact.id, id)).limit(1);
+        if (!head) return false;
+        await indexHead(connection, id, revision(head.revision).snapshot);
+        return true;
+      });
+      if (indexed) reindexed++;
+    }
+    if (page.length < 100) return reindexed;
+    last = page.at(-1)!.id;
+  }
 }
 
 // Quoting every whitespace-separated chunk turns FTS5 operators in user input into plain terms, and adjacent phrases mean AND.

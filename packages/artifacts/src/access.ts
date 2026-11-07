@@ -18,6 +18,16 @@ function isBusy(error: unknown): boolean {
   return ('code' in error && typeof error.code === 'string' && /SQLITE_BUSY|SQLITE_LOCKED/.test(error.code)) || isBusy(error.cause);
 }
 
+export async function writeTransaction<T>(db: Database, work: (connection: Connection) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await db.transaction(work); }
+    catch (error) {
+      if (attempt >= 5 || !isBusy(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 * 2 ** attempt));
+    }
+  }
+}
+
 export function createAccess(db: Database, options: { publishOrigin: string; access: AccessPolicy }) {
   const admission = createAdmission(db, options.access);
   const origin = new URL(options.publishOrigin).origin;
@@ -54,15 +64,7 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
     if (found && found.id !== artifactId) throw new ArtifactError('slug_conflict', 'The slug already names an artifact in this project', { slug, project, artifactId: found.id });
   }
 
-  async function transaction<T>(work: (connection: Connection) => Promise<T>): Promise<T> {
-    for (let attempt = 0; ; attempt++) {
-      try { return await db.transaction(work); }
-      catch (error) {
-        if (attempt >= 5 || !isBusy(error)) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 10 * 2 ** attempt));
-      }
-    }
-  }
+  const transaction = <T>(work: (connection: Connection) => Promise<T>) => writeTransaction(db, work);
 
   async function receipt<T>(actor: Actor, scope: string, kind: string, input: { requestId: string }, output: z.ZodType<T>, work: (connection: Connection) => Promise<T>): Promise<{ result: T; fresh: boolean }> {
     const payloadHash = await sha256(canonicalJson({ kind, input }));
