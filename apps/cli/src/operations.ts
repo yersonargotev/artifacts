@@ -3,7 +3,7 @@ import { lstat, mkdir, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { createSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { batchSchema, createSchema, moveSchema, publishSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { canonicalResource } from '@yargote/artifacts-contracts/http';
 import type { ArtifactHttpClient } from '@yargote/artifacts-client';
 
@@ -20,6 +20,7 @@ export const operationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...binding, kind: z.literal('move'), command: moveSchema }),
   z.strictObject({ ...binding, kind: z.literal('share'), command: shareSchema }),
   z.strictObject({ ...binding, kind: z.literal('unshare'), command: unshareSchema }),
+  z.strictObject({ ...binding, kind: z.literal('batch'), command: batchSchema }),
 ]);
 export type PreparedOperation = z.infer<typeof operationSchema>;
 export type Mutation =
@@ -28,7 +29,8 @@ export type Mutation =
   | { kind: 'publish'; command: z.input<typeof publishSchema> }
   | { kind: 'move'; command: z.input<typeof moveSchema> }
   | { kind: 'share'; command: z.input<typeof shareSchema> }
-  | { kind: 'unshare'; command: z.input<typeof unshareSchema> };
+  | { kind: 'unshare'; command: z.input<typeof unshareSchema> }
+  | { kind: 'batch'; command: z.input<typeof batchSchema> };
 
 export function operationPath(stateDir: string, resource: string, requestId: string): string {
   createSchema.shape.requestId.parse(requestId);
@@ -94,6 +96,7 @@ export function submitOperation(client: ArtifactHttpClient, operation: PreparedO
     case 'move': return client.move(operation.command);
     case 'share': return client.share(operation.command);
     case 'unshare': return client.unshare(operation.command);
+    case 'batch': return client.batch(operation.command);
   }
   const exhaustive: never = operation;
   throw new Error(`Unsupported retained operation: ${exhaustive}`);

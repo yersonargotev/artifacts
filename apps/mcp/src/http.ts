@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
-import { ArtifactError, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
+import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
 import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
@@ -68,6 +68,10 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
           const result = await artifacts.update(principal, input);
           return input.response === 'compact' ? compactArtifactRead(result) : result;
         }));
+        server.registerTool('artifacts_batch', {
+          title: 'Apply artifact batch', description: 'Apply 1 to 25 create and update operations as one all-or-nothing command with one receipt. Each operation has op create, with the artifacts_create snapshot, project, and slug, or op update, with a complete next snapshot. An update addresses its artifact by exactly one of artifactId or slug, with project only alongside slug, and a slug may name a page created earlier in the same batch. expectedRevisionId must equal the head at that point in the batch. Omit it only for a page that an earlier operation in this batch created or updated; otherwise the update fails with conflict and currentRevisionId. The first failure commits nothing and returns its error, such as conflict, slug_conflict, or not_found, with index, the 0-based position of the failing operation. Each snapshot keeps the 1 MiB and 32-file limits, and the whole batch has a 4 MiB ceiling of decoded content and metadata. The result lists { index, artifactId, revisionId } for every operation. Search reflects the batch when it commits. A batch never publishes. Requires artifacts:write. Retry with the same requestId and arguments.',
+          inputSchema: batchSchema, annotations: mutation,
+        }, async (input) => execute(() => artifacts.batch(principal, input)));
         server.registerTool('artifacts_publish', {
           title: 'Publish artifact revision', description: 'Select a retained revision at a stable protected URL. Requires artifacts:publish and the current expectedPublicationVersion, or zero if unpublished. Published HTML and design boards are self-contained, and every file, boards included, downloads as an attachment. Retry with the same requestId and arguments.',
           inputSchema: publishSchema, annotations: mutation,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { artifactReadSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, searchResultSchema, searchSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type SearchResult, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
+import { artifactReadSchema, batchResultSchema, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readSchema, searchResultSchema, searchSchema, shareCommandResultSchema, shareResultSchema, shareSchema, unshareSchema, updateSchema, type ArtifactRead, type BatchResult, type SearchResult, type Share, type ShareResult, type UpdateInput } from '@yargote/artifacts-contracts';
 import { compactArtifactReadSchema, historyResultSchema, httpErrorSchema, identitySchema, listResultSchema, projectsResultSchema, restBase, summaryHistoryResultSchema, type Identity } from '@yargote/artifacts-contracts/http';
 import type { CompactArtifactRead } from '@yargote/artifacts-contracts/workflow';
 
@@ -9,6 +9,8 @@ export type { CompactArtifactRead, RevisionSummary } from '@yargote/artifacts-co
 export { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 
 export type CreateInput = z.input<typeof createSchema>;
+export type BatchInput = z.input<typeof batchSchema>;
+export type { BatchResult };
 export type ReadInput = z.input<typeof readSchema>;
 export type PublishInput = z.input<typeof publishSchema>;
 export type ShareInput = z.input<typeof shareSchema>;
@@ -55,6 +57,7 @@ export interface ArtifactHttpClient {
   update(input: UpdateInput & { response: 'compact' }): Promise<CompactArtifactRead>;
   update(input: UpdateInput & { response?: 'full' }): Promise<ArtifactRead>;
   update(input: UpdateInput): Promise<ArtifactRead | CompactArtifactRead>;
+  batch(input: BatchInput): Promise<BatchResult>;
   history(input: HistoryInput & { response: 'summary' }): Promise<SummaryHistoryResult>;
   history(input: HistoryInput & { response?: 'full' }): Promise<HistoryResult>;
   history(input: HistoryInput): Promise<HistoryResult | SummaryHistoryResult>;
@@ -164,8 +167,8 @@ export function createArtifactHttpClient(options: {
     }
   }
 
-  function json<S extends z.ZodType>(path: string, method: HttpMethod, schema: S, input?: unknown): Promise<z.output<S>> {
-    return request(path, method, method === 'POST' ? 201 : 200, (response, bytes) => {
+  function json<S extends z.ZodType>(path: string, method: HttpMethod, schema: S, input?: unknown, status: 200 | 201 = method === 'POST' ? 201 : 200): Promise<z.output<S>> {
+    return request(path, method, status, (response, bytes) => {
       if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') throw new HttpError(response.status, 'invalid_response', 'The server did not return JSON');
       let value: unknown;
       try { value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
@@ -194,6 +197,9 @@ export function createArtifactHttpClient(options: {
     update(value: UpdateInput) {
       const input = updateSchema.parse(value);
       return json(`/artifacts/${encodeURIComponent(input.artifactId)}`, 'PUT', input.response === 'compact' ? compactArtifactReadSchema : artifactReadSchema, input);
+    },
+    batch(value: BatchInput) {
+      return json('/batch', 'POST', batchResultSchema, batchSchema.parse(value), 200);
     },
     history(value: HistoryInput) {
       const { artifactId, ...parameters } = historySchema.parse(value);
