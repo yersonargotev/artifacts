@@ -1,0 +1,64 @@
+---
+import type { ArtifactCard, CardPublication, ContentKind } from '@artifacts/artifacts/panel/model';
+import { getRuntime } from '../runtime.ts';
+import { artifactErrorResponse, panelActor } from '../publication.ts';
+import { previewSandbox, publicationStates, searchFor } from '../presentation.ts';
+import { detailHref, libraryHref, previewHref, readReaderUrl, readerHref } from '../urls.ts';
+import Panel from '../layouts/Panel.astro';
+import StatusTabs from '../components/library/StatusTabs.astro';
+import Icon from '../components/Icon.astro';
+const identity = Astro.locals.identity;
+if (!identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
+const { panel } = await getRuntime();
+type Entry = { artifactId: string; title: string; kind: ContentKind; revisionId: string; state: CardPublication['state']; publicationUrl: string | null };
+const entryOf = (card: ArtifactCard): Entry => ({ artifactId: card.artifactId, title: card.title, kind: card.kind, revisionId: card.head.revisionId, state: card.publication.state, publicationUrl: card.publication.state === 'unpublished' ? null : card.publication.url });
+const result = await (async () => {
+  const { artifactId, ...query } = readReaderUrl(Astro.url);
+  const actor = panelActor(identity);
+  const snapshot = await panel.library(actor, query);
+  const card = artifactId ? snapshot.page.cards.find((item) => item.artifactId === artifactId) : snapshot.page.cards[0];
+  if (card || !artifactId) return { snapshot, cursor: query.cursor, selected: card && entryOf(card) };
+  // A shared link can name an artifact on another page of the list, so its head comes from the detail read.
+  const { detail } = await panel.artifact(actor, { artifactId, includeComparison: false });
+  const { revision } = detail.selected;
+  const state: Entry['state'] = !detail.publication ? 'unpublished' : detail.publication.revision.revisionId === revision.id ? 'published' : 'pending';
+  return { snapshot, cursor: query.cursor, selected: { artifactId, title: revision.snapshot.metadata.title, kind: revision.snapshot.content.kind, revisionId: revision.id, state, publicationUrl: detail.publication?.url ?? null } };
+})().catch(artifactErrorResponse);
+if (result instanceof Response) return result;
+const { snapshot: { workspace, page }, cursor, selected } = result;
+const query = searchFor(page);
+const scopeTitle = page.scope.kind === 'unfiled' ? 'Sin proyecto' : page.scope.kind === 'project' ? page.scope.project.name : page.scope.kind === 'vanishedProject' ? page.scope.name : 'Biblioteca';
+const filtered = Boolean(page.q || page.status !== 'all');
+---
+<Panel title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query}>
+  <div class="reader" data-reader>
+    <section class="reader-list" aria-labelledby="reader-scope">
+      <header class="reader-list-heading"><h1 id="reader-scope">{scopeTitle}</h1><a href={libraryHref(query)}>Salir del modo lectura</a></header>
+      <StatusTabs page={page} reader />
+      {page.cards.length ? <nav aria-label="Artefactos"><ol class="reader-items">{page.cards.map((card) => {
+        const entry = entryOf(card);
+        return <li><a class="reader-item" href={readerHref(query, { cursor, artifactId: entry.artifactId })} aria-current={selected?.artifactId === entry.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={entry.artifactId}
+          data-preview={previewHref(entry.artifactId, entry.revisionId)} data-sandbox={previewSandbox(entry.kind)} data-detail={detailHref({ artifactId: entry.artifactId, tab: 'preview' })} data-publication={entry.publicationUrl ?? undefined}>
+          <span class="reader-item-title">{entry.title}</span><span class="artifact-status" data-state={entry.state}>{publicationStates[entry.state].label}</span>
+        </a></li>;
+      })}</ol></nav> : <div class="reader-empty"><p>{page.continued ? 'Llegaste al final de los resultados.' : filtered ? 'No hay artefactos con estos filtros.' : 'Aún no hay artefactos aquí.'}</p>{filtered && <a href={readerHref(query, { q: '', status: 'all' })}>Limpiar filtros</a>}</div>}
+      {(page.continued || page.next) && <div class="reader-pagination">
+        {page.continued && <a class="button secondary" href={readerHref(query)}>Volver al inicio</a>}
+        {page.next && <a class="button secondary" href={readerHref(query, { cursor: page.next })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
+      </div>}
+    </section>
+    {selected ? <section class="reader-pane" aria-labelledby="reader-title" data-reader-pane>
+      <header class="reader-pane-header">
+        <div class="reader-pane-title"><h2 id="reader-title" data-reader-title>{selected.title}</h2><span class="artifact-status" data-state={selected.state} data-reader-state>{publicationStates[selected.state].label}</span></div>
+        <div class="reader-pane-actions">
+          <a class="button secondary" href={detailHref({ artifactId: selected.artifactId, tab: 'preview' })} data-reader-detail>Ver artefacto</a>
+          <a class="button" data-variant="primary" href={selected.publicationUrl ?? undefined} hidden={!selected.publicationUrl} data-reader-publication>Abrir publicación</a>
+        </div>
+      </header>
+      <iframe class="reader-preview" title={`Vista previa de ${selected.title}`} sandbox={previewSandbox(selected.kind)} referrerpolicy="no-referrer" src={previewHref(selected.artifactId, selected.revisionId)} data-reader-frame></iframe>
+    </section> : <section class="reader-pane reader-pane-empty" aria-label="Vista previa"><p>Aquí verás la vista previa del artefacto que elijas.</p></section>}
+  </div>
+</Panel>
+<script>
+  import '../components/reader/reader.ts';
+</script>

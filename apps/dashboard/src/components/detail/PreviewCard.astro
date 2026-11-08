@@ -1,11 +1,12 @@
 ---
-import { isSelectedPublished, markdownPreviewSandbox, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { isSelectedPublished, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { previewSandbox } from '../../presentation.ts';
 import { previewHref } from '../../urls.ts';
 import Icon from '../Icon.astro';
 interface Props { detail: ArtifactDetail }
 const { detail } = Astro.props;
 const { revision } = detail.selected;
-const sandbox = revision.snapshot.content.kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts';
+const sandbox = previewSandbox(revision.snapshot.content.kind);
 ---
 <section class="preview-card" data-preview-size="desktop" aria-labelledby="preview-title">
   <div class="preview-heading">

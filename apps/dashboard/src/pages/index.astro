@@ -1,7 +1,7 @@
 ---
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
-import { readLibraryUrl, readListView, viewCookie } from '../urls.ts';
+import { readLibraryUrl, readListView, readerHref, viewCookie } from '../urls.ts';
 import { locationOf, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
 import LibraryHeading from '../components/library/LibraryHeading.astro';
@@ -32,7 +32,7 @@ const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Bibliotec
     <LibraryHeading workspace={snapshot.workspace} scope={snapshot.page.scope} />
     <SharedWithMe items={shared.items} />
     {(snapshot.workspace.total.count > 0 || shared.items.length === 0) && <>
-      <div class="library-controls"><StatusTabs page={snapshot.page} namedView={namedView} /><div class="library-view-controls"><ProjectFilter workspace={snapshot.workspace} page={snapshot.page} namedView={namedView} /><ViewToggle query={searchFor(snapshot.page, namedView)} view={view} /></div></div>
+      <div class="library-controls"><StatusTabs page={snapshot.page} namedView={namedView} /><div class="library-view-controls"><ProjectFilter workspace={snapshot.workspace} page={snapshot.page} namedView={namedView} /><a class="button secondary reader-link" href={readerHref(searchFor(snapshot.page))}><Icon name="layout-sidebar" size={16} /><span>Modo lectura</span></a><ViewToggle query={searchFor(snapshot.page, namedView)} view={view} /></div></div>
       <ArtifactGrid page={snapshot.page} workspaceCount={snapshot.workspace.total.count} now={new Date()} view={view} namedView={namedView} />
     </>}
   </> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}

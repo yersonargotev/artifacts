@@ -1,5 +1,5 @@
-import { projectKey } from '@artifacts/artifacts/panel/model';
-import type { ArtifactDetail, ClientRef, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, LibrarySort, ScopeRequest, SortDirection } from '@artifacts/artifacts/panel/model';
+import { markdownPreviewSandbox, projectKey } from '@artifacts/artifacts/panel/model';
+import type { ArtifactDetail, ClientRef, ContentKind, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, LibrarySort, ScopeRequest, SortDirection } from '@artifacts/artifacts/panel/model';
 import { scopeRequestOf, type LibraryLink, type ListView } from './urls.ts';
 
 export type NavLocation =
@@ -8,6 +8,7 @@ export type NavLocation =
   | { readonly kind: 'project'; readonly name: string }
   | { readonly kind: 'unfiled' }
   | { readonly kind: 'artifact'; readonly project: string | null }
+  | { readonly kind: 'read'; readonly scope: ScopeRequest }
   | { readonly kind: 'task' };
 
 export const workspaceQuery: LibraryQuery = { scope: { kind: 'all' }, status: 'all', q: '' };
@@ -37,6 +38,7 @@ export function locationOf(scope: LibraryScope): NavLocation {
 export function scopeOf(location: NavLocation): ScopeRequest {
   if (location.kind === 'project') return { kind: 'project', name: location.name };
   if (location.kind === 'unfiled') return { kind: 'unfiled' };
+  if (location.kind === 'read') return location.scope;
   if (location.kind === 'artifact') return location.project === null ? { kind: 'unfiled' } : { kind: 'project', name: location.project };
   return { kind: 'all' };
 }
@@ -54,6 +56,7 @@ export const sortLabels: Readonly<Record<LibrarySort, Readonly<Record<SortDirect
 
 export const clientLabel = (client: ClientRef) => client.name ?? client.clientId;
 export const absoluteTime = (at: Date) => `${at.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
+export const previewSandbox = (kind: ContentKind) => kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts';
 export const contentLabels = { html: 'HTML', markdown: 'Markdown', text: 'Texto', design: 'Diseño' } as const;
 export const publicationStates = {
   unpublished: { label: 'Sin publicar' },

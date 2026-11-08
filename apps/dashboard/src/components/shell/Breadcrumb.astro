@@ -6,7 +6,7 @@ import Icon from '../Icon.astro';
 interface Props { location: NavLocation; title: string }
 const { location, title } = Astro.props;
 const scope = scopeOf(location);
-const nested = location.kind === 'artifact' || location.kind === 'task';
+const nested = location.kind === 'artifact' || location.kind === 'task' || location.kind === 'read';
 const scoped = scope.kind !== 'all';
 const scopeName = scope.kind === 'project' ? scope.name : 'Sin proyecto';
 ---
