@@ -126,15 +126,16 @@ A deploy that changes how the store extracts search text does not rewrite existi
 export DATABASE_URL=$(turso db show artifacts --url)
 export DATABASE_AUTH_TOKEN=$(turso db tokens create artifacts --expiration 1d)
 pnpm search:reindex
+unset DATABASE_URL DATABASE_AUTH_TOKEN
 ```
 
-`search:reindex` rewrites each artifact's row from its head revision in a separate transaction, so a rerun is safe. It prints the number of artifacts it indexed. Schema migrations run before the merge instead, as described in [Migrate the production database before merge](ci-cd.md#migrate-the-production-database-before-merge).
+`search:reindex` rewrites each artifact's row from its head revision in a separate transaction, so a rerun is safe. It prints the number of artifacts it indexed. The `unset` keeps later commands in the same shell off production. Schema migrations run before the merge instead, as described in [Migrate the production database before merge](ci-cd.md#migrate-the-production-database-before-merge).
 
 ## Enable Resend delivery
 
 The production configurations select Resend for sign-in codes and invitations. Auth, MCP, and panel require `EMAIL_FROM` and `RESEND_API_KEY`. Auth, MCP, and panel also require `OWNER_EMAIL`. The viewer receives no email bindings. Cloudflare account credentials remain separate deployment inputs.
 
-Before deploying the S10 code and this provider replacement, apply the reviewed `0004_sweet_the_anarchist.sql` migration to the intended database. It adds an owner budget with no recipient or artifact data. CI does not run migrations. Deploy in the order auth, MCP, view, panel.
+Before the first Resend deployment, apply the reviewed `0004_sweet_the_anarchist.sql` migration to the intended database. It adds an owner budget with no recipient or artifact data. CI does not run migrations. Deploy in the order auth, MCP, view, panel.
 
 Configure the sender in your Resend account with this procedure:
 
@@ -146,7 +147,7 @@ Configure the sender in your Resend account with this procedure:
 6. Choose a bare sender address on that verified subdomain for `EMAIL_FROM`. Do not use a display-name form. Set `RESEND_API_KEY` and `EMAIL_FROM` in the private runtime secret files for auth, MCP, and panel. Set `OWNER_EMAIL` for auth, MCP, and panel. For GitHub releases, update the exact runtime binding union in `ARTIFACTS_RUNTIME_SECRETS` as described in the [CI/CD runtime secret contract](ci-cd.md#runtime-secret-contract). Remove the obsolete Cloudflare email token and the runtime copy of the Cloudflare account ID. Keep the separate deployment account ID and deployment API token.
 7. After deployment is separately authorized, verify one sign-in code and one disposable invitation with controlled recipients. Record provider acceptance separately from inbox delivery. A successful API response does not establish delivery.
 
-The sender makes one bounded request and does not retry provider failures. Resend quota rejection preserves the uniform sign-in response and the committed invitation receipt. Replaying a share receipt does not attempt another email. Account readiness, sender verification, DNS changes, deployment, and production delivery remain unverified by local tests. This provider follow-up does not change the historical S10 evidence.
+The sender makes one bounded request and does not retry provider failures. Resend quota rejection preserves the uniform sign-in response and the committed invitation receipt. Replaying a share receipt does not attempt another email. Account readiness, sender verification, DNS changes, deployment, and production delivery remain unverified by local tests.
 
 ## Verify a disposable deployed share
 

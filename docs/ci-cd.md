@@ -75,10 +75,11 @@ export DATABASE_URL=$(turso db show artifacts --url)
 export DATABASE_AUTH_TOKEN=$(turso db tokens create artifacts --expiration 1d)
 ```
 
-2. Apply the migrations. `db:migrate` reads `.env` only when `DATABASE_URL` is unset, so a local `.env` does not change the target. A second run applies nothing.
+2. Apply the migrations. `db:migrate` reads `.env` only when `DATABASE_URL` is unset, so a local `.env` does not change the target. A second run applies nothing. The `unset` keeps later commands in the same shell off production.
 
 ```sh
 pnpm db:migrate
+unset DATABASE_URL DATABASE_AUTH_TOKEN
 ```
 
 3. Merge the pull request. If the change affects search indexing, rebuild the index after the release as described in [Production operations](deployment.md#production-operations).
