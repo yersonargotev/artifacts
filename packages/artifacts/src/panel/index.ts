@@ -4,9 +4,9 @@ import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
-import { ArtifactError, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor } from '../contracts.ts';
+import { ArtifactError, exportSchema, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor, type Revision } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink } from './model.ts';
+import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink, type PreviewSnapshot } from './model.ts';
 import { pageLinks } from './links.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
@@ -64,6 +64,20 @@ async function readWorkspace(connection: Connection, ownerId: string): Promise<W
     projects: groups.flatMap(({ name, updatedAt, ...counts }) => name === null ? [] : [{ name: name as ProjectName, updatedAt: new Date(updatedAt), ...counts }]).sort((left, right) => projectOrder(left.name, right.name)),
   };
   return workspace;
+}
+
+async function resolveLinks(connection: Connection, ownerId: string, page: { project: string | null; slug: string | null }, selected: Revision): Promise<PageLink[] | null> {
+  if (selected.snapshot.content.kind !== 'markdown') return null;
+  const candidates = pageLinks(selected.snapshot.content.text, page.slug);
+  const slugs = [...new Set(candidates.flatMap(({ candidate }) => candidate.kind === 'slug' ? [candidate.slug] : []))];
+  const targets = slugs.length === 0 ? [] : await connection.select({ artifactId: artifact.id, slug: artifact.slug, title }).from(artifact).innerJoin(artifactRevision, headJoin)
+    .where(and(eq(artifact.ownerId, ownerId), page.project === null ? isNull(artifact.project) : eq(artifact.project, page.project), inArray(artifact.slug, slugs)));
+  const bySlug = new Map(targets.map((target) => [target.slug, target]));
+  return candidates.map(({ href, text, candidate }) => {
+    if (candidate.kind === 'broken') return { href, text, target: { state: 'broken', reason: candidate.reason } };
+    const found = bySlug.get(candidate.slug);
+    return { href, text, target: found ? { state: 'resolved', artifactId: found.artifactId, slug: candidate.slug, title: found.title } : { state: 'broken', reason: 'missing' } };
+  });
 }
 
 export function createPanel(db: Database, options: { publishOrigin: string; access: AccessPolicy }) {
@@ -160,19 +174,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
             .where(and(eq(artifactRevision.artifactId, owned.artifactId), eq(artifactRevision.id, compared.revisionId))).limit(1);
           comparison = await compareRevisions(revision(row!), selectedRevision);
         }
-        let links: PageLink[] | null = null;
-        if (selectedRevision.snapshot.content.kind === 'markdown') {
-          const candidates = pageLinks(selectedRevision.snapshot.content.text, owned.slug);
-          const slugs = [...new Set(candidates.flatMap(({ candidate }) => candidate.kind === 'slug' ? [candidate.slug] : []))];
-          const targets = slugs.length === 0 ? [] : await connection.select({ artifactId: artifact.id, slug: artifact.slug, title }).from(artifact).innerJoin(artifactRevision, headJoin)
-            .where(and(eq(artifact.ownerId, actor.userId), owned.project === null ? isNull(artifact.project) : eq(artifact.project, owned.project), inArray(artifact.slug, slugs)));
-          const bySlug = new Map(targets.map((target) => [target.slug, target]));
-          links = candidates.map(({ href, text, candidate }) => {
-            if (candidate.kind === 'broken') return { href, text, target: { state: 'broken', reason: candidate.reason } };
-            const found = bySlug.get(candidate.slug);
-            return { href, text, target: found ? { state: 'resolved', artifactId: found.artifactId, slug: candidate.slug, title: found.title } : { state: 'broken', reason: 'missing' } };
-          });
-        }
+        const links = await resolveLinks(connection, actor.userId, owned, selectedRevision);
         return { workspace: await readWorkspace(connection, actor.userId), detail: {
           artifactId: owned.artifactId, project: owned.project as ProjectName | null, slug: owned.slug, createdAt: owned.createdAt,
           selected: { revision: selectedRevision, author: { clientId: selectedRevision.authorClientId, name: selected.name } },
@@ -180,6 +182,18 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           history: { entries, before: input.before ?? null, olderBefore: history.length > 5 ? entries.at(-1)!.sequence : null },
           choices: [...choices.values()].sort((left, right) => right.sequence - left.sequence), compared: compared ?? null, comparison, links,
         } };
+      });
+    },
+    async preview(actor: Actor, value: z.input<typeof exportSchema>): Promise<PreviewSnapshot> {
+      const input = exportSchema.parse(value);
+      return access.transaction(async (connection) => {
+        await access.authorize(connection, actor, 'artifacts:read');
+        const [found] = await connection.select({ project: artifact.project, slug: artifact.slug, row: artifactRevision }).from(artifactRevision)
+          .innerJoin(artifact, eq(artifact.id, artifactRevision.artifactId))
+          .where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId), eq(artifactRevision.id, input.revisionId))).limit(1);
+        if (!found) throw new ArtifactError('not_found', 'Revision not found');
+        const selected = revision(found.row);
+        return { artifactId: input.artifactId, revision: selected, links: await resolveLinks(connection, actor.userId, found, selected) };
       });
     },
     async library(actor: Actor, value: z.input<typeof panelLibraryQuerySchema> = {}): Promise<LibrarySnapshot> {

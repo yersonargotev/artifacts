@@ -83,6 +83,12 @@ export type PageLinkTarget =
   | { readonly state: 'resolved'; readonly artifactId: string; readonly slug: string; readonly title: string }
   | { readonly state: 'broken'; readonly reason: 'missing' | 'outside' | 'unslugged' };
 export type PageLink = { readonly href: string; readonly text: string; readonly target: PageLinkTarget };
+export type BrokenPageLink = PageLink & { readonly target: Extract<PageLinkTarget, { state: 'broken' }> };
+export const brokenLinkLabels: Record<BrokenPageLink['target']['reason'], string> = { missing: 'No existe', outside: 'Sale del proyecto', unslugged: 'La página no tiene slug' };
+export const brokenLinks = (links: readonly PageLink[]) => links.filter((link): link is BrokenPageLink => link.target.state === 'broken');
+// Rendered Markdown stays script-free; these tokens only let an owner's click follow a link out of the frame.
+export const markdownPreviewSandbox = 'allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox';
+export type PreviewSnapshot = { readonly artifactId: string; readonly revision: Revision; readonly links: readonly PageLink[] | null };
 export type ArtifactDetail = {
   readonly artifactId: string;
   readonly project: ProjectName | null;
