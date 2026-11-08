@@ -1,10 +1,11 @@
 ---
-import { isSelectedPublished, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
+import { isSelectedPublished, markdownPreviewSandbox, type ArtifactDetail } from '@artifacts/artifacts/panel/model';
 import { previewHref } from '../../urls.ts';
 import Icon from '../Icon.astro';
 interface Props { detail: ArtifactDetail }
 const { detail } = Astro.props;
 const { revision } = detail.selected;
+const sandbox = revision.snapshot.content.kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts';
 ---
 <section class="preview-card" data-preview-size="desktop" aria-labelledby="preview-title">
   <div class="preview-heading">
@@ -18,6 +19,6 @@ const { revision } = detail.selected;
       <button class="icon-button" type="button" aria-label="Abrir vista previa en pantalla completa" data-preview-fullscreen><Icon name="arrows-maximize" size={17} /></button>
     </div>
   </div>
-  <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox="allow-scripts" referrerpolicy="no-referrer" src={previewHref(detail.artifactId, revision.id)}></iframe>
+  <iframe class="preview" title={`Vista previa de la revisión ${revision.sequence}`} sandbox={sandbox} referrerpolicy="no-referrer" src={previewHref(detail.artifactId, revision.id)}></iframe>
   <p class="preview-feedback sr-only" role="status"></p>
 </section>

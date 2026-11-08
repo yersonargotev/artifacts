@@ -267,6 +267,21 @@ test('previewDocument keeps HTML, Markdown, and text bytes and renders a design 
   assert.equal(previewDocument({ revision: { snapshot: design } }), shell(inert, canvasDocument(design, false)));
 });
 
+test('a published Markdown page stays an inert source block with links and HTML unrendered', async () => {
+  const text = '# Wiki\n\n[RAG](../concepts/rag.md) [web](https://example.com) <script>alert(1)</script>';
+  const snapshot = { ...artifact.revision.snapshot, content: { kind: 'markdown' as const, text } };
+  const handler = createPublicationApp(environment(), async (input) => String(input).endsWith('/consume')
+    ? Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 })
+    : Response.json({ ...artifact, revision: { ...artifact.revision, snapshot } }));
+  const cookie = cookieHeader((await authorize(handler)).admitted);
+  const response = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': 'Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36' } }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-security-policy')?.endsWith('; sandbox allow-scripts'), true, 'the publication frame policy is unchanged');
+  const body = await response.text();
+  assert(body.includes(`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(text)}</pre>`));
+  assert(!/<h1|<a |<script/.test(body));
+});
+
 test('a design content response carries the same headers as an HTML content response', async () => {
   const headers: Record<string, [string, string][]> = {};
   for (const [kind, snapshot] of [['html', artifact.revision.snapshot], ['design', design]] as const) {
