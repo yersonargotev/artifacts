@@ -238,8 +238,9 @@ Write(p) ==
        ELSE
          LET db == ExecFrom([arts |-> arts, revs |-> revs, failed |-> FALSE], st.writes, 1)
              placed == {st.writes[i].project : i \in {j \in DOMAIN st.writes : st.writes[j].op # "update"}} \ {NULL}
-             \* Every spelling shares one key, so a known set of two names that project twice and becomes empty.
-             known == IF Cardinality(seen[p].projects \cup placed) <= 1 THEN seen[p].projects \cup placed ELSE {}
+             \* Every spelling shares one key, so a placed spelling the read missed beside any other spelling is skew.
+             skewed == \E s \in placed \ seen[p].projects : (seen[p].projects \cup placed) \ {s} # {}
+             known == IF skewed THEN {} ELSE seen[p].projects \cup placed
              spellFails == SpellingGuard /\ placed # {} /\
                \E a \in DOMAIN db.arts : db.arts[a].project \notin known \cup {NULL}
              receiptFails == ReceiptKey /\ Req \in DOMAIN receipts

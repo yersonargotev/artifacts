@@ -24,7 +24,7 @@ Every rule fails when its guard is removed (checked at the sync commit with `--w
 
 ## How the spelling race was found
 
-`OneSpellingPerProject` and `SlugNamesOnePageInProject` first failed in their own run. The batch resolved project spellings from its read phase, and no index compares project names case-insensitively. A batch planned `docs`, a racing `store.create` stored `Docs`, and the batch then stored `docs` beside it. The `spelled` statement now fails such a batch, and the store plans again under `Docs`. The model's first check of that guard found a second path. A move landed a page in `Docs` between the project read and the page read, so the batch's own spellings named one project twice. The guard now fails on that case too. `tests/batch.test.ts` forces that race for a create and a move.
+`OneSpellingPerProject` and `SlugNamesOnePageInProject` first failed in their own run. The batch resolved project spellings from its read phase, and no index compares project names case-insensitively. A batch planned `docs`, a racing `store.create` stored `Docs`, and the batch then stored `docs` beside it. The `spelled` statement now fails such a batch, and the store plans again under `Docs`. The model's first check of that guard found a second path. A move landed a page in `Docs` between the project read and the page read, so the batch placed `Docs` beside its own `docs`. The guard now fails when a placed spelling that the project read missed shares a key with another spelling. A split that the read already held still lets the batch write, which `tests/batch.test.ts` checks. The model starts without split data and has no progress property, so only that test covers this case. `tests/batch.test.ts` forces that race for a create and a move.
 
 ## Run it
 

@@ -59,11 +59,15 @@ const moved = (ownerId: string, write: { artifactId: string; revisionId: string;
   sql: 'insert into artifact_command (owner_id) select null where not exists (select 1 from artifact where id = ? and owner_id = ? and head_revision_id = ? and project is ? and slug is ?)',
   args: [write.artifactId, ownerId, write.revisionId, write.project, write.slug],
 });
-// Projects group by letter case but the slug index compares spellings exactly. The batch fails when the owner holds a spelling outside the ones it read and placed, or when those name one project twice because the reads ran at different moments. An empty list fails on the batch's own placed rows.
-const spelled = (ownerId: string, known: string[]): Statement => ({
-  sql: 'insert into artifact_command (owner_id) select null where exists (select 1 from artifact where owner_id = ? and project not in (select value from json_each(?)))',
-  args: [ownerId, JSON.stringify(new Set(known.map(projectKey)).size === known.length ? known : [])],
-});
+// Projects group by letter case but the slug index compares spellings exactly. The batch fails when the owner holds a spelling outside the ones it read and placed. It also fails when it placed a spelling the project read missed for a project known by another spelling, because the project and page reads ran at different moments; an empty list fails on the batch's own placed rows. A split the read already held is older data that the batch leaves as it is.
+const spelled = (ownerId: string, read: string[], placed: string[]): Statement => {
+  const known = [...new Set([...read, ...placed])];
+  const skewed = placed.some((name) => !read.includes(name) && known.some((other) => other !== name && projectKey(other) === projectKey(name)));
+  return {
+    sql: 'insert into artifact_command (owner_id) select null where exists (select 1 from artifact where owner_id = ? and project not in (select value from json_each(?)))',
+    args: [ownerId, JSON.stringify(skewed ? [] : known)],
+  };
+};
 const held = alias(artifact, 'held');
 
 export async function reindexSearch(db: Database): Promise<number> {
@@ -219,7 +223,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           ];
         });
         const placed = writes.flatMap((write) => write.op !== 'update' && write.project !== null ? [write.project] : []);
-        if (placed.length) statements.push(spelled(actor.userId, [...new Set([...projects.map(({ name }) => name), ...placed])]));
+        if (placed.length) statements.push(spelled(actor.userId, projects.map(({ name }) => name), placed));
         statements.push(statement(db.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson({ results }), createdAt })));
         try {
           await db.$client.batch(statements, 'write');

@@ -41,7 +41,7 @@ const guards: Record<string, { file: string; pattern: RegExp }> = {
   SlugIndex: { file: 'packages/db/src/schema.ts', pattern: /uniqueIndex\('artifact_owner_project_slug_idx'\)\.on\(table\.ownerId, sql`coalesce\(project, ''\)`, table\.slug\)/ },
   ReceiptKey: { file: 'packages/db/src/schema.ts', pattern: /primaryKey\(\{ columns: \[table\.ownerId, table\.requestId\] \}\)/ },
   MovedGuard: { file: 'packages/artifacts/src/index.ts', pattern: /^\s*moved\(actor\.userId, write\),$/m },
-  SpellingGuard: { file: 'packages/artifacts/src/index.ts', pattern: /if \(placed\.length\) statements\.push\(spelled\(actor\.userId, /m },
+  SpellingGuard: { file: 'packages/artifacts/src/index.ts', pattern: /if \(placed\.length\) statements\.push\(spelled\(actor\.userId, projects\.map\(\(\{ name \}\) => name\), placed\)\);/m },
   HeadGuard: { file: 'packages/artifacts/src/index.ts', pattern: /set\(\{ headRevisionId: write\.revisionId \}\)\.where\(and\(eq\(artifact\.id, write\.artifactId\), eq\(artifact\.ownerId, actor\.userId\), eq\(artifact\.headRevisionId, write\.parentRevisionId\)\)\)/ },
 };
 
