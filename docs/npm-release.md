@@ -4,7 +4,12 @@ This procedure publishes only `@yargote/artifacts-contracts`, `@yargote/artifact
 
 ## Prepare a version
 
-1. Set the three source manifest versions to an unused `X.Y.Z-beta.N` version. Keep their source `private: true` guards. Keep workspace dependencies as `workspace:*`.
+1. Replace the previous version with an unused `X.Y.Z-beta.N` version in every file that carries it. Keep the source `private: true` guards and the `workspace:*` dependencies. `git grep -l '<previous version>'` lists the files. For `0.1.0-beta.11` they were:
+   - `packages/contracts/package.json`, `packages/client/package.json`, and `apps/cli/package.json`.
+   - `packages/contracts/README.md`, `packages/client/README.md`, `apps/cli/README.md`, and `README.md`.
+   - `docs/npm-release.md`, in the `--expected-version` example in step 3.
+
+   Leave `docs/decisions/` unchanged. A decision record names the version that first shipped a feature.
 2. Run the checks with Node 24 and the repository's pinned pnpm:
 
 ```sh
@@ -17,7 +22,7 @@ This procedure publishes only `@yargote/artifacts-contracts`, `@yargote/artifact
 	pnpm release:npm:check
 ```
 
-The package build is the only tarball producer. `dist/packages/manifest.json` records names, versions, dependencies, exact contents, and integrity. The release check reads actual tarballs and refuses stable versions, private dependencies, unexpected files, and mismatched metadata. Inspect the three public inventories and package READMEs before publication. The four private local tarballs remain available for existing package proofs.
+The package build is the only tarball producer. `release:npm:check` compares the tarballs and `manifest.json` in `dist/packages` with the source manifests. Run it only after a fresh `pnpm test:packages`, which rebuilds that directory. Against an older build it fails with an `actual` version that differs from the `expected` source version. `dist/packages/manifest.json` records names, versions, dependencies, exact contents, and integrity. The release check reads actual tarballs and refuses stable versions, private dependencies, unexpected files, and mismatched metadata. Inspect the three public inventories and package READMEs before publication. The four private local tarballs remain available for existing package proofs.
 
 3. Install the three public tarballs in an empty external consumer. Run the first-use proof against its installed `artifacts` binary with a supported resource and an existing account:
 

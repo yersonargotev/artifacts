@@ -82,7 +82,53 @@ gh secret set --env production ARTIFACTS_RUNTIME_SECRETS < /absolute/private/run
 
 7. Merge the checked changes into `main`. Production downloads that run's checked Worker artifact, preflights all services, deploys them in order, and performs read-only HTTP smoke checks.
 
-The [CI/CD release contract](ci-cd.md) describes artifact integrity, current-main skips, retries, partial-release behavior, and manual database operations. Manual workflow dispatch runs validation without deploying production.
+The [CI/CD release contract](ci-cd.md) describes artifact integrity, current-main skips, retries, partial-release behavior, and production migrations. Manual workflow dispatch runs validation without deploying production.
+
+## Production operations
+
+Production runs four Workers on one Cloudflare account and stores its data in the Turso database `artifacts`.
+
+| Service | Worker | Origin |
+| --- | --- | --- |
+| REST and MCP | `artifacts-api` | `https://artifacts-api.yersonargotev.workers.dev` |
+| Authorization | `artifacts-auth` | `https://artifacts-auth.yersonargotev.workers.dev` |
+| Panel | `artifacts-panel` | `https://artifacts-panel.yersonargotev.workers.dev` |
+| Publication | `artifacts-view` | `https://artifacts-view.yersonargotev.workers.dev` |
+
+`scripts/cloudflare.ts` holds the origins, and each service's `cloudflare.config.ts` holds its Worker name.
+
+### Use the cf CLI
+
+The repository deploys with the Cloudflare `cf` CLI from its dev dependencies. Run it as `pnpm exec cf`. Wrangler is not installed.
+
+Account commands need `CLOUDFLARE_ACCOUNT_ID`. Without it, `cf accounts subscriptions get` lists only the zone's Cloudflare Free Plan and omits the account's Workers plan. `cf accounts list` prints the account ID.
+
+```sh
+export CLOUDFLARE_ACCOUNT_ID=<account id>
+pnpm exec cf accounts subscriptions get
+```
+
+- `cf accounts subscriptions get` lists the account's plans. Production needs `Workers Paid` in that list.
+- `cf o11y telemetry query` reads Workers Observability, including CPU time per invocation. Run `cf o11y telemetry query --help` for its options.
+- `cf workers delete NAME --force` deletes a Worker and all its versions, for example a throwaway spike Worker. Never run it on a production Worker.
+
+For another task, run `cf cli search "<task>"` once and then `<command> --help`. Nested `--help` output starts with a notice that asks agents to search instead.
+
+### Keep the account on Workers Paid
+
+Every measured batch command needs more than 10 ms of CPU, which is the Workers Free limit per invocation. On Free, Cloudflare fails all requests with `exceededCpu` after a short burst. Workers Paid allows up to 5 minutes of CPU per request. The [batch commands decision](decisions/wiki-pages.md#batch-commands) records the measurement.
+
+### Rebuild the search index after a search change
+
+A deploy that changes how the store extracts search text does not rewrite existing index rows. After that release, rebuild the index from a checkout of the released `main`, because the script uses the local store's extraction rule:
+
+```sh
+export DATABASE_URL=$(turso db show artifacts --url)
+export DATABASE_AUTH_TOKEN=$(turso db tokens create artifacts --expiration 1d)
+pnpm search:reindex
+```
+
+`search:reindex` rewrites each artifact's row from its head revision in a separate transaction, so a rerun is safe. It prints the number of artifacts it indexed. Schema migrations run before the merge instead, as described in [Migrate the production database before merge](ci-cd.md#migrate-the-production-database-before-merge).
 
 ## Enable Resend delivery
 

@@ -62,9 +62,44 @@ An authenticated internal panel read uses a random nonexistent user and session,
 
 The smoke performs no login, authoring, grant consumption, or production data mutation. The absent-session read proves session-table connectivity and fail-closed admission. It does not prove every table, schema version, or authenticated authoring flow. A smoke failure leaves the deployed quartet in place and fails the release job.
 
-## Manual database operations
+## Migrate the production database before merge
 
-S10 adds migration `0004_sweet_the_anarchist.sql` for the owner invitation budget. Apply the reviewed migration before deploying S10. Ordinary releases never run `db:migrate`, `identity:bootstrap`, or `identity:migrate`. Future production schema changes require a separately reviewed manual migration against the intended production database before deploying dependent code. The operator owns migration timing and compatibility with the currently deployed services. CI does not acknowledge or apply a production schema revision.
+Releases never run `db:migrate`, `identity:bootstrap`, or `identity:migrate`, and a merge to `main` deploys at once. A pull request that adds a file under `packages/db/migrations` therefore needs its migration applied to production before it merges. Otherwise the new Workers run against the old schema.
+
+The previous release keeps serving traffic between the migration and the deploy, so the migration must also work with the deployed code. The operator owns migration timing and that compatibility. CI does not apply or acknowledge a production schema revision.
+
+1. From the pull request branch, point the database variables at the Turso database `artifacts` with a one-day token:
+
+```sh
+export DATABASE_URL=$(turso db show artifacts --url)
+export DATABASE_AUTH_TOKEN=$(turso db tokens create artifacts --expiration 1d)
+```
+
+2. Apply the migrations. `db:migrate` reads `.env` only when `DATABASE_URL` is unset, so a local `.env` does not change the target. A second run applies nothing.
+
+```sh
+pnpm db:migrate
+```
+
+3. Merge the pull request. If the change affects search indexing, rebuild the index after the release as described in [Production operations](deployment.md#production-operations).
+
+## Diagnose a failed run
+
+A pull request run takes 13 to 15 minutes. That is longer than the 10-minute limit on a foreground agent command, so start the watch as a background task:
+
+```sh
+gh pr checks <number> --watch --fail-fast
+```
+
+After the whole run finishes, `gh run view <run> --log-failed` prints the failed steps. While other jobs still run, it refuses with `run <run> is still in progress`. To read a failed job before then, fetch its log through the API. `gh api` refuses a log that contains terminal escape sequences unless you pass `--allow-escape-sequences`.
+
+```sh
+RUN=$(gh run list --branch <branch> --limit 1 --json databaseId -q '.[0].databaseId')
+JOB=$(gh run view $RUN --json jobs -q '.jobs[] | select(.conclusion == "failure") | .databaseId')
+gh api --allow-escape-sequences repos/yersonargotev/artifacts/actions/jobs/$JOB/logs | sed 's/\x1b\[[0-9;]*m//g' | grep -n -B2 -A22 'TimeoutError\|proof.ts:'
+```
+
+The Chrome proofs are deterministic since [#109](https://github.com/yersonargotev/artifacts/pull/109) removed the last focus race. Treat a failed proof as a real failure and read its log before you rerun the job.
 
 ## Production email bindings
 
