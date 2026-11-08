@@ -65,6 +65,59 @@ test('panel library searches the whole scope literally before status filtering a
   } finally { await app.close(); }
 });
 
+test('panel library sorts the whole scope by title, state, revision, and update time across cursor pages', async () => {
+  const app = await fixture({ allowGuests: true });
+  try {
+    const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
+    assert(signedIn);
+    const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'library-test', scopes: ['artifacts:read', 'artifacts:write', 'artifacts:publish'] };
+    const options = { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://published.example.test' };
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const created = [];
+    // 30 titles in a shuffled order, with case variants and a non-ASCII title, so a sort cannot pass by insertion order.
+    for (let index = 0; index < 30; index++) {
+      const number = (index * 7) % 30;
+      const title = index === 0 ? 'Índice' : `${number % 2 ? 'page' : 'Page'} ${String(number).padStart(2, '0')}`;
+      created.push(await store.create(actor, { requestId: randomUUID(), snapshot: snapshot(title), project: 'Sorted' }));
+    }
+    for (const read of created.slice(0, 4)) await store.publish(actor, { requestId: randomUUID(), artifactId: read.artifactId, revisionId: read.revision.id, expectedPublicationVersion: 0 });
+    let head = created[0];
+    for (let index = 0; index < 3; index++) head = await store.update(actor, { requestId: randomUUID(), artifactId: created[0].artifactId, expectedRevisionId: head.revision.id, snapshot: snapshot('Índice') });
+    await store.update(actor, { requestId: randomUUID(), artifactId: created[5].artifactId, expectedRevisionId: created[5].revision.id, snapshot: snapshot('page 05') });
+    const scope = { kind: 'project' as const, name: 'Sorted' };
+    const all = async (sort: 'updated' | 'title' | 'state' | 'revision', direction?: 'asc' | 'desc') => {
+      const first = (await panel.library(actor, { scope, sort, direction })).page;
+      assert.equal(first.cards.length, 25);
+      assert(first.next);
+      const second = (await panel.library(actor, { scope, sort, direction, cursor: first.next })).page;
+      assert.equal(second.cards.length, 5);
+      assert.equal(second.next, null);
+      const cards = [...first.cards, ...second.cards];
+      assert.equal(new Set(cards.map(({ artifactId }) => artifactId)).size, 30, `${sort} ${direction}`);
+      return { first, cards };
+    };
+    const byTitle = await all('title');
+    assert.equal(byTitle.first.sort, 'title');
+    assert.equal(byTitle.first.direction, 'asc');
+    const titles = byTitle.cards.map(({ title }) => title);
+    assert.deepEqual(titles, [...titles].sort((left, right) => left.toLowerCase() < right.toLowerCase() ? -1 : left.toLowerCase() > right.toLowerCase() ? 1 : 0));
+    assert.equal(titles.at(-1), 'Índice');
+    assert.deepEqual((await all('title', 'desc')).cards.map(({ title }) => title), [...titles].reverse());
+    const rank = { pending: 0, unpublished: 1, published: 2 };
+    const states = (await all('state')).cards.map(({ publication }) => rank[publication.state]);
+    assert.deepEqual(states, [...states].sort());
+    assert.deepEqual(states.slice(0, 1), [0]);
+    assert.deepEqual((await all('state', 'desc')).cards.slice(0, 3).map(({ publication }) => publication.state), ['published', 'published', 'published']);
+    const revisions = (await all('revision')).cards.map(({ head }) => head.sequence);
+    assert.deepEqual(revisions.slice(0, 2), [4, 2]);
+    assert.deepEqual(revisions, [...revisions].sort((left, right) => right - left));
+    const updated = (await all('updated')).cards.map(({ artifactId }) => artifactId);
+    assert.deepEqual(updated.slice(0, 2), [created[5].artifactId, created[0].artifactId]);
+    assert.deepEqual((await all('updated', 'asc')).cards.map(({ artifactId }) => artifactId), [...updated].reverse());
+  } finally { await app.close(); }
+});
+
 test('published library query exports and public MCP list validation stay unchanged', () => {
   assert.deepEqual(libraryQuerySchema.parse({}), { q: '', status: 'all' });
   assert.deepEqual(libraryQuerySchema.parse({ project: ' Alpha ' }), { q: '', status: 'all', project: 'Alpha' });

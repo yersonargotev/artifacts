@@ -1,0 +1,48 @@
+---
+import { defaultDirections, type LibraryPage, type LibrarySort } from '@artifacts/artifacts/panel/model';
+import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
+import { libraryHref, scopeHref, type LibraryLink } from '../../urls.ts';
+import ArtifactActions from './ArtifactActions.astro';
+import Icon from '../Icon.astro';
+interface Props { page: LibraryPage; query: LibraryLink; now: Date; selectable: boolean }
+const { page, query, now, selectable } = Astro.props;
+// Inside a project or Sin proyecto every row has the same project, so the column would repeat the heading.
+const showProject = page.scope.kind === 'all';
+const sortable = (sort: LibrarySort) => {
+  const active = page.sort === sort;
+  const direction = active ? (page.direction === 'asc' ? 'desc' : 'asc') : defaultDirections[sort];
+  return { active, href: libraryHref(query, { sort, direction }), ariaSort: active ? (page.direction === 'asc' ? 'ascending' : 'descending') : undefined, icon: active ? (page.direction === 'asc' ? 'arrow-up' : 'arrow-down') : 'selector' } as const;
+};
+const columns = { title: sortable('title'), state: sortable('state'), revision: sortable('revision'), updated: sortable('updated') };
+---
+<div class="artifact-table-frame">
+  <table class="artifact-table" data-project-column={showProject ? '' : undefined}>
+    <thead><tr>
+      {selectable && <th class="artifact-table-check" scope="col"><input type="checkbox" data-select-all aria-label="Seleccionar todos" hidden /></th>}
+      <th class="artifact-table-title" scope="col" aria-sort={columns.title.ariaSort}><a href={columns.title.href}>Título<Icon name={columns.title.icon} size={13} /></a></th>
+      {showProject && <th class="artifact-table-project" scope="col">Proyecto</th>}
+      <th class="artifact-table-state" scope="col" aria-sort={columns.state.ariaSort}><a href={columns.state.href}>Estado<Icon name={columns.state.icon} size={13} /></a></th>
+      <th class="artifact-table-kind" scope="col">Tipo</th>
+      <th class="artifact-table-revision" scope="col" aria-sort={columns.revision.ariaSort}><a href={columns.revision.href}>Revisión<Icon name={columns.revision.icon} size={13} /></a></th>
+      <th class="artifact-table-updated" scope="col" aria-sort={columns.updated.ariaSort}><a href={columns.updated.href}>Actualizado<Icon name={columns.updated.icon} size={13} /></a></th>
+      <th class="artifact-table-actions" scope="col"><span class="sr-only">Acciones</span></th>
+    </tr></thead>
+    <tbody>{page.cards.map((card) => {
+      const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
+      return <tr>
+        {selectable && <td class="artifact-table-check"><label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} data-move-item={JSON.stringify({ artifactId: card.artifactId, title: card.title, project: card.project })} aria-label={`Seleccionar ${card.title}`} /></label></td>}
+        <td class="artifact-table-title"><div class="artifact-table-name">
+          <a href={detailUrl} title={card.title}>{card.title}</a>
+          {card.slug ? <code class="artifact-table-slug" title={card.description || `Slug ${card.slug}`}>{card.slug}</code> : card.description && <p title={card.description}>{card.description}</p>}
+        </div></td>
+        {showProject && <td class="artifact-table-project"><a class="project-chip" data-tone={card.project ? projectTone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a></td>}
+        <td class="artifact-table-state"><span class="artifact-status" data-state={card.publication.state}>{publicationStates[card.publication.state].label}</span></td>
+        <td class="artifact-table-kind"><span class="artifact-kind">{contentLabels[card.kind]}</span></td>
+        <td class="artifact-table-revision"><span class="artifact-table-compact">Rev. </span>{card.head.sequence}</td>
+        <td class="artifact-table-updated"><time datetime={card.head.createdAt.toISOString()} title={absoluteTime(card.head.createdAt)}>{relativeTime(card.head.createdAt, now)}</time></td>
+        <td class="artifact-table-actions"><ArtifactActions card={card} /></td>
+      </tr>;
+    })}</tbody>
+  </table>
+</div>
+{selectable && <script>import './table.ts';</script>}

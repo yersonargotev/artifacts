@@ -1,8 +1,9 @@
 ---
-import type { LibraryQuery } from '@artifacts/artifacts/panel/model';
+import { defaultDirections } from '@artifacts/artifacts/panel/model';
+import type { LibraryLink } from '../../urls.ts';
 import Icon from '../Icon.astro';
 import { Input } from '../ui/input.tsx';
-interface Props { query: LibraryQuery }
+interface Props { query: LibraryLink }
 const { query } = Astro.props;
 const placeholder = query.scope.kind === 'project' ? `Buscar en ${query.scope.name}…` : query.scope.kind === 'unfiled' ? 'Buscar en Sin proyecto…' : 'Buscar artefactos…';
 ---
@@ -11,5 +12,8 @@ const placeholder = query.scope.kind === 'project' ? `Buscar en ${query.scope.na
   {query.scope.kind === 'project' && <input type="hidden" name="project" value={query.scope.name} />}
   {query.scope.kind === 'unfiled' && <input type="hidden" name="unfiled" value="1" />}
   {query.status !== 'all' && <input type="hidden" name="status" value={query.status} />}
+  {query.sort && query.sort !== 'updated' && <input type="hidden" name="sort" value={query.sort} />}
+  {query.direction && query.direction !== defaultDirections[query.sort ?? 'updated'] && <input type="hidden" name="dir" value={query.direction} />}
+  {query.view && <input type="hidden" name="view" value={query.view} />}
   <button class="secondary" type="submit">Buscar</button>
 </form>

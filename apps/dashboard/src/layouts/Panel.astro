@@ -2,7 +2,8 @@
 import '../styles/tokens.css';
 import '../styles/panel.css';
 import '../styles/effects.css';
-import type { LibraryQuery, Workspace } from '@artifacts/artifacts/panel/model';
+import type { Workspace } from '@artifacts/artifacts/panel/model';
+import type { LibraryLink } from '../urls.ts';
 import ShareDialog from '../components/share/ShareDialog.tsx';
 import MoveDialog from '../components/move/MoveDialog.tsx';
 import Sidebar from '../components/shell/Sidebar.astro';
@@ -10,7 +11,7 @@ import Breadcrumb from '../components/shell/Breadcrumb.astro';
 import SearchForm from '../components/shell/SearchForm.astro';
 import { scopeOf, type NavLocation } from '../presentation.ts';
 import { getRuntime } from '../runtime.ts';
-interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryQuery; detail?: boolean; move?: boolean; share?: boolean }
+interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryLink; detail?: boolean; move?: boolean; share?: boolean }
 const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, detail = false, move = false, share = false } = Astro.props;
 const identity = Astro.locals.identity;
 const authUrl = identity ? (await getRuntime()).config.auth : '';

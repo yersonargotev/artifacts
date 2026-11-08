@@ -116,3 +116,6 @@ export function designSnapshot(boardCount = 3): Snapshot {
     files: paths.map((path) => ({ path, mediaType: 'text/html', encoding: 'utf8', data: `<!doctype html><html lang="es"><meta charset="utf-8"><title>${path}</title><h1>${path}</h1></html>` })),
   };
 }
+
+/** Pins the panel's card view for proofs that check card markup; the table is the default view. */
+export const cardsViewCookie = (origin: string) => ({ name: 'panel_view', value: 'cards', domain: new URL(origin).hostname, path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'Lax' as const });

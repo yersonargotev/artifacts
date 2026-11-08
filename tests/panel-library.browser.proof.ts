@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { artifactReadSchema, type ArtifactRead, type ArtifactSummary } from '../packages/contracts/src/index.ts';
-import { grant } from './helpers.ts';
+import { cardsViewCookie, grant } from './helpers.ts';
 import { restCliFixture } from './rest-cli-fixture.ts';
 
 const evidence = resolve(process.env.PANEL_LIBRARY_EVIDENCE ?? `.test-artifacts/panel-library-${Date.now()}`);
@@ -56,6 +56,7 @@ try {
   await login.getByRole('button', { name: 'Iniciar sesión', exact: true }).press('Enter');
   await login.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   const storageState = await setup.storageState();
+  storageState.cookies.push(cardsViewCookie(app.dashboard));
   const context = await browser.newContext({ storageState, viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(evidence, 'videos'), size: { width: 1440, height: 900 } } });
   await setup.close();
   page = await context.newPage();

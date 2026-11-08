@@ -13,7 +13,7 @@ import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { publishSelectedRevision } from '../apps/dashboard/src/publish.ts';
-import { fixture } from './helpers.ts';
+import { cardsViewCookie, fixture } from './helpers.ts';
 
 async function assertPreviewInViewport(page: Page) {
   await page.evaluate(() => scrollTo(0, 0));
@@ -119,6 +119,7 @@ try {
   assert.equal(authenticatedWithoutOrigin.status, 400);
   browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await context.addCookies([cardsViewCookie(dashboard)]);
   const page = await context.newPage();
   const callbackRequest = page.waitForRequest((request) => new URL(request.url()).origin === publish && new URL(request.url()).pathname === '/callback');
   await page.goto(firstPublication.url);

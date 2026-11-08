@@ -1,0 +1,19 @@
+---
+import { libraryHref, viewCookie, type LibraryLink, type ListView } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { query: LibraryLink; view: ListView }
+const { query, view } = Astro.props;
+const choices = [{ value: 'table', label: 'Tabla', icon: 'list' }, { value: 'cards', label: 'Tarjetas', icon: 'layout-grid' }] as const;
+---
+<nav class="view-toggle" aria-label="Vista" data-view-cookie={viewCookie}>
+  {choices.map((choice) => <a href={libraryHref(query, { view: choice.value })} data-set-view={choice.value} aria-current={view === choice.value ? 'true' : undefined} title={choice.label}><Icon name={choice.icon} size={16} /><span>{choice.label}</span></a>)}
+</nav>
+<script>
+  // The URL names the view for this page; the cookie keeps the choice for links that do not carry it.
+  const toggle = document.querySelector<HTMLElement>('[data-view-cookie]');
+  for (const link of toggle?.querySelectorAll<HTMLAnchorElement>('[data-set-view]') ?? []) {
+    link.addEventListener('click', () => {
+      document.cookie = `${toggle!.dataset.viewCookie}=${link.dataset.setView}; path=/; max-age=31536000; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`;
+    });
+  }
+</script>

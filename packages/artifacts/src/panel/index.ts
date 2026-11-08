@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
@@ -6,20 +6,42 @@ import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
 import { ArtifactError, exportSchema, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor, type Revision } from '../contracts.ts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
-import { libraryPageSize, libraryStatuses, projectKey, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink, type PreviewSnapshot } from './model.ts';
+import { defaultDirections, libraryPageSize, librarySorts, libraryStatuses, projectKey, type LibrarySort, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink, type PreviewSnapshot } from './model.ts';
 import { pageLinks } from './links.ts';
 import { revision } from '../revision.ts';
 import { compareRevisions } from '../workflow.ts';
 
-const cursorSchema = z.string().max(160).regex(/^(0|[1-9]\d{0,15}):[a-zA-Z0-9_-]{1,128}$/).refine((value) => {
-  const ms = Number(value.split(':')[0]);
-  return Number.isSafeInteger(ms) && ms <= 8_640_000_000_000_000;
+// A cursor is `<ms>:<id>` for the default order, and `<key>.<ms>:<id>` when another column sorts the list.
+// The key is the sort value of the last card: base64url UTF-8 for a title, an integer for a state rank or revision.
+const cursorPattern = /^(?:([A-Za-z0-9_-]{1,1400})\.)?(0|[1-9]\d{0,15}):([a-zA-Z0-9_-]{1,128})$/;
+const cursorSchema = z.string().max(1600).regex(cursorPattern).refine((value) => {
+  const match = cursorPattern.exec(value);
+  const ms = Number(match?.[2]);
+  return Boolean(match) && Number.isSafeInteger(ms) && ms <= 8_640_000_000_000_000;
 });
+const encodeTitle = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+function decodeTitle(value: string): string | undefined {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), (char) => char.charCodeAt(0))); }
+  catch { return undefined; }
+}
+function cursorKey(sort: LibrarySort, key: string | undefined): string | number | undefined {
+  if (key === undefined) return undefined;
+  if (sort === 'title') return decodeTitle(key);
+  if (sort === 'state') return /^[0-2]$/.test(key) ? Number(key) : undefined;
+  if (sort === 'revision') return /^[1-9]\d{0,8}$/.test(key) ? Number(key) : undefined;
+  return undefined;
+}
 export const panelLibraryQuerySchema = z.strictObject({
   scope: z.discriminatedUnion('kind', [z.strictObject({ kind: z.literal('all') }), z.strictObject({ kind: z.literal('project'), name: projectNameSchema }), z.strictObject({ kind: z.literal('unfiled') })]).default({ kind: 'all' }),
   status: z.enum(libraryStatuses).default('all'),
   q: z.string().trim().max(256).default(''),
+  sort: z.enum(librarySorts).optional(),
+  direction: z.enum(['asc', 'desc']).optional(),
   cursor: cursorSchema.optional(),
+}).superRefine(({ sort = 'updated', cursor }, context) => {
+  if (cursor === undefined) return;
+  const key = cursorPattern.exec(cursor)?.[1];
+  if (sort === 'updated' ? key !== undefined : cursorKey(sort, key) === undefined) context.addIssue({ code: 'custom', path: ['cursor'], message: 'Cursor does not match the sort order' });
 });
 
 export const panelDetailQuerySchema = z.strictObject({
@@ -45,6 +67,10 @@ const tally = {
   pending: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is not null and ${artifactPublication.revisionId} != ${artifact.headRevisionId} then 1 else 0 end), 0)`.mapWith(Number),
 };
 const zeroTally = (): Tally => ({ count: 0, published: 0, pending: 0 });
+// Pending sorts first, then unpublished, then published.
+const stateRank = sql<number>`case when ${artifactPublication.artifactId} is null then 1 when ${artifactPublication.revisionId} != ${artifact.headRevisionId} then 0 else 2 end`;
+const sortColumns = { title: sql`${title} collate nocase`, state: stateRank, revision: sql`${artifactRevision.sequence}` } as const;
+const stateRanks = { pending: 0, unpublished: 1, published: 2 } as const;
 
 function resolveScope(workspace: Workspace, request: ScopeRequest): LibraryScope {
   if (request.kind === 'all') return request;
@@ -202,7 +228,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
         await access.authorize(connection, actor, 'artifacts:read');
         const workspace = await readWorkspace(connection, actor.userId);
         const scope = resolveScope(workspace, input.scope);
-        if (scope.kind === 'vanishedProject') return { workspace, page: { scope, status: input.status, q: input.q, cards: [], counts: { all: 0, published: 0, unpublished: 0, pending: 0 }, next: null, continued: Boolean(input.cursor) } };
+        if (scope.kind === 'vanishedProject') return { workspace, page: { scope, status: input.status, q: input.q, sort: input.sort ?? 'updated', direction: input.direction ?? defaultDirections[input.sort ?? 'updated'], cards: [], counts: { all: 0, published: 0, unpublished: 0, pending: 0 }, next: null, continued: Boolean(input.cursor) } };
         const matching = and(eq(artifact.ownerId, actor.userId), scope.kind === 'project' ? eq(artifact.project, scope.project.name) : scope.kind === 'unfiled' ? isNull(artifact.project) : undefined,
           input.q ? or(sql`instr(lower(${title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
         const statuses = {
@@ -211,8 +237,16 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           unpublished: isNull(artifactPublication.artifactId),
           pending: and(isNotNull(artifactPublication.artifactId), ne(artifactPublication.revisionId, artifact.headRevisionId)),
         };
-        const [ms, cursorId] = input.cursor?.split(':') ?? [];
-        const before = ms === undefined ? undefined : or(lt(artifactRevision.createdAt, new Date(Number(ms))), and(eq(artifactRevision.createdAt, new Date(Number(ms))), lt(artifact.id, cursorId)));
+        const { sort = 'updated' } = input;
+        const direction = input.direction ?? defaultDirections[sort];
+        const ordered: typeof asc = direction === 'asc' ? asc : desc;
+        const beyond: typeof gt = direction === 'asc' ? gt : lt;
+        const order = sort === 'updated' ? [ordered(artifactRevision.createdAt), ordered(artifact.id)] : [ordered(sortColumns[sort]), desc(artifactRevision.createdAt), desc(artifact.id)];
+        const [, key, ms, cursorId] = input.cursor ? cursorPattern.exec(input.cursor)! : [];
+        const at = ms === undefined ? undefined : new Date(Number(ms));
+        const before = at === undefined ? undefined : sort === 'updated'
+          ? or(beyond(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), beyond(artifact.id, cursorId!)))
+          : or(beyond(sortColumns[sort], cursorKey(sort, key)), and(eq(sortColumns[sort], cursorKey(sort, key)), or(lt(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), lt(artifact.id, cursorId!)))));
         const rows = await connection.select({
           artifactId: artifact.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
           kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project, slug: artifact.slug,
@@ -221,15 +255,16 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
         }).from(artifact).innerJoin(artifactRevision, headJoin).leftJoin(artifactPublication, publicationJoin)
           .leftJoin(publishedRevision, and(eq(publishedRevision.artifactId, artifact.id), eq(publishedRevision.id, artifactPublication.revisionId)))
-          .where(and(matching, statuses[input.status], before)).orderBy(desc(artifactRevision.createdAt), desc(artifact.id)).limit(libraryPageSize + 1);
+          .where(and(matching, statuses[input.status], before)).orderBy(...order).limit(libraryPageSize + 1);
         const [counts] = await connection.select(tally).from(artifact).innerJoin(artifactRevision, headJoin).leftJoin(artifactPublication, publicationJoin).where(matching);
         const cards: ArtifactCard[] = rows.slice(0, libraryPageSize).map(({ publication, published, project, ...row }) => ({
           ...row, project: project as ProjectName | null,
           publication: publication ? { state: publication.revisionId === row.head.revisionId ? 'published' : 'pending', url: access.publicationUrl(row.artifactId), version: publication.version, revision: published! } : { state: 'unpublished' },
         }));
         const last = cards.at(-1);
-        return { workspace, page: { scope, status: input.status, q: input.q, counts: { all: counts.count, published: counts.published - counts.pending, unpublished: counts.count - counts.published, pending: counts.pending }, cards,
-          next: rows.length > libraryPageSize && last ? `${last.head.createdAt.getTime()}:${last.artifactId}` : null, continued: Boolean(input.cursor) } };
+        const lastKey = !last || sort === 'updated' ? '' : `${sort === 'title' ? encodeTitle(last.title) : sort === 'revision' ? last.head.sequence : stateRanks[last.publication.state]}.`;
+        return { workspace, page: { scope, status: input.status, q: input.q, sort, direction, counts: { all: counts.count, published: counts.published - counts.pending, unpublished: counts.count - counts.published, pending: counts.pending }, cards,
+          next: rows.length > libraryPageSize && last ? `${lastKey}${last.head.createdAt.getTime()}:${last.artifactId}` : null, continued: Boolean(input.cursor) } };
       });
     },
   };
