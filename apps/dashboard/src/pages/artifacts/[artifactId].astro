@@ -4,6 +4,7 @@ import { artifactErrorResponse, panelActor } from '../../publication.ts';
 import { retainedMarkers } from '../../presentation.ts';
 import { readDetailUrl, detailQuery } from '../../urls.ts';
 import { summarizeRevision } from '@artifacts/artifacts/workflow';
+import { brokenLinks } from '@artifacts/artifacts/panel/model';
 import Panel from '../../layouts/Panel.astro';
 import DetailHeader from '../../components/detail/DetailHeader.astro';
 import DetailTabs from '../../components/detail/DetailTabs.astro';
@@ -24,6 +25,7 @@ const result = await (async () => {
 if (result instanceof Response) return result;
 const { workspace, detail } = result;
 const url = { ...result.url, revisionId: detail.selected.revision.id, compareTo: detail.compared?.revisionId };
+const broken = url.tab === 'preview' && detail.links ? brokenLinks(detail.links) : [];
 const summary = url.tab === 'files' ? await summarizeRevision(detail.selected.revision) : undefined;
 ---
 <Panel share move title={detail.selected.revision.snapshot.metadata.title} workspace={workspace} location={{ kind: 'artifact', project: detail.project }} detail>
@@ -33,7 +35,7 @@ const summary = url.tab === 'files' ? await summarizeRevision(detail.selected.re
     <div class="detail-body">
       <div class="detail-main">
         {url.tab === 'preview' && <PreviewCard detail={detail} />}
-        {url.tab === 'preview' && detail.links !== null && <LinksCard links={detail.links} />}
+        {broken.length > 0 && <LinksCard links={broken} />}
         {summary && <FilesPanel files={summary.files} sequence={detail.selected.revision.sequence} />}
         {url.tab === 'compare' && <ComparePanel detail={detail} url={url} />}
         {url.tab === 'information' && <InformationPanel detail={detail} />}

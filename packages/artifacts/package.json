@@ -6,7 +6,8 @@
     ".": "./src/index.ts",
     "./contracts": "./src/contracts.ts",
     "./panel": "./src/panel/index.ts",
-    "./panel/model": "./src/panel/model.ts",
+    "./panel/markdown": "./src/panel/markdown.ts",
+    "./panel/model":"./src/panel/model.ts",
     "./workflow": "./src/workflow.ts"
   },
   "dependencies": {

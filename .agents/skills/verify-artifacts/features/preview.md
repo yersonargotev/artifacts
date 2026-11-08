@@ -11,7 +11,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 - `preview-mobile` exposes history and preview without horizontal page overflow.
 - `preview-menus` opens library card menus with Space, moves with arrows, and restores focus with Escape. The selected title menu is checked in the extended artifact browser proof under the built panel CSP.
 - `preview-pagination` follows `Ver más artefactos` and `Ver revisiones anteriores`; these are extended paths not covered by the fixed two-revision drive.
-- `preview-inert` displays Markdown, text, and unsupported-browser HTML as inert content; these are extended paths.
+- `preview-inert` displays text and unsupported-browser HTML as inert content; these are extended paths. Markdown renders for the owner and is driven by [Links](links.md).
 
 ## How to get to it (user POV)
 
@@ -46,7 +46,7 @@ Preconditions:
 
 - Direct navigation to `/artifacts/<artifactId>/preview?revisionId=<revisionId>` is deliberately denied with 403. Use the real detail-page iframe; changing request headers manually would bypass the user entry point.
 - The iframe accessible title is `Vista previa de la revisión N`; `.preview` is the existing stable frame selector. Keep button/heading checks inside that frame.
-- Unsupported browser user agents display escaped HTML source with scripts disabled. Markdown and text remain inert even in supported Chrome. Report those paths separately from interactive HTML.
+- Unsupported browser user agents display escaped HTML source with scripts disabled. Text remains inert even in supported Chrome. Markdown renders without scripts in every browser, with raw HTML escaped, under a sandbox that adds only `allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox` and without `Connection-Allowlist: ()`, which would block its link navigations. Report those paths separately from interactive HTML.
 - `tests/artifact-browser.proof.ts` checks historical content, preview denial, and containment using store-seeded artifact fixtures. `tests/publication-network.proof.ts` adds renderer/UDP probes. Neither a screenshot nor a raw HTML render proves the complete sandbox, network, and authentication behavior.
 - The fixed drive has a two-revision verification artifact and three library documents. It cannot prove pagination, empty-list state, arbitrary content kinds, or every mobile browser. The extended identity proof captures the empty library.
 - The `Más reciente` and `Publicada` badges describe different pointers. A historical selection may show neither; this is not a failed preview.

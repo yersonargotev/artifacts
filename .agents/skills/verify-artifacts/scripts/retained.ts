@@ -6,6 +6,9 @@ import { unzipSync, zipSync, type Zippable } from 'fflate';
 import type { BrowserContext, Frame, Locator, Page, Response as BrowserResponse } from 'playwright';
 import { artifactReadSchema, decodeFile, type ArtifactRead } from '../../../../packages/artifacts/src/contracts.ts';
 import { documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, supportsInteractiveHtml } from '../../../../apps/publication/src/document.ts';
+import { markdownPreviewPolicy } from '../../../../apps/dashboard/src/preview.ts';
+import { markdownDocument } from '../../../../packages/artifacts/src/panel/markdown.ts';
+import { markdownPreviewSandbox } from '../../../../packages/artifacts/src/panel/model.ts';
 
 export type ContentExpectation =
   | { kind: 'text'; selector: string; text: string }
@@ -162,7 +165,7 @@ async function panelPublication(page: Page, expected: ArtifactRead, mode: Identi
   }
 }
 
-async function policy(response: BrowserResponse, value: string, name: string, context: 'document' | 'wrapper' = 'document') {
+async function policy(response: BrowserResponse, value: string, name: string, context: 'document' | 'markdown' | 'wrapper' = 'document') {
   assert.equal(response.status(), 200, `${name} must respond successfully`);
   const headers = response.headers();
   assert.equal(headers['content-security-policy'], value, `${name} CSP differs`);
@@ -171,9 +174,12 @@ async function policy(response: BrowserResponse, value: string, name: string, co
   assert(['private, no-store', 'no-store'].includes(headers['cache-control']!), `${name} must forbid storage`);
 }
 
-async function contentFrame(page: Page, iframe: Locator, interactive: boolean) {
+// Wiki link targets depend on the owner's other pages, so only their wrappers are left out of the exact comparison.
+const unwrapWikiLinks = (html: string) => html.replace(/<a href="\/artifacts\/[^"]*" target="_top"(?: title="[^"]*")?>(.*?)<\/a>|<span class="broken-link" title="[^"]*">(.*?)<\/span>/gs, (_, link = '', broken = '') => link + broken);
+
+async function contentFrame(page: Page, iframe: Locator, sandbox: string) {
   assert.equal(await iframe.count(), 1, 'One real content iframe is required');
-  assert.equal(await iframe.getAttribute('sandbox'), interactive ? 'allow-scripts' : '', 'Content iframe sandbox differs');
+  assert.equal(await iframe.getAttribute('sandbox'), sandbox, 'Content iframe sandbox differs');
   assert.equal(await iframe.getAttribute('referrerpolicy'), 'no-referrer', 'Content iframe must suppress referrers');
   const frame = await (await iframe.elementHandle())!.contentFrame();
   assert(frame, 'Real content frame must be loaded');
@@ -284,9 +290,11 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
       const iframe = panel.locator('iframe.preview');
       assert.equal(new URL((await iframe.getAttribute('src'))!, config.panelUrl).href, previewUrl, 'Panel preview URL must pin the exact revision');
       assert.equal(realPreview.url(), previewUrl, 'Actual iframe response must come from the pinned preview URL');
-      await policy(realPreview, report.interactive ? previewPolicy : inertPreviewPolicy, 'Actual iframe preview response');
-      assert.deepEqual(await realPreview.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
-      const frame = await contentFrame(panel, iframe, true);
+      const { content } = expected.revision.snapshot;
+      await policy(realPreview, content.kind === 'markdown' ? markdownPreviewPolicy : report.interactive ? previewPolicy : inertPreviewPolicy, 'Actual iframe preview response', content.kind === 'markdown' ? 'markdown' : 'document');
+      if (content.kind === 'markdown') assert.equal(unwrapWikiLinks((await realPreview.body()).toString()), markdownDocument(content.text, []), 'Actual Markdown preview differs from the expected retained content outside its wiki links');
+      else assert.deepEqual(await realPreview.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
+      const frame = await contentFrame(panel, iframe, content.kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts');
       assert.equal(frame.url(), previewUrl, 'Actual content frame must load the exact pinned preview URL');
       const titleMenu = panel.locator('.artifact-title-trigger');
       const hasTitleMenu = await titleMenu.count() === 1;
@@ -324,7 +332,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         }
         const publishedIframe = publication.locator('main > iframe');
         const legacySrcdoc = await publishedIframe.getAttribute('srcdoc');
-        const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive);
+        const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive ? 'allow-scripts' : '');
         const expectedFrameUrl = legacySrcdoc === null ? contentUrl : 'about:srcdoc';
         if (legacySrcdoc !== null) {
           await policy(response, documentPolicy.replace("script-src 'none'", "script-src 'unsafe-inline'"), 'Legacy protected publication');

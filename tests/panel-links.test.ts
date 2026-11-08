@@ -83,3 +83,35 @@ test('the panel detail resolves Markdown links to pages of the same project at t
     assert.deepEqual((await panel.artifact(actor, { artifactId: source.artifactId, includeComparison: false })).detail.links, []);
   } finally { await app.close(); }
 });
+
+test('the panel preview reads the selected revision with the same links as the detail', async () => {
+  const app = await fixture();
+  try {
+    const signedIn = await app.auth.api.getSession({ headers: new Headers({ cookie: app.cookie }) });
+    assert(signedIn);
+    const actor: Actor = { userId: app.ownerId, sessionId: signedIn.session.id, clientId: 'panel-links-test', scopes: ['artifacts:read', 'artifacts:write'] };
+    const options = { access: { ownerEmail: 'owner@example.test', allowGuests: false }, publishOrigin: 'https://published.example.test' };
+    const store = createArtifactStore(app.db, options);
+    const panel = createPanel(app.db, options);
+    const page = (title: string, text: string, slug: string, kind: 'markdown' | 'text' = 'markdown') =>
+      store.create(actor, { requestId: randomUUID(), snapshot: { metadata: { title, description: '' }, content: { kind, text }, files: [] }, project: 'Wiki', slug });
+    await page('Retrieval', '# RAG', 'concepts/rag');
+    const source = await page('Karpathy', '[RAG](../concepts/rag.md) [gone](../concepts/missing.md)', 'sources/karpathy');
+    const updated = await store.update(actor, { requestId: randomUUID(), artifactId: source.artifactId, expectedRevisionId: source.headRevisionId, snapshot: { metadata: { title: 'Karpathy', description: '' }, content: { kind: 'markdown', text: 'Now [RAG](../concepts/rag.md) only.' }, files: [] } });
+    const notes = await page('Notes', '[RAG](../concepts/rag.md)', 'notes', 'text');
+
+    for (const revisionId of [source.headRevisionId, updated.headRevisionId]) {
+      const preview = await panel.preview(actor, { artifactId: source.artifactId, revisionId });
+      const { detail } = await panel.artifact(actor, { artifactId: source.artifactId, revisionId, includeComparison: false });
+      assert.equal(preview.revision.id, revisionId);
+      assert.deepEqual(preview.revision, detail.selected.revision);
+      assert.deepEqual(preview.links, detail.links);
+    }
+    assert.equal((await panel.preview(actor, { artifactId: source.artifactId, revisionId: source.headRevisionId })).links?.length, 2);
+    assert.equal((await panel.preview(actor, { artifactId: notes.artifactId, revisionId: notes.headRevisionId })).links, null);
+
+    await assert.rejects(panel.preview(actor, { artifactId: source.artifactId, revisionId: notes.headRevisionId }), { code: 'not_found' }, 'a revision of another artifact is not found');
+    await assert.rejects(panel.preview({ ...actor, userId: 'someone-else' }, { artifactId: source.artifactId, revisionId: source.headRevisionId }), 'another user cannot read the preview');
+    await assert.rejects(panel.preview({ ...actor, scopes: ['artifacts:write'] }, { artifactId: source.artifactId, revisionId: source.headRevisionId }), { code: 'forbidden' });
+  } finally { await app.close(); }
+});

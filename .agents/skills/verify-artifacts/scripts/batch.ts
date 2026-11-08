@@ -113,16 +113,17 @@ export async function driveBatch({ page, panel, directory, checks, call, cli, ok
   await capture(page, 'batch-library');
   await record('Open the index detail', { artifactId: index.artifactId });
   await page.goto(`${panel}/artifacts/${encodeURIComponent(index.artifactId)}`);
-  const section = page.getByRole('region', { name: 'Enlaces', exact: true });
-  await section.waitFor();
-  assert.equal(await section.getByRole('link').count(), 3, 'The reorganized index links resolve to the three batch pages, including the moved one');
-  assert.equal(await section.locator('[data-link-state="broken"]').count(), 0, 'No index link is broken');
+  const preview = page.frameLocator('.preview');
+  await preview.getByRole('heading', { level: 1, name: 'Index', exact: true }).waitFor();
+  assert.equal(await preview.locator('a[href^="/artifacts/"][target="_top"]').count(), 3, 'The reorganized index links in the rendered preview resolve to the three batch pages, including the moved one');
+  assert.equal(await preview.locator('.broken-link').count(), 0, 'No index link is broken in the preview');
+  assert.equal(await page.getByRole('region', { name: 'Enlaces', exact: true }).count(), 0, 'Enlaces is absent without broken links');
   await capture(page, 'batch-index');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await section.waitFor();
+  await preview.getByRole('heading', { level: 1, name: 'Index', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px index detail does not overflow');
   await capture(page, 'batch-index-390');
 
-  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'A colliding batch move exits 1 with slug_conflict at its index and moves nothing', 'A CLI batch moves a page, updates it and the index by its new slug, and MCP and CLI search return it under that slug', 'A CLI batch edit by project and slug appends to the log beside a create, and MCP reads the merged head on the prior one', 'The panel library shows the batch pages, and the index links resolve to them at desktop and 390px');
+  checks.push('Source CLI batch over REST creates three pages and updates the index, the log, and a page created earlier in the batch', 'HTTP MCP reads show the batch heads and sequences, without publication', 'CLI retry replays the batch receipt', 'A stale batch exits 1 with conflict at its index and commits nothing', 'HTTP MCP and CLI search find batch text and not replaced text', 'A colliding batch move exits 1 with slug_conflict at its index and moves nothing', 'A CLI batch moves a page, updates it and the index by its new slug, and MCP and CLI search return it under that slug', 'A CLI batch edit by project and slug appends to the log beside a create, and MCP reads the merged head on the prior one', 'The panel library shows the batch pages, and the rendered index links resolve to them with no Enlaces section at desktop and 390px');
 }

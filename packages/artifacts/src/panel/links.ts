@@ -30,7 +30,7 @@ export function resolveLink(path: string, from: string | null): LinkCandidate {
   return slugSchema.safeParse(slug).success ? { kind: 'slug', slug } : { kind: 'broken', reason: 'missing' };
 }
 
-// The lexer only locates links; the page is never rendered from these tokens.
+// markdown.ts renders the owner preview from the same lexer and looks each link up by href, so both agree on what is a wiki link.
 export function pageLinks(markdown: string, from: string | null): PageLinkCandidate[] {
   const links = new Map<string, PageLinkCandidate>();
   marked.walkTokens(marked.lexer(markdown), (token) => {
