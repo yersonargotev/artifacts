@@ -1,5 +1,7 @@
 # Batch
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/batch-run`.
+
 An owner maintaining a wiki applies an ingest, such as new pages plus the index and log updates, as one all-or-nothing command with one receipt. An update addresses its page by `artifactId` or by `{ project, slug }`, including a slug created earlier in the same batch, and may omit `expectedRevisionId` only for such a page. A failure commits nothing and names the 0-based `index` of the failing operation. Search reflects the batch when it commits, and a batch never publishes.
 
 ## Sub-features

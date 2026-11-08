@@ -1,5 +1,7 @@
 # Projects
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/projects-run`.
+
 An owner files artifacts under named projects from MCP or the CLI, finds a project's artifacts, moves an artifact between projects from MCP, the CLI, or the panel, and browses projects from the panel index and sidebar. A project is a label on the artifact, outside its immutable revisions. It exists while at least one artifact carries it.
 
 ## Sub-features

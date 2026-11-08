@@ -1,5 +1,7 @@
 # Panel browsing and preview
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/preview-run`.
+
 An owner finds an artifact in their panel, opens its current draft, follows retained revision history, and interacts with the selected revision inside the panel's actual sandboxed preview. The layout remains usable on a narrow screen.
 
 ## Sub-features

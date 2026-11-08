@@ -1,5 +1,7 @@
 # Identity and sessions
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/identity-run`.
+
 An owner signs in to see their artifacts and the same account ID used by connected tools. Panel logout closes the panel session; global logout requires confirmation and revokes browser and MCP access together.
 
 ## Sub-features

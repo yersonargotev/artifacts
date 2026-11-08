@@ -1,5 +1,7 @@
 # Protected publication and attachments
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/publication-run`.
+
 An owner opens a published artifact at one stable authenticated URL, interacts with supported self-contained HTML, and downloads retained attachments. Publishing another revision changes the content at that URL while anonymous users remain unable to retrieve documents or files.
 
 ## Sub-features

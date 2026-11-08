@@ -1,5 +1,7 @@
 # Shared publication viewers
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --allow-guests --run .test-artifacts/verify-artifacts/sharing-run`.
+
 An owner shares a published artifact with an exact email address through the MCP tool `artifacts_share`. A signed-in guest whose account email is verified and matches the share opens the owner's publication URL and sees the published revision and its attachments. The guest page omits the owner's project, the author client, and the revision sequence. Revoking the share with `artifacts_unshare` denies the guest's next request.
 
 ## Sub-features

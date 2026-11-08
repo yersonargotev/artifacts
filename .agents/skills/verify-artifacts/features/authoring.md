@@ -1,5 +1,7 @@
 # Authoring and publication selection
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/authoring-run`.
+
 A connected tool creates an artifact, saves complete immutable revisions, retrieves retained content, and selects which revision appears at a stable protected publication URL. Stale expected versions and conflicting retries must not silently overwrite retained work.
 
 ## Sub-features

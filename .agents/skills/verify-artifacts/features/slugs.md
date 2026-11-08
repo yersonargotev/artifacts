@@ -1,5 +1,7 @@
 # Slugs
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/slugs-run`.
+
 An owner names a page with a slug such as `concepts/rag` and reads it back by `{ project, slug }` without knowing its ID. A slug is unique within the owner's project, matched by the project's stored spelling. Artifacts without a project share one unfiled namespace. The owner renames or clears a slug with `move`. The panel shows the slug on library cards and under Información on the detail, and its move page lists the artifacts whose slugs would collide in the destination.
 
 ## Sub-features

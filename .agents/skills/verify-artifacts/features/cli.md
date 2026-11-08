@@ -1,5 +1,7 @@
 # Standalone CLI over REST
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/cli-run`.
+
 A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI calls REST under `${API_URL}/v1`. MCP uses `${API_URL}/mcp` with its own OAuth audience. Both share the artifact store and account issuer. It prints JSON to stdout, diagnostics and retained request IDs to stderr, and exits `1` on errors.
 
 ## Sub-features
