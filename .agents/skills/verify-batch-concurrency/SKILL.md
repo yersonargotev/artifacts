@@ -5,7 +5,7 @@ description: "Model-check store.batch against concurrent creates, updates, moves
 
 # Verify batch concurrency
 
-`store.batch` does not use an interactive transaction. It reads the receipt, the owner's project spellings, and the named pages as three separate statements, plans with `planBatch`, and sends every write plus the receipt as one atomic `$client.batch(statements, 'write')`. Nothing inside that write request reads. The schema guards and the `moved` statement must reject every plan that a stale read let through, and the store then reads and plans again (up to 3 write requests). Tests force one race at a time; this model checks every interleaving within its bounds.
+`store.batch` does not use an interactive transaction. It reads the receipt, the owner's project spellings, and the named pages as three separate statements, plans with `planBatch`, and sends every write plus the receipt as one atomic `$client.batch(statements, 'write')`. Nothing inside that write request reads. The schema guards and the `moved` and `spelled` statements must reject every plan that a stale read let through, and the store then reads and plans again (up to 3 write requests). Tests force one race at a time; this model checks every interleaving within its bounds.
 
 ## What it checks
 
@@ -14,23 +14,17 @@ description: "Model-check store.batch against concurrent creates, updates, moves
 | `LinearHistory` | Every revision of a page sits on one parent chain ending at the head. | A stale batch update leaves an orphan revision or forks history, and its write is lost. | `artifact_revision_sequence_idx` |
 | `BatchReportsTruth` | A batch that answers success left every page it wrote at the head, project, and slug that its results report. | The caller is told a move or update happened when it did not. | `moved(...)` statement after each move |
 | `SlugNamesOnePage` | A stored (project, slug) pair names at most one page. | Two pages answer to one path. | `artifact_owner_project_slug_idx` |
+| `OneSpellingPerProject` | All of the owner's pages store one spelling of a project, such as `docs` or `Docs`. | The owner sees two projects, and pages under the second spelling cannot be reached by path. | `spelled(...)` statement after the writes |
+| `SlugNamesOnePageInProject` | A slug names at most one page in a project, whatever spelling each page stored. | Two pages answer to one path. | `spelled(...)` statement after the writes |
 | `ExactlyOnce` | One request ID applies its operations at most once, even when two calls with it race or one was deleted and retried. | Duplicate pages or revisions from a client retry. | `artifact_command` primary key |
 
 The batch head update's `where head_revision_id = parentRevisionId` (`HeadGuard`) is redundant under the model: with the sequence index present, removing it breaks no rule.
 
 Every rule fails when its guard is removed (checked at the sync commit with `--without`). Removing `moved(actor.userId, write)` from the real code makes `race` and `retry` fail `BatchReportsTruth`.
 
-## Known finding (the `spelling` run)
+## How the spelling race was found
 
-`OneSpellingPerProject` and `SlugNamesOnePageInProject` fail on the current code. Projects group by letter case (`docs/decisions/projects.md`), but only interactive commands resolve the spelling inside a serialized transaction. The batch resolves it from its read phase, and no index compares project names case-insensitively.
-
-The shortest counterexample, in the code's terms:
-
-1. The owner has no project. A batch `[{ op: 'create', project: 'docs', slug: 'b' }]` reads its receipt, `ownedProjects` (empty), and its pages, and plans the spelling `docs`.
-2. Another client runs `store.create` with `project: 'Docs', slug: 'b'`. It sees no project, so it stores `Docs`.
-3. The batch write request commits. The slug index compares `coalesce(project, '')` exactly, so `docs`/`b` and `Docs`/`b` both stand.
-
-The owner then has two projects, `docs` and `Docs`. `read` resolves either spelling to `docs`, so the `Docs/b` page cannot be reached by its path. This was reproduced on the real store with the race hook from `tests/batch.test.ts` (an interactive create run just before the write request). The checker reports this run as `KNOWN FINDING` and does not fail on it. When a fix lands, the run reports `FINDING FIXED`; then move its rules into the `race` run in `scripts/check.ts`, delete the `spelling` run, and rewrite this section.
+`OneSpellingPerProject` and `SlugNamesOnePageInProject` first failed in their own run. The batch resolved project spellings from its read phase, and no index compares project names case-insensitively. A batch planned `docs`, a racing `store.create` stored `Docs`, and the batch then stored `docs` beside it. The `spelled` statement now fails such a batch, and the store plans again under `Docs`. The model's first check of that guard found a second path. A move landed a page in `Docs` between the project read and the page read, so the batch's own spellings named one project twice. The guard now fails on that case too. `tests/batch.test.ts` forces that race for a create and a move.
 
 ## Run it
 
@@ -40,7 +34,7 @@ node .agents/skills/verify-batch-concurrency/scripts/check.ts
 
 The first run downloads `tla2tools.jar` 1.7.4 and an Eclipse Temurin 21.0.5 JRE into `~/.cache/artifacts-formal` (or `$XDG_CACHE_HOME/artifacts-formal`), checking pinned SHA-256 sums. Set `TLA2TOOLS` and `JAVA` to use your own. The full run takes about 4 minutes on 10 cores: `race` explores about 13 million distinct states and `retry` about 20 million. It exits 1 when `race` or `retry` fails or TLC does not finish.
 
-Options: `--run race,retry` for a subset, `--without MovedGuard` (or `SeqIndex`, `SlugIndex`, `ReceiptKey`, `HeadGuard`) to model the code without a guard, `--trace` to print the known finding's counterexample, `--keep` to keep the TLC directory with the spec, generated `.cfg` files, and outputs.
+Options: `--run race,retry` for a subset, `--without MovedGuard` (or `SeqIndex`, `SlugIndex`, `ReceiptKey`, `SpellingGuard`, `HeadGuard`) to model the code without a guard, `--keep` to keep the TLC directory with the spec, generated `.cfg` files, and outputs.
 
 The script reads the guards from the code itself: it searches the covered files for each guard's exact code and passes `TRUE` or `FALSE` to the model, and it reads the retry bound from `conflicts++ < N`. A guard that was rewritten but not removed shows as `MISSING`; check the code, and update its pattern in `scripts/check.ts` if the guard still holds.
 

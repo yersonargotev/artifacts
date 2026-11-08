@@ -31,6 +31,7 @@ CONSTANTS
   SlugIndex,        \* schema.ts uniqueIndex artifact_owner_project_slug_idx (owner, coalesce(project, ''), slug)
   ReceiptKey,       \* schema.ts artifact_command primaryKey (owner_id, request_id)
   MovedGuard,       \* index.ts `moved(actor.userId, write)` statement after each batch move
+  SpellingGuard,    \* index.ts `spelled(...)` statement: no project spelling outside the read and planned ones
   HeadGuard         \* index.ts batch head update `where head_revision_id = parentRevisionId`
 
 ASSUME Attempts \in 1..5 /\ MaxOps \in 1..3 /\ MaxInteractive \in 0..3
@@ -236,8 +237,13 @@ Write(p) ==
          /\ UNCHANGED <<arts, revs, receipts, ops, seen, attempt, icount, commits, truthful>>
        ELSE
          LET db == ExecFrom([arts |-> arts, revs |-> revs, failed |-> FALSE], st.writes, 1)
+             placed == {st.writes[i].project : i \in {j \in DOMAIN st.writes : st.writes[j].op # "update"}} \ {NULL}
+             \* Every spelling shares one key, so a known set of two names that project twice and becomes empty.
+             known == IF Cardinality(seen[p].projects \cup placed) <= 1 THEN seen[p].projects \cup placed ELSE {}
+             spellFails == SpellingGuard /\ placed # {} /\
+               \E a \in DOMAIN db.arts : db.arts[a].project \notin known \cup {NULL}
              receiptFails == ReceiptKey /\ Req \in DOMAIN receipts
-         IN IF db.failed \/ receiptFails THEN
+         IN IF db.failed \/ spellFails \/ receiptFails THEN
               IF attempt[p] < Attempts THEN
                 /\ attempt' = [attempt EXCEPT ![p] = attempt[p] + 1]
                 /\ seen' = [seen EXCEPT ![p] = Unread]
@@ -339,12 +345,12 @@ ExactlyOnce == commits <= 1
 SlugNamesOnePage ==
   \A a, b \in DOMAIN arts : a # b => ~(arts[a].slug # NULL /\ arts[a].slug = arts[b].slug /\ arts[a].project = arts[b].project)
 
-\* Finding: projects group by letter case (docs/decisions/projects.md), so one project has one stored spelling.
+\* Projects group by letter case (docs/decisions/projects.md), so one project has one stored spelling.
 OneSpellingPerProject ==
   \A a, b \in DOMAIN arts :
     (arts[a].project # NULL /\ arts[b].project # NULL) => arts[a].project = arts[b].project
 
-\* Finding: a slug names one page in a project, whatever letter case each page's project was stored in.
+\* A slug names one page in a project, whatever letter case each page's project was stored in.
 SlugNamesOnePageInProject ==
   \A a, b \in DOMAIN arts : a # b =>
     ~(arts[a].slug # NULL /\ arts[a].slug = arts[b].slug /\ Key(arts[a].project) = Key(arts[b].project))

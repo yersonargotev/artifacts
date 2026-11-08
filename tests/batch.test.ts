@@ -180,6 +180,20 @@ test('a write that a stale read let through re-plans into the precise error', as
   } finally { await app.close(); }
 });
 
+test('a batch stores a project under the spelling that a racing command stored first', async () => {
+  const app = await batchFixture();
+  try {
+    const created = app.racing(() => app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('B', 'b'), project: 'Docs', slug: 'b' }));
+    const [placed] = (await created.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'create', project: 'docs', slug: 'a', snapshot: page('A', 'a') }] })).results;
+    assert.equal((await app.store.read(app.actor, { artifactId: placed!.artifactId })).project, 'Docs');
+
+    const moved = app.racing(() => app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('C', 'c'), project: 'Notes', slug: 'c' }));
+    await moved.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', artifactId: app.log.artifactId, project: 'notes' }] });
+    assert.equal((await app.store.read(app.actor, { artifactId: app.log.artifactId })).project, 'Notes');
+    assert.deepEqual((await app.store.projects(app.actor)).items.map(({ name }) => name), ['Docs', 'Notes', 'Wiki']);
+  } finally { await app.close(); }
+});
+
 test('a batch moves pages and later operations address them by their new slug', async () => {
   const app = await batchFixture();
   try {
