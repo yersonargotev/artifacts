@@ -11,6 +11,7 @@ import { ArtifactError, artifactReadSchema, batchResultSchema, batchSchema, cons
 import { canonicalJson, sha256 } from './serialization.ts';
 import { createAccess, isBusy, isConstraint, writeTransaction, type Connection } from './access.ts';
 import { planBatch } from './batch.ts';
+import { projectKey } from './panel/model.ts';
 import { revision } from './revision.ts';
 import { invitation, type InvitationSender } from './invitation.ts';
 import type { SharedArtifactSummary } from './contracts.ts';
@@ -58,6 +59,15 @@ const moved = (ownerId: string, write: { artifactId: string; revisionId: string;
   sql: 'insert into artifact_command (owner_id) select null where not exists (select 1 from artifact where id = ? and owner_id = ? and head_revision_id = ? and project is ? and slug is ?)',
   args: [write.artifactId, ownerId, write.revisionId, write.project, write.slug],
 });
+// Projects group by letter case but the slug index compares spellings exactly. The batch fails when the owner holds a spelling outside the ones it read and placed. It also fails when it placed a spelling the project read missed for a project known by another spelling, because the project and page reads ran at different moments; an empty list fails on the batch's own placed rows. A split the read already held is older data that the batch leaves as it is.
+const spelled = (ownerId: string, read: string[], placed: string[]): Statement => {
+  const known = [...new Set([...read, ...placed])];
+  const skewed = placed.some((name) => !read.includes(name) && known.some((other) => other !== name && projectKey(other) === projectKey(name)));
+  return {
+    sql: 'insert into artifact_command (owner_id) select null where exists (select 1 from artifact where owner_id = ? and project not in (select value from json_each(?)))',
+    args: [ownerId, JSON.stringify(skewed ? [] : known)],
+  };
+};
 const held = alias(artifact, 'held');
 
 export async function reindexSearch(db: Database): Promise<number> {
@@ -193,7 +203,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         const { results, writes } = planBatch(input.operations, projects.map(({ name }) => name), pages, () => crypto.randomUUID());
         const createdAt = new Date();
         const author = { authorUserId: actor.userId, authorClientId: actor.clientId, createdAt };
-        // Each guard fails the batch when a read no longer holds: the revision sequence index for a concurrent update, the revision foreign key for a delete, the slug index for a claimed slug, the moved check for a concurrent move, update, or delete, and the receipt key for a raced retry.
+        // Each guard fails the batch when a read no longer holds: the revision sequence index for a concurrent update, the revision foreign key for a delete, the slug index for a claimed slug, the moved check for a concurrent move, update, or delete, the spelled check for a concurrent new project spelling, and the receipt key for a raced retry.
         const statements = writes.flatMap((write) => {
           if (write.op === 'move') return [
             statement(db.update(artifact).set({ project: write.project, slug: write.slug }).where(and(eq(artifact.id, write.artifactId), eq(artifact.ownerId, actor.userId), write.from.project === null ? isNull(artifact.project) : eq(artifact.project, write.from.project), write.from.slug === null ? isNull(artifact.slug) : eq(artifact.slug, write.from.slug)))),
@@ -212,6 +222,8 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
             statement(db.insert(artifactSearch).values(searchRow(write.artifactId, write.snapshot))),
           ];
         });
+        const placed = writes.flatMap((write) => write.op !== 'update' && write.project !== null ? [write.project] : []);
+        if (placed.length) statements.push(spelled(actor.userId, projects.map(({ name }) => name), placed));
         statements.push(statement(db.insert(artifactCommand).values({ ownerId: actor.userId, requestId: input.requestId, payloadHash, result: canonicalJson({ results }), createdAt })));
         try {
           await db.$client.batch(statements, 'write');

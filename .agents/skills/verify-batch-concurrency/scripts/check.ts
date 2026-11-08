@@ -1,9 +1,8 @@
 // Model-checks store.batch against concurrent writers with TLC.
 // Usage: node .agents/skills/verify-batch-concurrency/scripts/check.ts [options]
 //   --env               print JAVA and TLA2TOOLS exports for the pinned tools, then exit
-//   --run race,retry    run only these runs (race, retry, spelling)
+//   --run race,retry    run only these runs
 //   --without A,B       model the code without these guards, to see what each one protects
-//   --trace             also print the counterexample of a known finding
 //   --keep              keep the TLC working directory (spec, configs, outputs) and print its path
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -42,6 +41,7 @@ const guards: Record<string, { file: string; pattern: RegExp }> = {
   SlugIndex: { file: 'packages/db/src/schema.ts', pattern: /uniqueIndex\('artifact_owner_project_slug_idx'\)\.on\(table\.ownerId, sql`coalesce\(project, ''\)`, table\.slug\)/ },
   ReceiptKey: { file: 'packages/db/src/schema.ts', pattern: /primaryKey\(\{ columns: \[table\.ownerId, table\.requestId\] \}\)/ },
   MovedGuard: { file: 'packages/artifacts/src/index.ts', pattern: /^\s*moved\(actor\.userId, write\),$/m },
+  SpellingGuard: { file: 'packages/artifacts/src/index.ts', pattern: /if \(placed\.length\) statements\.push\(spelled\(actor\.userId, projects\.map\(\(\{ name \}\) => name\), placed\)\);/m },
   HeadGuard: { file: 'packages/artifacts/src/index.ts', pattern: /set\(\{ headRevisionId: write\.revisionId \}\)\.where\(and\(eq\(artifact\.id, write\.artifactId\), eq\(artifact\.ownerId, actor\.userId\), eq\(artifact\.headRevisionId, write\.parentRevisionId\)\)\)/ },
 };
 
@@ -51,9 +51,8 @@ const shared = `CONSTANTS
   MaxOps = 2
 `;
 const runs = [
-  { name: 'race', expect: 'pass', constants: 'Retry = FALSE\n  MaxInteractive = 2', invariants: ['TypeOK', 'LinearHistory', 'BatchReportsTruth', 'SlugNamesOnePage'] },
-  { name: 'retry', expect: 'pass', constants: 'Retry = TRUE\n  MaxInteractive = 1', invariants: ['TypeOK', 'LinearHistory', 'BatchReportsTruth', 'SlugNamesOnePage', 'ExactlyOnce'] },
-  { name: 'spelling', expect: 'finding', constants: 'Retry = FALSE\n  MaxInteractive = 1', invariants: ['OneSpellingPerProject', 'SlugNamesOnePageInProject'] },
+  { name: 'race', constants: 'Retry = FALSE\n  MaxInteractive = 2', invariants: ['TypeOK', 'LinearHistory', 'BatchReportsTruth', 'SlugNamesOnePage', 'OneSpellingPerProject', 'SlugNamesOnePageInProject'] },
+  { name: 'retry', constants: 'Retry = TRUE\n  MaxInteractive = 1', invariants: ['TypeOK', 'LinearHistory', 'BatchReportsTruth', 'SlugNamesOnePage', 'OneSpellingPerProject', 'SlugNamesOnePageInProject', 'ExactlyOnce'] },
 ];
 
 const sha = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
@@ -132,15 +131,8 @@ for (const run of runs.filter(({ name }) => only.length === 0 || only.includes(n
     console.log(`\n[${run.name}] TLC did not finish (exit ${tlc.status}). Output:\n${out.slice(-4000)}`);
     continue;
   }
-  if (run.expect === 'pass') {
-    if (passed) console.log(`\n[${run.name}] PASS  ${run.invariants.join(', ')}  (${states} states, ${seconds}s)`);
-    else { failed = true; console.log(`\n[${run.name}] FAIL  ${violated} is violated  (${seconds}s)\n${trace(out)}`); }
-  } else if (passed) {
-    console.log(`\n[${run.name}] FINDING FIXED  ${run.invariants.join(', ')} now hold. Move them into a 'pass' run and update the skill.`);
-  } else {
-    console.log(`\n[${run.name}] KNOWN FINDING still present: ${violated} is violated  (${seconds}s)`);
-    if (process.argv.includes('--trace')) console.log(trace(out));
-  }
+  if (passed) console.log(`\n[${run.name}] PASS  ${run.invariants.join(', ')}  (${states} states, ${seconds}s)`);
+  else { failed = true; console.log(`\n[${run.name}] FAIL  ${violated} is violated  (${seconds}s)\n${trace(out)}`); }
 }
 if (process.argv.includes('--keep')) console.log(`\nTLC working directory: ${work}`);
 else rmSync(work, { recursive: true, force: true });

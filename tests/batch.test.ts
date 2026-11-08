@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { artifactCommand } from '../packages/db/src/schema.ts';
+import { artifact, artifactCommand } from '../packages/db/src/schema.ts';
 import { batchSchema, createArtifactStore, type Actor, type BatchInput, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
 import { fixture } from './helpers.ts';
@@ -177,6 +177,34 @@ test('a write that a stale read let through re-plans into the precise error', as
     let first: unknown;
     const retried = app.racing(async () => { first = await app.store.batch(app.actor, input); });
     assert.deepEqual(await retried.batch(app.actor, input), first, 'a raced receipt returns the committed result');
+  } finally { await app.close(); }
+});
+
+test('a batch stores a project under the spelling that a racing command stored first', async () => {
+  const app = await batchFixture();
+  try {
+    const created = app.racing(() => app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('B', 'b'), project: 'Docs', slug: 'b' }));
+    const [placed] = (await created.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'create', project: 'docs', slug: 'a', snapshot: page('A', 'a') }] })).results;
+    assert.equal((await app.store.read(app.actor, { artifactId: placed!.artifactId })).project, 'Docs');
+
+    const moved = app.racing(() => app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('C', 'c'), project: 'Notes', slug: 'c' }));
+    await moved.batch(app.actor, { requestId: randomUUID(), operations: [{ op: 'move', artifactId: app.log.artifactId, project: 'notes' }] });
+    assert.equal((await app.store.read(app.actor, { artifactId: app.log.artifactId })).project, 'Notes');
+    assert.deepEqual((await app.store.projects(app.actor)).items.map(({ name }) => name), ['Docs', 'Notes', 'Wiki']);
+  } finally { await app.close(); }
+});
+
+test('a batch still writes for an owner whose stored projects already split by letter case', async () => {
+  const app = await batchFixture();
+  try {
+    await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('A', 'a'), project: 'docs', slug: 'a' });
+    const split = await app.store.create(app.actor, { requestId: randomUUID(), snapshot: page('B', 'b'), project: 'docs', slug: 'b' });
+    await app.db.update(artifact).set({ project: 'Docs' }).where(eq(artifact.id, split.artifactId));
+    await app.store.batch(app.actor, { requestId: randomUUID(), operations: [
+      { op: 'create', project: 'wiki', slug: 'c', snapshot: page('C', 'c') },
+      { op: 'move', artifactId: split.artifactId, slug: 'renamed' },
+    ] });
+    assert.equal((await app.store.read(app.actor, { artifactId: split.artifactId })).slug, 'renamed');
   } finally { await app.close(); }
 });
 
