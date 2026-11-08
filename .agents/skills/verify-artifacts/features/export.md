@@ -1,5 +1,7 @@
 # Historical export
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/export-run`.
+
 An owner downloads the original complete snapshot of an explicitly selected retained revision, even after saving a newer one. Browser and MCP exports of the same revision produce identical ZIP bytes with content, attachments, metadata, and revision provenance.
 
 ## Sub-features

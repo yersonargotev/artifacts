@@ -1,5 +1,7 @@
 # Links
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/links-run`.
+
 An owner keeps a wiki of cross-linked Markdown pages in one project. The panel preview renders a Markdown revision for the owner. A relative link resolves as a path against the page's slug, without its `.md` suffix and fragment, among the owner's pages in the same project at their current slugs. A resolved link inside the preview navigates the main window to the target's detail after the owner's click. A missing target, a link that leaves the project, and a relative link from a page without a slug render as marked text, not links. `http:` and `https:` links open a new tab without opener or referrer. Other schemes render as text. Raw HTML in the page renders as escaped text. The `Enlaces` section under the preview lists only the broken links and is absent when there are none. The publication keeps rendering the Markdown as inert text.
 
 ## Sub-features

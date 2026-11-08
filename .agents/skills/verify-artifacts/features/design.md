@@ -1,5 +1,7 @@
 # Retained design canvases
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/design-run`.
+
 A design retains HTML boards, their placement, pages, and notes in one revision. The panel and protected publication use the same canvas renderer. Board-name buttons open interactive focus view at the board's declared size.
 
 ## Run the design recipe

@@ -1,5 +1,7 @@
 # Artifacts verification map
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch`.
+
 This directory is the maintained source for Artifacts verification. The primary surfaces are the authenticated Astro panel and the protected publication page. Authoring happens through the HTTP MCP tools, including clients such as Claude Code and Codex, and through the standalone `artifacts` CLI over REST. Read this index and the matching feature file before driving a feature.
 
 ## Baseline preconditions

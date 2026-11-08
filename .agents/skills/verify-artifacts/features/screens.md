@@ -1,5 +1,7 @@
 # Panel screen captures
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/screens-run`.
+
 The `screens` drive captures the current panel pages at 1440x900 and 390x844. Each capture checks horizontal page overflow, browser console errors, uncaught page errors, and the number of visible primary actions outside an open dialog.
 
 ## Run the drive

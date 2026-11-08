@@ -1,5 +1,7 @@
 # Search
 
+Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/search-run`.
+
 An owner finds a page by what it says, without listing and reading every artifact. Search covers owned artifacts at their head revision. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. Attachments are never searched. Every term must match, letter case and accents are ignored, and operator text is treated as plain words. Each result names the page's `artifactId`, `project`, `slug`, `title`, a `snippet` with matches in `**`, and a `rank`.
 
 ## Sub-features

@@ -4,7 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer, type Server } from 'node:net';
-import { mkdir, readFile, writeFile, appendFile, open, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, appendFile, open, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { serve } from '@hono/node-server';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
@@ -202,7 +202,9 @@ async function supervisor() {
 }
 
 async function launch() {
-  await stat(entry).catch(() => { throw new Error('Build the panel first: pnpm build'); });
+  const build = await readFile(entry, 'utf8').catch(() => undefined);
+  assert(build !== undefined, 'Panel not built; run pnpm build');
+  assert(build.includes('"adapterName":"@astrojs/node"'), 'Panel built for Workers, not Node; run pnpm build');
   await mkdir(resolve(run, '..'), { recursive: true, mode: 0o700 });
   await mkdir(run, { mode: 0o700 });
   await mkdir(runtime, { mode: 0o700 });
@@ -617,6 +619,8 @@ async function drive(feature: Feature) {
             await cardTrigger.focus();
             await cardTrigger.press('Space');
             await page.waitForFunction(() => document.activeElement?.textContent === 'Ver artefacto');
+            await page.keyboard.press('ArrowDown');
+            assert.equal(await page.getByRole('menuitem', { name: 'Compartir', exact: true }).evaluate((item) => item === document.activeElement), true);
             await page.keyboard.press('ArrowDown');
             assert.equal(await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).evaluate((item) => item === document.activeElement), true);
             assert.equal(new URL((await page.getByRole('menuitem', { name: 'Descargar revisión más reciente', exact: true }).getAttribute('href'))!, instance.panel).searchParams.get('revisionId'), libraryDemo.artifact.revision.id);
