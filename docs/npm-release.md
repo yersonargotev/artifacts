@@ -4,7 +4,7 @@ This procedure publishes only `@yargote/artifacts-contracts`, `@yargote/artifact
 
 ## Prepare a version
 
-1. Replace the previous version with an unused `X.Y.Z-beta.N` version in every file that carries it. Keep the source `private: true` guards and the `workspace:*` dependencies. `git grep -l '<previous version>'` lists the files. For `0.1.0-beta.11` they were:
+1. Replace the previous version with an unused `X.Y.Z-beta.N` version in every file that carries it. Keep the source `private: true` guards and the `workspace:*` dependencies. `git grep -l '<previous version>'` lists the files:
    - `packages/contracts/package.json`, `packages/client/package.json`, and `apps/cli/package.json`.
    - `packages/contracts/README.md`, `packages/client/README.md`, `apps/cli/README.md`, and `README.md`.
    - `docs/npm-release.md`, in the `--expected-version` example in step 3.
