@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
-import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
+import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListView, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
 import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
@@ -56,7 +56,7 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
     assert.deepEqual(unfiled.page.cards.map(({ artifactId }) => artifactId), [loose.artifactId]);
     assert.deepEqual(unfiled.page.counts, { all: 1, published: 0, unpublished: 1, pending: 0 });
     const vanished = await panel.library(actor, { scope: { kind: 'project', name: 'Gone' }, q: 'draft', status: 'published' });
-    assert.deepEqual(vanished, { workspace: all.workspace, page: { scope: { kind: 'vanishedProject', name: 'Gone' }, q: 'draft', status: 'published', cards: [], counts: { all: 0, published: 0, unpublished: 0, pending: 0 }, next: null, continued: false } });
+    assert.deepEqual(vanished, { workspace: all.workspace, page: { scope: { kind: 'vanishedProject', name: 'Gone' }, q: 'draft', status: 'published', sort: 'updated', direction: 'desc', cards: [], counts: { all: 0, published: 0, unpublished: 0, pending: 0 }, next: null, continued: false } });
     await store.move(actor, { requestId: randomUUID(), artifactId: draft.artifactId, project: null });
     const removed = await panel.library(actor, { scope: { kind: 'project', name: 'Álpha' } });
     assert.deepEqual(removed.page.counts, { all: 1, published: 0, unpublished: 0, pending: 1 });
@@ -144,6 +144,19 @@ test('panel URLs validate explicit scopes and cursors and reset cursors when fil
   assert.equal(libraryHref(query, { cursor: '2:def' }), '/?unfiled=1&q=draft&status=pending&cursor=2%3Adef');
   for (const value of ['?project=Beta&unfiled=1', '?project=', '?unfiled=0', '?q=' + 'x'.repeat(257), '?cursor=1', '?cursor=-1:abc', '?cursor=01:abc', '?cursor=1.5:abc', '?cursor=8640000000000001:abc', '?cursor=1:']) assert.throws(() => read(value), { name: 'ZodError' }, value);
   assert.deepEqual(panelLibraryQuerySchema.parse({}), { scope: { kind: 'all' }, status: 'all', q: '' });
+  assert.deepEqual(read('?project=Beta&sort=title&dir=desc'), { scope: { kind: 'project', name: 'Beta' }, q: '', status: 'all', sort: 'title', direction: 'desc' });
+  assert.deepEqual(read('?sort=unknown&dir=sideways'), { scope: { kind: 'all' }, q: '', status: 'all' });
+  assert.equal(libraryHref({ ...query, sort: 'title', direction: 'asc', view: 'cards' }, { status: 'all' }), '/?unfiled=1&q=draft&sort=title&view=cards');
+  assert.equal(libraryHref({ ...query, sort: 'updated', direction: 'asc' }, { cursor: '2:def' }), '/?unfiled=1&q=draft&status=pending&dir=asc&cursor=2%3Adef');
+  assert.equal(libraryHref({ ...query, sort: 'revision', direction: 'desc', view: 'table' }, { scope: { kind: 'project', name: 'Beta' } }), '/?project=Beta&q=draft&status=pending&sort=revision&view=table');
+  for (const value of ['?sort=title&cursor=1:abc', '?cursor=MQ.1:abc', '?sort=state&cursor=3.1:abc', '?sort=revision&cursor=0.1:abc', '?sort=title&cursor=_w.1:abc']) assert.throws(() => read(value), { name: 'ZodError' }, value);
+  assert.deepEqual(read('?sort=state&cursor=2.1:abc').cursor, '2.1:abc');
+  const view = (search: string, cookie?: string) => readListView(new URL(`https://panel.example.test/${search}`), cookie);
+  assert.deepEqual(view(''), { view: 'table', named: undefined });
+  assert.deepEqual(view('', 'cards'), { view: 'cards', named: undefined });
+  assert.deepEqual(view('', 'grid'), { view: 'table', named: undefined });
+  assert.deepEqual(view('?view=table', 'cards'), { view: 'table', named: 'table' });
+  assert.deepEqual(view('?view=list', 'cards'), { view: 'cards', named: undefined });
   assert.equal(panelLibraryQuerySchema.safeParse({ status: 'unknown' }).success, false);
 });
 

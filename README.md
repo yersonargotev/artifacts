@@ -122,7 +122,7 @@ Use `artifacts_read`, `artifacts_list`, and `artifacts_history` to retrieve arti
 
 Pass an optional `project` name to `artifacts_create` to group artifacts. A name that matches an existing project regardless of letter case joins it. `artifacts_list` accepts the same `project` filter, `projects_list` returns each project with its artifact count, and `artifacts_move` changes or clears the project without creating a revision. The panel sidebar lists the projects, and `Mover a proyecto` in an artifact's menu moves it to a project or removes it from one. [The projects decision](docs/decisions/projects.md) records the model.
 
-Pass an optional `slug` such as `concepts/rag` to `artifacts_create` to name a page within its project, then read it with `artifacts_read` and `{ project, slug }` instead of its ID. The CLI uses `create --slug SLUG` and `read --project NAME --slug SLUG`, and REST uses `GET /v1/lookup`. The panel shows the slug on library cards and under Información. [The wiki pages decision](docs/decisions/wiki-pages.md) records the rules.
+Pass an optional `slug` such as `concepts/rag` to `artifacts_create` to name a page within its project, then read it with `artifacts_read` and `{ project, slug }` instead of its ID. The CLI uses `create --slug SLUG` and `read --project NAME --slug SLUG`, and REST uses `GET /v1/lookup`. The panel shows the slug in the library table, on library cards, and under Información. [The wiki pages decision](docs/decisions/wiki-pages.md) records the rules.
 
 Use `artifacts_search` with a plain-text `query` to find owned pages at their head revision without listing and reading each one. Markdown and text match by title, description, and content. HTML matches by title, description, and visible text, without tags, attributes, scripts, or styles. A design matches by title and description only. Every term must match, and letter case and accents are ignored, so `busqueda` finds `Búsqueda`. Each result carries the page's `project`, `slug`, a highlighted `snippet`, and a `rank`. The CLI uses `search QUERY [--project NAME]`, and REST uses `GET /v1/search`. Attachments, older revisions, and shared artifacts are not searched.
 
@@ -199,6 +199,8 @@ Use a fresh `ARTIFACTS_PROOF_RUN` and `ARTIFACTS_PROOF_DIR` for another end-to-e
 See [deployment instructions](docs/deployment.md), [artifact architecture](docs/decisions/artifacts.md), [execution evidence](.audit/artifact-e2e/runtime.md), and the independent [domain review](.audit/artifact-e2e/review.md) and [publication review](.audit/artifact-e2e/publication-review.md).
 
 ## Review and publish a saved revision
+
+The library and each project page list artifacts in a table by default. The **Tabla | Tarjetas** toggle switches to cards, keeps the choice in a cookie, and names it in the URL as `?view=cards` or `?view=table` so the link can be shared. The Título, Estado, Revisión, and Actualizado headers sort the whole list on the server through `?sort=` and `?dir=`, so pagination keeps the order. The header checkbox selects every row on the page for Mover a otro proyecto.
 
 Open an artifact in the panel to see the selected, latest, and published revisions. The list identifies unpublished changes. Each selected revision has an attachment inventory and an escaped comparison of content, metadata, and changed files. History navigation keeps the selected revision and comparison.
 

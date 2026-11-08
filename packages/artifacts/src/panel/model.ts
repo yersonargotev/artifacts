@@ -8,6 +8,10 @@ export const projectKey = (name: string) => name.toLowerCase();
 export const libraryStatuses = ['all', 'published', 'unpublished', 'pending'] as const;
 export const libraryPageSize = 25;
 export type LibraryStatus = typeof libraryStatuses[number];
+export const librarySorts = ['updated', 'title', 'state', 'revision'] as const;
+export type LibrarySort = typeof librarySorts[number];
+export type SortDirection = 'asc' | 'desc';
+export const defaultDirections: Readonly<Record<LibrarySort, SortDirection>> = { updated: 'desc', title: 'asc', state: 'asc', revision: 'desc' };
 
 export type ScopeRequest =
   | { readonly kind: 'all' }
@@ -18,6 +22,8 @@ export type LibraryQuery = {
   readonly scope: ScopeRequest;
   readonly status: LibraryStatus;
   readonly q: string;
+  readonly sort?: LibrarySort;
+  readonly direction?: SortDirection;
   readonly cursor?: string;
 };
 
@@ -55,6 +61,8 @@ export type LibraryPage = {
   readonly scope: LibraryScope;
   readonly status: LibraryStatus;
   readonly q: string;
+  readonly sort: LibrarySort;
+  readonly direction: SortDirection;
   readonly counts: Readonly<Record<LibraryStatus, number>>;
   readonly cards: readonly ArtifactCard[];
   readonly next: string | null;

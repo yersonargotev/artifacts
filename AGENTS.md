@@ -40,7 +40,7 @@ node scripts/prepare-native.mjs --check && pnpm install --frozen-lockfile
 - `pnpm test` runs `tests/*.test.ts`.
 - `pnpm test:rest-cli` runs the REST and CLI tests.
 - `pnpm test:cli-skills` builds the packages and checks the skills that the CLI ships.
-- `pnpm test:browser` builds the panel and runs 15 Chrome proofs.
+- `pnpm test:browser` builds the panel and runs 16 Chrome proofs.
 
 pnpm 12 rejects `-s`. To shorten output, pipe it to `tail`, for example `pnpm check 2>&1 | tail -5`.
 

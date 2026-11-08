@@ -1,11 +1,11 @@
 ---
 import type { LibraryPage, ScopeRequest, Workspace } from '@artifacts/artifacts/panel/model';
 import { projectTone, searchFor } from '../../presentation.ts';
-import { libraryHref } from '../../urls.ts';
+import { libraryHref, type ListView } from '../../urls.ts';
 import Icon from '../Icon.astro';
-interface Props { workspace: Workspace; page: LibraryPage }
-const { workspace, page } = Astro.props;
-const query = searchFor(page);
+interface Props { workspace: Workspace; page: LibraryPage; namedView?: ListView }
+const { workspace, page, namedView } = Astro.props;
+const query = searchFor(page, namedView);
 const label = page.scope.kind === 'project' ? page.scope.project.name : page.scope.kind === 'vanishedProject' ? page.scope.name : page.scope.kind === 'unfiled' ? 'Sin proyecto' : 'Todos los proyectos';
 const choices: readonly { label: string; count: number; scope: ScopeRequest }[] = [
   { label: 'Todos los proyectos', count: workspace.total.count, scope: { kind: 'all' } },

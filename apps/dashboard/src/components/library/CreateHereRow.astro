@@ -1,0 +1,13 @@
+---
+import { createCommand } from '../../presentation.ts';
+import Icon from '../Icon.astro';
+interface Props { project: string }
+const { project } = Astro.props;
+const command = createCommand(project);
+---
+<div class="create-here-row">
+  <span class="create-here-icon" aria-hidden="true"><Icon name="code" size={18} /></span>
+  <p><strong>Crea en este proyecto.</strong> Pídeselo a tu agente o usa <code title={command}>{command}</code></p>
+  <button type="button" class="button secondary" data-copy-command={command} aria-describedby="create-here-feedback" hidden><Icon name="copy" size={16} />Copiar comando</button>
+  <p id="create-here-feedback" class="sr-only" role="status"></p>
+</div>

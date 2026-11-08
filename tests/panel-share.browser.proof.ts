@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { chromium, type BrowserContext, type Page, type Route } from 'playwright';
 import { createArtifactHttpClient } from '../packages/client/src/index.ts';
 import { artifactReadSchema } from '../packages/contracts/src/index.ts';
+import { cardsViewCookie } from './helpers.ts';
 
 const execute = promisify(execFile);
 const args = process.argv.slice(2);
@@ -46,6 +47,7 @@ async function create(title: string, accessToken = credentials.accessToken) {
 async function context(options: Parameters<typeof browser.newContext>[0] = {}) {
   const value = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });
   contexts.push(value);
+  await value.addCookies([cardsViewCookie('http://localhost')]);
   value.on('page', (page) => page.on('pageerror', (error) => errors.push(error.message)));
   return value;
 }

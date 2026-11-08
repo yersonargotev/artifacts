@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { chromium, type Page, type Request as BrowserRequest } from 'playwright';
 import { artifact, artifactPublication, artifactRevision } from '../packages/db/src/schema.ts';
 import { artifactReadSchema } from '../packages/contracts/src/index.ts';
-import { grant } from './helpers.ts';
+import { cardsViewCookie, grant } from './helpers.ts';
 import { restCliFixture } from './rest-cli-fixture.ts';
 
 const exec = promisify(execFile);
@@ -69,6 +69,7 @@ try {
   await login.getByRole('button', { name: 'Iniciar sesión', exact: true }).press('Enter');
   await login.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
   const state = await setup.storageState();
+  state.cookies.push(cardsViewCookie(app.dashboard));
   await setup.close();
   const first = await create('Alpha first', 'Alpha');
   const second = await create('Alpha second', 'Alpha');

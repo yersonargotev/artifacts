@@ -1,6 +1,6 @@
 import { projectKey } from '@artifacts/artifacts/panel/model';
-import type { ArtifactDetail, ClientRef, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
-import { scopeRequestOf } from './urls.ts';
+import type { ArtifactDetail, ClientRef, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, LibrarySort, ScopeRequest, SortDirection } from '@artifacts/artifacts/panel/model';
+import { scopeRequestOf, type LibraryLink, type ListView } from './urls.ts';
 
 export type NavLocation =
   | { readonly kind: 'library' }
@@ -41,9 +41,16 @@ export function scopeOf(location: NavLocation): ScopeRequest {
   return { kind: 'all' };
 }
 
-export function searchFor(page: LibraryPage): LibraryQuery {
-  return { scope: scopeRequestOf(page.scope), status: page.status, q: page.q };
+export function searchFor(page: LibraryPage, view?: ListView): LibraryLink {
+  return { scope: scopeRequestOf(page.scope), status: page.status, q: page.q, sort: page.sort, direction: page.direction, ...(view ? { view } : {}) };
 }
+
+export const sortLabels: Readonly<Record<LibrarySort, Readonly<Record<SortDirection, string>>>> = {
+  updated: { desc: 'Más recientes primero', asc: 'Más antiguos primero' },
+  title: { asc: 'Título A–Z', desc: 'Título Z–A' },
+  state: { asc: 'Cambios pendientes primero', desc: 'Publicados primero' },
+  revision: { desc: 'Más revisiones primero', asc: 'Menos revisiones primero' },
+};
 
 export const clientLabel = (client: ClientRef) => client.name ?? client.clientId;
 export const absoluteTime = (at: Date) => `${at.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC`;
