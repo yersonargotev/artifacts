@@ -1,0 +1,3 @@
+interface:
+  display_name: "Verificar concurrencia de batch"
+  short_description: "Comprueba con TLA+ las carreras de store.batch"
