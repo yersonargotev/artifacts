@@ -374,6 +374,8 @@ async function drive(feature: Feature) {
       browser = await chromium.launch({ channel: 'chrome', headless: !args.includes('--headed') });
       context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...(feature === 'screens' && args.includes('--headed') ? { recordVideo: { dir: join(directory, 'video'), size: { width: 1440, height: 900 } } } : {}) });
       if (feature === 'screens' || feature === 'projects' || feature === 'slugs') await observeMoveReadiness(context);
+      // The panel lists artifacts in a table by default; these recipes prove the card view, and screens captures the default table.
+      if (feature !== 'screens') await context.addCookies([{ name: 'panel_view', value: 'cards', domain: 'localhost', path: '/' }]);
       await context.tracing.start({ screenshots: true, snapshots: true });
       const page = await context.newPage();
       const browserVersion = browser.version();
