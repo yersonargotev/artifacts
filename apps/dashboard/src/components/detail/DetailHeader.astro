@@ -32,9 +32,9 @@ const command = { artifactId: detail.artifactId, revisionId: revision.id, expect
     <ArtifactMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={JSON.stringify([
       { label: `Descargar revisión ${revision.sequence}`, href: exportHref(detail.artifactId, revision.id) },
       { label: 'Mover a proyecto', href: moveHref([detail.artifactId]), moveItems: JSON.stringify([{ artifactId: detail.artifactId, title: revision.snapshot.metadata.title, project: detail.project }]) },
+      { label: 'Modo lectura', href: readerHref({ scope: detail.project === null ? { kind: 'unfiled' } : { kind: 'project', name: detail.project }, status: 'all', q: '' }, { artifactId: detail.artifactId }) },
     ])} deleteUrl={`${path}/delete`} client:load />
     <noscript><a class="native-move-link" href={moveHref([detail.artifactId])}>Mover a proyecto</a></noscript>
-    <a class="button secondary" href={readerHref({ scope: detail.project === null ? { kind: 'unfiled' } : { kind: 'project', name: detail.project }, status: 'all', q: '' }, { artifactId: detail.artifactId })}><Icon name="layout-sidebar" size={16} />Modo lectura</a>
     <a class="button secondary" href={shareHref(detail.artifactId)} data-share-trigger>Compartir</a>
     <a class="button secondary" href={exportHref(detail.artifactId, revision.id)}><Icon name="download" size={16} />Exportar</a>
     {isSelectedPublished(detail) ? <a class="button" data-variant="primary" href={detail.publication!.url}>Abrir publicación</a> : <PublicationForm command={command} label={`Publicar revisión ${revision.sequence}`} />}

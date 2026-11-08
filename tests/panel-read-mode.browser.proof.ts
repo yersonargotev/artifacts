@@ -158,7 +158,8 @@ try {
   checks.push('a direct link selects its artifact, even one on a later page, and the next link pages the list');
 
   await page.goto(`${app.dashboard}/artifacts/${draft.artifactId}`);
-  await Promise.all([page.waitForURL(`${app.dashboard}/read?project=Lectura&artifact=${draft.artifactId}`), page.locator('.detail-actions').getByRole('link', { name: 'Modo lectura', exact: true }).click()]);
+  await page.locator('.artifact-title-trigger').press('Enter');
+  await Promise.all([page.waitForURL(`${app.dashboard}/read?project=Lectura&artifact=${draft.artifactId}`), page.getByRole('menuitem', { name: 'Modo lectura', exact: true }).press('Enter')]);
   assert.deepEqual(await current(page), ['Notas sin publicar']);
   await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('Guía');
   await Promise.all([page.waitForURL(`${app.dashboard}/read?q=Gu%C3%ADa&project=Lectura`), page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).press('Enter')]);

@@ -202,7 +202,7 @@ See [deployment instructions](docs/deployment.md), [artifact architecture](docs/
 
 The library and each project page list artifacts in a table by default. The **Tabla | Tarjetas** toggle switches to cards, keeps the choice in a cookie, and names it in the URL as `?view=cards` or `?view=table` so the link can be shared. The Título, Estado, Revisión, and Actualizado headers sort the whole list on the server through `?sort=` and `?dir=`, so pagination keeps the order. The header checkbox selects every row on the page for Mover a otro proyecto.
 
-**Modo lectura** at `/read` shows the list beside the selected artifact's preview, so you can move between artifacts without leaving the page. It keeps the project, status filter, search, and sort, and names the selected artifact as `?artifact=<id>` so the link can be shared. Click a row or press `j` and `k` to change the preview. The library controls and each artifact's header open it.
+**Modo lectura** at `/read` shows the list beside the selected artifact's preview, so you can move between artifacts without leaving the page. It keeps the project, status filter, search, and sort, and names the selected artifact as `?artifact=<id>` so the link can be shared. Click a row or press `j` and `k` to change the preview. The library controls and each artifact's title menu open it.
 
 Open an artifact in the panel to see the selected, latest, and published revisions. The list identifies unpublished changes. Each selected revision has an attachment inventory and an escaped comparison of content, metadata, and changed files. History navigation keeps the selected revision and comparison.
 
