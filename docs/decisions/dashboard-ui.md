@@ -11,3 +11,11 @@ Astro's built-in `security.csp` generates script hashes in server responses. It 
 The publication Worker retains its own CSS and native title, Information, and Files disclosures. It loads no dashboard assets or React runtime. Its header stays within 45% of the viewport, leaving at least 55% for the sandboxed document.
 
 Revision selection stays in native GET forms. Publication uses the existing four-field `PublishCommand` and native POST form. Menus do not mutate artifacts. The retained verifier opens the selected export menu and native viewer disclosures before checking the same revision identifiers, archive bytes, attachment bytes, and isolation headers.
+
+## Read mode
+
+The owner moves between artifacts in `/read`, a two-column panel page: the scoped list on the left, the selected artifact's preview filling the right. A publication portal was rejected because the publication Worker authorizes one artifact per cookie and serves no scripts. The panel already holds the owner session and the preview route, so read mode adds no contract, REST, MCP, or Worker change.
+
+The page reads the same `panel.library` page as the library. The `artifact` parameter selects a card by ID. When it names an artifact outside the page, such as a shared link to the second page, `panel.artifact` supplies its head revision and title. Without it the first card is selected. Filter, search, and page links drop the selection, like the cursor, so the list and preview stay in agreement.
+
+Each row is a GET link, so read mode works without JavaScript. A bundled script, hashed by `security.csp`, swaps the preview on a click or on `j` and `k`, pushes the row URL, and restores the selection on `popstate`. It replaces the iframe rather than setting its `src`, because a frame navigation adds a history entry and Back would walk the frame instead of the reader URLs. The preview keeps the detail page's sandbox: `markdownPreviewSandbox` for Markdown and `allow-scripts` otherwise. In read mode the sidebar's project links stay in read mode.

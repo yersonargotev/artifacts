@@ -2,7 +2,7 @@
 import type { ArtifactDetail } from '@artifacts/artifacts/panel/model';
 import { isPending, isSelectedPublished } from '@artifacts/artifacts/panel/model';
 import { contentLabels, revisionLabel } from '../../presentation.ts';
-import { moveHref, shareHref, exportHref, type DetailUrl } from '../../urls.ts';
+import { moveHref, readerHref, shareHref, exportHref, type DetailUrl } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 import PublicationForm from '../PublicationForm.astro';
 import Icon from '../Icon.astro';
@@ -32,6 +32,7 @@ const command = { artifactId: detail.artifactId, revisionId: revision.id, expect
     <ArtifactMenu title={revision.snapshot.metadata.title} revisionLabel={`Revisión ${revision.sequence}`} actions={JSON.stringify([
       { label: `Descargar revisión ${revision.sequence}`, href: exportHref(detail.artifactId, revision.id) },
       { label: 'Mover a proyecto', href: moveHref([detail.artifactId]), moveItems: JSON.stringify([{ artifactId: detail.artifactId, title: revision.snapshot.metadata.title, project: detail.project }]) },
+      { label: 'Modo lectura', href: readerHref({ scope: detail.project === null ? { kind: 'unfiled' } : { kind: 'project', name: detail.project }, status: 'all', q: '' }, { artifactId: detail.artifactId }) },
     ])} deleteUrl={`${path}/delete`} client:load />
     <noscript><a class="native-move-link" href={moveHref([detail.artifactId])}>Mover a proyecto</a></noscript>
     <a class="button secondary" href={shareHref(detail.artifactId)} data-share-trigger>Compartir</a>

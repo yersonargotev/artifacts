@@ -638,7 +638,8 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .project-header-counts { flex-wrap: wrap; gap: 4px 10px; }
   .project-header-action { flex-basis: 100%; }
   .view-toggle a { padding: 5px 8px; }
-  .view-toggle a > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .reader-link { padding: 6px 10px; }
+  .reader-link > span, .view-toggle a > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .artifact-table, .artifact-table tbody { display: block; }
   .artifact-table thead { display: none; }
   .artifact-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 12px 8px 12px 12px; border-bottom: 1px solid var(--divider); }
@@ -658,4 +659,43 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .artifact-table-updated::before { content: '· '; }
   .create-here-row { flex-wrap: wrap; }
   .create-here-row > p { white-space: normal; overflow-wrap: anywhere; }
+}
+
+.reader-link { flex: none; min-height: 38px; padding: 6px 12px; font-size: 13px; font-weight: 500; }
+.reader-shell .panel-workspace { display: flex; flex-direction: column; height: 100dvh; }
+.reader-shell .panel-main { display: flex; flex: 1; width: 100%; max-width: none; min-height: 0; padding: 16px 24px 20px; }
+.reader { display: grid; flex: 1; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; min-width: 0; min-height: 0; }
+.reader-list { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.reader-list > nav { flex: 0 1 auto; min-height: 0; margin: -3px; padding: 3px; overflow: auto; }
+.reader-list-heading { display: grid; gap: 2px; }
+.reader-list-heading h1 { margin: 0; font-size: 22px; letter-spacing: -.4px; overflow-wrap: anywhere; }
+.reader-list-heading a { justify-self: start; color: var(--muted); font-size: 13px; }
+.reader-list-heading a:hover { color: var(--blue); }
+.reader-list .library-filters { gap: 4px; }
+.reader-list .library-filters a { gap: 6px; min-height: 32px; padding: 4px 8px; font-size: 12px; }
+.reader-items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.reader-item { display: grid; justify-items: start; gap: 6px; min-width: 0; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; text-decoration: none; }
+.reader-item:hover { background: var(--canvas); }
+.reader-item[aria-current] { border-color: var(--accent-border); background: var(--accent-surface); }
+.reader-item-title { max-width: 100%; overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.reader-empty p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.reader-empty a { font-size: 13px; }
+.reader-pagination { display: flex; flex-wrap: wrap; gap: 8px; }
+.reader-pagination a { font-size: 12px; font-weight: 500; }
+.reader-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--divider); border-radius: 14px; background: var(--mantle); }
+.reader-pane-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--divider); background: var(--canvas); }
+.reader-pane-title { display: flex; flex: 1 1 200px; align-items: center; gap: 10px; min-width: 0; }
+.reader-pane-title h2 { margin: 0; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.reader-pane-title .artifact-status { flex: none; }
+.reader-pane-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reader-pane-actions .button { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.reader-pane-actions [hidden] { display: none; }
+.reader-preview { display: block; flex: 1; width: 100%; min-height: 0; border: 0; background: var(--preview-background); }
+.reader-pane-empty { align-items: center; justify-content: center; padding: 24px; color: var(--muted); text-align: center; }
+@media (max-width: 760px) {
+  .reader-shell .panel-workspace { display: block; height: auto; }
+  .reader-shell .panel-main { display: block; padding: 16px 16px 28px; }
+  .reader { grid-template-columns: minmax(0, 1fr); }
+  .reader-list > nav { max-height: 45dvh; }
+  .reader-pane { height: 75dvh; min-height: 360px; }
 }

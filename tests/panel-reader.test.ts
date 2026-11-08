@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
-import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListView, libraryHref, scopeHref } from '../apps/dashboard/src/urls.ts';
+import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, type LibraryLink } from '../apps/dashboard/src/urls.ts';
 import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
@@ -158,6 +158,21 @@ test('panel URLs validate explicit scopes and cursors and reset cursors when fil
   assert.deepEqual(view('?view=table', 'cards'), { view: 'table', named: 'table' });
   assert.deepEqual(view('?view=list', 'cards'), { view: 'cards', named: undefined });
   assert.equal(panelLibraryQuerySchema.safeParse({ status: 'unknown' }).success, false);
+});
+
+test('reader URLs round-trip scope, filters, cursor, and selection, and filter links restart the selection', () => {
+  const read = (href: string) => readReaderUrl(new URL(href, 'https://panel.example.test'));
+  const query = { scope: { kind: 'project' as const, name: 'Beta' }, q: 'draft', status: 'pending' as const, sort: 'state' as const, direction: 'desc' as const, cursor: '2.1:abc', artifactId: 'artifact-one' };
+  const href = readerHref(query, { cursor: query.cursor, artifactId: query.artifactId });
+  assert.equal(href, '/read?project=Beta&q=draft&status=pending&sort=state&dir=desc&cursor=2.1%3Aabc&artifact=artifact-one');
+  assert.deepEqual(read(href), query);
+  assert.deepEqual(read(readerHref({ scope: { kind: 'unfiled' }, status: 'published', q: '' }, { artifactId: 'artifact-two' })), { scope: { kind: 'unfiled' }, q: '', status: 'published', artifactId: 'artifact-two' });
+  assert.equal(readerHref(query, { status: 'all' }), '/read?project=Beta&q=draft&sort=state&dir=desc');
+  assert.equal(readerHref({ scope: { kind: 'all' }, status: 'all', q: '' }), '/read');
+  assert.deepEqual(read('/read'), { scope: { kind: 'all' }, q: '', status: 'all' });
+  const link: LibraryLink = { scope: { kind: 'all' }, status: 'all', q: '', view: 'cards' };
+  assert.equal(readerHref(link), '/read');
+  for (const value of ['/read?project=Beta&unfiled=1', '/read?cursor=1']) assert.throws(() => read(value), { name: 'ZodError' }, value);
 });
 
 test('projects index returns inclusive tallies, the three newest titles per group, and head-derived update times', async (t) => {

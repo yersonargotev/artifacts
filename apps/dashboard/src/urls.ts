@@ -32,12 +32,29 @@ export function scopeRequestOf(scope: LibraryScope): ScopeRequest {
   return scope.kind === 'project' ? { kind: 'project', name: scope.project.name } : scope.kind === 'vanishedProject' ? { kind: 'project', name: scope.name } : { kind: scope.kind };
 }
 
+function listParams({ scope, status, q, sort = 'updated', direction = defaultDirections[sort] }: LibraryQuery): Record<string, string> {
+  return { ...(scope.kind === 'project' ? { project: scope.name } : scope.kind === 'unfiled' ? { unfiled: '1' } : {}), ...(q ? { q } : {}), ...(status !== 'all' ? { status } : {}),
+    ...(sort !== 'updated' ? { sort } : {}), ...(direction !== defaultDirections[sort] ? { dir: direction } : {}) };
+}
+
 export function libraryHref(query: LibraryLink, patch: Partial<LibraryLink> = {}): string {
-  const { scope, status, q, sort = 'updated', direction: chosen, view } = { ...query, ...patch };
-  const direction = chosen ?? defaultDirections[sort];
-  const params = new URLSearchParams({ ...(scope.kind === 'project' ? { project: scope.name } : scope.kind === 'unfiled' ? { unfiled: '1' } : {}), ...(q ? { q } : {}), ...(status !== 'all' ? { status } : {}),
-    ...(sort !== 'updated' ? { sort } : {}), ...(direction !== defaultDirections[sort] ? { dir: direction } : {}), ...(view ? { view } : {}), ...(patch.cursor ? { cursor: patch.cursor } : {}) });
+  const state = { ...query, ...patch };
+  const params = new URLSearchParams({ ...listParams(state), ...(state.view ? { view: state.view } : {}), ...(patch.cursor ? { cursor: patch.cursor } : {}) });
   return params.size ? `/?${params}` : '/';
+}
+
+/** A library query plus the artifact the reader shows. Without one the reader selects the first card of the page. */
+export type ReaderUrl = LibraryQuery & { readonly artifactId?: string };
+
+export function readReaderUrl(url: URL): ReaderUrl {
+  const artifactId = url.searchParams.get('artifact');
+  return { ...readLibraryUrl(url), ...(artifactId ? { artifactId } : {}) };
+}
+
+/** Like the cursor, the selection comes only from the patch, so a filter or page link starts at that list's first artifact. */
+export function readerHref(query: ReaderUrl, patch: Partial<ReaderUrl> = {}): string {
+  const params = new URLSearchParams({ ...listParams({ ...query, ...patch }), ...(patch.cursor ? { cursor: patch.cursor } : {}), ...(patch.artifactId ? { artifact: patch.artifactId } : {}) });
+  return params.size ? `/read?${params}` : '/read';
 }
 
 export function scopeHref(scope: ScopeRequest): string {

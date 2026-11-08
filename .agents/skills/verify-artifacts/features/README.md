@@ -52,7 +52,7 @@ This directory is the maintained source for Artifacts verification. The primary 
 The panel lists artifacts in a table by default. Browser drives other than `screens` set the `panel_view=cards` cookie, so their card selectors keep proving the card view; `screens` captures the default table, and `tests/panel-table.browser.proof.ts` covers the table, the view toggle, sorting, and select-all.
 
 - [Panel screen captures](./screens.md): `screens` seeds a repeatable library and captures the welcome, library, projects index, project, selected project, detail, move, and delete confirmation pages at 1440x900 and 390x844, with overflow, browser-error, and primary-action checks.
-- [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, and mobile layout.
+- [Panel browsing and preview](./preview.md): `preview` covers the artifact list, revision history, actual preview iframe interaction, read mode, and mobile layout.
 - [Protected publication and attachments](./publication.md): `publication` covers login handoff, the stable URL after republication, actual document interaction, attachment bytes, and anonymous denial.
 - [Shared publication viewers](./sharing.md): `sharing` creates a verified guest, shares, lists, and revokes through the MCP share tools, and checks guest admission, the guest page without owner details, owner-only MCP denials, revocation, and the `account` command for later lanes.
 - [Permanent panel deletion](./deletion.md): the dedicated `tests/artifact-deletion.browser.proof.ts` proves confirmation, cancel, stale and uncertain commands, exact retry, library refresh and revoked artifact access with its own disposable local fixture.
