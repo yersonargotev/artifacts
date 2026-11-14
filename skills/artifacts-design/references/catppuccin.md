@@ -1,6 +1,6 @@
 # Catppuccin roles
 
-The starter maps the official [Catppuccin palette](https://github.com/catppuccin/palette/blob/main/palette.json) to semantic tokens. Latte serves the light theme and Mocha the dark theme. Blue is the Artifacts accent.
+The starter maps the official [Catppuccin palette](https://github.com/catppuccin/palette/blob/main/palette.json) to semantic tokens. Latte serves the light theme and Mocha the dark theme. Blue is the accent. This palette is the Artifacts house look. A palette you build for another direction keeps the same token roles and contrast ratios with its own values.
 
 | Token | Role | Latte (light) | Mocha (dark) |
 | --- | --- | --- | --- |
@@ -33,6 +33,6 @@ Use these in order after Blue. Give each series a direct label or marker as well
 | 4 | Mauve `#8839ef` | Mauve `#cba6f7` |
 | 5 | Yellow `#df8e1d` | Yellow `#f9e2af` |
 
-Mauve is a data color only, never the accent.
+In the house palette, Mauve is a data color only, never the accent.
 
 The palette's license notice is retained in [third-party notices](../THIRD-PARTY-NOTICES.md).

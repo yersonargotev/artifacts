@@ -15,3 +15,11 @@ The skill bundles Latin subsets of Bricolage Grotesque, Public Sans, JetBrains M
 The starter template follows the viewer's system theme. Latte is the light theme and Mocha is the dark theme, with Blue as the only accent. Status uses soft fills with darkened ink colors that reach 4.5:1 in Latte. The application shell keeps the decision in [Catppuccin blue application design](catppuccin-blue.md).
 
 `artifacts skills get --full` labels binary files with their size instead of printing their bytes, so loading the design skill does not put font data into an agent's context.
+
+## Visual direction per artifact
+
+On 2026-11-13 the owner reported that every generated artifact had the same design. The skill told the author to copy the starter's style block, so each document shipped Latte and Mocha with Blue, the same three faces, and one centered column.
+
+The skill now fixes the contract and frees the look. The contract is the sandbox rules, the token roles, both themes, the contrast ratios, the 375 px width, and the rendered checks. `scripts/deal-directions.mjs` deals two random directions, each with a ground, an accent, a type pairing, and a shape. The author chooses the direction that fits the subject and sets the exact values. A first version left the choice to prose alone. Three trial artifacts on unrelated subjects then all used a cream page near `#f5eee3`, and two used Newsreader with a terracotta accent, so the choice needs a random source. The starter remains a reference for the roles and components. Its values are the house look, which the author ships only on request. Artifacts in one set and content-only revisions keep their existing direction.
+
+The bundled fonts are unchanged. An author can also use a system stack or embed another licensed `woff2` by hand.

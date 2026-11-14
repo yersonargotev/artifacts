@@ -1,11 +1,11 @@
 ---
 name: artifacts-design
-description: Design HTML documents and multi-board design canvases of a retained Artifact with embedded fonts, light and dark Catppuccin tokens, purposeful layout, and rendered checks. Use before writing or restyling HTML or design boards for the artifacts or artifacts-cli skills.
+description: Design HTML documents and multi-board design canvases of a retained Artifact with a visual direction chosen for each artifact, embedded fonts, light and dark themes, and rendered checks. Use before writing or restyling HTML or design boards for the artifacts or artifacts-cli skills.
 ---
 
 # Design HTML artifacts
 
-The calling skill owns the snapshot, size limit, and save workflow. This skill owns how the document looks and behaves. Follow the user's visual direction first. When revising content only, keep an existing artifact's established style. When the user asks to redesign or improve the look, start from these defaults.
+The calling skill owns the snapshot, size limit, and save workflow. This skill owns how the document looks and behaves. Follow the user's visual direction first. When revising content only, keep an existing artifact's established style. Give artifacts that the user treats as one set the same direction. In every other case, including a redesign, choose a direction for this artifact.
 
 The document renders in a sandbox that blocks every network request. Fonts, images, and icons load only as `data:` URIs. External stylesheets, Google Fonts links, and CDN scripts silently fail. Inline all CSS and JavaScript.
 
@@ -17,16 +17,34 @@ Before writing HTML, identify the reader's task, the facts and assets available,
 
 Choose the element that carries the answer: a comparison, a diagram, a sequence, a chart, or a result beside its inputs. Give it the most space and put its supporting text nearby. If the same composition would fit an unrelated topic unchanged, use the subject's actual relationships or quantities to make the structure more specific. A report can be dense, an explanation can use large scenes, and a calculator can fit on one screen. Do not impose a hero, a section count, or a word budget.
 
-## Use the starter's tokens
+## Choose a visual direction
 
-Copy the `<style>` block of [the starter](templates/starter.html) into the new document. It defines the color, font, and spacing tokens and shared components: contextual text and labels, lede, summary strip, pills, expandable rows, panel, note, table, filter bar, and footer. Delete components the page does not use. Derive every new color and type decision from its tokens.
+Decide the look before writing CSS. Deal two directions:
 
-The starter supplies a vocabulary, not a layout. Compose the body for the reader's task:
+```sh
+node <skill-directory>/scripts/deal-directions.mjs
+```
+
+For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. Each direction names a ground, an accent, a type pairing, and a shape. Choose the direction that fits the subject and the reader better. Run the script once for each artifact. Do not run it again to get a deal you prefer.
+
+Keep all four parts of the chosen direction and set the exact values yourself: the token colors for both themes, the type scale, the spacing, and the density. Change one part only when it contradicts the subject or a rule in this skill, for example an accent that collides with a status color the page uses. The layout is not dealt. It follows the composition.
+
+Without Node, read the `axes` lists in the script. Count the letters in the artifact title, and take from each list the entry at that count modulo the list length.
+
+State the direction in one sentence to the user when you deliver the artifact.
+
+## Keep the role tokens
+
+[The starter](templates/starter.html) shows the token roles, the light and dark theme blocks, and how each shared component uses the roles: contextual text and labels, lede, summary strip, pills, expandable rows, panel, note, table, filter bar, and footer. Keep the role names. Set your own values for color, font, radius, and width. Copy only the components the page uses, and restyle them to the direction. Add components the starter lacks.
+
+The starter's values are the Artifacts house look. Ship them unchanged only when the user asks for the house look or for Catppuccin.
+
+The purpose of the artifact sets the composition, whatever the direction:
 
 | Purpose | Composition |
 | --- | --- |
 | Report or guide | A conclusion first, a reading column near 68 characters, and evidence beside the claim it supports. |
-| Inventory, ledger, or status | A summary strip, a filter bar with a live count, then one `.row` per record. Its summary shows the identifier, title, and state; its detail holds everything else. Set `--cols` on `.rows` to match the summary cells. Rows stack to one column below 720 px. |
+| Inventory, ledger, or status | A summary, a filter bar with a live count, then one expandable row per record. The row summary shows the identifier, title, and state. The row detail holds everything else. With the starter's `.rows`, set `--cols` to match the summary cells. Rows stack to one column below 720 px. |
 | Compare options | Aligned criteria in a table, consistent scales, and the tradeoff stated in words. |
 | Explore data | A dominant chart or table sized to carry the page, with filters beside it. |
 | Calculate or simulate | Labeled inputs beside the result they change, with units and a realistic starting example. |
@@ -36,39 +54,41 @@ Open in a complete state with the user's real data. Never ship an empty shell or
 
 ## Typography
 
-Use the bundled faces through the starter's tokens:
+The dealt direction assigns `--f-display` and `--f-body`. Set `--f-mono` to JetBrains Mono or a system monospace stack. When the user names a face, it comes from one of three sources:
 
-- `--f-display` is Bricolage Grotesque. Use it for `h1` to `h3` and large figures only.
-- `--f-body` is Public Sans for running text, controls, labels, and table headers.
-- `--f-mono` is JetBrains Mono for code and identifiers. Use it for measurements when it helps the reader read or align them.
-- Newsreader is an optional reading face. For a long essay or editorial guide, set `--f-body` to `"Newsreader",Charter,Georgia,serif` and keep Public Sans for controls.
+- **Bundled faces.** Bricolage Grotesque is a display grotesque. Public Sans is a neutral sans. Newsreader is a reading serif with italics. JetBrains Mono is a monospace. The embedding script handles these.
+- **System stacks.** They cost no bytes and render differently on each platform, so end each stack with a generic family. Examples: `Charter,"Iowan Old Style",Georgia,serif`, `"Avenir Next","Segoe UI",system-ui,sans-serif`, `ui-rounded,"SF Pro Rounded",system-ui,sans-serif`, and `Rockwell,"Roboto Slab",Georgia,serif`.
+- **Another face.** Embed its `woff2` yourself in a `@font-face` rule with a `data:` URI. Use a face only when its license allows embedding, and subset it to the characters the page needs. An unembedded face silently falls back.
 
-Start with `h1` at `clamp(28px,4vw,40px)` and body at 15 to 16 px with a 1.55 line height. Set labels in the body face at 12 to 13 px, in sentence case without added tracking. Adjust the scale for the document's main visual and reading density. Keep `text-wrap: balance` on headings and `font-variant-numeric: tabular-nums` wherever digits align.
+Use at most three families. Set the scale for the direction and the reading density. Keep body text at 15 px or more with a line height near 1.5, and labels at 12 px or more. Keep `text-wrap: balance` on headings and `font-variant-numeric: tabular-nums` wherever digits align.
 
-After the HTML file is complete, embed the fonts it names:
+After the HTML file is complete, embed the bundled fonts it names:
 
 ```sh
 node <skill-directory>/scripts/embed-fonts.mjs page.html
 ```
 
-For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. The script rewrites the file in place and is safe to rerun after edits. It selects families from CSS `font-family` and `font` declarations in style elements and inline styles, including referenced custom properties. Comments, content text, and JavaScript strings do not select fonts. It adds italic faces for CSS `font-style: italic`, italic `font` shorthand, or real `<em>`, `<i>`, and `<cite>` elements. It refuses to write a page above 1 MiB. Three families add about 135 KB. Newsreader adds about 80 to 165 KB. Do not name another family unless you embed its `woff2` yourself, because an unembedded face silently falls back. Without Node, keep the fallback stacks and report that the fonts were not embedded.
+For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. The script rewrites the file in place and is safe to rerun after edits. It selects bundled families from CSS `font-family` and `font` declarations in style elements and inline styles, including referenced custom properties. Comments, content text, and JavaScript strings do not select fonts. It adds italic faces for CSS `font-style: italic`, italic `font` shorthand, or real `<em>`, `<i>`, and `<cite>` elements. It leaves your own `@font-face` rules in place. It refuses to write a page above 1 MiB. Three bundled families add about 135 KB. Newsreader adds about 80 to 165 KB. Without Node, keep the fallback stacks and report that the fonts were not embedded.
 
 ## Color
 
-The starter follows the viewer's system theme. Light uses Catppuccin Latte and dark uses Mocha, with Blue as the only accent. [Catppuccin roles](references/catppuccin.md) lists every token and the extra chart colors.
+Build a palette for the direction on the starter's role tokens. [Catppuccin roles](references/catppuccin.md) describes each role and shows the house palette as a worked example.
 
-- Define each color once as a token on bare `:root` and redefine only the tokens in both dark blocks. Never write a literal color in a component rule.
+- Follow the viewer's system theme. Define each color once as a token on bare `:root` and redefine only the tokens in both dark blocks. Never write a literal color in a component rule.
+- When the direction or the user calls for a single theme, set its values on bare `:root`, set the matching `color-scheme`, and drop the media blocks.
+- Compute the contrast of every pair you ship, in each theme. `--fg`, `--muted`, and each `*-ink` token reach 4.5:1 on `--page`, `--surface`, and their own `*-soft` background. `--control` reaches 3:1. Fix a failing token before saving.
 - Keep `body` on `var(--page)`. Use `--surface` for the objects you set apart, and `--sunken` for table headers and hover.
-- Show state with soft pills: a `*-soft` background and `*-ink` text. Do not fill badges with saturated pastels. Map every state to neutral, accent, ok, warn, or bad. Do not add a hue for an extra state; distinguish it with its label.
-- Use the accent for links, focus, the selected state, and one primary action. Status colors carry meaning only.
-- When the user names a single dark look, set the Mocha values on bare `:root`, keep `color-scheme: dark`, and drop the media blocks.
+- Use one accent hue for links, focus, the selected state, and one primary action. Status colors carry meaning only. Keep ok, warn, and bad distinguishable from the accent and from each other.
+- Show state with a soft background and ink text, or with a mark beside a label. Do not fill badges with saturated color. Map every state to neutral, accent, ok, warn, or bad. Do not add a hue for an extra state; distinguish it with its label.
 
-## Layout and components
+## Layout
 
-- Center one `.wrap` column at `--width` with `max(16px, env(safe-area-inset-*))` side gutters. Space siblings with grid or flex `gap`.
-- Use borders and fills by role. A summary strip, a table, and one panel can each earn a surface. Running text and headings sit on the page.
+Choose the skeleton that fits the content: one reading column, a sidebar with an index, a full-width table or chart, a grid of scenes, or a single screen with no scroll. The starter's centered `.wrap` column is one option.
+
+- Keep side gutters of `max(16px, env(safe-area-inset-*))`. Space siblings with grid or flex `gap`.
+- Use borders and fills by role. Running text and headings sit on the page. Set apart only the objects that need it.
 - Use an eyebrow only for source or scope information the heading does not already give. A label names a field, and numbering appears only for real sequences.
-- Encode attention in form. A row that needs action gets a pill or a muted closed state, not only a different word.
+- Encode attention in form. A row that needs action gets a mark or a muted closed state, not only a different word.
 - Put wide code and diagrams in their own `overflow-x: auto` container. Use a `<table>` only for short records that stay readable when scrolled; use expandable rows for records with long text. The page itself never scrolls sideways at 375 px.
 - Draw diagrams in inline SVG with token colors and labels inside the view box. For icons, use inline Tabler outline SVGs with `currentColor`.
 - Respect `prefers-reduced-motion`. Use motion only to explain a change of state.
