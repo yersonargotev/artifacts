@@ -19,16 +19,17 @@ Choose the element that carries the answer: a comparison, a diagram, a sequence,
 
 ## Choose a visual direction
 
-Decide the look before writing CSS. Derive it from the subject, the reader, and where the reader will open the artifact. Make four decisions:
+Decide the look before writing CSS. Deal two directions:
 
-- **Color.** The temperature of the page and surfaces, and one accent hue.
-- **Type.** A pairing of faces and a scale, as [Typography](#typography) allows.
-- **Shape.** Corner radius, rules or fills, shadows or none, and density.
-- **Layout.** The page skeleton, as [Layout](#layout) allows.
+```sh
+node <skill-directory>/scripts/deal-directions.mjs
+```
 
-A ledger of invoices can be dense and ruled, with monospace figures on a cool gray page. A field guide can use a serif on warm paper with wide margins. An incident timeline can be dark by default with one alarm hue. These examples show the reasoning. They are not presets, so do not pick from them.
+For the CLI, `<skill-directory>` is the output of `artifacts skills path artifacts-design`. Each direction names a ground, an accent, a type pairing, and a shape. Choose the direction that fits the subject and the reader better. Run the script once for each artifact. Do not run it again to get a deal you prefer.
 
-Two artifacts on unrelated subjects must differ in at least color and type. Do not repeat the look of the previous artifact in the conversation unless both belong to one set. Do not default to blue on cool gray.
+Keep all four parts of the chosen direction and set the exact values yourself: the token colors for both themes, the type scale, the spacing, and the density. Change one part only when it contradicts the subject or a rule in this skill, for example an accent that collides with a status color the page uses. The layout is not dealt. It follows the composition.
+
+Without Node, read the `axes` lists in the script. Count the letters in the artifact title, and take from each list the entry at that count modulo the list length.
 
 State the direction in one sentence to the user when you deliver the artifact.
 
@@ -53,10 +54,10 @@ Open in a complete state with the user's real data. Never ship an empty shell or
 
 ## Typography
 
-Assign faces to `--f-display`, `--f-body`, and `--f-mono`. Any face can take any role. Choose from three sources:
+The dealt direction assigns `--f-display` and `--f-body`. Set `--f-mono` to JetBrains Mono or a system monospace stack. When the user names a face, it comes from one of three sources:
 
 - **Bundled faces.** Bricolage Grotesque is a display grotesque. Public Sans is a neutral sans. Newsreader is a reading serif with italics. JetBrains Mono is a monospace. The embedding script handles these.
-- **System stacks.** They cost no bytes and render differently on each platform, so end each stack with a generic family. Examples: `Charter,"Iowan Old Style",Georgia,serif`, `"Avenir Next","Segoe UI",system-ui,sans-serif`, `ui-rounded,"SF Pro Rounded",system-ui,sans-serif`, and `Rockwell,"Roboto Slab",serif`.
+- **System stacks.** They cost no bytes and render differently on each platform, so end each stack with a generic family. Examples: `Charter,"Iowan Old Style",Georgia,serif`, `"Avenir Next","Segoe UI",system-ui,sans-serif`, `ui-rounded,"SF Pro Rounded",system-ui,sans-serif`, and `Rockwell,"Roboto Slab",Georgia,serif`.
 - **Another face.** Embed its `woff2` yourself in a `@font-face` rule with a `data:` URI. Use a face only when its license allows embedding, and subset it to the characters the page needs. An unembedded face silently falls back.
 
 Use at most three families. Set the scale for the direction and the reading density. Keep body text at 15 px or more with a line height near 1.5, and labels at 12 px or more. Keep `text-wrap: balance` on headings and `font-variant-numeric: tabular-nums` wherever digits align.
