@@ -55,6 +55,6 @@ Adapted on 2026-10-14 from [Emil Kowalski's design engineering skill](https://ra
 
 The accessibility and interface checks incorporate Vercel's Web Interface Guidelines `command.md` as local guidance. Its remote command workflow and output format are not required. The sandbox adaptations are specific to Artifacts.
 
-The composition workflow and the distinction between required checks and visual judgment draw on [Hallmark](https://github.com/Nutlope/hallmark), reviewed on 2026-10-24. This adaptation retains Artifacts' document types, palette, embedded fonts, and sandbox constraints.
+The composition workflow and the distinction between required checks and visual judgment draw on [Hallmark](https://github.com/Nutlope/hallmark), reviewed on 2026-10-24. This adaptation retains Artifacts' document types, token roles, embedded fonts, and sandbox constraints.
 
 License notices are retained in [Third-party notices](../THIRD-PARTY-NOTICES.md).

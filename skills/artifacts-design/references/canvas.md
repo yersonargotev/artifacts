@@ -7,7 +7,7 @@ Create a retained `design` snapshot when several HTML boards belong in one canva
 1. Choose a frame size for each board. Common starting sizes are 1440 by 900 for desktop, 390 by 844 for a phone, and 768 by 1024 for a tablet. These are authoring conventions, not schema limits.
 2. Place boards in a row with 80 px between their edges. Start another row 120 px below the tallest board in the preceding row. Coordinates are canvas pixels, and boards can use different sizes.
 3. Write each board under `boards/` as one UTF-8 `.html` file. Inline its styles, scripts, images, and fonts. Files retained beside a board are downloads, not relative executable assets.
-4. Apply this skill's typography and Catppuccin tokens inside each board. The canvas ground follows the viewer's light or dark theme independently.
+4. Choose one visual direction for the canvas and apply its tokens and typography inside each board. The canvas ground follows the viewer's light or dark theme independently.
 5. Define `canvas.json` with the exact index below. Keep snapshot metadata outside the index.
 
 ```json
