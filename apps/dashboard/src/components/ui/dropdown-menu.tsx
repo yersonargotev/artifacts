@@ -13,7 +13,7 @@ function DropdownMenuContent({ align = 'start', alignOffset = 0, side = 'bottom'
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner className="isolate z-50 outline-none" align={align} alignOffset={alignOffset} side={side} sideOffset={sideOffset}>
-        <MenuPrimitive.Popup data-slot="dropdown-menu-content" className={cn('z-50 max-h-(--available-height) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground outline-none', className)} {...props} />
+        <MenuPrimitive.Popup data-slot="dropdown-menu-content" className={cn('z-50 max-h-(--available-height) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground outline-none', className)} {...props} />
       </MenuPrimitive.Positioner>
     </MenuPrimitive.Portal>
   );
@@ -28,7 +28,7 @@ function DropdownMenuLabel({ className, ...props }: MenuPrimitive.GroupLabel.Pro
 }
 
 function DropdownMenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
-  return <MenuPrimitive.Item data-slot="dropdown-menu-item" className={cn('relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50', className)} {...props} />;
+  return <MenuPrimitive.Item data-slot="dropdown-menu-item" className={cn('relative flex cursor-default items-center gap-1.5 rounded-sm px-1.5 py-1 text-md outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50', className)} {...props} />;
 }
 
 function DropdownMenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {

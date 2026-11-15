@@ -20,14 +20,26 @@ test('project tones have stylesheet rules and ignore letter case', async () => {
 });
 const effectPolicy = {
   '--accent-fill': { property: 'background', subject: 'primary' },
-  '--glow-primary': { property: 'box-shadow', subject: 'primary' },
-  '--glow-active': { property: 'box-shadow', subject: 'active' },
   '--cover-wash': { property: 'background', subject: 'cover' },
-  '--elevation-overlay': { property: 'box-shadow', subject: 'overlay' },
+  '--shadow-1': { property: 'box-shadow', subject: 'document' },
+  '--shadow-2': { property: 'box-shadow', subject: 'overlay' },
 } as const;
 type EffectToken = keyof typeof effectPolicy;
 type Subject = typeof effectPolicy[EffectToken]['subject'];
-const isEffectToken = (name: string) => name.startsWith('--glow-') || name.startsWith('--cover-') || name === '--accent-fill' || name === '--elevation-overlay';
+const isEffectToken = (name: string) => Object.hasOwn(effectPolicy, name) || /^--(?:cover|shadow)-/.test(name);
+const isShadowToken = (name: string) => name.startsWith('--shadow-');
+const scales = {
+  'font-size': ['--text-2xs', '--text-xs', '--text-sm', '--text-md', '--text-lg', '--text-xl', '--text-2xl'],
+  'border-radius': ['--r-sm', '--r-md', '--r-lg', '--r-full'],
+  motion: ['--dur-1', '--dur-2', '--dur-3', '--ease-out', '--ease-in-out'],
+};
+const scaleValues = {
+  '--text-2xs': '11px', '--text-xs': '12px', '--text-sm': '13px', '--text-md': '14px', '--text-lg': '16px', '--text-xl': '20px', '--text-2xl': '28px',
+  '--r-sm': '6px', '--r-md': '8px', '--r-lg': '12px', '--r-full': '999px',
+  '--dur-1': '90ms', '--dur-2': '160ms', '--dur-3': '260ms', '--ease-out': 'cubic-bezier(.2, .8, .2, 1)', '--ease-in-out': 'cubic-bezier(.4, 0, .2, 1)',
+};
+const radiusProperties = new Set(['border-radius', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius']);
+const motionProperties = new Set(['transition', 'transition-duration', 'transition-timing-function', 'transition-delay', 'animation', 'animation-duration', 'animation-timing-function', 'animation-delay']);
 
 function objects(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.flatMap(objects);
@@ -38,17 +50,41 @@ function objects(value: unknown): Record<string, unknown>[] {
 function matchesSubject(selector: Selector, subject: Subject) {
   const lastCombinator = selector.findLastIndex((component) => component.type === 'combinator');
   const target = selector.slice(lastCombinator + 1);
-  if (subject === 'overlay') return target.some((component) => (component.type === 'class' && ['artifact-menu', 'project-filter-links'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content'));
-  if (subject === 'active' && target.length === 2 && target[0].type === 'class' && target[0].name === 'artifact-card' && target[1].type === 'pseudo-class' && target[1].kind === 'has') {
-    const checked = target[1].selectors;
-    if (checked.length === 1 && checked[0].length === 2 && checked[0][0].type === 'type' && checked[0][0].name === 'input' && checked[0][1].type === 'pseudo-class' && checked[0][1].kind === 'checked') return true;
-  }
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
-    if (component.type !== 'attribute' || component.namespace) return false;
-    if (subject === 'primary') return component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary';
-    return component.name === 'aria-current' || (['aria-selected', 'aria-pressed'].includes(component.name) && component.operation?.operator === 'equal' && component.operation.value === 'true');
+    if (subject === 'document') return component.type === 'class' && component.name === 'reader-pane';
+    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'project-filter-links', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
+    return component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary';
   });
+}
+
+function scaleViolation(property: string, declaration: { property: string; value: unknown }, variables: string[], nodes: Record<string, unknown>[]) {
+  const lengths = nodes.filter((node) => node.type === 'length' || node.type === 'dimension' || (node.type === 'token' && (node.value as { type?: string })?.type === 'dimension'));
+  if (property === 'font-size' || property === 'font') {
+    if (declaration.property !== 'unparsed') return 'must use a --text-* size step';
+    const keyword = nodes.some((node) => node.type === 'ident' && ['inherit', 'unset', 'initial'].includes(node.value as string));
+    if (!variables.length && !keyword) return 'must use a --text-* size step';
+    if (variables.some((name) => !scales['font-size'].includes(name))) return 'uses a size outside the --text-* scale';
+    if (lengths.some((node) => (node.value as { unit?: string }).unit !== 'vw')) return 'mixes a literal length into a scale size';
+  }
+  if (radiusProperties.has(property)) {
+    if (declaration.property !== 'unparsed') {
+      const values = objects(declaration.value).filter((node) => node.type === 'dimension' || node.type === 'percentage');
+      if (values.some((node) => node.type === 'percentage' ? node.value !== 0.5 : (node.value as { value: number }).value !== 0)) return 'must use an --r-* radius step, 0, or 50%';
+      return null;
+    }
+    if (!variables.length || variables.some((name) => !scales['border-radius'].includes(name))) return 'must use an --r-* radius step, 0, or 50%';
+    if (lengths.length || nodes.some((node) => node.type === 'token' && (node.value as { type?: string; value?: number }).type === 'number' && (node.value as { value: number }).value !== 0)) return 'mixes a literal length into a radius step';
+  }
+  if (motionProperties.has(property)) {
+    if (declaration.property !== 'unparsed') {
+      const timed = objects(declaration.value).some((node) => (node.type === 'seconds' || node.type === 'milliseconds') && node.value !== 0);
+      return timed ? 'must take durations and easings from the motion tokens' : null;
+    }
+    if (variables.some((name) => !scales.motion.includes(name)) || nodes.some((node) => node.type === 'time') || lengths.some((node) => /^m?s$/.test(String((node.value as { unit?: string }).unit)))) return 'must take durations and easings from the motion tokens';
+    if (nodes.some((node) => (node.type === 'function' && /^(?:cubic-bezier|steps|linear)$/.test((node.value as { name: string }).name)) || (node.type === 'ident' && /^(?:ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end)$/.test(node.value as string)))) return 'must take durations and easings from the motion tokens';
+  }
+  return null;
 }
 
 function stylesheetViolations(filename: string, source: string) {
@@ -81,21 +117,26 @@ function stylesheetViolations(filename: string, source: string) {
         const token = customName && Object.hasOwn(effectPolicy, customName) ? customName as EffectToken : null;
         const hasGradient = nodes.some((node) => node.type === 'gradient' || (node.type === 'function' && /gradient$/i.test((node.value as { name: string }).name)));
         const hasDropShadow = nodes.some((node) => node.type === 'drop-shadow' || (node.type === 'function' && (node.value as { name: string }).name === 'drop-shadow'));
+        if ([customName, ...variables].some((name) => name && /glow/i.test(name))) report(`${customName ?? property} names a glow token; current and selected items use the side indicator`);
         if (hasGradient && !(tokensFile && token && effectPolicy[token].property === 'background')) report(`${customName ?? property} contains a gradient outside its effect token`);
         if (hasDropShadow) report(`${property} contains a drop shadow`);
         if (customName && isEffectToken(customName)) {
           if (!tokensFile || !token) report(`${customName} is not an approved token definition`);
         }
         for (const name of effects) {
-          if (name !== '--elevation-overlay' && filename !== 'effects.css') report(`${name} is referenced outside effects.css`);
+          if (!isShadowToken(name) && filename !== 'effects.css') report(`${name} is referenced outside effects.css`);
           const policy = effectPolicy[name as EffectToken];
           if (!policy || property !== policy.property || !(rule.selectors.length > 0 && rule.selectors.every((item) => matchesSubject(item, policy.subject)))) report(`${name} is used outside its allowed property or subject selector`);
         }
         if (property === 'box-shadow' || property === 'text-shadow') {
           const empty = declaration.property === 'unparsed' && declaration.value.value.length === 1 && declaration.value.value[0].type === 'token' && declaration.value.value[0].value.type === 'ident' && declaration.value.value[0].value.value === 'none';
-          const allowed = property === 'box-shadow' && variables.length === 1 && Object.hasOwn(effectPolicy, variables[0]) && effectPolicy[variables[0] as EffectToken].property === 'box-shadow';
+          const allowed = property === 'box-shadow' && variables.length === 1 && isShadowToken(variables[0]) && Object.hasOwn(effectPolicy, variables[0]);
           const directToken = declaration.property === 'unparsed' && declaration.value.value.length === 1 && declaration.value.value[0].type === 'var' && !declaration.value.value[0].value.fallback;
-          if (!empty && !(allowed && directToken)) report(`${property} must use one approved shadow token without a fallback`);
+          if (!empty && !(allowed && directToken)) report(`${property} must use one shadow token without a fallback`);
+        }
+        if (!customName) {
+          const problem = scaleViolation(property, declaration, variables, nodes);
+          if (problem) report(`${property} ${problem}`);
         }
       },
       Color(color) {
@@ -111,7 +152,10 @@ function markupViolations(filename: string, source: string) {
   for (const match of source.matchAll(/\b(?:shadow|drop-shadow|ring|bg-linear|bg-radial|bg-conic|bg-gradient)(?:-[\w[\]/.%-]+)?\b/g)) issues.push(`${filename}: forbidden effect utility ${match[0]}`);
   for (const match of source.matchAll(/\b(?:boxShadow|textShadow|box-shadow|text-shadow)["']?\s*:/gi)) issues.push(`${filename}: forbidden inline shadow ${match[0]}`);
   for (const match of source.matchAll(/[\w-]*(?:gradient|drop-shadow)\s*\(/gi)) issues.push(`${filename}: forbidden inline effect ${match[0]}`);
-  for (const match of source.matchAll(/--(?:(?:glow|cover)-[\w-]+|accent-fill(?![\w-]))/g)) issues.push(`${filename}: effect token ${match[0]} belongs in effects.css`);
+  for (const match of source.matchAll(/--(?:(?:glow|cover|shadow)-[\w-]+|accent-fill(?![\w-]))/g)) issues.push(`${filename}: effect token ${match[0]} belongs in the stylesheets`);
+  for (const [utility] of source.matchAll(/(?<![\w-])text-[\w[\]().%/-]+/g)) if (/^text-(?:base|\d*xl|xs|sm|md|lg|\[.*\]|\(.*\))$/.test(utility) && !/^text-(?:2xs|xs|sm|md|lg|xl|2xl)$/.test(utility)) issues.push(`${filename}: font size ${utility} is outside the type scale`);
+  for (const [utility] of source.matchAll(/(?<![\w-])rounded(?:-[\w[\]().%/-]+)?(?![\w-])/g)) if (!/^rounded(?:-(?:[trbl]|tl|tr|br|bl|[se]|ss|se|es|ee))?-(?:sm|md|lg|full|none)$/.test(utility)) issues.push(`${filename}: radius ${utility} is outside the radius scale`);
+  for (const match of source.matchAll(/\b(?:fontSize|font-size|borderRadius|border-radius)["']?\s*:/gi)) issues.push(`${filename}: inline ${match[0]} bypasses the scales`);
   return issues;
 }
 
@@ -120,32 +164,47 @@ async function sourceFiles(directory: string): Promise<string[]> {
   return (await Promise.all(entries.map((entry) => entry.isDirectory() ? sourceFiles(resolve(directory, entry.name)) : [resolve(directory, entry.name)]))).flat();
 }
 
-test('panel styles and markup follow the effects policy', async () => {
+test('panel styles and markup follow the effects and scale policy', async () => {
   const files = await sourceFiles(sourceRoot);
   const issues = (await Promise.all(files.map(async (filename) => {
     const source = await readFile(filename, 'utf8');
     if (filename.startsWith(`${styleRoot}/`) && filename.endsWith('.css')) return stylesheetViolations(relative(styleRoot, filename), source);
-    if (/\.(astro|tsx)$/.test(filename)) return markupViolations(relative(sourceRoot, filename), source);
+    if (/\.(astro|tsx)$/.test(filename)) {
+      const styles = [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].flatMap((match) => stylesheetViolations(relative(sourceRoot, filename), match[1]));
+      return [...styles, ...markupViolations(relative(sourceRoot, filename), source.replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, ''))];
+    }
     return [];
   }))).flat();
   assert.deepEqual(issues, []);
 });
 
-test('effect policy rejects stray gradients, shadows, aliases, and selector escapes', () => {
+test('tokens define the type, radius, and motion scales and the reduced-motion rule removes all motion', async () => {
+  const tokens = await readFile(resolve(styleRoot, 'tokens.css'), 'utf8');
+  const defined = Object.fromEntries([...tokens.matchAll(/(--(?:text-\d?x?[sml]\w*|r-\w+|dur-\d|ease-[\w-]+)):\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]));
+  assert.deepEqual(defined, scaleValues);
+  const panel = await readFile(resolve(styleRoot, 'panel.css'), 'utf8');
+  assert.match(panel, /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{[^}]*transition: none !important;[^}]*animation: none !important;/);
+});
+
+test('effect policy rejects glow, stray gradients, shadows, aliases, and selector escapes', () => {
   for (const source of [
     '.sidebar-link { background: linear-gradient(red, blue) }',
     '.sidebar-link { box-shadow: 0 0 12px blue }',
-    '.sidebar-link { box-shadow: var(--glow-primary) }',
-    '.sidebar-link { box-shadow: var(--elevation-overlay) }',
-    '.project-filter-links .sidebar-link { box-shadow: var(--elevation-overlay) }',
-    '.project-filter-links, .sidebar-link { box-shadow: var(--elevation-overlay) }',
-    '[data-variant="primary"] .sidebar-link { box-shadow: var(--glow-primary) }',
-    '[data-variant="primary"], .sidebar-link { box-shadow: var(--glow-primary) }',
-    '[aria-selected="false"] { box-shadow: var(--glow-active) }',
+    '.sidebar-link { box-shadow: var(--shadow-2) }',
+    '.project-filter-links .sidebar-link { box-shadow: var(--shadow-2) }',
+    '.project-filter-links, .sidebar-link { box-shadow: var(--shadow-2) }',
+    '.artifact-menu { box-shadow: var(--shadow-1) }',
+    '.preview { box-shadow: var(--shadow-1) }',
+    '[aria-current] { box-shadow: var(--glow-active) }',
+    '[data-variant="primary"] { box-shadow: var(--glow-primary) }',
+    '.sidebar-link { --glow: 0 0 12px blue }',
+    '.sidebar-link { box-shadow: inset 3px 0 0 var(--accent) }',
     '.sidebar-link { --wash: var(--cover-wash) }',
     '.sidebar-link { background: var(--accent-fill) }',
+    '[data-variant="primary"] .sidebar-link { background: var(--accent-fill) }',
     '.sidebar-link { --accent-fill: red }',
-    '.sidebar-link { box-shadow: var(--elevation-overlay, 0 0 12px blue) }',
+    '.sidebar-link { --shadow-3: 0 0 12px blue }',
+    '.artifact-menu { box-shadow: var(--shadow-2, 0 0 12px blue) }',
     '.sidebar-link { filter: drop-shadow(0 0 12px blue) }',
     '.sidebar-link { --wash: linear-gradient(red, blue) }',
     '@keyframes glow { to { box-shadow: 0 0 12px blue } }',
@@ -155,30 +214,33 @@ test('effect policy rejects stray gradients, shadows, aliases, and selector esca
   assert.match(stylesheetViolations('panel.css', '\n.sidebar-link { background: linear-gradient(red, blue) }').join('\n'), /panel\.css:2 \.sidebar-link: background contains a gradient/);
 });
 
-test('effect policy permits only scoped effect tokens and neutral overlay elevation', () => {
-  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill); box-shadow: var(--glow-primary) } [aria-current], [aria-selected="true"], [aria-pressed="true"] { box-shadow: var(--glow-active) } .project-cover { background: var(--cover-wash) }'), []);
-  assert.deepEqual(stylesheetViolations('panel.css', '.artifact-menu { box-shadow: var(--elevation-overlay) }'), []);
-  assert.deepEqual(stylesheetViolations('panel.css', '.project-filter-links { box-shadow: var(--elevation-overlay) }'), []);
+test('effect policy permits scoped effect tokens and shadow tokens on their subjects', () => {
+  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill) } .project-cover { background: var(--cover-wash) } .sidebar-link[aria-current]::before { background: var(--accent) }'), []);
+  for (const selector of ['.artifact-menu', '.project-filter-links', '.dialog-content', '.combobox-content', '[data-slot=dropdown-menu-content]']) assert.deepEqual(stylesheetViolations('panel.css', `${selector} { box-shadow: var(--shadow-2) }`), [], selector);
+  assert.deepEqual(stylesheetViolations('panel.css', '.reader-pane { box-shadow: var(--shadow-1) }'), []);
+  assert.deepEqual(stylesheetViolations('panel.css', '.sidebar-link { box-shadow: none }'), []);
 });
 
-test('selected card effects require the exact checked input subject', () => {
-  assert.deepEqual(stylesheetViolations('effects.css', '.artifact-card:has(input:checked) { box-shadow: var(--glow-active) }'), []);
-  for (const selector of [
-    '.artifact-card:has(input)', '.artifact-card:has(input:not(:checked))', '.artifact-card:has(input:checked, a)',
-    '.artifact-card:has(input:checked) .artifact-description', '.sidebar-link:has(input:checked)',
-    '.artifact-card:has(.other:checked)', '.artifact-card:has(input:checked), .sidebar-link',
-    '.artifact-card:has(input:checked, input)', '.artifact-card:has(input:checked) + .artifact-card',
-  ]) assert(stylesheetViolations('effects.css', `${selector} { box-shadow: var(--glow-active) }`).length > 0, selector);
-  for (const value of ['var(--glow-active, 0 0 12px blue)', 'var(--alias)', 'var(--glow-active) var(--glow-active)']) {
-    assert(stylesheetViolations('effects.css', `.artifact-card:has(input:checked) { box-shadow: ${value} }`).length > 0, value);
-  }
+test('scale policy accepts only scale steps for sizes, radii, and motion', () => {
+  for (const declaration of [
+    'font-size: var(--text-sm)', 'font: var(--text-md)/1.5 a, b', 'font: inherit', 'font-size: clamp(var(--text-xl), 6vw, var(--text-2xl))',
+    'border-radius: var(--r-md)', 'border-radius: var(--r-lg) var(--r-lg) 0 0', 'border-radius: 50%', 'border-radius: 0',
+    'transition: color var(--dur-1) var(--ease-out), transform var(--dur-2) var(--ease-in-out)', 'transition: none', 'animation: none',
+  ]) assert.deepEqual(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`), [], declaration);
+  for (const declaration of [
+    'font-size: 13px', 'font-size: 1rem', 'font: 12px/1.6 mono', 'font-size: var(--text-3xl)', 'font-size: calc(var(--text-sm) + 1px)', 'font-size: clamp(36px, 6vw, 54px)',
+    'border-radius: 4px', 'border-radius: 30%', 'border-radius: var(--r-xl)', 'border-radius: var(--r-md) 4px', 'border-top-left-radius: 3px',
+    'transition: color 90ms ease', 'transition: color var(--dur-1) ease-in', 'transition: color 200ms var(--ease-out)', 'transition-duration: .2s', 'animation: spin 1s linear infinite', 'transition: color var(--dur-1) cubic-bezier(0, 0, 1, 1)',
+  ]) assert(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`).length > 0, declaration);
 });
 
-test('markup policy rejects effect utilities and inline shadows', () => {
-  for (const utility of ['shadow-md', 'hover:shadow-xl', 'drop-shadow-lg', 'focus-visible:ring-2', 'bg-linear-to-r', 'bg-radial-at-t', 'bg-gradient-to-r']) assert(markupViolations('fixture.tsx', `<div className="${utility}" />`).length > 0, utility);
+test('markup policy rejects effect utilities, off-scale sizes and radii, and inline styles', () => {
+  for (const utility of ['shadow-md', 'hover:shadow-xl', 'drop-shadow-lg', 'focus-visible:ring-2', 'bg-linear-to-r', 'bg-radial-at-t', 'bg-gradient-to-r', 'text-base', 'text-3xl', 'text-[13px]', 'rounded', 'rounded-xl', 'rounded-[10px]', 'rounded-t-2xl']) assert(markupViolations('fixture.tsx', `<div className="${utility}" />`).length > 0, utility);
   for (const source of [
     '<div style="box-shadow: 0 0 4px blue" />',
     '<div style={{ boxShadow: "0 0 4px blue" }} />',
+    '<div style={{ fontSize: 13 }} />',
+    '<div style="border-radius: 4px" />',
     '<div class="bg-[linear-gradient(var(--accent),var(--danger))]" />',
     '<div class="[background:linear-gradient(var(--accent),var(--danger))]" />',
     '<div className="hover:bg-[image:radial-gradient(var(--accent),var(--danger))]" />',
@@ -192,6 +254,7 @@ test('markup policy rejects effect utilities and inline shadows', () => {
     '<div className="[box-shadow:var(--glow-primary)]" />',
     '<div style={{ backgroundImage: "repeating-linear-gradient(var(--accent),var(--danger))" }} />',
   ]) assert(markupViolations('fixture.tsx', source).length > 0, source);
+  assert.deepEqual(markupViolations('fixture.tsx', '<div className="rounded-md rounded-t-lg text-sm text-muted-foreground text-foreground rounded-full text-2xs" />'), []);
   assert.deepEqual(markupViolations('fixture.astro', '<button data-variant="primary">Publicar</button>'), []);
 });
 

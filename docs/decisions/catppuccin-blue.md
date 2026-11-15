@@ -10,11 +10,38 @@ The application adapts those choices to a compact dashboard. Base, mantle, and c
 
 The native font stack avoids remote font requests. The publication wrapper retains its independent stylesheet. Its trusted header is separated from the authenticated content iframe so the library link can navigate while the document keeps its own network denial policy. Tabler outline icons provide consistent geometry; their local notices retain attribution.
 
+## Tokens and scales
+
+`tokens.css` owns every literal value in the panel. Tokens are named by function, not by palette entry: `--bg`, `--bg-chrome`, `--bg-sunken`, `--bg-raised`, and `--bg-hover` for surfaces; `--border-subtle`, `--border`, and `--border-strong` for lines; `--text`, `--text-2`, and `--text-3` for the three text tiers. Dividers inside a card or table use `--border-subtle`. Outlines of cards, controls, and popups use `--border`. Hover surfaces use `--bg-hover`.
+
+Translucent color comes from three steps mixed from the accent with `color-mix`. `--accent-a1` (9%) fills selected rows and tinted surfaces. `--accent-a2` (16%) fills the active navigation item, a highlighted menu item, and a pressed toggle. `--accent-a3` (32%) draws tinted borders and the text selection. Warning and success use the same pattern with `--warn-a1`, `--warn-a3`, `--ok-a1`, and `--ok-a3`. A surface that was a translucent neutral is now a solid surface token. Because every step derives from its base color, another theme gets the steps by redefining the base color only.
+
+The panel uses seven font sizes, `--text-2xs` (11px) to `--text-2xl` (28px), with body text at `--text-md` (14px). It uses four radii, `--r-sm` (6px), `--r-md` (8px), `--r-lg` (12px), and `--r-full`, plus `0` and `50%` for a true circle. Tailwind's font size and radius namespaces point at the same tokens, so a utility class in `ui/*.tsx` lands on the same scale as `panel.css`.
+
 ## Panel effects
 
-`tokens.css` owns the Mocha palette and literal effect values. `effects.css` applies the primary glow and 120-degree gradient to `[data-variant="primary"]`, the active glow to current or selected controls, and the cover wash to `.project-cover`. Destructive primary actions retain a solid red background without a glow. Other buttons use flat Surface0.
+`effects.css` applies the 120-degree gradient to `[data-variant="primary"]` with no shadow, the cover wash to `.project-cover`, and the indicator to current or selected items. Destructive primary actions keep a solid red background. Other buttons use `--bg-raised` with a `--border` outline.
 
-The focus ring is a solid blue outline. Menus use a neutral overlay shadow. The brand, page background, and empty states use solid fills. The parsed stylesheet conventions test rejects gradients and shadows outside the token policy, effect tokens outside their selector scope, Tailwind shadow and gradient classes, and inline shadows.
+Current and selected items have no glow. A current navigation item, the current reader item, the current project filter, and a selected table row or card show a 3px `--accent` bar on their leading edge over an `--accent-a1` or `--accent-a2` surface. Detail tabs keep their underline, and the status filters and view toggle keep their tinted or raised fill. This replaces the earlier decision to mark active items with a blue glow.
+
+The focus ring is `2px solid var(--accent)` with a 2px offset. Shadows come only from `--shadow-1`, for the reader pane, and `--shadow-2`, for menus, dialogs, and popups. A dialog dims the page with `--scrim`.
+
+## Motion
+
+Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` (260ms), and two curves, `--ease-out` and `--ease-in-out`. Buttons, links, rows, inputs, and menu items transition color, background, border, and transform over `--dur-1` with `--ease-out`. A pressed button scales to 97%. Under `prefers-reduced-motion: reduce`, the panel removes every transition and animation.
+
+## Conventions test
+
+`tests/panel-conventions.test.ts` parses every panel stylesheet and every Astro `<style>` block. It fails on:
+
+- a glow token or any shadow other than `none` or one shadow token on its allowed subject;
+- a gradient outside its effect token, or an effect token outside its selector scope;
+- a font size or `font` shorthand that does not resolve to a `--text-*` step, and a radius that is not an `--r-*` step, `0`, or `50%`;
+- a transition or animation duration or easing that does not come from the motion tokens;
+- a literal color outside `tokens.css`;
+- a Tailwind shadow, ring, gradient, off-scale size, or off-scale radius class, or an inline shadow, font size, or radius in markup.
+
+It also checks that `tokens.css` defines the exact scale values and that `panel.css` holds the reduced-motion rule.
 
 ## Library behavior
 

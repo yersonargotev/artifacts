@@ -1,15 +1,11 @@
 [data-variant="primary"] {
   background: var(--accent-fill);
   color: var(--on-accent);
-  box-shadow: var(--glow-primary);
 }
 
-[aria-current], [aria-selected="true"], [aria-pressed="true"] {
-  box-shadow: var(--glow-active);
-}
-
-.artifact-card:has(input:checked) {
-  box-shadow: var(--glow-active);
+[data-variant="primary"]:hover {
+  background: var(--accent-fill);
+  filter: brightness(1.06);
 }
 
 .project-cover {
@@ -18,5 +14,25 @@
 
 [data-variant="primary"].destructive-button {
   background: var(--danger);
-  box-shadow: none;
+}
+
+.sidebar-link[aria-current]::before,
+.project-filter-links a[aria-current]::before,
+.reader-item[aria-current]::before,
+.artifact-card:has(input:checked)::before,
+.artifact-table tr:has(input:checked) > .artifact-table-check::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--accent);
+}
+
+.artifact-table tr:has(input:checked) > .artifact-table-check::before {
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
 }

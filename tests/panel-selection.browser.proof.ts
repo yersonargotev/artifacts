@@ -104,8 +104,8 @@ try {
   assert.deepEqual((await formIds(page)).sort(), selectedIds);
   await checkbox(page, 'Alpha first').focus();
   await capture(page, 'checkbox-focus');
-  const effects = await page.locator('.artifact-card').evaluateAll((cards) => cards.map((card) => ({ title: card.querySelector('h2')!.textContent, checked: Boolean(card.querySelector('input:checked')), shadow: getComputedStyle(card).boxShadow, border: getComputedStyle(card).borderColor, ariaSelected: card.getAttribute('aria-selected') })));
-  assert(effects.every(({ checked, shadow, ariaSelected }) => (checked ? shadow !== 'none' : shadow === 'none') && ariaSelected === null));
+  const effects = await page.locator('.artifact-card').evaluateAll((cards) => cards.map((card) => ({ title: card.querySelector('h2')!.textContent, checked: Boolean(card.querySelector('input:checked')), shadow: getComputedStyle(card).boxShadow, indicator: getComputedStyle(card, '::before').width, border: getComputedStyle(card).borderColor, ariaSelected: card.getAttribute('aria-selected') })));
+  assert(effects.every(({ checked, shadow, indicator, ariaSelected }) => shadow === 'none' && (checked ? indicator === '3px' : indicator === 'auto') && ariaSelected === null));
   await json('selected-effects.json', effects);
   await capture(page, 'bulk-1440');
   await page.waitForTimeout(3500);
