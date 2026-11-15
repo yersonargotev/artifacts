@@ -88,8 +88,9 @@ try {
   await hydrated(page);
   assert.deepEqual(await visibleHints(page), ['j k mover', '↵ leer', 'p publicar', 't tema'], 'the library lists the prototype hints for the keys that work on it');
   const trigger = page.getByRole('button', { name: 'Abrir la paleta de comandos', exact: true });
-  assert.equal(await trigger.textContent(), '⌘K');
-  assert.equal(await trigger.getAttribute('aria-keyshortcuts'), 'Meta+K');
+  const mac = process.platform === 'darwin';
+  assert.equal(await trigger.textContent(), mac ? '⌘K' : 'Ctrl K');
+  assert.equal(await trigger.getAttribute('aria-keyshortcuts'), mac ? 'Meta+K' : 'Control+K');
   assert.equal(await page.locator('a.reader-link .kbd').textContent(), 'r');
   assert.equal(await page.locator('a.reader-link .kbd').isVisible(), true, 'Modo lectura shows its r key');
   checks.push('with JavaScript the library shows j k mover, ↵ leer, p publicar, t tema, the ⌘K trigger in the search field, and r on Modo lectura');
