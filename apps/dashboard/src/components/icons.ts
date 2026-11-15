@@ -34,6 +34,8 @@ export const icons = {
   'selector': ['M8 9l4 -4l4 4', 'M16 15l-4 4l-4 -4'],
   'arrow-down': ['M12 5v14', 'M18 13l-6 6', 'M6 13l6 6'],
   'arrow-up': ['M12 5v14', 'M18 11l-6 -6', 'M6 11l6 -6'],
+  'sun': ['M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0', 'M3 12h1M20 12h1M12 3v1M12 20v1M5.6 5.6l.7 .7M17.7 17.7l.7 .7M18.4 5.6l-.7 .7M6.3 17.7l-.7 .7'],
+  'moon': ['M12 3a6 6 0 0 0 9 9a9 9 0 1 1 -9 -9'],
 } as const;
 
 export type IconName = keyof typeof icons;

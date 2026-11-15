@@ -1,0 +1,26 @@
+---
+import { themeCookie, themeToggle, themes, type Theme } from '../../theme.ts';
+import Icon from '../Icon.astro';
+interface Props { theme: Theme }
+const { theme } = Astro.props;
+---
+<form class="theme-toggle" method="post" action="/theme" data-theme-cookie={themeCookie}>
+  <input type="hidden" name="theme" value={themeToggle[theme].next} />
+  <input type="hidden" name="return" value={`${Astro.url.pathname}${Astro.url.search}`} />
+  <button type="submit">{themes.map((current) => <span data-theme-label={current} hidden={current !== theme}><Icon name={themeToggle[current].icon} size={18} />{themeToggle[current].label}</span>)}</button>
+</form>
+<script>
+  // With JavaScript the theme flips in place, so the page keeps its scroll, selection, and open disclosures; the form is the fallback.
+  const form = document.querySelector<HTMLFormElement>('form[data-theme-cookie]');
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const field = form.elements.namedItem('theme') as HTMLInputElement;
+    const next = field.value;
+    const root = document.documentElement;
+    root.dataset.theme = next;
+    document.cookie = `${form.dataset.themeCookie}=${next}; path=/; max-age=31536000; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`;
+    field.value = next === 'dark' ? 'light' : 'dark';
+    for (const label of form.querySelectorAll<HTMLElement>('[data-theme-label]')) label.hidden = label.dataset.themeLabel !== next;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim());
+  });
+</script>

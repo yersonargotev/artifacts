@@ -1,6 +1,6 @@
 # Catppuccin blue application design
 
-The library, artifact review page, and publication header use Catppuccin Mocha with blue as the primary accent. The application presents saved work and its publication state. It does not impose its appearance on the document inside the sandbox.
+The library, artifact review page, and publication header use Catppuccin with blue as the primary accent. The panel has a dark theme from Catppuccin Mocha and a light theme from Catppuccin Latte. The publication header stays on Mocha. The application presents saved work and its publication state. It does not impose its appearance on the document inside the sandbox.
 
 ## Reference sources
 
@@ -14,9 +14,25 @@ The panel serves its own fonts, so it makes no remote font request. The publicat
 
 `tokens.css` owns every literal value in the panel. Tokens are named by function, not by palette entry: `--bg`, `--bg-chrome`, `--bg-sunken`, `--bg-raised`, and `--bg-hover` for surfaces; `--border-subtle`, `--border`, and `--border-strong` for lines; `--text`, `--text-2`, and `--text-3` for the three text tiers. Dividers inside a card or table use `--border-subtle`. Outlines of cards, controls, and popups use `--border`. Hover surfaces use `--bg-hover`.
 
-Translucent color comes from three steps mixed from the accent with `color-mix`. `--accent-a1` (9%) fills selected rows and tinted surfaces. `--accent-a2` (16%) fills the active navigation item, a highlighted menu item, and a pressed toggle. `--accent-a3` (32%) draws tinted borders and the text selection. Warning and success use the same pattern with `--warn-a1`, `--warn-a3`, `--ok-a1`, and `--ok-a3`. A surface that was a translucent neutral is now a solid surface token. Because every step derives from its base color, another theme gets the steps by redefining the base color only.
+Translucent color comes from three steps mixed from the accent with `color-mix`. `--accent-a1` (9%) fills selected rows and tinted surfaces. `--accent-a2` (16%) fills the active navigation item, a highlighted menu item, a pressed toggle, and the text selection. `--accent-a3` (32%) draws tinted borders. Warning and success use the same pattern with `--warn-a1`, `--warn-a3`, `--ok-a1`, and `--ok-a3`. A surface that was a translucent neutral is now a solid surface token. Because every step derives from its base color, another theme gets the steps by redefining the base color only.
 
 The panel uses seven font sizes, `--text-2xs` (11px) to `--text-2xl` (28px), with body text at `--text-md` (14px). It uses four radii, `--r-sm` (6px), `--r-md` (8px), `--r-lg` (12px), and `--r-full`, plus `0` and `50%` for a true circle. Tailwind's font size and radius namespaces point at the same tokens, so a utility class in `ui/*.tsx` lands on the same scale as `panel.css`.
+
+## Themes
+
+The panel has two themes. Dark is the default. This replaces the earlier decision that the panel is dark only.
+
+The owner switches the theme with a button in the sidebar. The choice persists in the `panel_theme` cookie for a year. The server reads the cookie, accepts only `dark` or `light`, renders anything else as dark, and writes the result as `data-theme` on `<html>`. The first byte of markup therefore carries the stored theme, so a cold load paints that theme first and needs no inline script. The button is a form that posts to `/theme`, which sets the cookie and redirects to the same-origin path and query that sent it. It works without JavaScript. With JavaScript, the click flips `data-theme` in place, writes the same cookie, and keeps the page state. The button names the action, such as Cambiar a tema claro, and shows a sun in the dark theme and a moon in the light theme. `meta name="theme-color"` takes the theme's `--bg`.
+
+`tokens.css` defines every color token once in `[data-theme="dark"]` and once in `[data-theme="light"]`, with the same names, and each block sets `color-scheme`. The alpha steps, the cover wash, and the project tones derive from those tokens, so no other stylesheet branches on the theme. The sandboxed preview and the publication Worker keep their own appearance. The preview iframe keeps a white background in both themes.
+
+The light theme starts from Latte. Its text and status colors are darker than Latte, because Latte's values fail on the panel's sunken, hover, and tinted surfaces. The three text tiers keep the same contrast steps as the dark theme on `--bg`: about 11, 7.4, and 6. The project tones are darker versions of their Latte hues, because a project chip uses its tone as text.
+
+### Contrast rule
+
+Every rendered text node measures at least 4.5 to 1 against the background it sits on, in both themes. The background is the composite of every layer under the text, including translucent tints and gradients. The rule covers hover and keyboard focus on rows, links, buttons, and menu items, placeholders, disabled controls, selected rows and cards, open menus and dialogs, and selected text. Selected text uses `--text` over `--accent-a2`, and `--on-accent` inside a primary button. At 32% the selection put `--text` below 4.5 on the dark project cover, so it uses the 16% step.
+
+`tests/panel-theme.browser.proof.ts` enforces the rule in `pnpm test:browser`. It seeds every project tone, opens the main pages at 1440 and 390 wide in both themes, measures every text node, and fails below 4.5. It also proves the toggle with and without JavaScript, the cookie validation, and the redirect target validation.
 
 ## Typography
 
@@ -46,11 +62,12 @@ Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` 
 - a `font-family` or `font` shorthand whose family is not `--font-sans` or `--font-mono`, a `--font-*` definition outside `tokens.css`, or an `@font-face` outside `fonts.css`;
 - a `url()` or `@import` that points at another origin;
 - a transition or animation duration or easing that does not come from the motion tokens;
-- a literal color outside `tokens.css`;
+- a literal color outside `tokens.css`, including a Tailwind palette or arbitrary color class or an inline color in markup;
+- a `[data-theme]` selector, a `prefers-color-scheme` query, or a Tailwind `dark:` variant outside `tokens.css`;
 - a Tailwind shadow, ring, gradient, off-scale size, or off-scale radius class, or an inline shadow, font family, font size, or radius in markup;
 - a `<link>` in markup other than the same-origin icon, so no layout loads a font or font stylesheet through a link tag.
 
-It also checks that `tokens.css` defines the exact scale values and the two font tokens, that `fonts.css` declares exactly the four packaged faces, that both font packages are pinned to an exact version, and that `panel.css` holds the reduced-motion rule.
+It also checks that both theme blocks in `tokens.css` define the same tokens and their own `color-scheme`, that the `theme-color` values match each theme's `--bg`, that `tokens.css` defines the exact scale values and the two font tokens, that `fonts.css` declares exactly the four packaged faces, that both font packages are pinned to an exact version, and that `panel.css` holds the reduced-motion rule.
 
 ## Library behavior
 
