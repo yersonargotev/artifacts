@@ -46,8 +46,13 @@ const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
 const paged = Boolean(page.next || page.continued);
 ---
-<Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`}>
-  <Fragment slot="status"><span><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span></Fragment>
+<Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`} artifacts={rows.map(({ card, href }) => ({ title: card.title, project: card.project, tone: card.project ? projectTone(card.project) : undefined, href }))}>
+  <Fragment slot="status">
+    <span data-key-hint="move" hidden><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span>
+    <span data-key-hint="fullscreen" hidden><kbd class="kbd">f</kbd> pantalla completa</span>
+    <span data-key-hint="publish" hidden><kbd class="kbd">p</kbd> publicar</span>
+    <span data-key-hint="back" hidden><kbd class="kbd">Esc</kbd> volver</span>
+  </Fragment>
   <div class="reader" data-reader>
     <section class="reader-list" aria-label="Lista de lectura">
       <div class="reader-filters">

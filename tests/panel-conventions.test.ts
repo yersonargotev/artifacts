@@ -57,7 +57,7 @@ function matchesSubject(selector: Selector, subject: Subject) {
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (subject === 'document') return component.type === 'class' && component.name === 'reader-document';
-    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'choice-list', 'rail-panel', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
+    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'choice-list', 'rail-panel', 'dialog-content', 'combobox-content', 'palette', 'publish-dialog'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
     return (component.type === 'class' && component.name === 'rail-brand') || (component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary');
   });
 }
@@ -213,6 +213,14 @@ test('tokens define the type, radius, and motion scales and the reduced-motion r
   assert.deepEqual(defined, scaleValues);
   const panel = await readFile(resolve(styleRoot, 'panel.css'), 'utf8');
   assert.match(panel, /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{[^}]*transition: none !important;[^}]*animation: none !important;/);
+});
+
+test('view transitions opt in only without a reduced-motion preference', async () => {
+  const sheets = await Promise.all((await readdir(styleRoot)).filter((name) => name.endsWith('.css')).map(async (name) => [name, await readFile(resolve(styleRoot, name), 'utf8')] as const));
+  const optIns = sheets.flatMap(([name, source]) => [...source.matchAll(/@view-transition/g)].map(() => name));
+  const guarded = sheets.flatMap(([name, source]) => [...source.matchAll(/@media \(prefers-reduced-motion: no-preference\) \{\s*@view-transition \{[^}]*\}\s*\}/g)].map(() => name));
+  assert.deepEqual(optIns, ['views.css'], 'only views.css opts in');
+  assert.deepEqual(guarded, optIns, 'the opt-in sits inside prefers-reduced-motion: no-preference, so a reduced-motion preference turns it off');
 });
 
 function themeBlocks(tokens: string) {

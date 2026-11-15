@@ -3,6 +3,7 @@ import { absoluteTime, previewSandbox, publicationStates, relativeTime } from '.
 import { detailHref, previewHref, shareHref } from '../../urls.ts';
 import type { ReaderRow } from './rows.ts';
 import PublicationForm from '../PublicationForm.astro';
+import PublishConfirm from '../PublishConfirm.astro';
 import Icon from '../Icon.astro';
 interface Props { row: ReaderRow; now: Date }
 const { row: { card, href, position, previous, next }, now } = Astro.props;
@@ -24,7 +25,8 @@ const steps = [{ direction: -1, label: 'Anterior', key: 'k', icon: 'chevron-up',
       <a class="button reader-labeled-button" href={detailHref({ artifactId: card.artifactId, tab: 'preview' })}><Icon name="external-link" size={15} /><span>Detalle</span></a>
       {publication.state !== 'unpublished' && <a class="button reader-icon-button" href={publication.url} aria-label="Abrir publicación" title="Abrir publicación"><Icon name="world" size={15} /></a>}
       {publication.state === 'pending' && <PublicationForm command={{ artifactId: card.artifactId, revisionId: head.revisionId, expectedPublicationVersion: publication.version, requestId: crypto.randomUUID() }} label={`Publicar rev. ${head.sequence}`} returnPath={href} />}
-      <button class="reader-icon-button" type="button" aria-label="Pantalla completa" title="Pantalla completa" data-reader-fullscreen hidden><Icon name="maximize" size={15} /></button>
+      <PublishConfirm card={card} returnPath={href} />
+      <button class="reader-icon-button" type="button" aria-label="Pantalla completa" title="Pantalla completa (f)" data-reader-fullscreen hidden><Icon name="maximize" size={15} /></button>
     </div>
   </header>
   <div class="reader-document">

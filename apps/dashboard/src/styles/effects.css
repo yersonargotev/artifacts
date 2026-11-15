@@ -23,8 +23,8 @@
 
 .rail-link[aria-current]::before,
 .reader-item[aria-current]::before,
-.artifact-card:has(input:checked)::before,
-.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible)) > :first-child::before {
+.artifact-card:is(:has(input:checked), [data-selected])::before,
+.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible), [data-selected]) > :first-child::before {
   content: '';
   position: absolute;
   top: 8px;
@@ -36,7 +36,7 @@
 }
 
 .reader-item[aria-current]::before,
-.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible)) > :first-child::before {
+.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible), [data-selected]) > :first-child::before {
   top: 0;
   bottom: 0;
   border-radius: 0;
