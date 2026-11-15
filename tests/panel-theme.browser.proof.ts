@@ -420,6 +420,7 @@ try {
       assert.deepEqual(await list.getByRole('link').allTextContents(), ['Ver artefacto', 'Compartir', 'Descargar revisión más reciente', 'Mover a proyecto', 'Modo lectura', 'Eliminar artefacto'], 'without JavaScript the row menu falls back to the same links');
       const box = (await list.boundingBox())!;
       assert(box.x >= 0 && box.x + box.width <= width, `the fallback menu opens inside the ${width}px viewport`);
+      assert.equal(await list.getByRole('link', { name: 'Eliminar artefacto', exact: true }).evaluate((link) => { const probe = document.createElement('i'); probe.style.color = 'var(--danger)'; document.body.append(probe); const danger = getComputedStyle(probe).color; probe.remove(); return getComputedStyle(link).color === danger; }), true, 'the fallback menu marks Eliminar artefacto with --danger');
       await measure(page, theme, 'row-menu-fallback', 'static', list);
       if (width === 1440) for (const link of await list.getByRole('link').all()) { await link.hover(); await measure(page, theme, 'row-menu-fallback', 'hover', link); }
       await page.close();
