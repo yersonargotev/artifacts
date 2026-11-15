@@ -35,6 +35,7 @@
   background: var(--accent);
 }
 
+.reader-item[aria-current]::before,
 .artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible)) > :first-child::before {
   top: 0;
   bottom: 0;

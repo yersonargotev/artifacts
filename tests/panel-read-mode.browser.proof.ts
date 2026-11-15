@@ -38,6 +38,20 @@ const titles = (page: Page) => list(page).locator('.reader-item-title').allTextC
 const current = (page: Page) => list(page).locator('[aria-current=page] .reader-item-title').allTextContents();
 const frameSrc = (page: Page) => page.locator('iframe.reader-preview').getAttribute('src');
 const artifactParam = (page: Page) => new URL(page.url()).searchParams.get('artifact');
+const pane = (page: Page) => page.locator('[data-reader-pane]');
+const position = async (page: Page) => (await pane(page).locator('.reader-position').count()) ? pane(page).locator('.reader-position').textContent() : null;
+/** The pane's Anterior or Siguiente link: its href, or null when it is disabled, which also leaves it out of the tab order. */
+const stepHref = async (page: Page, name: 'Anterior' | 'Siguiente') => {
+  const link = pane(page).getByRole('link', { name, exact: true });
+  const href = await link.getAttribute('href');
+  if (href === null) {
+    assert.equal(await link.getAttribute('aria-disabled'), 'true', `a disabled ${name} says so`);
+    assert.equal(await link.evaluate((element) => { (element as HTMLElement).focus(); return document.activeElement === element; }), false, `a disabled ${name} takes no focus`);
+  }
+  return href;
+};
+const publishButton = (page: Page) => pane(page).getByRole('button', { name: /^Publicar rev\. \d+$/ });
+const rowHref = (page: Page, title: string) => list(page).getByRole('link', { name: new RegExp(`^${title}`) }).getAttribute('href');
 const showsPreview = async (page: Page, read: { artifactId: string; headRevisionId: string }, text: string) => {
   await page.waitForFunction((src) => document.querySelector('iframe.reader-preview')?.getAttribute('src') === src, previewHref(read.artifactId, read.headRevisionId));
   await page.frameLocator('iframe.reader-preview').getByText(text, { exact: false }).waitFor();
@@ -63,6 +77,8 @@ try {
   await create('Otra nota', 'Otro');
   const archive = [];
   for (let index = 0; index < 26; index++) archive.push(await create(`Archivo ${String(index).padStart(2, '0')}`, 'Archivo'));
+  await mcp('artifacts_publish', { requestId: randomUUID(), artifactId: archive[25]!.artifactId, revisionId: archive[25]!.headRevisionId, expectedPublicationVersion: 0 });
+  archive[25] = artifactReadSchema.parse(await mcp('artifacts_update', { requestId: randomUUID(), artifactId: archive[25]!.artifactId, expectedRevisionId: archive[25]!.headRevisionId, snapshot: snapshot('Archivo 25', 'Cuerpo de Archivo 25') }));
 
   const context = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 } });
   const page = active = await context.newPage();
@@ -80,13 +96,25 @@ try {
   await showsPreview(page, pending, 'Contenido nuevo del borrador');
   assert.equal(await page.locator('iframe.reader-preview').getAttribute('sandbox'), 'allow-scripts');
   assert.equal(await page.getByRole('heading', { level: 2, name: 'Borrador con cambios', exact: true }).count(), 1);
-  assert.equal(await page.getByRole('link', { name: 'Ver artefacto', exact: true }).getAttribute('href'), `/artifacts/${pending.artifactId}`);
+  assert.equal(await pane(page).getByRole('link', { name: 'Detalle', exact: true }).getAttribute('href'), `/artifacts/${pending.artifactId}`);
+  assert.equal(await page.getByRole('heading', { level: 1 }).count(), 1, 'one h1 per page');
+  assert.equal(await page.locator('header.top-bar h1').textContent(), 'Modo lectura');
+  assert.equal(await page.locator('header.top-bar').getByRole('link', { name: 'Salir del modo lectura', exact: true }).getAttribute('href'), '/?project=Lectura');
+  assert.equal(await page.locator('.status-totals').textContent(), 'Leyendo 3 artefactos');
+  assert.equal(await position(page), '1 de 3');
+  assert.equal(await stepHref(page, 'Anterior'), null, 'the first row of the first page has no previous artifact');
+  assert.equal(await stepHref(page, 'Siguiente'), await rowHref(page, 'Notas sin publicar'));
+  assert.equal(await publishButton(page).textContent(), 'Publicar rev. 2', 'a pending selection offers to publish its head revision');
+  await pane(page).getByRole('button', { name: 'Pantalla completa', exact: true }).click();
+  await page.waitForFunction(() => document.fullscreenElement?.matches('iframe.reader-preview[sandbox="allow-scripts"]'));
+  await page.evaluate(() => document.exitFullscreen());
+  await page.waitForFunction(() => !document.fullscreenElement);
   assert.equal(await page.locator('.reader-pane').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), pending.publication!.url);
   const readerProjects = page.locator('.reader-list').getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
   assert.equal(await readerProjects.getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
   assert.equal(await readerProjects.getByRole('link', { name: /^Todos los proyectos/ }).getAttribute('href'), '/read');
   await capture(page, 'read-1440');
-  checks.push('the library link opens read mode for the project, listing all its artifacts with status badges and previewing the first head revision');
+  checks.push('the library link opens read mode for the project, listing all its artifacts with status badges and previewing the first head revision, with one h1, a back link, the position, Publicar for the pending head, and a fullscreen button that puts the same sandboxed frame in fullscreen');
 
   const filters = page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true });
   await Promise.all([page.waitForURL(`${app.dashboard}/read?project=Lectura&status=published`), filters.getByRole('link', { name: 'Publicados (1)', exact: true }).click()]);
@@ -105,9 +133,12 @@ try {
   assert.equal(artifactParam(page), draft.artifactId);
   assert.deepEqual(await current(page), ['Notas sin publicar']);
   assert.equal(await page.locator('#reader-title').textContent(), 'Notas sin publicar');
-  assert.equal(await page.locator('[data-reader-state]').textContent(), 'Sin publicar');
+  assert.equal(await pane(page).locator('.reader-head-meta .artifact-status').textContent(), 'Sin publicar');
   assert.equal(await page.locator('.reader-pane').getByRole('link', { name: 'Abrir publicación', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('link', { name: 'Ver artefacto', exact: true }).getAttribute('href'), `/artifacts/${draft.artifactId}`);
+  assert.equal(await pane(page).getByRole('link', { name: 'Detalle', exact: true }).getAttribute('href'), `/artifacts/${draft.artifactId}`);
+  assert.equal(await position(page), '2 de 3');
+  assert.equal(await stepHref(page, 'Anterior'), await rowHref(page, 'Borrador con cambios'));
+  assert.equal(await publishButton(page).count(), 0, 'an unpublished selection offers no publish button');
   checks.push('clicking a row swaps the iframe to that head revision, header and aria-current in the same document and pushes the reader URL');
 
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -115,6 +146,9 @@ try {
   await showsPreview(page, published, 'Cuerpo de Guía publicada');
   assert.equal(artifactParam(page), published.artifactId);
   assert.deepEqual(await current(page), ['Guía publicada']);
+  assert.equal(await position(page), '3 de 3', 'j moves the position with the selection');
+  assert.equal(await stepHref(page, 'Siguiente'), null, 'the last row of the last page has no next artifact');
+  assert.equal(await publishButton(page).count(), 0, 'a published selection offers no publish button');
   await page.keyboard.press('j');
   assert.equal(artifactParam(page), published.artifactId, 'j stops at the last row');
   await list(page).getByRole('link', { name: /^Guía publicada/ }).focus();
@@ -125,11 +159,23 @@ try {
   await page.keyboard.press('k');
   assert.equal(artifactParam(page), draft.artifactId, 'typing in the search box does not move the selection');
   assert.equal(await sameDocument(), true);
-  checks.push('j and ArrowUp move the selection and URL without reloading, and typing in an input is ignored');
+  await pane(page).getByRole('link', { name: 'Anterior', exact: true }).click();
+  await showsPreview(page, pending, 'Contenido nuevo del borrador');
+  assert.equal(await position(page), '1 de 3');
+  assert.equal(await sameDocument(), true, 'Anterior moves within the page without a navigation');
+  await pane(page).getByRole('link', { name: 'Siguiente', exact: true }).click();
+  await showsPreview(page, draft, 'Cuerpo de Notas sin publicar');
+  assert.equal(artifactParam(page), draft.artifactId);
+  checks.push('j and ArrowUp move the selection, position, and URL without reloading, the pane links do the same, and typing in an input is ignored');
 
+  await page.goBack();
+  await showsPreview(page, pending, 'Contenido nuevo del borrador');
+  await page.goBack();
+  await showsPreview(page, draft, 'Cuerpo de Notas sin publicar');
   await page.goBack();
   await showsPreview(page, published, 'Cuerpo de Guía publicada');
   assert.deepEqual(await current(page), ['Guía publicada']);
+  assert.equal(await position(page), '3 de 3', 'Back restores the position with the selection');
   await page.goBack();
   await showsPreview(page, draft, 'Cuerpo de Notas sin publicar');
   await page.goBack();
@@ -149,6 +195,9 @@ try {
   assert.deepEqual(await current(page), []);
   assert.equal(await page.locator('#reader-title').textContent(), 'Archivo 00');
   await showsPreview(page, archive[0]!, 'Cuerpo de Archivo 00');
+  assert.equal(await position(page), null, 'a selection from another page shows no position');
+  assert.equal(await stepHref(page, 'Anterior'), null);
+  assert.equal(await stepHref(page, 'Siguiente'), null);
   await page.keyboard.press('j');
   assert.equal(artifactParam(page), archive[25]!.artifactId);
   await page.goBack();
@@ -157,7 +206,63 @@ try {
   await Promise.all([page.waitForURL((url) => url.pathname === '/read' && url.searchParams.has('cursor')), page.getByRole('link', { name: 'Ver más artefactos', exact: true }).click()]);
   assert.deepEqual(await titles(page), ['Archivo 00']);
   assert.deepEqual(await current(page), ['Archivo 00']);
-  checks.push('a direct link selects its artifact, even one on a later page, and the next link pages the list');
+  assert.equal(new URL(page.url()).searchParams.get('offset'), '25', 'the next page link carries the offset');
+  assert.equal(await position(page), '26 de 26', 'the second page numbers from the offset');
+  assert.equal(await page.locator('.status-totals').textContent(), 'Leyendo 26 artefactos');
+  checks.push('a direct link selects its artifact, even one on a later page, without a position or neighbors, and the next link pages the list and numbers it from the offset');
+
+  await page.goto(`${app.dashboard}/read?project=Archivo`);
+  assert.equal(await position(page), '1 de 26');
+  assert.equal(await publishButton(page).textContent(), 'Publicar rev. 2');
+  await list(page).getByRole('link', { name: /^Archivo 01/ }).click();
+  assert.equal(await position(page), '25 de 26');
+  const after = await stepHref(page, 'Siguiente');
+  assert.match(after!, /^\/read\?project=Archivo&cursor=[^&]+&offset=25$/, 'Siguiente on the last row links to the next page');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await Promise.all([page.waitForURL(`${app.dashboard}${after}`), page.keyboard.press('j')]);
+  assert.deepEqual(await current(page), ['Archivo 00'], 'j at the page edge loads the next page on its first row');
+  assert.equal(await position(page), '26 de 26');
+  assert.equal(await stepHref(page, 'Anterior'), '/read?project=Archivo&at=last', 'Anterior on the first row of the second page links to the last row of the first page');
+  await Promise.all([page.waitForURL(`${app.dashboard}/read?project=Archivo&at=last`), page.keyboard.press('k')]);
+  assert.deepEqual(await current(page), ['Archivo 01'], 'k at the page edge loads the previous page on its last row');
+  assert.equal(await position(page), '25 de 26');
+  await list(page).getByRole('link', { name: /^Archivo 02/ }).click();
+  await page.goBack();
+  await showsPreview(page, archive[1]!, 'Cuerpo de Archivo 01');
+  assert.deepEqual(await current(page), ['Archivo 01'], 'Back to an at=last entry restores the last row');
+  checks.push('at a page edge Siguiente and j load the next page on its first row and Anterior and k load the previous page on its last row');
+
+  await page.goto(`${app.dashboard}/read?project=Archivo&sort=title`);
+  assert.deepEqual([await current(page), await position(page)], [['Archivo 00'], '1 de 26']);
+  await page.goto(`${app.dashboard}${await rowHref(page, 'Archivo 24')}`);
+  await Promise.all([page.waitForURL((url) => url.searchParams.get('offset') === '25'), pane(page).getByRole('link', { name: 'Siguiente', exact: true }).click()]);
+  assert.deepEqual([await current(page), await position(page)], [['Archivo 25'], '26 de 26'], 'the position follows the title sort across pages');
+  const second = new URL(page.url());
+  for (const offset of [null, '50', '7', '0']) {
+    if (offset === null) second.searchParams.delete('offset'); else second.searchParams.set('offset', offset);
+    await page.goto(second.href);
+    assert.deepEqual(await current(page), ['Archivo 25']);
+    assert.equal(await position(page), null, `an offset of ${offset} that the counts cannot confirm hides the position`);
+    assert.equal(await stepHref(page, 'Anterior'), null, `an offset of ${offset} disables Anterior at the page edge`);
+  }
+  await page.goto(`${app.dashboard}/read?q=Archivo%202&status=unpublished`);
+  assert.deepEqual([await titles(page), await position(page), await page.locator('.status-totals').textContent()], [['Archivo 24', 'Archivo 23', 'Archivo 22', 'Archivo 21', 'Archivo 20'], '1 de 5', 'Leyendo 5 artefactos'], 'search and a status filter count only the matching artifacts');
+  checks.push('the position stays honest under a title sort, search, and a status filter, and a missing or tampered offset hides it');
+
+  await page.goto(`${app.dashboard}/?project=Archivo`);
+  await Promise.all([page.waitForURL((url) => url.searchParams.get('offset') === '25'), page.getByRole('link', { name: 'Ver más artefactos', exact: true }).click()]);
+  await Promise.all([page.waitForURL((url) => url.pathname === '/read'), page.getByRole('link', { name: 'Leer', exact: true }).click()]);
+  assert.deepEqual([await current(page), await position(page)], [['Archivo 00'], '26 de 26'], 'Leer on the second library page opens read mode with the position');
+  checks.push('the library page links carry the offset into read mode');
+
+  await page.goto(`${app.dashboard}/read?project=Lectura`);
+  const pendingHref = await rowHref(page, 'Borrador con cambios');
+  await Promise.all([page.waitForURL(`${app.dashboard}${pendingHref}`), publishButton(page).click()]);
+  assert.deepEqual(await current(page), ['Borrador con cambios'], 'publishing returns to the same artifact');
+  assert.equal(await pane(page).locator('.reader-head-meta .artifact-status').textContent(), 'Publicado');
+  assert.equal(await publishButton(page).count(), 0, 'after publishing the button is gone');
+  assert.equal(await position(page), '1 de 3');
+  checks.push('Publicar publishes the pending head and returns to the same artifact without the button');
 
   await page.goto(`${app.dashboard}/artifacts/${draft.artifactId}`);
   await page.locator('.artifact-title-trigger').press('Enter');
@@ -183,8 +288,42 @@ try {
   await Promise.all([plain.waitForURL(`${app.dashboard}/read?project=Lectura&artifact=${published.artifactId}`), plain.getByRole('navigation', { name: 'Artefactos', exact: true }).getByRole('link', { name: /^Guía publicada/ }).click()]);
   assert.deepEqual(await current(plain), ['Guía publicada']);
   assert.equal(await frameSrc(plain), previewHref(published.artifactId, published.headRevisionId));
+  assert.equal(await pane(plain).getByRole('button', { name: 'Pantalla completa', exact: true }).isVisible(), false, 'without JavaScript the fullscreen button stays hidden');
+  const drive: { step: string; url: string; selected: string[]; position: string | null; previous: string | null; next: string | null; publish: number }[] = [];
+  const note = async (step: string) => drive.push({ step, url: plain.url().slice(app.dashboard.length), selected: await current(plain), position: await position(plain), previous: await stepHref(plain, 'Anterior'), next: await stepHref(plain, 'Siguiente'), publish: await publishButton(plain).count() });
+  const follow = async (step: string, click: () => Promise<void>) => { await Promise.all([plain.waitForNavigation(), click()]); await note(step); };
+  await plain.goto(`${app.dashboard}/read?project=Archivo`);
+  await note('open Archivo');
+  assert.deepEqual([drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.publish], [['Archivo 25'], '1 de 26', 1]);
+  await follow('Siguiente', () => pane(plain).getByRole('link', { name: 'Siguiente', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.publish], [['Archivo 24'], '2 de 26', 0]);
+  await follow('Anterior', () => pane(plain).getByRole('link', { name: 'Anterior', exact: true }).click());
+  assert.deepEqual(drive.at(-1)!.selected, ['Archivo 25']);
+  await follow('row Archivo 01', () => list(plain).getByRole('link', { name: /^Archivo 01/ }).click());
+  assert.deepEqual([drive.at(-1)!.position, drive.at(-1)!.next?.includes('offset=25')], ['25 de 26', true]);
+  await follow('Siguiente at the page edge', () => pane(plain).getByRole('link', { name: 'Siguiente', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.next], [['Archivo 00'], '26 de 26', null]);
+  await follow('Anterior at the page edge', () => pane(plain).getByRole('link', { name: 'Anterior', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.selected, drive.at(-1)!.position], ['/read?project=Archivo&at=last', ['Archivo 01'], '25 de 26']);
+  await follow('Ver más artefactos', () => plain.getByRole('link', { name: 'Ver más artefactos', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.selected, drive.at(-1)!.position], [['Archivo 00'], '26 de 26']);
+  await follow('Volver al inicio', () => plain.getByRole('link', { name: 'Volver al inicio', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.position], ['/read?project=Archivo', '1 de 26']);
+  await follow('Pendientes filter', () => plain.getByRole('navigation', { name: 'Filtrar por publicación', exact: true }).getByRole('link', { name: 'Pendientes (1)', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.publish], ['/read?project=Archivo&status=pending', ['Archivo 25'], '1 de 1', 1]);
+  await follow('Publicar rev. 2', () => publishButton(plain).click());
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.publish], [`/read?project=Archivo&status=pending&artifact=${archive[25]!.artifactId}`, [], null, 0], 'publishing returns to the same artifact, which has left the pending filter');
+  assert.equal(await pane(plain).locator('.reader-head-meta .artifact-status').textContent(), 'Publicado');
+  await follow('Todos filter', () => plain.getByRole('navigation', { name: 'Filtrar por publicación', exact: true }).getByRole('link', { name: 'Todos (26)', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.selected, drive.at(-1)!.position, drive.at(-1)!.publish], [['Archivo 25'], '1 de 26', 0]);
+  await follow('project chip Lectura', () => plain.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true }).getByRole('link', { name: 'Lectura (3)', exact: true }).click());
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.position], ['/read?project=Lectura', '1 de 3']);
+  await plain.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('Notas');
+  await follow('search Notas', () => plain.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).press('Enter'));
+  assert.deepEqual([drive.at(-1)!.url, drive.at(-1)!.selected, drive.at(-1)!.position], ['/read?q=Notas&project=Lectura', ['Notas sin publicar'], '1 de 1']);
+  await json('nojs-drive.json', drive);
   await native.close();
-  checks.push('without JavaScript each row is a link that renders its selection on the server');
+  checks.push('without JavaScript each row, Anterior, Siguiente across page edges, pagination, the status and project filters, search, and Publicar work through plain links and forms, and the fullscreen button stays hidden');
 
   const loggedOut = await browser.newContext();
   const response = await loggedOut.request.get(`${app.dashboard}/read?project=Lectura`, { maxRedirects: 0 });

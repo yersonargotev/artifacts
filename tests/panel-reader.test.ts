@@ -6,10 +6,11 @@ import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
-import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListGroup, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, type LibraryLink } from '../apps/dashboard/src/urls.ts';
+import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListGroup, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, pageOffset, nextOffset, type LibraryLink } from '../apps/dashboard/src/urls.ts';
+import { detachedRow, readerRows } from '../apps/dashboard/src/components/reader/rows.ts';
 import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
 import { groupCards } from '../apps/dashboard/src/components/library/groups.ts';
-import type { ArtifactCard, ProjectName, Workspace } from '../packages/artifacts/src/panel/model.ts';
+import type { ArtifactCard, LibraryPage, ProjectName, Workspace } from '../packages/artifacts/src/panel/model.ts';
 import { fixture } from './helpers.ts';
 
 const snapshot = (title: string): Snapshot => ({ metadata: { title, description: `Description for ${title}` }, content: { kind: 'text', text: title }, files: [] });
@@ -147,7 +148,7 @@ test('the library groups a page by workspace project order and the URL turns gro
   assert.equal(libraryHref(query, { status: 'pending' }), '/?status=pending&group=none');
   assert.equal(libraryHref(query, { cursor: '2:def' }), '/?group=none&cursor=2%3Adef');
   assert.equal(libraryHref(query, { group: undefined }), '/');
-  assert.equal(readerHref(query, { artifactId: 'a1' }), '/read?artifact=a1', 'read mode does not carry the dashboard grouping');
+  assert.equal(readerHref(query, { artifactId: 'a1' }), '/read?group=none&artifact=a1', 'read mode groups like the library and carries the grouping toggle');
 });
 
 test('panel URLs validate explicit scopes and cursors and reset cursors when filters change', () => {
@@ -190,6 +191,30 @@ test('reader URLs round-trip scope, filters, cursor, and selection, and filter l
   const link: LibraryLink = { scope: { kind: 'all' }, status: 'all', q: '', view: 'cards' };
   assert.equal(readerHref(link), '/read');
   for (const value of ['/read?project=Beta&unfiled=1', '/read?cursor=1']) assert.throws(() => read(value), { name: 'ZodError' }, value);
+  assert.equal(readerHref(query, { cursor: '3.1:def', offset: 25, artifactId: 'artifact-one' }), '/read?project=Beta&q=draft&status=pending&sort=state&dir=desc&cursor=3.1%3Adef&offset=25&artifact=artifact-one');
+  assert.equal(readerHref(query, { offset: 25 }), '/read?project=Beta&q=draft&status=pending&sort=state&dir=desc', 'an offset travels only with its cursor');
+  assert.equal(readerHref(query, { at: 'last' }), '/read?project=Beta&q=draft&status=pending&sort=state&dir=desc&at=last');
+  assert.equal(readerHref(query, { at: 'last', artifactId: 'artifact-one' }), '/read?project=Beta&q=draft&status=pending&sort=state&dir=desc&artifact=artifact-one', 'a named artifact wins over at=last');
+  assert.deepEqual(read('/read?cursor=1%3Aabc&offset=25&at=last&group=none'), { scope: { kind: 'all' }, q: '', status: 'all', cursor: '1:abc', group: 'none', offset: 25, at: 'last' });
+  for (const offset of ['0', '-25', '25.0', '025', 'x', '']) assert.equal(read(`/read?cursor=1%3Aabc&offset=${offset}`).offset, undefined, offset);
+  assert.equal(libraryHref({ scope: { kind: 'all' }, status: 'all', q: '' }, { cursor: '1:abc', offset: 50 }), '/?cursor=1%3Aabc&offset=50');
+});
+
+test('read mode numbers rows from an offset that the page counts confirm and links each row to its neighbors', () => {
+  const card = (artifactId: string) => ({ artifactId }) as ArtifactCard;
+  const page = (cards: number, { continued, next, total }: { continued: boolean; next: boolean; total: number }) => ({ status: 'pending', counts: { all: 99, published: 0, unpublished: 0, pending: total }, cards: Array.from({ length: cards }, (_, index) => card(`c${index}`)), continued, next: next ? 'n' : null }) as unknown as LibraryPage;
+  const first = page(25, { continued: false, next: true, total: 60 });
+  const middle = page(25, { continued: true, next: true, total: 60 });
+  const last = page(10, { continued: true, next: false, total: 60 });
+  assert.deepEqual([pageOffset(undefined, first), pageOffset(50, first)], [0, 0], 'the first page starts at zero whatever the URL says');
+  assert.deepEqual([pageOffset(25, middle), pageOffset(undefined, middle), pageOffset(7, middle), pageOffset(50, middle)], [25, undefined, undefined, undefined], 'an offset that would run past the total shows no position');
+  assert.deepEqual([pageOffset(50, last), pageOffset(25, last), pageOffset(75, last)], [50, undefined, undefined], 'the last page must end at the total');
+  assert.equal(pageOffset(undefined, page(3, { continued: false, next: false, total: 4 })), undefined, 'a first page that disagrees with its total shows no position');
+  assert.deepEqual([nextOffset(0, first), nextOffset(undefined, first), nextOffset(25, middle), nextOffset(undefined, middle)], [25, 25, 50, undefined]);
+  const rows = readerRows(middle.cards.slice(0, 3), middle, 25, { row: (item) => `/${item.artifactId}`, before: '/before', after: '/after' });
+  assert.deepEqual(rows.map(({ href, position, previous, next }) => [href, position, previous, next]), [['/c0', '26 de 60', '/before', '/c1'], ['/c1', '27 de 60', '/c0', '/c2'], ['/c2', '28 de 60', '/c1', '/after']]);
+  assert.deepEqual(readerRows([card('c0')], middle, undefined, { row: (item) => `/${item.artifactId}`, before: undefined, after: undefined }).map(({ position, previous, next }) => [position, previous, next]), [[undefined, undefined, undefined]]);
+  assert.deepEqual(detachedRow(card('far'), '/far'), { card: card('far'), href: '/far', position: undefined, previous: undefined, next: undefined });
 });
 
 test('projects index returns inclusive tallies, the three newest titles per group, and head-derived update times', async (t) => {

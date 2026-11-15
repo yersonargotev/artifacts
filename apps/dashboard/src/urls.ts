@@ -1,13 +1,16 @@
 import { z } from 'zod';
 import { panelDetailQuerySchema, panelLibraryQuerySchema, panelMoveIdsSchema } from '@artifacts/artifacts/panel';
-import { defaultDirections } from '@artifacts/artifacts/panel/model';
-import type { DetailQuery, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
+import { defaultDirections, libraryPageSize } from '@artifacts/artifacts/panel/model';
+import type { DetailQuery, LibraryPage, LibraryQuery, LibraryScope, ScopeRequest } from '@artifacts/artifacts/panel/model';
 
 export const listViews = ['table', 'cards'] as const;
 export type ListView = typeof listViews[number];
 export const viewCookie = 'panel_view';
-/** A library query plus the view and grouping the URL names. Both stay out of the panel query because only the dashboard renders them. */
-export type LibraryLink = LibraryQuery & { readonly view?: ListView; readonly group?: 'none' };
+/**
+ * A library query plus the view, grouping, and offset the URL names. They stay out of the panel query because only the dashboard renders them.
+ * The offset counts the artifacts before a cursor's page, so read mode can number its rows.
+ */
+export type LibraryLink = LibraryQuery & { readonly view?: ListView; readonly group?: 'none'; readonly offset?: number };
 const isView = (value: string | null | undefined): value is ListView => listViews.some((view) => view === value);
 
 /** The URL names the view to share it; otherwise the cookie that the toggle writes decides, and the table is the default. */
@@ -19,6 +22,24 @@ export function readListView(url: URL, cookie: string | undefined): { view: List
 /** The table groups its rows by project unless the URL turns grouping off. */
 export function readListGroup(url: URL): 'none' | undefined {
   return url.searchParams.get('group') === 'none' ? 'none' : undefined;
+}
+
+export function readListOffset(url: URL): number | undefined {
+  const offset = url.searchParams.get('offset');
+  return offset && /^[1-9]\d{0,8}$/.test(offset) ? Number(offset) : undefined;
+}
+
+/** Only the dashboard's own page links write the offset, so one that is missing or disagrees with the page's counts returns undefined rather than a guess. */
+export function pageOffset(named: number | undefined, page: LibraryPage): number | undefined {
+  const offset = page.continued ? named : 0;
+  if (offset === undefined || offset % libraryPageSize) return undefined;
+  const end = offset + page.cards.length;
+  const total = page.counts[page.status];
+  return (page.next ? end < total : end === total) ? offset : undefined;
+}
+
+export function nextOffset(offset: number | undefined, page: LibraryPage): number | undefined {
+  return page.continued ? offset === undefined ? undefined : offset + libraryPageSize : libraryPageSize;
 }
 
 export function readLibraryUrl(url: URL): LibraryQuery {
@@ -44,21 +65,28 @@ function listParams({ scope, status, q, sort = 'updated', direction = defaultDir
 
 export function libraryHref(query: LibraryLink, patch: Partial<LibraryLink> = {}): string {
   const state = { ...query, ...patch };
-  const params = new URLSearchParams({ ...listParams(state), ...(state.view ? { view: state.view } : {}), ...(state.group ? { group: state.group } : {}), ...(patch.cursor ? { cursor: patch.cursor } : {}) });
+  const params = new URLSearchParams({ ...listParams(state), ...(state.view ? { view: state.view } : {}), ...(state.group ? { group: state.group } : {}), ...pageParams(patch) });
   return params.size ? `/?${params}` : '/';
 }
 
-/** A library query plus the artifact the reader shows. Without one the reader selects the first card of the page. */
-export type ReaderUrl = LibraryQuery & { readonly artifactId?: string };
+function pageParams({ cursor, offset }: Pick<LibraryLink, 'cursor' | 'offset'>): Record<string, string> {
+  return { ...(cursor ? { cursor } : {}), ...(cursor && offset ? { offset: String(offset) } : {}) };
+}
+
+/** A library link plus the artifact the reader shows. Without one the reader selects the first row of the page, or its last row when `at` says so. */
+export type ReaderUrl = Omit<LibraryLink, 'view'> & { readonly artifactId?: string; readonly at?: 'last' };
 
 export function readReaderUrl(url: URL): ReaderUrl {
   const artifactId = url.searchParams.get('artifact');
-  return { ...readLibraryUrl(url), ...(artifactId ? { artifactId } : {}) };
+  const group = readListGroup(url);
+  const offset = readListOffset(url);
+  return { ...readLibraryUrl(url), ...(group ? { group } : {}), ...(offset ? { offset } : {}), ...(artifactId ? { artifactId } : url.searchParams.get('at') === 'last' ? { at: 'last' } : {}) };
 }
 
-/** Like the cursor, the selection comes only from the patch, so a filter or page link starts at that list's first artifact. */
+/** Like the cursor, the offset and the selection come only from the patch, so a filter or page link starts at that list's first artifact. */
 export function readerHref(query: ReaderUrl, patch: Partial<ReaderUrl> = {}): string {
-  const params = new URLSearchParams({ ...listParams({ ...query, ...patch }), ...(patch.cursor ? { cursor: patch.cursor } : {}), ...(patch.artifactId ? { artifact: patch.artifactId } : {}) });
+  const state = { ...query, ...patch };
+  const params = new URLSearchParams({ ...listParams(state), ...(state.group ? { group: state.group } : {}), ...pageParams(patch), ...(patch.artifactId ? { artifact: patch.artifactId } : patch.at ? { at: patch.at } : {}) });
   return params.size ? `/read?${params}` : '/read';
 }
 

@@ -1,19 +1,19 @@
 ---
 import type { LibraryPage, Workspace } from '@artifacts/artifacts/panel/model';
-import { libraryHref, readerHref, type LibraryLink, type ListView } from '../../urls.ts';
+import { libraryHref, nextOffset, readerHref, type LibraryLink, type ListView } from '../../urls.ts';
 import ArtifactCard from './ArtifactCard.astro';
 import ArtifactTable from './ArtifactTable.astro';
 import CreateHereCard from './CreateHereCard.astro';
 import CreateHereRow from './CreateHereRow.astro';
 import SelectionBar from './SelectionBar.astro';
 import Icon from '../Icon.astro';
-interface Props { page: LibraryPage; workspace: Workspace; query: LibraryLink; cursor: string | undefined; now: Date; view: ListView }
-const { page, workspace, query, cursor, now, view } = Astro.props;
+interface Props { page: LibraryPage; workspace: Workspace; query: LibraryLink; cursor: string | undefined; offset: number | undefined; now: Date; view: ListView }
+const { page, workspace, query, cursor, offset, now, view } = Astro.props;
 const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
 const selectable = page.scope.kind === 'project' || page.scope.kind === 'unfiled';
 const clearHref = libraryHref(query, { q: '', status: 'all' });
-const reader = (artifactId: string) => readerHref(query, { cursor, artifactId });
+const reader = (artifactId: string) => readerHref(query, { cursor, offset, artifactId });
 const empty = page.continued
   ? { icon: 'layers-intersect', title: 'Llegaste al final de los resultados', text: 'Vuelve al inicio para ver los artefactos más recientes.' } as const
   : filtered
@@ -43,6 +43,6 @@ const empty = page.continued
   {view === 'table' && page.cards.length > 0 && page.scope.kind === 'project' && <CreateHereRow project={page.scope.project.name} />}
   {(page.continued && page.cards.length > 0 || page.next) && <div class="library-pagination">
     {page.continued && page.cards.length > 0 && <a class="button secondary" href={libraryHref(query)}>Volver al inicio</a>}
-    {page.next && <a class="library-next button secondary" href={libraryHref(query, { cursor: page.next })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
+    {page.next && <a class="library-next button secondary" href={libraryHref(query, { cursor: page.next, offset: nextOffset(offset, page) })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
   </div>}
 </section>

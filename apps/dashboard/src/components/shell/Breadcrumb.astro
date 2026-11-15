@@ -2,8 +2,9 @@
 import type { NavLocation } from '../../presentation.ts';
 import { projectTone, scopeOf } from '../../presentation.ts';
 import { scopeHref } from '../../urls.ts';
-interface Props { location: NavLocation; title: string }
-const { location, title } = Astro.props;
+/** With `heading` the page renders its title as the heading after the trail, so the trail stops at a separator. */
+interface Props { location: NavLocation; title: string; heading?: boolean }
+const { location, title, heading = false } = Astro.props;
 const scope = scopeOf(location);
 const leaf = location.kind === 'artifact' || location.kind === 'task' || location.kind === 'read';
 const scopeName = scope.kind === 'project' ? scope.name : scope.kind === 'unfiled' ? 'Sin proyecto' : undefined;
@@ -13,6 +14,7 @@ const tone = scope.kind === 'project' ? projectTone(scope.name) : undefined;
   <ol>
     <li><a href="/">Biblioteca</a></li>
     {scopeName && <li><span class="breadcrumb-separator" aria-hidden="true">/</span>{leaf ? <a href={scopeHref(scope)} title={scopeName}>{tone && <span class="project-dot" data-tone={tone}></span>}<span>{scopeName}</span></a> : <span aria-current="page" title={scopeName}>{tone && <span class="project-dot" data-tone={tone}></span>}<span>{scopeName}</span></span>}</li>}
-    {leaf && <li><span class="breadcrumb-separator" aria-hidden="true">/</span><span aria-current="page" title={title}>{title}</span></li>}
+    {leaf && !heading && <li><span class="breadcrumb-separator" aria-hidden="true">/</span><span aria-current="page" title={title}>{title}</span></li>}
   </ol>
+  {heading && <span class="breadcrumb-separator" aria-hidden="true">/</span>}
 </nav>

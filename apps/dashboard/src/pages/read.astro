@@ -1,65 +1,76 @@
 ---
-import type { ArtifactCard, CardPublication, ContentKind } from '@artifacts/artifacts/panel/model';
+import { libraryPageSize, type ArtifactCard } from '@artifacts/artifacts/panel/model';
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
-import { previewSandbox, publicationStates, searchFor } from '../presentation.ts';
-import { detailHref, libraryHref, previewHref, readReaderUrl, readerHref } from '../urls.ts';
+import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime, searchFor } from '../presentation.ts';
+import { libraryHref, nextOffset, pageOffset, readReaderUrl, readerHref } from '../urls.ts';
+import { groupCards } from '../components/library/groups.ts';
+import { detachedRow, readerRows } from '../components/reader/rows.ts';
 import Panel from '../layouts/Panel.astro';
 import StatusTabs from '../components/library/StatusTabs.astro';
 import ProjectFilter from '../components/library/ProjectFilter.astro';
+import ReaderPane from '../components/reader/ReaderPane.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
 if (!identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
 const { panel } = await getRuntime();
-type Entry = { artifactId: string; title: string; kind: ContentKind; revisionId: string; state: CardPublication['state']; publicationUrl: string | null };
-const entryOf = (card: ArtifactCard): Entry => ({ artifactId: card.artifactId, title: card.title, kind: card.kind, revisionId: card.head.revisionId, state: card.publication.state, publicationUrl: card.publication.state === 'unpublished' ? null : card.publication.url });
 const result = await (async () => {
-  const { artifactId, ...query } = readReaderUrl(Astro.url);
+  const { artifactId, at, offset, group, ...query } = readReaderUrl(Astro.url);
   const actor = panelActor(identity);
   const snapshot = await panel.library(actor, query);
-  const card = artifactId ? snapshot.page.cards.find((item) => item.artifactId === artifactId) : snapshot.page.cards[0];
-  if (card || !artifactId) return { snapshot, cursor: query.cursor, selected: card && entryOf(card) };
+  if (!artifactId) return { snapshot, query, artifactId, at, offset, group, detached: undefined };
+  if (snapshot.page.cards.some((card) => card.artifactId === artifactId)) return { snapshot, query, artifactId, at, offset, group, detached: undefined };
   // A shared link can name an artifact on another page of the list, so its head comes from the detail read.
   const { detail } = await panel.artifact(actor, { artifactId, includeComparison: false });
   const { revision } = detail.selected;
-  const state: Entry['state'] = !detail.publication ? 'unpublished' : detail.publication.revision.revisionId === revision.id ? 'published' : 'pending';
-  return { snapshot, cursor: query.cursor, selected: { artifactId, title: revision.snapshot.metadata.title, kind: revision.snapshot.content.kind, revisionId: revision.id, state, publicationUrl: detail.publication?.url ?? null } };
+  const publication: ArtifactCard['publication'] = !detail.publication ? { state: 'unpublished' } : { ...detail.publication, state: detail.publication.revision.revisionId === detail.head.revisionId ? 'published' : 'pending' };
+  const detached: ArtifactCard = { artifactId, title: revision.snapshot.metadata.title, description: revision.snapshot.metadata.description, kind: revision.snapshot.content.kind, project: detail.project, slug: detail.slug, head: detail.head, publication };
+  return { snapshot, query, artifactId, at, offset, group, detached };
 })().catch(artifactErrorResponse);
 if (result instanceof Response) return result;
-const { snapshot: { workspace, page }, cursor, selected } = result;
-const query = searchFor(page);
-const scopeTitle = page.scope.kind === 'unfiled' ? 'Sin proyecto' : page.scope.kind === 'project' ? page.scope.project.name : page.scope.kind === 'vanishedProject' ? page.scope.name : 'Biblioteca';
+const { snapshot: { workspace, page }, query: { cursor }, artifactId, at, group, detached } = result;
+const query = searchFor(page, { group });
+const now = new Date();
+// Inside a project or Sin proyecto every row has the same project, so only the whole library groups, as the library table does.
+const groups = page.scope.kind === 'all' && !group ? groupCards(page.cards, workspace.projects) : [{ project: undefined, cards: page.cards }];
+const offset = pageOffset(result.offset, page);
+const rows = readerRows(groups.flatMap((item) => item.cards), page, offset, {
+  row: (card) => readerHref(query, { cursor, offset, artifactId: card.artifactId }),
+  // Only the first page needs no cursor, so a link can reach the page before this one only when that page is the first.
+  before: offset === libraryPageSize ? readerHref(query, { at: 'last' }) : undefined,
+  after: page.next ? readerHref(query, { cursor: page.next, offset: nextOffset(offset, page) }) : undefined,
+});
+const selected = detached ? detachedRow(detached, readerHref(query, { cursor, offset, artifactId })) : artifactId ? rows.find((row) => row.card.artifactId === artifactId) : at === 'last' ? rows.at(-1) : rows[0];
+const rowsOf = (cards: readonly ArtifactCard[]) => cards.map((card) => rows.find((row) => row.card === card)!);
+const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
+const paged = Boolean(page.next || page.continued);
 ---
-<Panel title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query}>
+<Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`}>
   <Fragment slot="status"><span><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span></Fragment>
   <div class="reader" data-reader>
-    <section class="reader-list" aria-labelledby="reader-scope">
-      <header class="reader-list-heading"><h1 id="reader-scope">{scopeTitle}</h1><a href={libraryHref(query)}>Salir del modo lectura</a></header>
-      <StatusTabs page={page} query={query} reader />
-      <ProjectFilter workspace={workspace} query={query} reader />
-      {page.cards.length ? <nav aria-label="Artefactos"><ol class="reader-items">{page.cards.map((card) => {
-        const entry = entryOf(card);
-        return <li><a class="reader-item" href={readerHref(query, { cursor, artifactId: entry.artifactId })} aria-current={selected?.artifactId === entry.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={entry.artifactId}
-          data-preview={previewHref(entry.artifactId, entry.revisionId)} data-sandbox={previewSandbox(entry.kind)} data-detail={detailHref({ artifactId: entry.artifactId, tab: 'preview' })} data-publication={entry.publicationUrl ?? undefined}>
-          <span class="reader-item-title">{entry.title}</span><span class="artifact-status" data-state={entry.state}>{publicationStates[entry.state].label}</span>
-        </a></li>;
-      })}</ol></nav> : <div class="reader-empty"><p>{page.continued ? 'Llegaste al final de los resultados.' : filtered ? 'No hay artefactos con estos filtros.' : 'Aún no hay artefactos aquí.'}</p>{filtered && <a href={readerHref(query, { q: '', status: 'all' })}>Limpiar filtros</a>}</div>}
-      {(page.continued || page.next) && <div class="reader-pagination">
+    <section class="reader-list" aria-label="Lista de lectura">
+      <div class="reader-filters">
+        <StatusTabs page={page} query={query} reader />
+        <ProjectFilter workspace={workspace} query={query} reader />
+      </div>
+      {rows.length ? <nav class="reader-rows" aria-label="Artefactos">{groups.map((item) => <div class="reader-group">
+        {item.project !== undefined && <h2><span class="project-dot" data-tone={item.project === null ? undefined : projectTone(item.project)} aria-hidden="true"></span><span>{item.project ?? 'Sin proyecto'}</span> <span class="reader-group-count">{item.cards.length}{paged && ' en esta página'}</span></h2>}
+        <ol class="reader-items">{rowsOf(item.cards).map(({ card, href }) => <li>
+          <a class="reader-item" href={href} aria-current={selected?.card.artifactId === card.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={card.artifactId}>
+            <span class="reader-item-title" title={card.title}>{card.title}</span>
+            <time datetime={card.head.createdAt.toISOString()} title={absoluteTime(card.head.createdAt)}>{relativeTime(card.head.createdAt, now)}</time>
+            <span class="reader-item-meta"><span class="artifact-status" data-state={card.publication.state}>{publicationStates[card.publication.state].label}</span><span>Rev. {card.head.sequence}</span><span class="artifact-kind">{contentLabels[card.kind]}</span></span>
+          </a>
+        </li>)}</ol>
+      </div>)}</nav> : <div class="reader-empty"><p>{page.continued ? 'Llegaste al final de los resultados.' : filtered ? 'No hay artefactos con estos filtros.' : 'Aún no hay artefactos aquí.'}</p>{filtered && <a href={readerHref(query, { q: '', status: 'all' })}>Limpiar filtros</a>}</div>}
+      {paged && <div class="reader-pagination">
         {page.continued && <a class="button secondary" href={readerHref(query)}>Volver al inicio</a>}
-        {page.next && <a class="button secondary" href={readerHref(query, { cursor: page.next })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
+        {page.next && <a class="button secondary" href={readerHref(query, { cursor: page.next, offset: nextOffset(offset, page) })}>Ver más artefactos<Icon name="chevron-right" size={16} /></a>}
       </div>}
     </section>
-    {selected ? <section class="reader-pane" aria-labelledby="reader-title" data-reader-pane>
-      <header class="reader-pane-header">
-        <div class="reader-pane-title"><h2 id="reader-title" data-reader-title>{selected.title}</h2><span class="artifact-status" data-state={selected.state} data-reader-state>{publicationStates[selected.state].label}</span></div>
-        <div class="reader-pane-actions">
-          <a class="button secondary" href={detailHref({ artifactId: selected.artifactId, tab: 'preview' })} data-reader-detail>Ver artefacto</a>
-          <a class="button" data-variant="primary" href={selected.publicationUrl ?? undefined} hidden={!selected.publicationUrl} data-reader-publication>Abrir publicación</a>
-        </div>
-      </header>
-      <iframe class="reader-preview" title={`Vista previa de ${selected.title}`} sandbox={previewSandbox(selected.kind)} referrerpolicy="no-referrer" src={previewHref(selected.artifactId, selected.revisionId)} data-reader-frame></iframe>
-    </section> : <section class="reader-pane reader-pane-empty" aria-label="Vista previa"><p>Aquí verás la vista previa del artefacto que elijas.</p></section>}
+    {selected ? <ReaderPane row={selected} now={now} /> : <section class="reader-pane reader-pane-empty" aria-label="Vista previa"><p>Aquí verás la vista previa del artefacto que elijas.</p></section>}
+    {rows.map((row) => <template data-reader-template={row.card.artifactId}><ReaderPane row={row} now={now} /></template>)}
   </div>
 </Panel>
 <script>

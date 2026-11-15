@@ -14,8 +14,10 @@ import StatusBar from '../components/shell/StatusBar.astro';
 import { scopeOf, type NavLocation } from '../presentation.ts';
 import { getRuntime } from '../runtime.ts';
 import { readTheme, themeColors, themeCookie } from '../theme.ts';
-interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryLink; move?: boolean; share?: boolean; flush?: boolean }
-const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, move = false, share = false, flush = false } = Astro.props;
+import Icon from '../components/Icon.astro';
+/** `back` adds a back link before the breadcrumb and makes the title the page heading. `summary` replaces the workspace totals in the status bar. */
+interface Props { title?: string; workspace?: Workspace; location?: NavLocation; search?: LibraryLink; move?: boolean; share?: boolean; flush?: boolean; back?: { href: string; label: string }; summary?: string }
+const { title = 'Biblioteca', workspace, location = { kind: 'task' }, search, move = false, share = false, flush = false, back, summary } = Astro.props;
 const identity = Astro.locals.identity;
 const authUrl = identity ? (await getRuntime()).config.auth : '';
 const query = search ?? { scope: scopeOf(location), q: '', status: 'all' };
@@ -30,12 +32,15 @@ const topLevel = location.kind === 'library' || location.kind === 'projects';
     {identity && <Rail identity={identity} authUrl={authUrl} location={location} theme={theme} />}
     <div class="app-column">
       {identity ? <header class="top-bar">
-        {topLevel ? <h1 id="page-title">{title}</h1> : <Breadcrumb location={location} title={title} />}
+        {topLevel ? <h1 id="page-title">{title}</h1> : back ? <>
+          <a class="top-bar-back" href={back.href} aria-label={back.label} title={back.label}><Icon name="chevron-left" size={16} /></a>
+          <Breadcrumb location={location} title={title} heading /><h1 id="page-title">{title}</h1>
+        </> : <Breadcrumb location={location} title={title} />}
         <SearchForm query={query} action={location.kind === 'read' ? '/read' : '/'} />
         {Astro.slots.has('bar') && <div class="top-bar-actions"><slot name="bar" /></div>}
       </header> : <header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>Biblioteca</span></header>}
       <main class="panel-main" id="main-content" data-flush={flush ? '' : undefined}><slot /></main>
-      {identity && <StatusBar workspace={workspace}><slot name="status" /></StatusBar>}
+      {identity && <StatusBar workspace={workspace} summary={summary}><slot name="status" /></StatusBar>}
     </div>
     {share && <ShareDialog client:load />}
     {move && workspace && <MoveDialog projects={JSON.stringify(workspace.projects.map(({ name }) => name))} client:load />}
