@@ -332,7 +332,7 @@ try {
   await late.waitForLoadState('load');
   await late.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   assert(held > 0, 'the stylesheet of read mode arrived after its body');
-  assert.deepEqual(errors, [], 'a transition that Chrome drops before pagereveal reaches the page as no error');
+  assert.deepEqual([...errors], [], 'a transition that Chrome drops before pagereveal reaches the page as no error');
   motion.lateStylesheet = { held, viewTransition: await late.evaluate(() => sessionStorage.getItem('reveal')) };
   await late.close();
   await json('motion.json', motion);
