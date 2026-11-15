@@ -4,6 +4,7 @@ import { relative, resolve } from 'node:path';
 import { test } from 'node:test';
 import { transform, type Selector } from 'lightningcss';
 import { projectTone, projectTones } from '../apps/dashboard/src/presentation.ts';
+import { themeColors, themes } from '../apps/dashboard/src/theme.ts';
 
 const sourceRoot = resolve('apps/dashboard/src');
 const styleRoot = resolve(sourceRoot, 'styles');
@@ -113,6 +114,8 @@ function stylesheetViolations(filename: string, source: string) {
         const offset = rule.type === 'style' ? lineOffsets[line - 1] + rule.value.loc.column - 1 : 0;
         rules.push({ selectors: rule.type === 'style' ? rule.value.selectors : [], label: rule.type === 'style' ? source.slice(offset).split('{')[0].trim() : `@${rule.type}`, line, offset });
         if (rule.type === 'import' && crossOrigin(rule.value.url)) issues.push(`${filename}: @import ${rule.value.url} leaves the panel origin`);
+        if (!tokensFile && rule.type === 'media' && JSON.stringify(rule.value.query).includes('"prefers-color-scheme"')) issues.push(`${filename}: a color scheme query belongs in tokens.css`);
+        if (!tokensFile && rule.type === 'style' && objects(rule.value.selectors).some((component) => component.type === 'attribute' && component.name === 'data-theme')) issues.push(`${filename}:${line} ${rules.at(-1)!.label}: a theme selector belongs in tokens.css`);
         if (rule.type === 'font-face' && filename !== 'fonts.css') issues.push(`${filename}: @font-face belongs in fonts.css`);
       },
       Url(url) {
@@ -178,6 +181,9 @@ function markupViolations(filename: string, source: string) {
   for (const [utility] of source.matchAll(/(?<![\w-])text-[\w[\]().%/-]+/g)) if (/^text-(?:base|\d*xl|xs|sm|md|lg|\[.*\]|\(.*\))$/.test(utility) && !/^text-(?:2xs|xs|sm|md|lg|xl|2xl)$/.test(utility)) issues.push(`${filename}: font size ${utility} is outside the type scale`);
   for (const [utility] of source.matchAll(/(?<![\w-])rounded(?:-[\w[\]().%/-]+)?(?![\w-])/g)) if (!/^rounded(?:-(?:[trbl]|tl|tr|br|bl|[se]|ss|se|es|ee))?-(?:sm|md|lg|full|none)$/.test(utility)) issues.push(`${filename}: radius ${utility} is outside the radius scale`);
   for (const match of source.matchAll(/\b(?:fontSize|font-size|fontFamily|font-family|borderRadius|border-radius)["']?\s*:/gi)) issues.push(`${filename}: inline ${match[0]} bypasses the scales`);
+  for (const [utility] of source.matchAll(/(?<![\w-])dark:[\w[\]-]+/g)) issues.push(`${filename}: ${utility} branches on the theme outside tokens.css`);
+  for (const [utility] of source.matchAll(/(?<![\w-])(?:bg|text|border|outline|fill|stroke|decoration|accent|caret|placeholder|from|via|to|divide)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d+|\[(?:#|rgb|hsl|oklch|color)[^\]]*\])(?:\/\d+)?(?![\w-])/g)) issues.push(`${filename}: literal color ${utility} belongs in tokens.css`);
+  for (const match of source.matchAll(/\b(?:color|background(?:-color)?|backgroundColor|border-color|borderColor)["']?\s*:\s*["']?(?:#[\da-f]{3,8}\b|(?:rgb|hsl|oklch)a?\()/gi)) issues.push(`${filename}: inline literal color ${match[0]} belongs in tokens.css`);
   for (const [tag] of source.matchAll(/<link\b[^>]*>/gi)) if (!/\brel=["']icon["']/i.test(tag) || !/\bhref=["']\/(?!\/)/i.test(tag)) issues.push(`${filename}: ${tag} loads a resource outside the panel stylesheets`);
   return issues;
 }
@@ -207,6 +213,37 @@ test('tokens define the type, radius, and motion scales and the reduced-motion r
   assert.deepEqual(defined, scaleValues);
   const panel = await readFile(resolve(styleRoot, 'panel.css'), 'utf8');
   assert.match(panel, /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{[^}]*transition: none !important;[^}]*animation: none !important;/);
+});
+
+function themeBlocks(tokens: string) {
+  const declarations = (body: string) => Object.fromEntries([...body.matchAll(/(--[\w-]+|color-scheme):\s*([^;]+);/g)].map((match) => [match[1]!, match[2]!.trim()]));
+  return {
+    root: declarations(tokens.match(/^:root \{([^}]*)\}/m)![1]!),
+    ...Object.fromEntries(themes.map((theme) => [theme, declarations(tokens.match(new RegExp(`^\\[data-theme="${theme}"\\] \\{([^}]*)\\}`, 'm'))?.[1] ?? '')])),
+  } as Record<'root' | typeof themes[number], Record<string, string>>;
+}
+
+test('both themes define the same tokens, their color scheme, and the browser theme color', async () => {
+  const blocks = themeBlocks(await readFile(resolve(styleRoot, 'tokens.css'), 'utf8'));
+  const names = (theme: typeof themes[number]) => Object.keys(blocks[theme]).sort();
+  assert(names('dark').length > 20, 'the dark block defines the theme tokens');
+  assert.deepEqual(names('light'), names('dark'));
+  for (const theme of themes) {
+    assert.equal(blocks[theme]['color-scheme'], theme);
+    assert.equal(blocks[theme]['--bg'], themeColors[theme], `the ${theme} theme-color meta matches --bg`);
+  }
+  assert.deepEqual(Object.keys(blocks.root).filter((name) => Object.hasOwn(blocks.dark, name)), [], 'a token defined per theme has no shared :root value');
+});
+
+test('theme and color policy keeps theme branches and literal colors in tokens.css', () => {
+  for (const source of ['.sidebar-link { color: #fff }', '.sidebar-link { background: rgb(0 0 0 / .5) }', '.sidebar-link { border-color: white }', '[data-theme="light"] .sidebar-link { color: var(--text) }', '@media (prefers-color-scheme: light) { .sidebar-link { color: var(--text) } }']) {
+    assert(stylesheetViolations('panel.css', source).length > 0, source);
+    assert(stylesheetViolations('components/Fixture.astro', source).length > 0, source);
+  }
+  assert.deepEqual(stylesheetViolations('tokens.css', '[data-theme="light"] { --text: #32354d } @media (prefers-color-scheme: light) { :root { --x: 1px } }'), []);
+  assert.deepEqual(stylesheetViolations('panel.css', '.sidebar-link { color: var(--text); background: transparent; border-color: currentColor }'), []);
+  for (const source of ['<div className="dark:bg-muted" />', '<div className="bg-white" />', '<div class="text-black/50" />', '<div className="bg-red-500" />', '<div class="border-[#ccd0da]" />', '<div className="fill-[rgb(0,0,0)]" />', '<div style="color: #fff" />', '<div style={{ backgroundColor: "rgb(0 0 0)" }} />']) assert(markupViolations('fixture.tsx', source).length > 0, source);
+  assert.deepEqual(markupViolations('fixture.tsx', '<div className="bg-transparent border-transparent text-foreground bg-muted hover:bg-muted/80 text-muted-foreground" />'), []);
 });
 
 test('effect policy rejects glow, stray gradients, shadows, aliases, and selector escapes', () => {
