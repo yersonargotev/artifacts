@@ -57,7 +57,7 @@ function matchesSubject(selector: Selector, subject: Subject) {
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (subject === 'document') return component.type === 'class' && component.name === 'reader-pane';
-    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'project-filter-links', 'rail-panel', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
+    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'choice-list', 'rail-panel', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
     return (component.type === 'class' && component.name === 'rail-brand') || (component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary');
   });
 }
@@ -251,8 +251,8 @@ test('effect policy rejects glow, stray gradients, shadows, aliases, and selecto
     '.rail-link { background: linear-gradient(red, blue) }',
     '.rail-link { box-shadow: 0 0 12px blue }',
     '.rail-link { box-shadow: var(--shadow-2) }',
-    '.project-filter-links .rail-link { box-shadow: var(--shadow-2) }',
-    '.project-filter-links, .rail-link { box-shadow: var(--shadow-2) }',
+    '.choice-list .rail-link { box-shadow: var(--shadow-2) }',
+    '.choice-list, .rail-link { box-shadow: var(--shadow-2) }',
     '.artifact-menu { box-shadow: var(--shadow-1) }',
     '.preview { box-shadow: var(--shadow-1) }',
     '[aria-current] { box-shadow: var(--glow-active) }',
@@ -276,7 +276,7 @@ test('effect policy rejects glow, stray gradients, shadows, aliases, and selecto
 
 test('effect policy permits scoped effect tokens and shadow tokens on their subjects', () => {
   assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill) } .rail-brand { background: var(--accent-fill) } .project-cover { background: var(--cover-wash) } .rail-link[aria-current]::before { background: var(--accent) }'), []);
-  for (const selector of ['.artifact-menu', '.project-filter-links', '.rail-panel', '.dialog-content', '.combobox-content', '[data-slot=dropdown-menu-content]']) assert.deepEqual(stylesheetViolations('panel.css', `${selector} { box-shadow: var(--shadow-2) }`), [], selector);
+  for (const selector of ['.artifact-menu', '.choice-list', '.rail-panel', '.dialog-content', '.combobox-content', '[data-slot=dropdown-menu-content]']) assert.deepEqual(stylesheetViolations('panel.css', `${selector} { box-shadow: var(--shadow-2) }`), [], selector);
   assert.deepEqual(stylesheetViolations('panel.css', '.reader-pane { box-shadow: var(--shadow-1) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.rail-link { box-shadow: none }'), []);
 });

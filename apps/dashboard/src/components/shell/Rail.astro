@@ -21,7 +21,7 @@ const destinations = [
   {destinations.map(({ target, href, label, icon }) => <a class="rail-link" href={href} aria-label={label} title={label} aria-current={current(target)}><Icon name={icon} size={18} /></a>)}
   <span class="rail-spacer"></span>
   <ThemeToggle theme={theme} />
-  <details class="rail-disclosure" id="connect-tools">
+  <details class="rail-disclosure" id="connect-tools" data-disclosure>
     <summary class="rail-link" aria-label="Conectar herramientas" title="Conectar herramientas"><Icon name="plug-connected" size={18} /></summary>
     <div class="rail-panel">
       <h2>Conectar herramientas</h2>
@@ -30,7 +30,7 @@ const destinations = [
       <p>Usa <strong>artifacts_create</strong> para crear tu primer artefacto. Cada revisión conserva su contenido y sus archivos.</p>
     </div>
   </details>
-  <details class="rail-disclosure identity">
+  <details class="rail-disclosure identity" data-disclosure>
     <summary class="rail-link" aria-label="Mi cuenta" title="Mi cuenta"><span class="account-avatar" aria-hidden="true">{initials}</span></summary>
     <div class="rail-panel">
       <h2>{identity.name}</h2>
@@ -43,17 +43,7 @@ const destinations = [
   </details>
 </nav>
 <script>
-  const panels = [...document.querySelectorAll<HTMLDetailsElement>('.rail-disclosure')];
-  const close = (panel: HTMLDetailsElement, focus: boolean) => { panel.open = false; if (focus) panel.querySelector('summary')?.focus(); };
-  for (const panel of panels) panel.addEventListener('toggle', () => { if (panel.open) for (const other of panels) if (other !== panel) other.open = false; });
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || event.defaultPrevented) return;
-    const open = panels.find((panel) => panel.open);
-    if (open) close(open, open.contains(document.activeElement));
-  });
-  document.addEventListener('click', (event) => {
-    for (const panel of panels) if (panel.open && !panel.contains(event.target as Node)) close(panel, false);
-  });
+  import './disclosure.ts';
   document.querySelectorAll('[data-open-tools]').forEach((button) => button.addEventListener('click', (event) => {
     const tools = document.querySelector('#connect-tools');
     if (!(tools instanceof HTMLDetailsElement)) return;

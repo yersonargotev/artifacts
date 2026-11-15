@@ -6,8 +6,10 @@ import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
-import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, type LibraryLink } from '../apps/dashboard/src/urls.ts';
+import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListGroup, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, type LibraryLink } from '../apps/dashboard/src/urls.ts';
 import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
+import { groupCards } from '../apps/dashboard/src/components/library/groups.ts';
+import type { ArtifactCard, ProjectName, Workspace } from '../packages/artifacts/src/panel/model.ts';
 import { fixture } from './helpers.ts';
 
 const snapshot = (title: string): Snapshot => ({ metadata: { title, description: `Description for ${title}` }, content: { kind: 'text', text: title }, files: [] });
@@ -131,6 +133,21 @@ test('workspace and pages isolate owners even for empty searches, status filters
     await app.db.delete(session).where(eq(session.id, actor.sessionId));
     await assert.rejects(panel.library(actor), { code: 'forbidden' });
   } finally { await app.close(); }
+});
+
+test('the library groups a page by workspace project order and the URL turns grouping off', () => {
+  const card = (title: string, project: string | null) => ({ artifactId: title, title, project: project as ProjectName | null }) as ArtifactCard;
+  const projects = [{ name: 'Alpha' }, { name: 'Beta' }] as unknown as Workspace['projects'];
+  const groups = groupCards([card('b1', 'beta'), card('u1', null), card('g1', 'Gamma'), card('a1', 'Alpha'), card('b2', 'Beta')], projects);
+  assert.deepEqual(groups.map(({ project, cards }) => [project, cards.map(({ title }) => title)]), [['Alpha', ['a1']], ['Beta', ['b1', 'b2']], ['Gamma', ['g1']], [null, ['u1']]]);
+  assert.deepEqual(groupCards([], projects), []);
+  const group = (search: string) => readListGroup(new URL(`https://panel.example.test/${search}`));
+  assert.deepEqual([group(''), group('?group=none'), group('?group=project'), group('?group=')], [undefined, 'none', undefined, undefined]);
+  const query: LibraryLink = { scope: { kind: 'all' }, q: '', status: 'all', group: 'none' };
+  assert.equal(libraryHref(query, { status: 'pending' }), '/?status=pending&group=none');
+  assert.equal(libraryHref(query, { cursor: '2:def' }), '/?group=none&cursor=2%3Adef');
+  assert.equal(libraryHref(query, { group: undefined }), '/');
+  assert.equal(readerHref(query, { artifactId: 'a1' }), '/read?artifact=a1', 'read mode does not carry the dashboard grouping');
 });
 
 test('panel URLs validate explicit scopes and cursors and reset cursors when filters change', () => {

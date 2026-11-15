@@ -63,12 +63,11 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(instance.panel);
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   const projects = page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
-  const projectLinks = async () => page.locator('.project-filter-links a[href*="project="]').evaluateAll((links) => links.map((link) => ({ name: `${link.children[1]?.textContent} (${link.querySelector('.project-count')?.textContent})`, href: new URL(link.getAttribute('href')!, location.href).search.replace(/&.*$/, ''), current: link.getAttribute('aria-current') })));
-  const openProjectFilter = async () => { await page.locator('.project-filter > summary').click(); await projects.waitFor(); };
+  const projectLinks = async () => page.locator('.project-filter a[href*="project="]').evaluateAll((links) => links.map((link) => ({ name: `${link.children[1]?.textContent} (${link.querySelector('.project-count')?.textContent})`, href: new URL(link.getAttribute('href')!, location.href).search.replace(/&.*$/, ''), current: link.getAttribute('aria-current') })));
+  const openProjectFilter = async () => { await projects.waitFor(); };
   assert.deepEqual(await projectLinks(), [{ name: 'Alpha (1)', href: '?project=Alpha', current: null }, { name: 'Beta (1)', href: '?project=Beta', current: null }]);
   await openProjectFilter();
   for (const name of ['Alpha', 'Beta']) assert.equal(await projects.getByRole('link', { name: `${name} (1)`, exact: true }).count(), 1, `Project filter link ${name}`);
-  await page.locator('.project-filter > summary').click();
   const cards = async () => page.locator('.artifact-card').evaluateAll((items) => items.map((item) => [item.querySelector('h2')?.textContent, item.querySelector('.project-chip')?.textContent]).sort());
   assert.deepEqual(await cards(), [['Alpha plan', 'Alpha'], ['Beta handoff', 'Beta'], ['Unfiled notes', 'Sin proyecto']]);
   await capture(page, 'projects-library-desktop');

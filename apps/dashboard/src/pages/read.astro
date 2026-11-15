@@ -36,8 +36,8 @@ const filtered = Boolean(page.q || page.status !== 'all');
   <div class="reader" data-reader>
     <section class="reader-list" aria-labelledby="reader-scope">
       <header class="reader-list-heading"><h1 id="reader-scope">{scopeTitle}</h1><a href={libraryHref(query)}>Salir del modo lectura</a></header>
-      <StatusTabs page={page} reader />
-      <ProjectFilter workspace={workspace} page={page} reader />
+      <StatusTabs page={page} query={query} reader />
+      <ProjectFilter workspace={workspace} query={query} reader />
       {page.cards.length ? <nav aria-label="Artefactos"><ol class="reader-items">{page.cards.map((card) => {
         const entry = entryOf(card);
         return <li><a class="reader-item" href={readerHref(query, { cursor, artifactId: entry.artifactId })} aria-current={selected?.artifactId === entry.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={entry.artifactId}

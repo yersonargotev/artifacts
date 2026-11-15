@@ -82,9 +82,9 @@ try {
   assert.equal(await page.getByRole('heading', { level: 2, name: 'Borrador con cambios', exact: true }).count(), 1);
   assert.equal(await page.getByRole('link', { name: 'Ver artefacto', exact: true }).getAttribute('href'), `/artifacts/${pending.artifactId}`);
   assert.equal(await page.locator('.reader-pane').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), pending.publication!.url);
-  await page.locator('.reader-list .project-filter > summary').click();
-  assert.equal(await page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true }).getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
-  await page.locator('.reader-list .project-filter > summary').click();
+  const readerProjects = page.locator('.reader-list').getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
+  assert.equal(await readerProjects.getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
+  assert.equal(await readerProjects.getByRole('link', { name: /^Todos los proyectos/ }).getAttribute('href'), '/read');
   await capture(page, 'read-1440');
   checks.push('the library link opens read mode for the project, listing all its artifacts with status badges and previewing the first head revision');
 

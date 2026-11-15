@@ -2,17 +2,24 @@
 import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { moveHref, shareHref, exportHref } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
-interface Props { card: Card }
-const { card } = Astro.props;
+import ChoiceMenu from './ChoiceMenu.astro';
+import Icon from '../Icon.astro';
+interface Props { card: Card; reader: string; row?: boolean }
+const { card, reader, row = false } = Astro.props;
 const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
 const publication = card.publication.state === 'unpublished' ? undefined : card.publication;
----
-<ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={JSON.stringify([
+const links = [
   { label: 'Ver artefacto', href: detailUrl },
   { label: 'Compartir', href: shareHref(card.artifactId), share: true },
   { label: 'Descargar revisión más reciente', href: exportHref(card.artifactId, card.head.revisionId) },
   ...(publication ? [{ label: 'Abrir publicación', href: publication.url }] : []),
   { label: 'Mover a proyecto', href: moveHref([card.artifactId]), moveItems: JSON.stringify([{ artifactId: card.artifactId, title: card.title, project: card.project }]) },
-])} deleteUrl={`${detailUrl}/delete`} client:load />
-<a class="native-share-link" href={shareHref(card.artifactId)} data-share-trigger>Compartir</a>
-<noscript><a class="native-move-link" href={moveHref([card.artifactId])}>Mover a proyecto</a></noscript>
+  { label: 'Modo lectura', href: reader },
+];
+const deleteUrl = `${detailUrl}/delete`;
+---
+<div class="artifact-actions">
+  {row && <><a class="row-action" href={reader}>Leer</a><a class="row-action" href={shareHref(card.artifactId)} data-share-trigger>Compartir</a></>}
+  <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={JSON.stringify(links)} deleteUrl={deleteUrl} client:load />
+  <noscript><ChoiceMenu class="menu-fallback" label={`Acciones de ${card.title}`} summaryLabel={`Menú de ${card.title}`} links={[...links, { label: 'Eliminar artefacto', href: deleteUrl, destructive: true }]}><Icon name="dots" size={18} /></ChoiceMenu></noscript>
+</div>

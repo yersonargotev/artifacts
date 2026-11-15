@@ -16,4 +16,5 @@ const placeholder = query.scope.kind === 'project' ? `Buscar en ${query.scope.na
   {query.sort && query.sort !== 'updated' && <input type="hidden" name="sort" value={query.sort} />}
   {query.direction && query.direction !== defaultDirections[query.sort ?? 'updated'] && <input type="hidden" name="dir" value={query.direction} />}
   {query.view && <input type="hidden" name="view" value={query.view} />}
+  {query.group && <input type="hidden" name="group" value={query.group} />}
 </form>

@@ -85,11 +85,45 @@ try {
   await capture(page, 'table-1440');
   checks.push('table is the default with project-free columns, state pills, revision, absolute time title, actions menu, compact header and create row');
 
+  const groupHeads = (target: Page) => target.locator('.artifact-table-group th').evaluateAll((cells) => cells.map((cell) => cell.textContent!.replace(/\s+/g, ' ').trim()));
   await page.goto(app.dashboard);
-  assert.deepEqual(await page.locator('.artifact-table thead th').allTextContents(), ['Título', 'Proyecto', 'Estado', 'Tipo', 'Revisión', 'Actualizado', 'Acciones']);
+  assert.deepEqual(await page.locator('.artifact-table thead th').allTextContents(), ['Título', 'Estado', 'Tipo', 'Revisión', 'Actualizado', 'Acciones']);
   assert.equal(await page.locator('.artifact-table [type=checkbox]').count(), 0);
+  assert.equal(await page.locator('.artifact-table .project-chip').count(), 0);
+  assert.deepEqual(await groupHeads(page), ['Wiki tabla 25 en esta página']);
+  await page.getByRole('link', { name: 'Ver más artefactos', exact: true }).click();
+  await page.waitForURL((url) => url.searchParams.has('cursor'));
+  assert.deepEqual(await groupHeads(page), ['Tabla 3 en esta página', 'Wiki tabla 2 en esta página'], 'groups follow the workspace project order, not the page order');
+  assert.deepEqual(await titles(page), ['Borrador con cambios', 'Notas sin publicar', 'Guía publicada', 'Página 11', 'Página 00']);
+  await capture(page, 'grouped-page-2-1440');
+  checks.push('the library groups each page by project in workspace order, labels each group with its rows on this page, and keeps rows unselectable');
+
+  await page.goto(`${app.dashboard}/?group=none`);
+  assert.deepEqual(await page.locator('.artifact-table thead th').allTextContents(), ['Título', 'Proyecto', 'Estado', 'Tipo', 'Revisión', 'Actualizado', 'Acciones']);
+  assert.deepEqual(await groupHeads(page), []);
   assert.equal(await page.locator('.artifact-table .project-chip').first().textContent(), 'Wiki tabla');
-  checks.push('the library adds a Proyecto column and keeps rows unselectable');
+  const ungrouped = async (href: string | null) => new URL(href!, app.dashboard).searchParams.get('group') === 'none';
+  const listLinks = await page.locator('.library-filters a, .project-filter a, .artifact-table th a, .library-next, .choice-list a').evaluateAll((links) => links.map((link) => [link.textContent!.trim(), link.getAttribute('href')]));
+  for (const [label, href] of listLinks) if (label !== 'Por proyecto') assert(await ungrouped(href), `${label} keeps grouping off: ${href}`);
+  assert.equal(await page.locator('form[role=search] input[name=group]').getAttribute('value'), 'none');
+  await page.getByRole('link', { name: 'Ver más artefactos', exact: true }).click();
+  await page.waitForURL((url) => url.searchParams.has('cursor') && url.searchParams.get('group') === 'none');
+  assert.deepEqual(await groupHeads(page), []);
+  await page.getByText('Agrupar: Ninguno', { exact: true }).click();
+  await page.getByRole('navigation', { name: 'Agrupar', exact: true }).getByRole('link', { name: 'Por proyecto', exact: true }).click();
+  await page.waitForURL(`${app.dashboard}/`);
+  assert.deepEqual(await groupHeads(page), ['Wiki tabla 25 en esta página']);
+  checks.push('group=none shows the Proyecto column and survives status, project, sort, pagination, and search; Por proyecto turns grouping back on');
+
+  await mcp('artifacts_update', { requestId: randomUUID(), artifactId: published.artifactId, expectedRevisionId: published.headRevisionId, snapshot: snapshot('Guía publicada', 'Descripción de Guía publicada', 'Contenido nuevo de la guía') });
+  await page.goto(`${app.dashboard}/?group=none`);
+  const banner = page.getByRole('region', { name: 'Cambios sin publicar', exact: true });
+  assert.equal(await banner.getByRole('link').first().textContent(), 'Guía publicada', 'the banner shows the most recently updated pending artifact');
+  assert.equal(await banner.getByRole('link', { name: 'Ver los 2 con cambios', exact: true }).getAttribute('href'), '/?status=pending&group=none');
+  assert.equal(await banner.getByRole('button', { name: 'Publicar rev. 2', exact: true }).count(), 1);
+  await page.goto(`${app.dashboard}/?project=Wiki+tabla`);
+  assert.equal(await page.getByRole('region', { name: 'Cambios sin publicar', exact: true }).count(), 0, 'a scope with nothing pending has no banner');
+  checks.push('with two pending artifacts the banner shows the newest and links to the pending filter with the count; a scope with none shows no banner');
 
   await page.goto(`${app.dashboard}/?project=Tabla`);
   await toggle(page).getByRole('link', { name: 'Tarjetas', exact: true }).click();
@@ -102,7 +136,7 @@ try {
   assert.equal(await page.locator('.artifact-grid').count(), 1);
   const statusHref = await page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true }).getByRole('link').first().getAttribute('href');
   assert.equal(new URL(statusHref!, app.dashboard).searchParams.get('view'), 'cards');
-  const projectHrefs = await page.locator('.project-filter-links a').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+  const projectHrefs = await page.locator('.project-filter a').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
   assert(projectHrefs.every((href) => new URL(href!, app.dashboard).searchParams.get('view') === 'cards'));
   await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).fill('Guía');
   await page.getByRole('searchbox', { name: 'Buscar artefactos', exact: true }).press('Enter');

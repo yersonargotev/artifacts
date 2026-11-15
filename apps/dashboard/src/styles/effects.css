@@ -22,10 +22,9 @@
 }
 
 .rail-link[aria-current]::before,
-.project-filter-links a[aria-current]::before,
 .reader-item[aria-current]::before,
 .artifact-card:has(input:checked)::before,
-.artifact-table tr:has(input:checked) > .artifact-table-check::before {
+.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible)) > :first-child::before {
   content: '';
   position: absolute;
   top: 8px;
@@ -36,7 +35,7 @@
   background: var(--accent);
 }
 
-.artifact-table tr:has(input:checked) > .artifact-table-check::before {
+.artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible)) > :first-child::before {
   top: 0;
   bottom: 0;
   border-radius: 0;
