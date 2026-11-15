@@ -167,7 +167,7 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .create-here-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--r-lg); background: var(--accent-a1); color: var(--accent); }
 .create-here-card h2 { margin: 0; font-size: var(--text-md); font-weight: 600; }
 .create-here-card p { margin: 0; color: var(--text-2); font-size: var(--text-sm); line-height: 1.45; }
-.create-here-card code { display: block; min-width: 0; max-width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--base); font-size: var(--text-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+.create-here-card code { display: block; min-width: 0; max-width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); font-size: var(--text-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
 .create-here-card > .button { align-self: flex-start; }
 .library-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg-chrome); }
 .library-stats > div { display: flex; flex-direction: column-reverse; gap: 3px; min-width: 0; padding: 18px 22px; }
