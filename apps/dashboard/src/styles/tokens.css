@@ -12,8 +12,6 @@
   --on-accent: #11111b;
   --sapphire: #74c7ec;
   --ok: #a6e3a1;
-  --warning-border: #f9e2af40;
-  --warning-surface: #f9e2af14;
   --warn: #f9e2af;
   --danger: #f38ba8;
   --peach: #fab387;
@@ -23,29 +21,21 @@
   --lavender: #b4befe;
   --flamingo: #f2cdcd;
   --maroon: #eba0ac;
-  --accent-surface: #89b4fa14;
   --border-strong: #45475a;
-  --accent-selection: #89b4fa40;
-  --accent-border: #89b4fa3d;
-  --accent-border-faint: #89b4fa1f;
-  --surface-half: #31324480;
-  --accent-badge: #89b4fa1a;
-  --accent-border-soft: #89b4fa30;
-  --surface-faint: #31324433;
-  --accent-icon-border: #89b4fa1c;
-  --accent-icon-surface: #89b4fa0d;
-  --surface-soft: #31324466;
-  --success-border: #a6e3a124;
-  --success-surface: #a6e3a10d;
-  --accent-empty-border: #89b4fa2b;
-  --accent-empty-surface: #89b4fa0a;
-  --mantle-half: #18182580;
   --preview-background: white;
   --accent-fill: linear-gradient(120deg, var(--accent), var(--sapphire));
   --glow-primary: 0 0 18px #89b4fa33;
   --glow-active: 0 0 12px #89b4fa14;
   --ring-active: var(--accent);
   --elevation-overlay: 0 12px 36px #11111b80;
+
+  --accent-a1: color-mix(in srgb, var(--accent) 9%, transparent);
+  --accent-a2: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-a3: color-mix(in srgb, var(--accent) 32%, transparent);
+  --warn-a1: color-mix(in srgb, var(--warn) 9%, transparent);
+  --warn-a3: color-mix(in srgb, var(--warn) 30%, transparent);
+  --ok-a1: color-mix(in srgb, var(--ok) 9%, transparent);
+  --ok-a3: color-mix(in srgb, var(--ok) 30%, transparent);
 
   --text-2xs: 11px;
   --text-xs: 12px;
