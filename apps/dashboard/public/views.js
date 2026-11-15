@@ -3,6 +3,8 @@
 (() => {
   const views = ['/', '/read'];
   const quiet = (transition) => { for (const promise of [transition.ready, transition.finished, transition.updateCallbackDone]) promise.catch(() => {}); };
+  // Chrome can abort an incoming transition before pagereveal hands it over ("Page already revealed"), so no listener can reach its promises. An aborted transition is not an error.
+  addEventListener('unhandledrejection', (event) => { if (event.reason instanceof DOMException && event.reason.message.startsWith('Transition was aborted')) event.preventDefault(); });
   addEventListener('pagereveal', (event) => { if (event.viewTransition) quiet(event.viewTransition); });
   addEventListener('pageswap', (event) => {
     if (!event.viewTransition) return;
