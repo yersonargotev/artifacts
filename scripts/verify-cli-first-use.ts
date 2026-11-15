@@ -289,7 +289,7 @@ try {
 
   if (panel) {
     stage = 'panel-projects';
-    await page.goto(`${panel}/?${new URLSearchParams({ project: projects[1] })}`);
+    await page.goto(`${panel}/?${new URLSearchParams({ project: projects[1], view: 'cards' })}`);
     const panelSignIn = page.getByRole('link', { name: 'Iniciar sesión', exact: true });
     if (await panelSignIn.count()) await panelSignIn.click();
     const consent = page.getByRole('button', { name: 'Permitir acceso', exact: true });
