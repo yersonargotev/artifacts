@@ -4,6 +4,11 @@
   box-shadow: var(--glow-primary);
 }
 
+[data-variant="primary"]:hover {
+  background: var(--accent-fill);
+  filter: brightness(1.06);
+}
+
 [aria-current], [aria-selected="true"], [aria-pressed="true"] {
   box-shadow: var(--glow-active);
 }

@@ -3,11 +3,14 @@
   --bg: #1e1e2e;
   --bg-chrome: #181825;
   --bg-sunken: #11111b;
-  --bg-raised: #313244;
-  --border: #313244;
+  --bg-raised: #25263a;
+  --bg-hover: #2a2b3d;
+  --border-subtle: #2a2b3d;
+  --border: #363849;
+  --border-strong: #585b70;
   --text: #cdd6f4;
   --text-2: #a6adc8;
-  --text-3: #7f849c;
+  --text-3: #9399b2;
   --accent: #89b4fa;
   --on-accent: #11111b;
   --sapphire: #74c7ec;
@@ -21,7 +24,6 @@
   --lavender: #b4befe;
   --flamingo: #f2cdcd;
   --maroon: #eba0ac;
-  --border-strong: #45475a;
   --preview-background: white;
   --accent-fill: linear-gradient(120deg, var(--accent), var(--sapphire));
   --glow-primary: 0 0 18px #89b4fa33;

@@ -20,7 +20,7 @@ const { items } = Astro.props;
   ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
   li { min-width: 0; }
   a { display: flex; align-items: flex-start; gap: 12px; min-height: 88px; height: 100%; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg); color: var(--text); background: var(--bg-chrome); text-decoration: none; }
-  a:hover { border-color: var(--accent); background: var(--bg); }
+  a:hover { border-color: var(--accent); background: var(--bg-hover); }
   a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .shared-icon, .shared-open { flex: none; color: var(--accent); }
   .shared-open { margin-left: auto; }
