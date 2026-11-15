@@ -607,7 +607,7 @@ try {
     await denialPage.getByRole('menuitem', { name: 'Compartir', exact: true }).click(); await denialReadHeld.promise;
     const logoutPage = await denialContext.newPage();
     await logoutPage.goto(instance.panel);
-    await logoutPage.getByText('Mi cuenta', { exact: true }).click();
+    await logoutPage.locator('summary[aria-label="Mi cuenta"]').click();
     const logoutResponse = logoutPage.waitForResponse((response) => new URL(response.url()).pathname === '/auth/logout' && response.request().method() === 'POST');
     await logoutPage.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
     assert.equal((await logoutResponse).status(), 303);
@@ -650,7 +650,7 @@ try {
     const expired = await context({ storageState: ownerState });
     const expiredPage = await expired.newPage(); active = expiredPage;
     await expiredPage.goto(instance.panel);
-    await expiredPage.getByText('Mi cuenta', { exact: true }).click();
+    await expiredPage.locator('summary[aria-label="Mi cuenta"]').click();
     await expiredPage.getByRole('button', { name: 'Cerrar sesión del panel', exact: true }).click();
     assert.equal((await live.request.post(`${instance.panel}${path}`, { headers, data: body })).status(), 401);
     pass('expired-session', 'Actual panel logout invalidates the old authenticated share POST');

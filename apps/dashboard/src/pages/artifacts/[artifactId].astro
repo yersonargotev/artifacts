@@ -28,7 +28,7 @@ const url = { ...result.url, revisionId: detail.selected.revision.id, compareTo:
 const broken = url.tab === 'preview' && detail.links ? brokenLinks(detail.links) : [];
 const summary = url.tab === 'files' ? await summarizeRevision(detail.selected.revision) : undefined;
 ---
-<Panel share move title={detail.selected.revision.snapshot.metadata.title} workspace={workspace} location={{ kind: 'artifact', project: detail.project }} detail>
+<Panel share move title={detail.selected.revision.snapshot.metadata.title} workspace={workspace} location={{ kind: 'artifact', project: detail.project }}>
   <section class="artifact-detail" {...retainedMarkers(detail)}>
     <DetailHeader detail={detail} url={{ ...url, compareTo: result.url.compareTo }} />
     <DetailTabs url={url} fileCount={detail.selected.revision.snapshot.files.length} />

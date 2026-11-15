@@ -6,6 +6,7 @@ import { previewSandbox, publicationStates, searchFor } from '../presentation.ts
 import { detailHref, libraryHref, previewHref, readReaderUrl, readerHref } from '../urls.ts';
 import Panel from '../layouts/Panel.astro';
 import StatusTabs from '../components/library/StatusTabs.astro';
+import ProjectFilter from '../components/library/ProjectFilter.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
 if (!identity) return Astro.redirect(`/auth/login?${new URLSearchParams({ returnTo: `${Astro.url.pathname}${Astro.url.search}` })}`, 303);
@@ -31,10 +32,12 @@ const scopeTitle = page.scope.kind === 'unfiled' ? 'Sin proyecto' : page.scope.k
 const filtered = Boolean(page.q || page.status !== 'all');
 ---
 <Panel title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query}>
+  <Fragment slot="status"><span><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span></Fragment>
   <div class="reader" data-reader>
     <section class="reader-list" aria-labelledby="reader-scope">
       <header class="reader-list-heading"><h1 id="reader-scope">{scopeTitle}</h1><a href={libraryHref(query)}>Salir del modo lectura</a></header>
       <StatusTabs page={page} reader />
+      <ProjectFilter workspace={workspace} page={page} reader />
       {page.cards.length ? <nav aria-label="Artefactos"><ol class="reader-items">{page.cards.map((card) => {
         const entry = entryOf(card);
         return <li><a class="reader-item" href={readerHref(query, { cursor, artifactId: entry.artifactId })} aria-current={selected?.artifactId === entry.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={entry.artifactId}

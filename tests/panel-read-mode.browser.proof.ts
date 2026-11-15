@@ -70,7 +70,7 @@ try {
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
 
   await page.goto(`${app.dashboard}/?project=Lectura&status=all&sort=title`);
-  const entry = page.locator('.library-view-controls').getByRole('link', { name: 'Modo lectura', exact: true });
+  const entry = page.locator('header.top-bar').getByRole('link', { name: 'Modo lectura', exact: true });
   assert.equal(await entry.getAttribute('href'), '/read?project=Lectura&sort=title');
   await page.goto(`${app.dashboard}/?project=Lectura`);
   await Promise.all([page.waitForURL(`${app.dashboard}/read?project=Lectura`), entry.click()]);
@@ -82,7 +82,9 @@ try {
   assert.equal(await page.getByRole('heading', { level: 2, name: 'Borrador con cambios', exact: true }).count(), 1);
   assert.equal(await page.getByRole('link', { name: 'Ver artefacto', exact: true }).getAttribute('href'), `/artifacts/${pending.artifactId}`);
   assert.equal(await page.locator('.reader-pane').getByRole('link', { name: 'Abrir publicación', exact: true }).getAttribute('href'), pending.publication!.url);
-  assert.equal(await page.getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
+  await page.locator('.reader-list .project-filter > summary').click();
+  assert.equal(await page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true }).getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
+  await page.locator('.reader-list .project-filter > summary').click();
   await capture(page, 'read-1440');
   checks.push('the library link opens read mode for the project, listing all its artifacts with status badges and previewing the first head revision');
 

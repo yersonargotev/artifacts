@@ -1,0 +1,10 @@
+---
+import type { Workspace } from '@artifacts/artifacts/panel/model';
+interface Props { workspace?: Workspace }
+const { workspace } = Astro.props;
+const count = (value: number, one: string, many: string) => `${value} ${value === 1 ? one : many}`;
+---
+<footer class="status-bar">
+  {workspace && <p class="status-totals"><span>{count(workspace.total.count, 'artefacto', 'artefactos')}</span><span>{count(workspace.total.published, 'publicado', 'publicados')}</span><span>{workspace.total.pending} con cambios pendientes</span></p>}
+  <div class="status-keys"><slot /></div>
+</footer>

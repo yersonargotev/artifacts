@@ -293,12 +293,12 @@ try {
     const panelSignIn = page.getByRole('link', { name: 'Iniciar sesión', exact: true });
     if (await panelSignIn.count()) await panelSignIn.click();
     const consent = page.getByRole('button', { name: 'Permitir acceso', exact: true });
-    const sidebarLink = page.getByRole('navigation', { name: 'Tus proyectos', exact: true }).getByRole('link', { name: `${projects[1]} (1)`, exact: true });
-    await Promise.race([sidebarLink.waitFor(), consent.waitFor().then(() => consent.click())]);
-    await sidebarLink.waitFor();
-    assert.equal(await sidebarLink.getAttribute('aria-current'), 'page');
+    const projectFilterLink = page.locator('.project-filter-links a[aria-current="page"]');
+    await Promise.race([projectFilterLink.waitFor({ state: 'attached' }), consent.waitFor().then(() => consent.click())]);
+    await projectFilterLink.waitFor({ state: 'attached' });
+    assert.equal(await projectFilterLink.evaluate((link) => [link.children[1]?.textContent, link.querySelector('.project-count')?.textContent].join(' ')), `${projects[1]} 1`);
     assert.deepEqual(await page.locator('.artifact-card h2').allTextContents(), [title]);
-    checked('panel-sidebar-groups-moved-artifact');
+    checked('panel-project-filter-groups-moved-artifact');
   }
 
   assert.deepEqual(await cli(['move', created.artifactId, '--no-project']), { artifactId: created.artifactId, project: null });
@@ -337,7 +337,7 @@ try {
     export: 'Check historical ZIP export, archive contents, and SHA-256 consistency.',
     'publication-browser': 'Check protected publication access and original revision rendering.',
     projects: 'Check create with a project, project filtering, the projects list, and move.',
-    'panel-projects': 'Check panel sign-in and the Proyectos sidebar for the moved artifact.',
+    'panel-projects': 'Check panel sign-in and the project filter for the moved artifact.',
     logout: 'Check credential revocation and authentication denial after logout.',
   };
   evidence.failureMessage = interrupted ? 'Verification was interrupted or exceeded its overall deadline.'

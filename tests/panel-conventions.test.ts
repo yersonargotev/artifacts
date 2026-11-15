@@ -57,8 +57,8 @@ function matchesSubject(selector: Selector, subject: Subject) {
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (subject === 'document') return component.type === 'class' && component.name === 'reader-pane';
-    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'project-filter-links', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
-    return component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary';
+    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'project-filter-links', 'rail-panel', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
+    return (component.type === 'class' && component.name === 'rail-brand') || (component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary');
   });
 }
 
@@ -236,49 +236,49 @@ test('both themes define the same tokens, their color scheme, and the browser th
 });
 
 test('theme and color policy keeps theme branches and literal colors in tokens.css', () => {
-  for (const source of ['.sidebar-link { color: #fff }', '.sidebar-link { background: rgb(0 0 0 / .5) }', '.sidebar-link { border-color: white }', '[data-theme="light"] .sidebar-link { color: var(--text) }', '@media (prefers-color-scheme: light) { .sidebar-link { color: var(--text) } }']) {
+  for (const source of ['.rail-link { color: #fff }', '.rail-link { background: rgb(0 0 0 / .5) }', '.rail-link { border-color: white }', '[data-theme="light"] .rail-link { color: var(--text) }', '@media (prefers-color-scheme: light) { .rail-link { color: var(--text) } }']) {
     assert(stylesheetViolations('panel.css', source).length > 0, source);
     assert(stylesheetViolations('components/Fixture.astro', source).length > 0, source);
   }
   assert.deepEqual(stylesheetViolations('tokens.css', '[data-theme="light"] { --text: #32354d } @media (prefers-color-scheme: light) { :root { --x: 1px } }'), []);
-  assert.deepEqual(stylesheetViolations('panel.css', '.sidebar-link { color: var(--text); background: transparent; border-color: currentColor }'), []);
+  assert.deepEqual(stylesheetViolations('panel.css', '.rail-link { color: var(--text); background: transparent; border-color: currentColor }'), []);
   for (const source of ['<div className="dark:bg-muted" />', '<div className="bg-white" />', '<div class="text-black/50" />', '<div className="bg-red-500" />', '<div class="border-[#ccd0da]" />', '<div className="fill-[rgb(0,0,0)]" />', '<div style="color: #fff" />', '<div style={{ backgroundColor: "rgb(0 0 0)" }} />']) assert(markupViolations('fixture.tsx', source).length > 0, source);
   assert.deepEqual(markupViolations('fixture.tsx', '<div className="bg-transparent border-transparent text-foreground bg-muted hover:bg-muted/80 text-muted-foreground" />'), []);
 });
 
 test('effect policy rejects glow, stray gradients, shadows, aliases, and selector escapes', () => {
   for (const source of [
-    '.sidebar-link { background: linear-gradient(red, blue) }',
-    '.sidebar-link { box-shadow: 0 0 12px blue }',
-    '.sidebar-link { box-shadow: var(--shadow-2) }',
-    '.project-filter-links .sidebar-link { box-shadow: var(--shadow-2) }',
-    '.project-filter-links, .sidebar-link { box-shadow: var(--shadow-2) }',
+    '.rail-link { background: linear-gradient(red, blue) }',
+    '.rail-link { box-shadow: 0 0 12px blue }',
+    '.rail-link { box-shadow: var(--shadow-2) }',
+    '.project-filter-links .rail-link { box-shadow: var(--shadow-2) }',
+    '.project-filter-links, .rail-link { box-shadow: var(--shadow-2) }',
     '.artifact-menu { box-shadow: var(--shadow-1) }',
     '.preview { box-shadow: var(--shadow-1) }',
     '[aria-current] { box-shadow: var(--glow-active) }',
     '[data-variant="primary"] { box-shadow: var(--glow-primary) }',
-    '.sidebar-link { --glow: 0 0 12px blue }',
-    '.sidebar-link { box-shadow: inset 3px 0 0 var(--accent) }',
-    '.sidebar-link { --wash: var(--cover-wash) }',
-    '.sidebar-link { background: var(--accent-fill) }',
-    '[data-variant="primary"] .sidebar-link { background: var(--accent-fill) }',
-    '.sidebar-link { --accent-fill: red }',
-    '.sidebar-link { --shadow-3: 0 0 12px blue }',
+    '.rail-link { --glow: 0 0 12px blue }',
+    '.rail-link { box-shadow: inset 3px 0 0 var(--accent) }',
+    '.rail-link { --wash: var(--cover-wash) }',
+    '.rail-link { background: var(--accent-fill) }',
+    '[data-variant="primary"] .rail-link { background: var(--accent-fill) }',
+    '.rail-link { --accent-fill: red }',
+    '.rail-link { --shadow-3: 0 0 12px blue }',
     '.artifact-menu { box-shadow: var(--shadow-2, 0 0 12px blue) }',
-    '.sidebar-link { filter: drop-shadow(0 0 12px blue) }',
-    '.sidebar-link { --wash: linear-gradient(red, blue) }',
+    '.rail-link { filter: drop-shadow(0 0 12px blue) }',
+    '.rail-link { --wash: linear-gradient(red, blue) }',
     '@keyframes glow { to { box-shadow: 0 0 12px blue } }',
     '@keyframes wash { to { background: linear-gradient(red, blue) } }',
   ]) assert(stylesheetViolations('effects.css', source).length > 0, source);
-  assert.match(stylesheetViolations('panel.css', '\n.sidebar-link { box-shadow: 0 0 12px blue }').join('\n'), /panel\.css:2 \.sidebar-link: box-shadow/);
-  assert.match(stylesheetViolations('panel.css', '\n.sidebar-link { background: linear-gradient(red, blue) }').join('\n'), /panel\.css:2 \.sidebar-link: background contains a gradient/);
+  assert.match(stylesheetViolations('panel.css', '\n.rail-link { box-shadow: 0 0 12px blue }').join('\n'), /panel\.css:2 \.rail-link: box-shadow/);
+  assert.match(stylesheetViolations('panel.css', '\n.rail-link { background: linear-gradient(red, blue) }').join('\n'), /panel\.css:2 \.rail-link: background contains a gradient/);
 });
 
 test('effect policy permits scoped effect tokens and shadow tokens on their subjects', () => {
-  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill) } .project-cover { background: var(--cover-wash) } .sidebar-link[aria-current]::before { background: var(--accent) }'), []);
-  for (const selector of ['.artifact-menu', '.project-filter-links', '.dialog-content', '.combobox-content', '[data-slot=dropdown-menu-content]']) assert.deepEqual(stylesheetViolations('panel.css', `${selector} { box-shadow: var(--shadow-2) }`), [], selector);
+  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill) } .rail-brand { background: var(--accent-fill) } .project-cover { background: var(--cover-wash) } .rail-link[aria-current]::before { background: var(--accent) }'), []);
+  for (const selector of ['.artifact-menu', '.project-filter-links', '.rail-panel', '.dialog-content', '.combobox-content', '[data-slot=dropdown-menu-content]']) assert.deepEqual(stylesheetViolations('panel.css', `${selector} { box-shadow: var(--shadow-2) }`), [], selector);
   assert.deepEqual(stylesheetViolations('panel.css', '.reader-pane { box-shadow: var(--shadow-1) }'), []);
-  assert.deepEqual(stylesheetViolations('panel.css', '.sidebar-link { box-shadow: none }'), []);
+  assert.deepEqual(stylesheetViolations('panel.css', '.rail-link { box-shadow: none }'), []);
 });
 
 test('scale policy accepts only scale steps for sizes, radii, and motion', () => {
@@ -286,12 +286,12 @@ test('scale policy accepts only scale steps for sizes, radii, and motion', () =>
     'font-size: var(--text-sm)', 'font: var(--text-md)/1.5 var(--font-sans)', 'font: inherit', 'font-size: clamp(var(--text-xl), 6vw, var(--text-2xl))',
     'border-radius: var(--r-md)', 'border-radius: var(--r-lg) var(--r-lg) 0 0', 'border-radius: 50%', 'border-radius: 0',
     'transition: color var(--dur-1) var(--ease-out), transform var(--dur-2) var(--ease-in-out)', 'transition: none', 'animation: none',
-  ]) assert.deepEqual(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`), [], declaration);
+  ]) assert.deepEqual(stylesheetViolations('panel.css', `.rail-link { ${declaration} }`), [], declaration);
   for (const declaration of [
     'font-size: 13px', 'font-size: 1rem', 'font: 12px/1.6 var(--font-mono)', 'font-size: var(--text-3xl)', 'font-size: calc(var(--text-sm) + 1px)', 'font-size: clamp(36px, 6vw, 54px)',
     'border-radius: 4px', 'border-radius: 30%', 'border-radius: var(--r-xl)', 'border-radius: var(--r-md) 4px', 'border-top-left-radius: 3px',
     'transition: color 90ms ease', 'transition: color var(--dur-1) ease-in', 'transition: color 200ms var(--ease-out)', 'transition-duration: .2s', 'animation: spin 1s linear infinite', 'transition: color var(--dur-1) cubic-bezier(0, 0, 1, 1)',
-  ]) assert(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`).length > 0, declaration);
+  ]) assert(stylesheetViolations('panel.css', `.rail-link { ${declaration} }`).length > 0, declaration);
 });
 
 test('markup policy rejects effect utilities, off-scale sizes and radii, and inline styles', () => {
@@ -337,19 +337,19 @@ test('tokens and fonts.css define two self-hosted variable families', async () =
 
 test('font policy rejects other families, remote URLs, and font links', () => {
   for (const source of [
-    ".sidebar-link { font-family: 'Inter' }",
-    '.sidebar-link { font-family: var(--font-sans), serif }',
-    '.sidebar-link { font-family: var(--font-display) }',
-    '.sidebar-link { font: var(--text-md)/1.5 a, b }',
-    ".sidebar-link { font: 600 var(--text-xs) 'JetBrains Mono' }",
-    '.sidebar-link { --font-sans: serif }',
-    '.sidebar-link { background: url(https://cdn.test/a.png) }',
-    '.sidebar-link { background: url(//cdn.test/a.png) }',
+    ".rail-link { font-family: 'Inter' }",
+    '.rail-link { font-family: var(--font-sans), serif }',
+    '.rail-link { font-family: var(--font-display) }',
+    '.rail-link { font: var(--text-md)/1.5 a, b }',
+    ".rail-link { font: 600 var(--text-xs) 'JetBrains Mono' }",
+    '.rail-link { --font-sans: serif }',
+    '.rail-link { background: url(https://cdn.test/a.png) }',
+    '.rail-link { background: url(//cdn.test/a.png) }',
     '@import url(https://fonts.googleapis.com/css2?family=Inter);',
     "@font-face { font-family: 'Inter Variable'; src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') }",
   ]) assert(stylesheetViolations('panel.css', source).length > 0, source);
   assert(stylesheetViolations('fonts.css', "@font-face { font-family: 'Inter Variable'; src: url(https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) }").length > 0);
-  for (const source of ['.sidebar-link { font-family: var(--font-mono) }', '.sidebar-link { font: 600 var(--text-xs) var(--font-mono) }', '.sidebar-link { font: inherit }', '.sidebar-link { font-family: inherit }', "@import 'tailwindcss';"]) assert.deepEqual(stylesheetViolations('panel.css', source), [], source);
+  for (const source of ['.rail-link { font-family: var(--font-mono) }', '.rail-link { font: 600 var(--text-xs) var(--font-mono) }', '.rail-link { font: inherit }', '.rail-link { font-family: inherit }', "@import 'tailwindcss';"]) assert.deepEqual(stylesheetViolations('panel.css', source), [], source);
   assert.deepEqual(stylesheetViolations('fonts.css', "@font-face { font-family: 'Inter Variable'; src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations') }"), []);
   for (const source of [
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter">',

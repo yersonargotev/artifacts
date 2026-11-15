@@ -1,0 +1,65 @@
+---
+import type { PanelIdentity } from '../../identity.ts';
+import { scopeOf, type NavLocation } from '../../presentation.ts';
+import { readerHref } from '../../urls.ts';
+import type { Theme } from '../../theme.ts';
+import Icon from '../Icon.astro';
+import ThemeToggle from './ThemeToggle.astro';
+interface Props { identity: PanelIdentity; authUrl: string; location: NavLocation; theme: Theme }
+const { identity, authUrl, location, theme } = Astro.props;
+const initials = identity.name.trim().split(/\s+/).slice(0, 2).map((part) => [...part][0]).join('').toUpperCase();
+const section = location.kind === 'projects' ? 'projects' : location.kind === 'read' ? 'read' : 'library';
+const current = (target: typeof section) => target !== section ? undefined : location.kind === 'library' || location.kind === 'projects' || location.kind === 'read' ? 'page' : 'true';
+const destinations = [
+  { target: 'library', href: '/', label: 'Biblioteca', icon: 'layout-grid' },
+  { target: 'projects', href: '/projects', label: 'Proyectos', icon: 'folder' },
+  { target: 'read', href: readerHref({ scope: scopeOf(location), status: 'all', q: '' }), label: 'Modo lectura', icon: 'book' },
+] as const;
+---
+<nav class="rail" aria-label="Principal">
+  <span class="rail-brand" aria-hidden="true"><Icon name="layers" size={18} /></span>
+  {destinations.map(({ target, href, label, icon }) => <a class="rail-link" href={href} aria-label={label} title={label} aria-current={current(target)}><Icon name={icon} size={18} /></a>)}
+  <span class="rail-spacer"></span>
+  <ThemeToggle theme={theme} />
+  <details class="rail-disclosure" id="connect-tools">
+    <summary class="rail-link" aria-label="Conectar herramientas" title="Conectar herramientas"><Icon name="plug-connected" size={18} /></summary>
+    <div class="rail-panel">
+      <h2>Conectar herramientas</h2>
+      <p>Agrega este servidor MCP en Claude Code o Codex e inicia sesión con tu cuenta.</p>
+      <code>{process.env.MCP_URL}</code>
+      <p>Usa <strong>artifacts_create</strong> para crear tu primer artefacto. Cada revisión conserva su contenido y sus archivos.</p>
+    </div>
+  </details>
+  <details class="rail-disclosure identity">
+    <summary class="rail-link" aria-label="Mi cuenta" title="Mi cuenta"><span class="account-avatar" aria-hidden="true">{initials}</span></summary>
+    <div class="rail-panel">
+      <h2>{identity.name}</h2>
+      <p class="session-indicator">Sesión activa</p>
+      <p>Este identificador es el mismo en el panel y en tus herramientas.</p>
+      <code data-testid="user-id">{identity.userId}</code>
+      <dl><dt>Conexión</dt><dd>Sesión activa</dd><dt>Permisos del panel</dt><dd>Identidad y artefactos propios</dd></dl>
+      <footer><form method="post" action="/auth/logout"><button class="secondary"><Icon name="logout" size={16} />Cerrar sesión del panel</button></form><a href={`${authUrl}/revoke-all`}>Cerrar todas las sesiones</a></footer>
+    </div>
+  </details>
+</nav>
+<script>
+  const panels = [...document.querySelectorAll<HTMLDetailsElement>('.rail-disclosure')];
+  const close = (panel: HTMLDetailsElement, focus: boolean) => { panel.open = false; if (focus) panel.querySelector('summary')?.focus(); };
+  for (const panel of panels) panel.addEventListener('toggle', () => { if (panel.open) for (const other of panels) if (other !== panel) other.open = false; });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const open = panels.find((panel) => panel.open);
+    if (open) close(open, open.contains(document.activeElement));
+  });
+  document.addEventListener('click', (event) => {
+    for (const panel of panels) if (panel.open && !panel.contains(event.target as Node)) close(panel, false);
+  });
+  document.querySelectorAll('[data-open-tools]').forEach((button) => button.addEventListener('click', (event) => {
+    const tools = document.querySelector('#connect-tools');
+    if (!(tools instanceof HTMLDetailsElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    tools.open = true;
+    tools.querySelector('summary')?.focus();
+  }));
+</script>
