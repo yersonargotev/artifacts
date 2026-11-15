@@ -1,6 +1,6 @@
 import { markdownPreviewSandbox, projectKey } from '@artifacts/artifacts/panel/model';
 import type { ArtifactDetail, ClientRef, ContentKind, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, LibrarySort, ScopeRequest, SortDirection } from '@artifacts/artifacts/panel/model';
-import { scopeRequestOf, type LibraryLink, type ListView } from './urls.ts';
+import { scopeRequestOf, type LibraryLink } from './urls.ts';
 
 export type NavLocation =
   | { readonly kind: 'library' }
@@ -43,8 +43,8 @@ export function scopeOf(location: NavLocation): ScopeRequest {
   return { kind: 'all' };
 }
 
-export function searchFor(page: LibraryPage, view?: ListView): LibraryLink {
-  return { scope: scopeRequestOf(page.scope), status: page.status, q: page.q, sort: page.sort, direction: page.direction, ...(view ? { view } : {}) };
+export function searchFor(page: LibraryPage, { view, group }: Pick<LibraryLink, 'view' | 'group'> = {}): LibraryLink {
+  return { scope: scopeRequestOf(page.scope), status: page.status, q: page.q, sort: page.sort, direction: page.direction, ...(view ? { view } : {}), ...(group ? { group } : {}) };
 }
 
 export const sortLabels: Readonly<Record<LibrarySort, Readonly<Record<SortDirection, string>>>> = {

@@ -136,7 +136,7 @@ async function sharedWithMe() {
     assert.equal(await sharedSection.getByRole('link', { name: title, exact: true }).getAttribute('href'), published.url);
     assert.equal(await sharedSection.getByText('Compartido por Test owner', { exact: true }).count(), 1);
     assert.equal(await sharedSection.locator('button,input,form,[role="menu"]').count(), 0);
-    assert.equal(await page.locator('.library-controls,.library-collection').count(), 0);
+    assert.equal(await page.locator('.library-bar,.library-collection').count(), 0);
     assert.equal(await page.getByRole('link', { name: 'Conectar herramientas', exact: true }).count(), 1);
     await shot('shared-section', 'shared-section');
     pass('S9-2', 'Verified guest sees the published title, owner name, and native publication link without owner controls');
@@ -377,7 +377,9 @@ try {
     const native = await context({ storageState: ownerState, javaScriptEnabled: false });
     const nativePage = await native.newPage(); active = nativePage;
     await nativePage.goto(instance.panel);
-    await nativePage.locator('.artifact-card').filter({ has: nativePage.getByRole('heading', { name: 'Sharing proof', exact: true }) }).getByRole('link', { name: 'Compartir', exact: true }).click();
+    const nativeCard = nativePage.locator('.artifact-card').filter({ has: nativePage.getByRole('heading', { name: 'Sharing proof', exact: true }) });
+    await nativeCard.locator('summary[aria-label="Menú de Sharing proof"]').click();
+    await nativeCard.getByRole('link', { name: 'Compartir', exact: true }).click();
     assert.equal(new URL(nativePage.url()).pathname, path);
     await nativePage.getByLabel('Correo electrónico', { exact: true }).fill('nope');
     let nativePost = nativePage.waitForResponse((response) => response.request().method() === 'POST');

@@ -293,7 +293,7 @@ try {
     const panelSignIn = page.getByRole('link', { name: 'Iniciar sesión', exact: true });
     if (await panelSignIn.count()) await panelSignIn.click();
     const consent = page.getByRole('button', { name: 'Permitir acceso', exact: true });
-    const projectFilterLink = page.locator('.project-filter-links a[aria-current="page"]');
+    const projectFilterLink = page.locator('.project-filter a[aria-current="page"]');
     await Promise.race([projectFilterLink.waitFor({ state: 'attached' }), consent.waitFor().then(() => consent.click())]);
     await projectFilterLink.waitFor({ state: 'attached' });
     assert.equal(await projectFilterLink.evaluate((link) => [link.children[1]?.textContent, link.querySelector('.project-count')?.textContent].join(' ')), `${projects[1]} 1`);

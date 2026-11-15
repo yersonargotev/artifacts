@@ -73,7 +73,7 @@ try {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
   assert.equal(await mobile.locator('header.top-bar').count(), 1);
-  assert.equal(await mobile.locator('main > header.library-header').count(), 1);
+  assert.equal(await mobile.locator('main > .library-bar').count(), 1);
   assert.equal(await mobile.locator('h1').count(), 1);
   assert.equal(await mobile.locator('.identity').count(), 1);
   assert.equal(await mobile.locator('.identity footer').count(), 1);

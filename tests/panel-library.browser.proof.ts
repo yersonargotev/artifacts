@@ -109,8 +109,10 @@ try {
   assert.equal(listed.items.length, 30);
   assert.deepEqual([listed.items.length, listed.items.filter((item) => item.publication).length, listed.items.filter((item) => item.publication && item.publication.revisionId !== item.headRevisionId).length, listed.items.filter((item) => item.project === null).length], [30, 3, 1, 10]);
   await page.goto(app.dashboard);
-  assert.deepEqual(await page.locator('.library-stats dd').allTextContents(), ['30', '3', '1', '10']);
-  assert.equal(await page.locator('.library-stats').getByRole('link', { name: 'Sin proyecto', exact: true }).getAttribute('href'), '/?unfiled=1');
+  assert.equal(await page.locator('.library-stats').count(), 0, 'the stats cards folded into the filters and the status bar');
+  assert.deepEqual(await page.locator('.status-totals > span').allTextContents(), ['30 artefactos', '3 publicados', '1 con cambios pendientes']);
+  const projectChips = page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
+  assert.equal(await projectChips.getByRole('link', { name: 'Sin proyecto (10)', exact: true }).getAttribute('href'), '/?unfiled=1');
   const tabs = page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true });
   for (const label of ['Todos (30)', 'Publicados (2)', 'Sin publicar (27)', 'Cambios pendientes (1)']) assert.equal(await tabs.getByRole('link', { name: label, exact: true }).count(), 1);
   assert.equal(await page.locator('.artifact-card').count(), 25);
@@ -125,7 +127,6 @@ try {
     await capture(`tabs-${state}-1440`);
   }
   await page.goto(`${app.dashboard}/?q=Documento&status=pending&cursor=0:exhausted`);
-  await page.locator('.project-filter > summary').press('Enter');
   await page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true }).getByRole('link', { name: 'Entregas', exact: false }).press('Enter');
   await page.waitForURL((url) => url.searchParams.get('project') === 'Entregas');
   assert.deepEqual([...new URL(page.url()).searchParams], [['project', 'Entregas'], ['q', 'Documento'], ['status', 'pending']]);
@@ -201,7 +202,6 @@ try {
   const nativeContext = await browser.newContext({ storageState, javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const native = await nativeContext.newPage();
   await native.goto(`${app.dashboard}/?q=Documento&status=pending`);
-  await native.locator('.project-filter > summary').press('Enter');
   await native.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true }).getByRole('link', { name: 'Entregas', exact: false }).press('Enter');
   await native.waitForURL((url) => url.searchParams.get('project') === 'Entregas');
   assert.deepEqual([...new URL(native.url()).searchParams], [['project', 'Entregas'], ['q', 'Documento'], ['status', 'pending']]);
@@ -222,6 +222,16 @@ try {
   await native.locator('.artifact-card h2 a').first().press('Enter');
   await native.locator('.artifact-detail').waitFor();
   assert.equal(await native.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await native.goto(app.dashboard);
+  const banner = native.getByRole('region', { name: 'Cambios sin publicar', exact: true });
+  assert.equal(await banner.locator('p').textContent(), 'Documento 01 La revisión 2 es más nueva que la publicada (rev. 1). Los lectores ven la revisión anterior.');
+  assert.equal(await banner.getByRole('link', { name: 'Comparar', exact: true }).getAttribute('href'), `/artifacts/${seeded[1]!.artifactId}?${new URLSearchParams({ revisionId: seeded[1]!.headRevisionId, compareTo: seeded[1]!.publication!.revisionId, tab: 'compare' })}`);
+  assert.equal(await banner.getByRole('link', { name: /^Ver los/ }).count(), 0, 'one pending artifact needs no link to the pending filter');
+  await banner.getByRole('button', { name: 'Publicar rev. 2', exact: true }).press('Enter');
+  await native.getByRole('heading', { level: 1, name: 'Revisión publicada', exact: true }).waitFor();
+  assert.equal((await mcp<ArtifactRead>('artifacts_read', { artifactId: seeded[1]!.artifactId })).publication?.revisionId, seeded[1]!.headRevisionId);
+  await native.goto(app.dashboard);
+  assert.equal(await native.getByRole('region', { name: 'Cambios sin publicar', exact: true }).count(), 0, 'the banner leaves once nothing is pending');
   await nativeContext.close();
   for (const item of seeded.filter((item) => item.project === null)) await cli('move', item.artifactId, '--project', 'Entregas');
   await page.goto(`${app.dashboard}/?unfiled=1`);
@@ -233,7 +243,7 @@ try {
   assert.deepEqual(requests, [], 'Library browsing sends only GET requests');
   await context.close();
   await video.saveAs(join(evidence, 'review.webm'));
-  await writeFile(join(evidence, 'result.json'), JSON.stringify({ status: 'passed', browser: browser.version(), stats: [30, 3, 1, 10], statusCounts: [30, 2, 27, 1], checks: ['literal source CLI stats', 'status partition chips', 'scoped project filter preserves search and status and clears cursor', 'empty owner connection', 'no results and scoped clear', 'vanished project', 'empty unfiled scope', 'exhausted continuation', 'Space and Enter menu, arrow focus, final destructive item, Escape return', 'head ZIP equals MCP export', '256-character title and 8192-character description clamp', '25 plus 5 cards in recent order', 'native no-JS GET links, search and disclosure', '1440 and 390 overflow', 'no console or page errors', 'no non-GET browsing requests'], authFavicon404, errors, requests }, null, 2));
+  await writeFile(join(evidence, 'result.json'), JSON.stringify({ status: 'passed', browser: browser.version(), stats: [30, 3, 1, 10], statusCounts: [30, 2, 27, 1], checks: ['literal source CLI totals in the status bar and the Sin proyecto chip', 'status partition chips', 'scoped project filter preserves search and status and clears cursor', 'empty owner connection', 'no results and scoped clear', 'vanished project', 'empty unfiled scope', 'exhausted continuation', 'Space and Enter menu, arrow focus, final destructive item, Escape return', 'head ZIP equals MCP export', '256-character title and 8192-character description clamp', '25 plus 5 cards in recent order', 'native no-JS GET links, search and project chips', 'pending banner names both revisions, links the comparison, and publishes without JavaScript', '1440 and 390 overflow', 'no console or page errors', 'no non-GET browsing requests'], authFavicon404, errors, requests }, null, 2));
   console.log(JSON.stringify({ status: 'passed', evidence }));
 } catch (error) {
   if (page && !page.isClosed()) await page.screenshot({ path: join(evidence, 'failure.png'), fullPage: true }).catch(() => {});

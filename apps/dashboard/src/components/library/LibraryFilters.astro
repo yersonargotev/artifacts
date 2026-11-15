@@ -1,0 +1,28 @@
+---
+import { defaultDirections, librarySorts, type LibraryPage, type SortDirection, type Workspace } from '@artifacts/artifacts/panel/model';
+import { sortLabels } from '../../presentation.ts';
+import { libraryHref, type LibraryLink, type ListView } from '../../urls.ts';
+import StatusTabs from './StatusTabs.astro';
+import ProjectFilter from './ProjectFilter.astro';
+import ViewToggle from './ViewToggle.astro';
+import ChoiceMenu from './ChoiceMenu.astro';
+import Icon from '../Icon.astro';
+interface Props { workspace: Workspace; page: LibraryPage; query: LibraryLink; view: ListView }
+const { workspace, page, query, view } = Astro.props;
+const sortNames = { updated: 'Actualizado', title: 'Título', state: 'Estado', revision: 'Revisión' } as const;
+const opposite = (direction: SortDirection): SortDirection => direction === 'asc' ? 'desc' : 'asc';
+const sorts = librarySorts.flatMap((sort) => [defaultDirections[sort], opposite(defaultDirections[sort])].map((direction) => ({ label: sortLabels[sort][direction], href: libraryHref(query, { sort, direction }), current: page.sort === sort && page.direction === direction })));
+// Rows group by project only in the table of the whole library; a project or Sin proyecto page is already one group.
+const groupable = view === 'table' && page.scope.kind === 'all';
+const groups = [{ label: 'Por proyecto', href: libraryHref(query, { group: undefined }), current: !query.group }, { label: 'Sin agrupar', href: libraryHref(query, { group: 'none' }), current: query.group === 'none' }];
+---
+<div class="library-bar">
+  <StatusTabs page={page} query={query} />
+  <span class="library-bar-divider" aria-hidden="true"></span>
+  <ProjectFilter workspace={workspace} query={query} />
+  <div class="library-bar-end">
+    {groupable && <ChoiceMenu label="Agrupar" links={groups}>Agrupar: {query.group ? 'Ninguno' : 'Proyecto'}</ChoiceMenu>}
+    <ChoiceMenu label="Ordenar" links={sorts}>Orden: {sortNames[page.sort]}<Icon name={page.direction === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} /><span class="library-order sr-only">{sortLabels[page.sort][page.direction]}</span></ChoiceMenu>
+    <ViewToggle query={query} view={view} />
+  </div>
+</div>

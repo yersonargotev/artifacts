@@ -1,10 +1,9 @@
 ---
 import type { LibraryPage } from '@artifacts/artifacts/panel/model';
-import { searchFor, statusTabs } from '../../presentation.ts';
-import { libraryHref, readerHref, type ListView } from '../../urls.ts';
-interface Props { page: LibraryPage; namedView?: ListView; reader?: boolean }
-const { page, namedView, reader = false } = Astro.props;
-const query = searchFor(page, namedView);
+import { statusTabs } from '../../presentation.ts';
+import { libraryHref, readerHref, type LibraryLink } from '../../urls.ts';
+interface Props { page: LibraryPage; query: LibraryLink; reader?: boolean }
+const { page, query, reader = false } = Astro.props;
 const href = reader ? readerHref : libraryHref;
 ---
 <nav class="library-filters" aria-label="Filtrar por publicación">

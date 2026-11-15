@@ -1,0 +1,18 @@
+---
+import type { ArtifactCard } from '@artifacts/artifacts/panel/model';
+import { detailHref } from '../../urls.ts';
+import PublicationForm from '../PublicationForm.astro';
+import Icon from '../Icon.astro';
+interface Props { card: ArtifactCard; count: number; pendingHref: string }
+const { card, count, pendingHref } = Astro.props;
+const { publication, head } = card;
+---
+{publication.state === 'pending' && <section class="pending-banner" aria-label="Cambios sin publicar">
+  <Icon name="alert-triangle" size={18} />
+  <p><a href={detailHref({ artifactId: card.artifactId, tab: 'preview' })}>{card.title}</a> <span>La revisión {head.sequence} es más nueva que la publicada (rev. {publication.revision.sequence}). Los lectores ven la revisión anterior.</span></p>
+  <div class="pending-banner-actions">
+    {count > 1 && <a class="pending-banner-more" href={pendingHref}>Ver los {count} con cambios</a>}
+    <a class="button secondary" href={detailHref({ artifactId: card.artifactId, tab: 'compare', revisionId: head.revisionId, compareTo: publication.revision.revisionId })}>Comparar</a>
+    <PublicationForm command={{ artifactId: card.artifactId, revisionId: head.revisionId, expectedPublicationVersion: publication.version, requestId: crypto.randomUUID() }} label={`Publicar rev. ${head.sequence}`} />
+  </div>
+</section>}

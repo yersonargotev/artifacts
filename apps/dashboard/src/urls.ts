@@ -6,14 +6,19 @@ import type { DetailQuery, LibraryQuery, LibraryScope, ScopeRequest } from '@art
 export const listViews = ['table', 'cards'] as const;
 export type ListView = typeof listViews[number];
 export const viewCookie = 'panel_view';
-/** A library query plus the view the URL names. The view stays out of the panel query because only the dashboard renders it. */
-export type LibraryLink = LibraryQuery & { readonly view?: ListView };
+/** A library query plus the view and grouping the URL names. Both stay out of the panel query because only the dashboard renders them. */
+export type LibraryLink = LibraryQuery & { readonly view?: ListView; readonly group?: 'none' };
 const isView = (value: string | null | undefined): value is ListView => listViews.some((view) => view === value);
 
 /** The URL names the view to share it; otherwise the cookie that the toggle writes decides, and the table is the default. */
 export function readListView(url: URL, cookie: string | undefined): { view: ListView; named: ListView | undefined } {
   const named = url.searchParams.get('view');
   return isView(named) ? { view: named, named } : { view: isView(cookie) ? cookie : 'table', named: undefined };
+}
+
+/** The table groups its rows by project unless the URL turns grouping off. */
+export function readListGroup(url: URL): 'none' | undefined {
+  return url.searchParams.get('group') === 'none' ? 'none' : undefined;
 }
 
 export function readLibraryUrl(url: URL): LibraryQuery {
@@ -39,7 +44,7 @@ function listParams({ scope, status, q, sort = 'updated', direction = defaultDir
 
 export function libraryHref(query: LibraryLink, patch: Partial<LibraryLink> = {}): string {
   const state = { ...query, ...patch };
-  const params = new URLSearchParams({ ...listParams(state), ...(state.view ? { view: state.view } : {}), ...(patch.cursor ? { cursor: patch.cursor } : {}) });
+  const params = new URLSearchParams({ ...listParams(state), ...(state.view ? { view: state.view } : {}), ...(state.group ? { group: state.group } : {}), ...(patch.cursor ? { cursor: patch.cursor } : {}) });
   return params.size ? `/?${params}` : '/';
 }
 

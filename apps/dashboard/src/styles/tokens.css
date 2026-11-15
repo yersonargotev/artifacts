@@ -30,6 +30,8 @@
   --dur-3: 260ms;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
   --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+
+  --row: 38px;
 }
 
 [data-theme="dark"] {

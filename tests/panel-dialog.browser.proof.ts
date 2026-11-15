@@ -283,7 +283,10 @@ try {
   for (const entry of ['card', 'header', 'facts', 'selection']) {
     await nojs.goto(entry === 'card' || entry === 'selection' ? `${app.dashboard}/?project=Gamma` : `${app.dashboard}/artifacts/${single.artifactId}`);
     if (entry === 'selection') { await checkbox(nojs, 'Plan de entrega').check(); await nojs.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter'); }
-    else await nojs.getByRole('link', { name: entry === 'facts' ? 'Mover' : 'Mover a proyecto', exact: true }).press('Enter');
+    else {
+      if (entry === 'card') await nojs.locator('summary[aria-label="Menú de Plan de entrega"]').press('Enter');
+      await nojs.getByRole('link', { name: entry === 'facts' ? 'Mover' : 'Mover a proyecto', exact: true }).press('Enter');
+    }
     await nojs.getByRole('heading', { name: 'Mover a proyecto', exact: true }).waitFor();
     assert.equal(new URL(nojs.url()).pathname, '/move');
     await nojs.getByLabel('Proyecto', { exact: true }).fill('Gamma');

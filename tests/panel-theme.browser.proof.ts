@@ -134,6 +134,21 @@ function shellGeometry() {
   };
 }
 
+/** Runs in the page. Reports a library row's height, whether its actions show, which inline actions it renders, and its side indicator. */
+function rowState(row: Element) {
+  const actions = row.querySelector<HTMLElement>('.artifact-actions')!;
+  const first = row.firstElementChild!;
+  const indicator = getComputedStyle(first, '::before');
+  return {
+    height: Math.round(row.getBoundingClientRect().height),
+    actions: getComputedStyle(actions).opacity,
+    links: [...actions.querySelectorAll<HTMLElement>('.row-action')].filter((link) => link.checkVisibility()).map((link) => link.textContent!.trim()),
+    menu: Boolean(actions.querySelector('.artifact-title-trigger')?.checkVisibility()),
+    indicator: indicator.content === 'none' ? 'auto' : indicator.width,
+    shadow: [row, ...row.children].map((cell) => getComputedStyle(cell).boxShadow).find((value) => value !== 'none') ?? 'none',
+  };
+}
+
 await control(['launch', '--allow-guests', '--run', run]);
 const evidence = resolve(process.env.PANEL_THEME_EVIDENCE ?? join(run, 'panel-theme'));
 await mkdir(evidence, { recursive: true });
@@ -145,6 +160,7 @@ const errors: string[] = [];
 const checks: string[] = [];
 const measured: Measured[] = [];
 const shells: (ReturnType<typeof shellGeometry> & { theme: Theme; width: number; scrolled?: boolean })[] = [];
+const rowStates: (ReturnType<typeof rowState> & { theme: Theme; width: number; state: string })[] = [];
 let active: Page | undefined;
 
 async function call(name: string, input: unknown, token = credentials.accessToken): Promise<Record<string, any>> {
@@ -257,7 +273,7 @@ try {
   const overview = encodeURIComponent(ids['Alpha overview']!);
   const delivery = encodeURIComponent(ids['Alpha delivery']!);
   const pages = [
-    ['library-table', '/?view=table'], ['library-cards', '/?view=cards'], ['project-table', '/?project=Alpha&view=table'], ['project-cards', '/?project=Alpha&view=cards'],
+    ['library-table', '/?view=table'], ['library-ungrouped', '/?view=table&group=none'], ['library-pending', '/?view=table&status=pending'], ['library-cards', '/?view=cards'], ['project-table', '/?project=Alpha&view=table'], ['project-cards', '/?project=Alpha&view=cards'],
     ['unfiled', '/?unfiled=1'], ['no-match', '/?q=sin-coincidencias'], ['read', '/read'], ['read-pending', `/read?project=Alpha&artifact=${overview}`],
     ['detail-preview', `/artifacts/${overview}`], ['detail-files', `/artifacts/${overview}?tab=files`], ['detail-compare', `/artifacts/${overview}?tab=compare`], ['detail-information', `/artifacts/${overview}?tab=information`],
     ['detail-links', `/artifacts/${delivery}`], ['projects', '/projects'], ['move', `/move?artifactId=${overview}`], ['delete', `/artifacts/${overview}/delete`], ['share', `/artifacts/${overview}/share`],
@@ -329,17 +345,52 @@ try {
       for (const item of await menu.locator('[data-slot=dropdown-menu-item]').all()) { await item.hover(); await measure(page, theme, 'library-menu', 'hover', item); }
       await page.keyboard.press('Escape');
 
-      await page.goto(`${instance.panel}/?view=cards`);
+      await page.goto(`${instance.panel}/?view=table`);
       await settle(page);
-      await page.locator('.project-filter > summary').click();
-      await page.locator('.project-filter-links').waitFor();
-      await measure(page, theme, 'project-filter', 'static');
-      for (const link of await page.locator('.project-filter-links a').all()) { await link.hover(); await measure(page, theme, 'project-filter', 'hover', link); }
+      for (const link of await page.locator('.library-bar > nav a, .library-bar .view-toggle a').all()) { await link.hover(); await measure(page, theme, 'library-filters', 'hover', link); await link.focus(); await measure(page, theme, 'library-filters', 'focus', link); }
+      for (const name of ['Agrupar', 'Ordenar']) {
+        const menu = page.locator('details.choice-menu').filter({ has: page.locator(`nav[aria-label="${name}"]`) });
+        await menu.locator('summary').click();
+        const list = menu.getByRole('navigation', { name, exact: true });
+        await list.waitFor();
+        const box = (await list.boundingBox())!;
+        assert(box.x >= 0 && box.x + box.width <= width, `${name} opens inside the ${width}px viewport: ${JSON.stringify(box)}`);
+        await measure(page, theme, `${name.toLowerCase()}-menu`, 'static', menu);
+        for (const link of await list.getByRole('link').all()) { await link.hover(); await measure(page, theme, `${name.toLowerCase()}-menu`, 'hover', link); }
+        await page.keyboard.press('Escape');
+        await list.waitFor({ state: 'hidden' });
+      }
+      const banner = page.getByRole('region', { name: 'Cambios sin publicar', exact: true });
+      await measure(page, theme, 'pending-banner', 'static', banner);
+      for (const control of await banner.locator('a, button').all()) { await control.hover(); await measure(page, theme, 'pending-banner', 'hover', control); await control.focus(); await measure(page, theme, 'pending-banner', 'focus', control); }
+      await measure(page, theme, 'group-header', 'static', page.locator('.artifact-table-group').first());
+      const rows = page.locator('.artifact-table tbody tr:not(.artifact-table-group)');
+      const row = rows.nth(1);
+      rowStates.push({ theme, width, state: 'rest', ...await row.evaluate(rowState) });
+      await row.hover();
+      await page.waitForTimeout(300);
+      rowStates.push({ theme, width, state: 'hover', ...await row.evaluate(rowState) });
+      await measure(page, theme, 'row-actions', 'hover', row);
+      if (width === 1440) for (const action of await row.locator('.row-action').all()) { await action.hover(); await measure(page, theme, 'row-actions', 'hover', action); }
+      await page.mouse.move(0, 0);
+      await rows.nth(2).locator('.artifact-table-name > a').focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(300);
+      rowStates.push({ theme, width, state: 'focus', ...await rows.nth(2).evaluate(rowState) });
+      await measure(page, theme, 'row-actions', 'focus', rows.nth(2));
+      await page.keyboard.press('Tab');
+      if (width === 1440) await measure(page, theme, 'row-actions', 'focus', rows.nth(2).getByRole('link', { name: 'Leer', exact: true }));
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
       await page.goto(`${instance.panel}/?project=Alpha&view=table`);
       await settle(page);
       for (const title of ['Alpha overview', 'Alpha delivery']) await page.getByRole('checkbox', { name: `Seleccionar ${title}`, exact: true }).check();
       await page.locator('[data-selection-count]').getByText('2 seleccionados', { exact: true }).waitFor();
+      await page.mouse.move(0, 0);
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      await page.waitForTimeout(300);
+      rowStates.push({ theme, width, state: 'selected', ...await page.locator('.artifact-table tbody tr').filter({ has: page.getByRole('checkbox', { name: 'Seleccionar Alpha delivery', exact: true }) }).evaluate(rowState) });
       await measure(page, theme, 'project-selection', 'static');
       if (width === 1440) await hoverStates(page, theme, 'project-selection');
       await page.goto(`${instance.panel}/?project=Alpha&view=cards`);
@@ -357,7 +408,38 @@ try {
       for (const option of await page.getByRole('option').all()) { await option.hover(); await measure(page, theme, 'move-dialog', 'hover', option); }
       await page.close();
     }
+    const plainTheme = await context(theme, { storageState: owner, javaScriptEnabled: false });
+    for (const width of [1440, 390]) {
+      const page = active = await plainTheme.newPage();
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${instance.panel}/?view=table`);
+      const fallback = page.locator('summary[aria-label="Menú de Unfiled notes"]');
+      await fallback.click();
+      const list = page.getByRole('navigation', { name: 'Acciones de Unfiled notes', exact: true });
+      await list.waitFor();
+      assert.deepEqual(await list.getByRole('link').allTextContents(), ['Ver artefacto', 'Compartir', 'Descargar revisión más reciente', 'Mover a proyecto', 'Modo lectura', 'Eliminar artefacto'], 'without JavaScript the row menu falls back to the same links');
+      const box = (await list.boundingBox())!;
+      assert(box.x >= 0 && box.x + box.width <= width, `the fallback menu opens inside the ${width}px viewport`);
+      assert.equal(await list.getByRole('link', { name: 'Eliminar artefacto', exact: true }).evaluate((link) => { const probe = document.createElement('i'); probe.style.color = 'var(--danger)'; document.body.append(probe); const danger = getComputedStyle(probe).color; probe.remove(); return getComputedStyle(link).color === danger; }), true, 'the fallback menu marks Eliminar artefacto with --danger');
+      await measure(page, theme, 'row-menu-fallback', 'static', list);
+      if (width === 1440) for (const link of await list.getByRole('link').all()) { await link.hover(); await measure(page, theme, 'row-menu-fallback', 'hover', link); }
+      await page.close();
+    }
   }
+  for (const state of rowStates) {
+    const label = `${state.theme} ${state.width} ${state.state}`;
+    if (state.width === 1440) assert.equal(state.height, 38, `${label}: a row is 38px tall`);
+    const shown = state.width !== 1440 || state.state !== 'rest';
+    assert.equal(state.actions, shown ? '1' : '0', `${label}: row actions are ${shown ? 'shown' : 'hidden until hover, focus, or selection'}`);
+    if (state.width === 1440) assert.deepEqual(state.links, ['Leer', 'Compartir'], `${label}: Leer and Compartir sit beside the menu`);
+    else assert.deepEqual(state.links, [], `${label}: a phone row keeps only the menu button, which lists Leer and Compartir`);
+    assert.equal(state.menu, true, `${label}: the row keeps its menu button`);
+    const indicated = state.state === 'focus' || state.state === 'selected';
+    assert.equal(state.indicator, indicated ? '3px' : 'auto', `${label}: ${indicated ? 'a 3px side indicator' : 'no indicator'}`);
+    assert.equal(state.shadow, 'none', `${label}: no glow`);
+  }
+  await writeFile(join(evidence, 'rows.json'), JSON.stringify(rowStates, null, 1));
+  checks.push('a library row is 38px; its Leer, Compartir, and menu actions appear on hover, keyboard focus, and selection at 1440 and stay visible at 390; focus and selection add the 3px indicator without a glow; without JavaScript the menu falls back to a native disclosure with the same links');
   for (const shell of shells) {
     const label = `${shell.theme} ${shell.width}${shell.scrolled ? ' scrolled' : ''}`;
     const { rail, bar, status, tokens, current, viewport } = shell;

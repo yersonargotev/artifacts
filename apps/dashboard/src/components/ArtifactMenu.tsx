@@ -12,7 +12,7 @@ export default function ArtifactMenu({ title, revisionLabel, actions, deleteUrl 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger id={id} render={<Button variant="ghost" size="icon" className="artifact-title-trigger" />} aria-label={`Menú de ${title}`}>
-        <Icon name="dots-vertical" />
+        <Icon name="dots" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="artifact-menu">
         <DropdownMenuGroup>

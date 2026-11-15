@@ -3,8 +3,8 @@ import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
 import { scopeHref } from '../../urls.ts';
 import ArtifactActions from './ArtifactActions.astro';
-interface Props { card: Card; now: Date; selectable: boolean }
-const { card, now, selectable } = Astro.props;
+interface Props { card: Card; reader: string; now: Date; selectable: boolean }
+const { card, reader, now, selectable } = Astro.props;
 const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
 const status = publicationStates[card.publication.state];
 ---
@@ -12,7 +12,7 @@ const status = publicationStates[card.publication.state];
   <div class="artifact-card-heading">
     {selectable && <label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} data-move-item={JSON.stringify({ artifactId: card.artifactId, title: card.title, project: card.project })} aria-label={`Seleccionar ${card.title}`} /></label>}
     <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>
-    <ArtifactActions card={card} />
+    <ArtifactActions card={card} reader={reader} />
   </div>
   <p class="artifact-description">{card.description}</p>
   <div class="artifact-card-labels">
