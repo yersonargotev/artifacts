@@ -20,6 +20,7 @@
   --text-lg: var(--text-lg);
   --text-xl: var(--text-xl);
   --text-2xl: var(--text-2xl);
+  --ease-*: initial;
   --radius-*: initial;
   --radius-sm: var(--r-sm);
   --radius-md: var(--r-md);
@@ -53,7 +54,11 @@ button, .button {
   text-decoration: none;
   cursor: pointer;
 }
+a, button, .button, summary, select, [data-slot=input], [data-slot=dropdown-menu-item], .combobox-item, .artifact-table td {
+  transition: color var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out), filter var(--dur-1) var(--ease-out);
+}
 button:hover, .button:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+button:active, .button:active { transform: scale(.97); }
 .secondary { border-color: var(--border-strong); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--ring-active); outline-offset: 3px; }
 h1, h2, h3, h4 { color: var(--text); line-height: 1.25; }
@@ -363,7 +368,7 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
   .logged-out h1 { font-size: var(--text-2xl); }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
 .destructive-menu-item, .destructive-menu-item:focus { color: var(--danger); }

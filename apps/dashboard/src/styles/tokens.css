@@ -51,6 +51,12 @@
   --r-md: 8px;
   --r-lg: 12px;
   --r-full: 999px;
+
+  --dur-1: 90ms;
+  --dur-2: 160ms;
+  --dur-3: 260ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
 }
 
 [data-tone="peach"] { --tone: var(--peach); }
