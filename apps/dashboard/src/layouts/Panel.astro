@@ -3,6 +3,7 @@ import '../styles/fonts.css';
 import '../styles/tokens.css';
 import '../styles/panel.css';
 import '../styles/effects.css';
+import '../styles/views.css';
 import type { Workspace } from '@artifacts/artifacts/panel/model';
 import { readerHref, scopeHref, type LibraryLink } from '../urls.ts';
 import ShareDialog from '../components/share/ShareDialog.tsx';
@@ -52,5 +53,8 @@ const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).
     {identity && <><Palette data={JSON.stringify(palette)} client:load /><dialog class="publish-dialog" aria-labelledby="publish-dialog-title" data-publish-dialog></dialog></>}
     {share && <ShareDialog client:load />}
     {move && workspace && <MoveDialog projects={JSON.stringify(workspace.projects.map(({ name }) => name))} client:load />}
+    <script>
+      import '../components/shell/views.ts';
+    </script>
   </body>
 </html>

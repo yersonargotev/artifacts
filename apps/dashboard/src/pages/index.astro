@@ -4,7 +4,6 @@ import { artifactErrorResponse, panelActor } from '../publication.ts';
 import { libraryHref, pageOffset, readLibraryUrl, readListGroup, readListOffset, readListView, readerHref, viewCookie } from '../urls.ts';
 import { locationOf, projectTone, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
-import '../styles/views.css';
 import LibraryHeading from '../components/library/LibraryHeading.astro';
 import LibraryFilters from '../components/library/LibraryFilters.astro';
 import PendingBanner from '../components/library/PendingBanner.astro';
@@ -56,5 +55,4 @@ const paletteArtifacts = snapshot && link ? snapshot.page.cards.map((card) => ({
 </Panel>
 <script>
   import '../components/library/keys.ts';
-  import '../components/shell/views.ts';
 </script>

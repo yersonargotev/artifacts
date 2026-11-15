@@ -219,7 +219,7 @@ test('view transitions opt in only without a reduced-motion preference', async (
   const sheets = await Promise.all((await readdir(styleRoot)).filter((name) => name.endsWith('.css')).map(async (name) => [name, await readFile(resolve(styleRoot, name), 'utf8')] as const));
   const optIns = sheets.flatMap(([name, source]) => [...source.matchAll(/@view-transition/g)].map(() => name));
   const guarded = sheets.flatMap(([name, source]) => [...source.matchAll(/@media \(prefers-reduced-motion: no-preference\) \{\s*@view-transition \{[^}]*\}\s*\}/g)].map(() => name));
-  assert.deepEqual(optIns, ['views.css'], 'only views.css opts in, and the library and read mode import it');
+  assert.deepEqual(optIns, ['views.css'], 'only views.css opts in');
   assert.deepEqual(guarded, optIns, 'the opt-in sits inside prefers-reduced-motion: no-preference, so a reduced-motion preference turns it off');
 });
 
