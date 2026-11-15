@@ -38,7 +38,7 @@ const sorts = { title: sortable('title'), state: sortable('state'), revision: so
       </th></tr>}
       {group.cards.map((card) => {
         const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
-        return <tr>
+        return <tr data-library-item data-reader={reader(card.artifactId)}>
           {selectable && <td class="artifact-table-check"><label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} data-move-item={JSON.stringify({ artifactId: card.artifactId, title: card.title, project: card.project })} aria-label={`Seleccionar ${card.title}`} /></label></td>}
           <td class="artifact-table-title"><div class="artifact-table-name">
             <a href={detailUrl} title={card.title}>{card.title}</a>

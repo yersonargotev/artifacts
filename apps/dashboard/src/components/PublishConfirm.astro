@@ -1,0 +1,16 @@
+---
+import type { ArtifactCard } from '@artifacts/artifacts/panel/model';
+import PublicationForm from './PublicationForm.astro';
+interface Props { card: ArtifactCard; returnPath: string }
+const { card: { artifactId, title, head, publication }, returnPath } = Astro.props;
+---
+{publication.state === 'pending' && <template data-publish-confirm>
+  <div class="publish-dialog-body">
+    <h2 id="publish-dialog-title">Publicar rev. {head.sequence}</h2>
+    <p><strong>{title}</strong>. Quien abra su publicación verá la revisión {head.sequence}. Hoy ve la revisión {publication.revision.sequence}.</p>
+    <div class="publish-dialog-actions">
+      <form method="dialog"><button class="secondary">Cancelar</button></form>
+      <PublicationForm command={{ artifactId, revisionId: head.revisionId, expectedPublicationVersion: publication.version, requestId: crypto.randomUUID() }} label={`Publicar rev. ${head.sequence}`} returnPath={returnPath} />
+    </div>
+  </div>
+</template>}

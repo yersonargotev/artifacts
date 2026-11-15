@@ -3,6 +3,7 @@ import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
 import { moveHref, shareHref, exportHref } from '../../urls.ts';
 import ArtifactMenu from '../ArtifactMenu.tsx';
 import ChoiceMenu from './ChoiceMenu.astro';
+import PublishConfirm from '../PublishConfirm.astro';
 import Icon from '../Icon.astro';
 interface Props { card: Card; reader: string; row?: boolean }
 const { card, reader, row = false } = Astro.props;
@@ -21,5 +22,6 @@ const deleteUrl = `${detailUrl}/delete`;
 <div class="artifact-actions">
   {row && <><a class="row-action" href={reader}>Leer</a><a class="row-action" href={shareHref(card.artifactId)} data-share-trigger>Compartir</a></>}
   <ArtifactMenu title={card.title} revisionLabel={`Revisión ${card.head.sequence}`} actions={JSON.stringify(links)} deleteUrl={deleteUrl} client:load />
+  <PublishConfirm card={card} returnPath={`${Astro.url.pathname}${Astro.url.search}`} />
   <noscript><ChoiceMenu class="menu-fallback" label={`Acciones de ${card.title}`} summaryLabel={`Menú de ${card.title}`} links={[...links, { label: 'Eliminar artefacto', href: deleteUrl, destructive: true }]}><Icon name="dots" size={18} /></ChoiceMenu></noscript>
 </div>

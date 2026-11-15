@@ -1,12 +1,17 @@
+import { bindKeys, revealHint, shortcutAllowed } from '../shell/keys.ts';
+import { confirmPublish } from '../shell/publish.ts';
+
 const reader = document.querySelector<HTMLElement>('[data-reader]');
 if (reader?.querySelector('[data-reader-pane]')) {
   const items = [...reader.querySelectorAll<HTMLAnchorElement>('[data-reader-item]')];
   const pane = () => reader.querySelector<HTMLElement>('[data-reader-pane]')!;
   const current = () => items.findIndex((item) => item.hasAttribute('aria-current'));
   const byHref = (href: string) => items.find((item) => item.getAttribute('href') === href);
+  const publishable = () => pane().querySelector<HTMLTemplateElement>('template[data-publish-confirm]');
   const enhance = (root: HTMLElement) => {
     const fullscreen = root.querySelector<HTMLButtonElement>('[data-reader-fullscreen]');
     if (fullscreen) fullscreen.hidden = !document.fullscreenEnabled;
+    revealHint('publish', Boolean(root.querySelector('template[data-publish-confirm]')));
   };
   enhance(pane());
 
@@ -59,9 +64,8 @@ if (reader?.querySelector('[data-reader-pane]')) {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !items.length) return;
+    if (!items.length || !shortcutAllowed(event)) return;
     const target = event.target as HTMLElement;
-    if (target.isContentEditable || target.closest('input, textarea, select')) return;
     const inList = items.includes(target as HTMLAnchorElement);
     const key = event.key === 'j' ? 1 : event.key === 'k' ? -1 : 0;
     const arrow = inList && event.key === 'ArrowDown' ? 1 : inList && event.key === 'ArrowUp' ? -1 : 0;
@@ -74,6 +78,16 @@ if (reader?.querySelector('[data-reader-pane]')) {
     select(item);
     if (inList) item.focus();
   });
+
+  const back = document.querySelector<HTMLAnchorElement>('a.top-bar-back');
+  bindKeys({
+    f: () => { const button = pane().querySelector<HTMLButtonElement>('[data-reader-fullscreen]'); if (!button || button.hidden) return false; button.click(); },
+    p: () => confirmPublish(publishable()),
+    Escape: () => { if (!back) return false; location.assign(back.href); },
+  });
+  revealHint('move', items.length > 0);
+  revealHint('fullscreen', document.fullscreenEnabled);
+  revealHint('back', Boolean(back));
 
   addEventListener('popstate', () => {
     const params = new URL(location.href).searchParams;

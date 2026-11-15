@@ -57,7 +57,7 @@ function matchesSubject(selector: Selector, subject: Subject) {
   return target.some((component) => {
     if (subject === 'cover') return component.type === 'class' && component.name === 'project-cover';
     if (subject === 'document') return component.type === 'class' && component.name === 'reader-document';
-    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'choice-list', 'rail-panel', 'dialog-content', 'combobox-content'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
+    if (subject === 'overlay') return (component.type === 'class' && ['artifact-menu', 'choice-list', 'rail-panel', 'dialog-content', 'combobox-content', 'palette', 'publish-dialog'].includes(component.name)) || (component.type === 'attribute' && component.name === 'data-slot' && component.operation?.operator === 'equal' && component.operation.value === 'dropdown-menu-content');
     return (component.type === 'class' && component.name === 'rail-brand') || (component.type === 'attribute' && !component.namespace && component.name === 'data-variant' && component.operation?.operator === 'equal' && component.operation.value === 'primary');
   });
 }

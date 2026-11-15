@@ -8,7 +8,7 @@ const { card, reader, now, selectable } = Astro.props;
 const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
 const status = publicationStates[card.publication.state];
 ---
-<li class="artifact-card">
+<li class="artifact-card" data-library-item data-reader={reader}>
   <div class="artifact-card-heading">
     {selectable && <label class="artifact-selection"><input id={`select-${card.artifactId}`} type="checkbox" form="selection" name="artifactId" value={card.artifactId} data-move-item={JSON.stringify({ artifactId: card.artifactId, title: card.title, project: card.project })} aria-label={`Seleccionar ${card.title}`} /></label>}
     <h2><a href={detailUrl} title={card.title}>{card.title}</a></h2>

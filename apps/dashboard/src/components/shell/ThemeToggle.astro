@@ -10,6 +10,7 @@ const { theme } = Astro.props;
   <button class="rail-link" type="submit" title={themeToggle[theme].label}>{themes.map((current) => <span data-theme-label={current} hidden={current !== theme}><Icon name={themeToggle[current].icon} size={18} /><span class="sr-only">{themeToggle[current].label}</span></span>)}</button>
 </form>
 <script>
+  import { bindKeys, revealHint } from './keys.ts';
   // With JavaScript the theme flips in place, so the page keeps its scroll, selection, and open disclosures; the form is the fallback.
   const form = document.querySelector<HTMLFormElement>('form[data-theme-cookie]');
   form?.addEventListener('submit', (event) => {
@@ -26,4 +27,8 @@ const { theme } = Astro.props;
     }
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim());
   });
+  if (form) {
+    bindKeys({ t: () => form.requestSubmit() });
+    revealHint('theme');
+  }
 </script>

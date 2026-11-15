@@ -1,19 +1,18 @@
 ---
 import type { PanelIdentity } from '../../identity.ts';
-import { scopeOf, type NavLocation } from '../../presentation.ts';
-import { readerHref } from '../../urls.ts';
+import type { NavLocation } from '../../presentation.ts';
 import type { Theme } from '../../theme.ts';
 import Icon from '../Icon.astro';
 import ThemeToggle from './ThemeToggle.astro';
-interface Props { identity: PanelIdentity; authUrl: string; location: NavLocation; theme: Theme }
-const { identity, authUrl, location, theme } = Astro.props;
+interface Props { identity: PanelIdentity; authUrl: string; location: NavLocation; theme: Theme; reader: string }
+const { identity, authUrl, location, theme, reader } = Astro.props;
 const initials = identity.name.trim().split(/\s+/).slice(0, 2).map((part) => [...part][0]).join('').toUpperCase();
 const section = location.kind === 'projects' ? 'projects' : location.kind === 'read' ? 'read' : 'library';
 const current = (target: typeof section) => target !== section ? undefined : location.kind === 'library' || location.kind === 'projects' || location.kind === 'read' ? 'page' : 'true';
 const destinations = [
   { target: 'library', href: '/', label: 'Biblioteca', icon: 'layout-grid' },
   { target: 'projects', href: '/projects', label: 'Proyectos', icon: 'folder' },
-  { target: 'read', href: readerHref({ scope: scopeOf(location), status: 'all', q: '' }), label: 'Modo lectura', icon: 'book' },
+  { target: 'read', href: reader, label: 'Modo lectura', icon: 'book' },
 ] as const;
 ---
 <nav class="rail" aria-label="Principal">
