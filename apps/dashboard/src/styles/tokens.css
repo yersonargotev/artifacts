@@ -26,10 +26,9 @@
   --maroon: #eba0ac;
   --preview-background: white;
   --accent-fill: linear-gradient(120deg, var(--accent), var(--sapphire));
-  --glow-primary: 0 0 18px #89b4fa33;
-  --glow-active: 0 0 12px #89b4fa14;
-  --ring-active: var(--accent);
-  --elevation-overlay: 0 12px 36px #11111b80;
+  --shadow-1: 0 1px 2px #0006;
+  --shadow-2: 0 16px 48px #000a;
+  --scrim: #11111bb3;
 
   --accent-a1: color-mix(in srgb, var(--accent) 9%, transparent);
   --accent-a2: color-mix(in srgb, var(--accent) 16%, transparent);
