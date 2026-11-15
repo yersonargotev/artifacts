@@ -46,6 +46,19 @@
   --glow-active: 0 0 12px #89b4fa14;
   --ring-active: var(--accent);
   --elevation-overlay: 0 12px 36px #11111b80;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
 }
 
 [data-tone="peach"] { --tone: var(--peach); }
