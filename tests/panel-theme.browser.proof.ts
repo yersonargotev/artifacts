@@ -86,6 +86,7 @@ function textContrast(root: Element, mode: Mode): Row[] {
       range.selectNodeContents(node);
       targets.push({ element, text, rect: () => Array.from(range.getClientRects()).find((box) => box.width > 1 && box.height > 1) });
     }
+    for (const input of root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input:not([type=hidden], [type=checkbox], [type=radio]), textarea')) if (input.value && input.checkVisibility()) targets.push({ element: input, text: input.value, rect: () => input.getBoundingClientRect() });
   }
   const rows: Row[] = [];
   const start = scrollY;
@@ -448,6 +449,46 @@ try {
       await page.getByRole('option', { name: 'Crear proyecto «New project»', exact: true }).waitFor();
       await measure(page, theme, 'move-dialog', 'static');
       for (const option of await page.getByRole('option').all()) { await option.hover(); await measure(page, theme, 'move-dialog', 'hover', option); }
+
+      await page.goto(`${instance.panel}/?view=table`);
+      await settle(page);
+      await page.waitForFunction(() => document.querySelector('[data-palette-open]:not([hidden])'));
+      if (width === 1440) await page.keyboard.press('ControlOrMeta+k');
+      else await page.getByRole('button', { name: 'Abrir la paleta de comandos', exact: true }).click();
+      const palette = page.getByRole('dialog', { name: 'Paleta de comandos', exact: true });
+      const query = palette.getByRole('combobox', { name: 'Buscar en la paleta', exact: true });
+      await page.waitForFunction(() => document.activeElement?.matches('[data-palette] [role=combobox]'));
+      await page.mouse.move(0, 0);
+      await measure(page, theme, 'palette', 'placeholder', palette, 'placeholder');
+      await measure(page, theme, 'palette', 'active', palette.locator('[role=option][data-highlighted]'));
+      // The list scrolls inside the palette, so each part is measured where it is shown rather than where it is clipped.
+      for (const part of await palette.locator('.palette-eyebrow, [role=option]').all()) { await part.scrollIntoViewIfNeeded(); await measure(page, theme, 'palette', 'static', part); }
+      await measure(page, theme, 'palette', 'static', palette.locator('.palette-footer'));
+      await query.fill('Alpha');
+      await palette.locator('[role=option]').first().waitFor();
+      await measure(page, theme, 'palette', 'input', palette);
+      if (width === 1440) for (const option of await palette.getByRole('option').all()) { await option.hover(); await measure(page, theme, 'palette', 'hover', option); }
+      await query.fill('sin coincidencias');
+      await palette.getByRole('status').waitFor();
+      await measure(page, theme, 'palette', 'empty', palette);
+      await page.keyboard.press('Escape');
+      await palette.waitFor({ state: 'detached' });
+      checks.push(`${theme} ${width}: the palette measures its placeholder, rest and active options, typed query, ${width === 1440 ? 'hovered options, ' : ''}and empty state`);
+
+      await page.goto(`${instance.panel}/?project=Alpha&view=table`);
+      await settle(page);
+      await page.waitForFunction(() => document.querySelector('[data-palette-open]:not([hidden])'));
+      await page.mouse.move(0, 0);
+      while (await page.locator('[data-library-item][data-selected] .artifact-table-name > a').textContent().catch(() => null) !== 'Alpha overview') await page.keyboard.press('j');
+      await page.waitForTimeout(300);
+      await measure(page, theme, 'library-selected', 'selected', page.locator('[data-library-item][data-selected]'));
+      await page.keyboard.press('p');
+      const confirm = page.getByRole('dialog', { name: 'Publicar rev. 2', exact: true });
+      await confirm.waitFor();
+      await measure(page, theme, 'publish-dialog', 'static', confirm);
+      for (const control of await confirm.getByRole('button').all()) { await control.focus(); await measure(page, theme, 'publish-dialog', 'focus', control); if (width === 1440) { await control.hover(); await measure(page, theme, 'publish-dialog', 'hover', control); } }
+      await page.keyboard.press('Escape');
+      await confirm.waitFor({ state: 'hidden' });
       await page.close();
     }
     const plainTheme = await context(theme, { storageState: owner, javaScriptEnabled: false });
