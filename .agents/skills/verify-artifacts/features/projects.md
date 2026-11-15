@@ -40,7 +40,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive proje
 node --import tsx .agents/skills/verify-artifacts/scripts/control.ts cleanup --run "$R"
 ```
 
-The drive first signs in with no artifacts and checks the empty index. It creates `Unfiled notes` and checks the unfiled-only index. It then creates `Alpha plan` with project `Alpha` and `Beta handoff` with project `alpha` through HTTP MCP. It runs the source CLI with the same environment as the `cli` drive. The signed-in panel uses `getByRole('navigation', { name: 'Filtrar por proyecto', exact: true })` inside the `.project-filter` disclosure. After the browsing checks it moves `Unfiled notes` into a new `Gamma` project from its card menu at 1440px, then removes it from its detail title menu at 390px.
+The drive first signs in with no artifacts and checks the empty index. It creates `Unfiled notes` and checks the unfiled-only index. It then creates `Alpha plan` with project `Alpha` and `Beta handoff` with project `alpha` through HTTP MCP. It runs the source CLI with the same environment as the `cli` drive. The signed-in panel uses `getByRole('navigation', { name: 'Filtrar por proyecto', exact: true })`, the row of project chips in the library filter bar. After the browsing checks it moves `Unfiled notes` into a new `Gamma` project from its card menu at 1440px, then removes it from its detail title menu at 390px.
 
 Expected observations:
 
@@ -83,7 +83,6 @@ Selection evidence adds `bulk-1440`, `selection-390`, `clear-selection`, `bulk-r
 - Project names in URLs are encoded by `URLSearchParams`, so a space appears as `+`.
 - The `Proyecto` field has a `list` attribute, so its ARIA role is `combobox`, not `textbox`. The drive finds it with `getByLabel('Proyecto', { exact: true })`.
 - Pressing Enter in `Proyecto` submits the first button, `Mover al proyecto`. Keep `Quitar del proyecto` after it, or Enter would remove the project.
-- Playwright role queries skip links inside a closed disclosure. Open `.project-filter` before choosing a project link by role.
 - The drive uses the source CLI with a bearer token, like the `cli` drive. Packaged CLI behavior and interactive login remain covered by the package and first-use proofs.
 
 ## Atomic panel movement
