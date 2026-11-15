@@ -1,7 +1,7 @@
 ---
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
-import { libraryHref, readLibraryUrl, readListGroup, readListView, readerHref, viewCookie } from '../urls.ts';
+import { libraryHref, pageOffset, readLibraryUrl, readListGroup, readListOffset, readListView, readerHref, viewCookie } from '../urls.ts';
 import { locationOf, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
 import LibraryHeading from '../components/library/LibraryHeading.astro';
@@ -33,7 +33,7 @@ const project = scope?.kind === 'project' ? scope.project.name : scope?.kind ===
 const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
 ---
 <Panel share move flush={Boolean(snapshot)} title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={link}>
-  {snapshot && <a slot="bar" class="button secondary reader-link" href={readerHref(searchFor(snapshot.page))}><Icon name="book" size={16} /><span>Modo lectura</span></a>}
+  {link && <a slot="bar" class="button secondary reader-link" href={readerHref(link)}><Icon name="book" size={16} /><span>Modo lectura</span></a>}
   {snapshot && <Fragment slot="status"><span><kbd class="kbd">Esc</kbd> cerrar menús</span></Fragment>}
   {snapshot && link ? <>
     <LibraryHeading scope={snapshot.page.scope} />
@@ -42,7 +42,7 @@ const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Bibliotec
     {(snapshot.workspace.total.count > 0 || shared.items.length === 0) && <>
       <LibraryFilters workspace={snapshot.workspace} page={snapshot.page} query={link} view={view} />
       {pending?.page.cards[0] && <PendingBanner card={pending.page.cards[0]} count={pending.page.counts.pending} pendingHref={libraryHref(link, { status: 'pending' })} />}
-      <ArtifactGrid page={snapshot.page} workspace={snapshot.workspace} query={link} cursor={query.cursor} now={new Date()} view={view} />
+      <ArtifactGrid page={snapshot.page} workspace={snapshot.workspace} query={link} cursor={query.cursor} offset={pageOffset(readListOffset(Astro.url), snapshot.page)} now={new Date()} view={view} />
     </>}
   </> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>

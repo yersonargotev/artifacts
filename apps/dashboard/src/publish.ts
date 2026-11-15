@@ -9,12 +9,14 @@ export type PublicationOutcome =
   | { kind: 'conflict'; observed: ArtifactRead | undefined }
   | { kind: 'uncertain' };
 
-export async function parsePublicationForm(request: Request, artifactId: string | undefined): Promise<PublishCommand> {
-  const fields = await readForm(request, { artifactId: [1, 1], revisionId: [1, 1], expectedPublicationVersion: [1, 1], requestId: [1, 1] }, 4096);
+/** A form can also name the panel page to return to after a confirmed publication. The page checks that it is local before it redirects. */
+export async function parsePublicationForm(request: Request, artifactId: string | undefined): Promise<PublishCommand & { readonly returnPath?: string }> {
+  const fields = await readForm(request, { artifactId: [1, 1], revisionId: [1, 1], expectedPublicationVersion: [1, 1], requestId: [1, 1], return: [0, 1] }, 4096);
   if (!fields) throw new Response('El formulario de publicación no es válido.', { status: 400 });
   const version = fields.get('expectedPublicationVersion')!;
   if (!/^(0|[1-9]\d*)$/.test(version) || !Number.isSafeInteger(Number(version)) || fields.get('artifactId') !== artifactId) throw new Response('El formulario no coincide con este artefacto.', { status: 400 });
-  return publishSchema.parse({ ...Object.fromEntries(fields), expectedPublicationVersion: Number(version) });
+  const { return: returnPath, ...command } = Object.fromEntries(fields);
+  return { ...publishSchema.parse({ ...command, expectedPublicationVersion: Number(version) }), ...(returnPath === undefined ? {} : { returnPath }) };
 }
 
 export async function publishSelectedRevision(store: Pick<ReturnType<typeof createArtifactStore>, 'publish' | 'read'>, actor: Actor, command: PublishCommand): Promise<PublicationOutcome> {

@@ -7,5 +7,9 @@ const { page, query, reader = false } = Astro.props;
 const href = reader ? readerHref : libraryHref;
 ---
 <nav class="library-filters" aria-label="Filtrar por publicación">
-  {statusTabs.map(({ value, label }) => <a href={href(query, { status: value })} aria-current={page.status === value ? 'page' : undefined} aria-label={`${label} (${page.counts[value]})`}>{label}<span>{page.counts[value]}</span></a>)}
+  {statusTabs.map((tab) => {
+    // The reader's narrow list uses the short label, and the full one stays as the tooltip.
+    const label = reader && 'short' in tab ? tab.short : tab.label;
+    return <a href={href(query, { status: tab.value })} aria-current={page.status === tab.value ? 'page' : undefined} aria-label={`${label} (${page.counts[tab.value]})`} title={label === tab.label ? undefined : tab.label}>{label}<span>{page.counts[tab.value]}</span></a>;
+  })}
 </nav>

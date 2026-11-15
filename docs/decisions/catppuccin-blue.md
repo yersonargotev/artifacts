@@ -46,7 +46,7 @@ The panel uses two variable fonts: Inter Variable for text and JetBrains Mono Va
 
 Current and selected items have no glow. A current rail item, the current reader item, the current project filter, and a selected table row or card show a 3px `--accent` bar on their leading edge over an `--accent-a1` or `--accent-a2` surface. Detail tabs keep their underline, and the status filters and view toggle keep their tinted or raised fill. This replaces the earlier decision to mark active items with a blue glow.
 
-The focus ring is `2px solid var(--accent)` with a 2px offset. Shadows come only from `--shadow-1`, for the reader pane, and `--shadow-2`, for menus, dialogs, and popups. A dialog dims the page with `--scrim`.
+The focus ring is `2px solid var(--accent)` with a 2px offset. Shadows come only from `--shadow-1`, for the reader's document card, and `--shadow-2`, for menus, dialogs, and popups. A dialog dims the page with `--scrim`.
 
 ## Motion
 

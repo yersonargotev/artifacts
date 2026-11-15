@@ -149,6 +149,19 @@ function rowState(row: Element) {
   };
 }
 
+/** Runs in the page. Reports a reader row's height, paint, and side indicator. */
+function readerRowState(row: Element) {
+  const indicator = getComputedStyle(row, '::before');
+  const box = row.getBoundingClientRect();
+  return {
+    height: Math.round(box.height),
+    background: getComputedStyle(row).backgroundColor,
+    indicator: indicator.content === 'none' ? 'auto' : indicator.width,
+    indicatorHeight: indicator.content === 'none' ? 0 : Math.round(Number.parseFloat(indicator.height)),
+    shadow: [row, ...row.querySelectorAll('*')].map((element) => getComputedStyle(element).boxShadow).find((value) => value !== 'none') ?? 'none',
+  };
+}
+
 await control(['launch', '--allow-guests', '--run', run]);
 const evidence = resolve(process.env.PANEL_THEME_EVIDENCE ?? join(run, 'panel-theme'));
 await mkdir(evidence, { recursive: true });
@@ -161,6 +174,7 @@ const checks: string[] = [];
 const measured: Measured[] = [];
 const shells: (ReturnType<typeof shellGeometry> & { theme: Theme; width: number; scrolled?: boolean })[] = [];
 const rowStates: (ReturnType<typeof rowState> & { theme: Theme; width: number; state: string })[] = [];
+const readerStates: (ReturnType<typeof readerRowState> & { theme: Theme; width: number; state: string })[] = [];
 let active: Page | undefined;
 
 async function call(name: string, input: unknown, token = credentials.accessToken): Promise<Record<string, any>> {
@@ -383,6 +397,34 @@ try {
       if (width === 1440) await measure(page, theme, 'row-actions', 'focus', rows.nth(2).getByRole('link', { name: 'Leer', exact: true }));
       await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
+      await page.goto(`${instance.panel}/read?project=Alpha&artifact=${overview}`);
+      await settle(page);
+      const selectedItem = page.locator('.reader-item[aria-current]');
+      const restItem = page.locator('.reader-item:not([aria-current])').first();
+      await page.mouse.move(0, 0);
+      readerStates.push({ theme, width, state: 'selected', ...await selectedItem.evaluate(readerRowState) }, { theme, width, state: 'rest', ...await restItem.evaluate(readerRowState) });
+      await measure(page, theme, 'reader-row', 'selected', selectedItem);
+      await measure(page, theme, 'reader-row', 'rest', restItem);
+      await restItem.hover();
+      await page.waitForTimeout(300);
+      readerStates.push({ theme, width, state: 'hover', ...await restItem.evaluate(readerRowState) });
+      await measure(page, theme, 'reader-row', 'hover', restItem);
+      await page.mouse.move(0, 0);
+      await page.locator('.reader-item').first().focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => document.activeElement?.matches('.reader-item:focus-visible')), true, 'a reader row takes keyboard focus');
+      const focusedItem = page.locator('.reader-item:focus');
+      readerStates.push({ theme, width, state: 'focus', ...await focusedItem.evaluate(readerRowState) });
+      await measure(page, theme, 'reader-row', 'focus', focusedItem);
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      const head = page.locator('.reader-head');
+      assert.deepEqual(await head.locator('a[href], button:not([hidden])').evaluateAll((controls) => controls.map((control) => control.getAttribute('aria-label') ?? control.textContent!.trim())), ['Anterior', 'Compartir', 'Detalle', 'Abrir publicación', 'Publicar rev. 2', 'Pantalla completa'], 'the pending pane header offers every action');
+      await measure(page, theme, 'reader-head', 'static', head);
+      for (const control of await head.locator('a[href], button:not([hidden])').all()) { await control.hover(); await measure(page, theme, 'reader-head', 'hover', control); await control.focus(); await measure(page, theme, 'reader-head', 'focus', control); }
+      await page.mouse.move(0, 0);
+
       await page.goto(`${instance.panel}/?project=Alpha&view=table`);
       await settle(page);
       for (const title of ['Alpha overview', 'Alpha delivery']) await page.getByRole('checkbox', { name: `Seleccionar ${title}`, exact: true }).check();
@@ -439,6 +481,18 @@ try {
     assert.equal(state.shadow, 'none', `${label}: no glow`);
   }
   await writeFile(join(evidence, 'rows.json'), JSON.stringify(rowStates, null, 1));
+  for (const state of readerStates) {
+    const label = `${state.theme} ${state.width} reader ${state.state}`;
+    assert.equal(state.height, 55, `${label}: a reader row is 55px tall, as in the prototype`);
+    assert.deepEqual([state.indicator, state.indicatorHeight], state.state === 'selected' ? ['3px', state.height - 1] : ['auto', 0], `${label}: ${state.state === 'selected' ? 'a 3px side indicator over the whole row above its bottom border' : 'no indicator'}`);
+    assert.equal(state.shadow, 'none', `${label}: no glow`);
+  }
+  for (const theme of themes) for (const width of [1440, 390]) {
+    const paint = Object.fromEntries(readerStates.filter((state) => state.theme === theme && state.width === width).map((state) => [state.state, state.background]));
+    assert.equal(new Set([paint.rest, paint.hover, paint.selected]).size, 3, `${theme} ${width}: rest, hover, and selected reader rows paint differently`);
+  }
+  await writeFile(join(evidence, 'reader-rows.json'), JSON.stringify(readerStates, null, 1));
+  checks.push('a reader row is 55px in both themes at 1440 and 390; rest, hover, and selected paint differently, only the selected row carries the 3px indicator over its whole height, and none has a glow; the pending pane header offers Anterior, Compartir, Detalle, Abrir publicación, Publicar rev. 2, and fullscreen');
   checks.push('a library row is 38px; its Leer, Compartir, and menu actions appear on hover, keyboard focus, and selection at 1440 and stay visible at 390; focus and selection add the 3px indicator without a glow; without JavaScript the menu falls back to a native disclosure with the same links');
   for (const shell of shells) {
     const label = `${shell.theme} ${shell.width}${shell.scrolled ? ' scrolled' : ''}`;

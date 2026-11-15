@@ -67,7 +67,7 @@ export const statusTabs = [
   { value: 'all', label: 'Todos' },
   { value: 'published', label: 'Publicados' },
   { value: 'unpublished', label: 'Sin publicar' },
-  { value: 'pending', label: 'Cambios pendientes' },
+  { value: 'pending', label: 'Cambios pendientes', short: 'Pendientes' },
 ] as const;
 
 export function relativeTime(at: Date, now: Date): string {

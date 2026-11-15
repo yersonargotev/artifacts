@@ -1,12 +1,13 @@
 ---
 import type { PublishCommand } from '../publish.ts';
-interface Props { command: PublishCommand; label: string }
-const { command, label } = Astro.props;
+interface Props { command: PublishCommand; label: string; returnPath?: string | undefined }
+const { command, label, returnPath } = Astro.props;
 ---
 <form class="publish-form" method="post" action={`/artifacts/${encodeURIComponent(command.artifactId)}/publish`}>
   <input type="hidden" name="artifactId" value={command.artifactId} />
   <input type="hidden" name="revisionId" value={command.revisionId} />
   <input type="hidden" name="expectedPublicationVersion" value={command.expectedPublicationVersion} />
   <input type="hidden" name="requestId" value={command.requestId} />
+  {returnPath && <input type="hidden" name="return" value={returnPath} />}
   <button data-variant="primary">{label}</button>
 </form>

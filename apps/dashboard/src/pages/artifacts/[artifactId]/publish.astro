@@ -3,15 +3,20 @@ import Panel from '../../../layouts/Panel.astro';
 import PublicationForm from '../../../components/PublicationForm.astro';
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
+import { localReturnPath } from '../../../identity.ts';
 import { parsePublicationForm, publishSelectedRevision, type PublicationOutcome } from '../../../publish.ts';
 import { workspaceQuery } from '../../../presentation.ts';
 if (Astro.request.method !== 'POST') return new Response('Método no permitido.', { status: 405, headers: { allow: 'POST' } });
 if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
-const command = await parsePublicationForm(Astro.request, Astro.params.artifactId).catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
-if (command instanceof Response) return command;
+const form = await parsePublicationForm(Astro.request, Astro.params.artifactId).catch((error: unknown) => error instanceof Response ? error : artifactErrorResponse(error));
+if (form instanceof Response) return form;
+const { returnPath: named, ...command } = form;
+let returnPath: string | undefined;
+try { returnPath = named === undefined ? undefined : localReturnPath(named, (await getRuntime()).config.origin); } catch {}
 const outcome = await getRuntime().then(({ artifacts }) => publishSelectedRevision(artifacts, panelActor(Astro.locals.identity!), command)).catch((error: unknown) => artifactErrorResponse(error));
 if (outcome instanceof Response && outcome.status !== 503) return outcome;
 const result: PublicationOutcome = outcome instanceof Response ? { kind: 'uncertain' } : outcome;
+if (result.kind === 'published' && returnPath) return Astro.redirect(returnPath, 303);
 Astro.response.status = result.kind === 'conflict' ? 409 : result.kind === 'uncertain' ? 503 : 200;
 const selectedUrl = `/artifacts/${encodeURIComponent(command.artifactId)}?${new URLSearchParams({ revisionId: command.revisionId })}`;
 const observed = result.kind === 'uncertain' ? undefined : result.observed;
@@ -27,7 +32,7 @@ if (snapshot instanceof Response) return snapshot;
     {result.kind === 'published' && <p role="status">Revisión {observed!.revision.sequence} publicada. La lectura posterior confirmó el resultado.</p>}
     {result.kind === 'superseded' && <p role="status">Tu solicitud se completó. La lectura posterior encontró otra revisión publicada. Revisa su estado antes de volver a publicar.</p>}
     {result.kind === 'conflict' && <p role="alert">La publicación esperada o el identificador de solicitud ya no coincide. Revisa el estado actual y vuelve a elegir qué revisión publicar.</p>}
-    {result.kind === 'uncertain' && <><p role="alert">La solicitud pudo haberse completado. Reintenta con la misma revisión, estado esperado e identificador de solicitud para confirmar su resultado.</p><PublicationForm command={command} label="Reintentar publicación" /></>}
+    {result.kind === 'uncertain' && <><p role="alert">La solicitud pudo haberse completado. Reintenta con la misma revisión, estado esperado e identificador de solicitud para confirmar su resultado.</p><PublicationForm command={command} label="Reintentar publicación" returnPath={returnPath} /></>}
     {current && <><h2>Publicación observada</h2><p>Esta es la publicación actual del artefacto.</p><div class="actions"><a href={`/artifacts/${encodeURIComponent(command.artifactId)}?${new URLSearchParams({ revisionId: current.revisionId })}`}>Ver revisión publicada</a><a class="button secondary" href={current.url}>Abrir publicación</a></div><code>{current.url}</code></>}
     {observed && !current && <p>Este artefacto está sin publicar.</p>}
     {result.kind === 'conflict' && !observed && <p>No pudimos leer el estado actual. Abre la revisión seleccionada para comprobarlo.</p>}
