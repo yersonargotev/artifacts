@@ -19,7 +19,7 @@ test('project tones have stylesheet rules and ignore letter case', async () => {
   assert(projectTones.every((tone) => !['green', 'yellow', 'mauve'].includes(tone)));
 });
 const effectPolicy = {
-  '--glow-primary-fill': { property: 'background', subject: 'primary' },
+  '--accent-fill': { property: 'background', subject: 'primary' },
   '--glow-primary': { property: 'box-shadow', subject: 'primary' },
   '--glow-active': { property: 'box-shadow', subject: 'active' },
   '--cover-wash': { property: 'background', subject: 'cover' },
@@ -27,6 +27,7 @@ const effectPolicy = {
 } as const;
 type EffectToken = keyof typeof effectPolicy;
 type Subject = typeof effectPolicy[EffectToken]['subject'];
+const isEffectToken = (name: string) => name.startsWith('--glow-') || name.startsWith('--cover-') || name === '--accent-fill' || name === '--elevation-overlay';
 
 function objects(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value.flatMap(objects);
@@ -76,13 +77,13 @@ function stylesheetViolations(filename: string, source: string) {
         const report = (message: string) => issues.push(`${filename}:${line} ${rule.label}: ${message}`);
         const nodes = objects(declaration.value);
         const variables = nodes.filter((node) => node.type === 'var').map((node) => (node.value as { name: { ident: string } }).name.ident);
-        const effects = variables.filter((name) => name.startsWith('--glow-') || name.startsWith('--cover-') || name === '--elevation-overlay');
+        const effects = variables.filter(isEffectToken);
         const token = customName && Object.hasOwn(effectPolicy, customName) ? customName as EffectToken : null;
         const hasGradient = nodes.some((node) => node.type === 'gradient' || (node.type === 'function' && /gradient$/i.test((node.value as { name: string }).name)));
         const hasDropShadow = nodes.some((node) => node.type === 'drop-shadow' || (node.type === 'function' && (node.value as { name: string }).name === 'drop-shadow'));
         if (hasGradient && !(tokensFile && token && effectPolicy[token].property === 'background')) report(`${customName ?? property} contains a gradient outside its effect token`);
         if (hasDropShadow) report(`${property} contains a drop shadow`);
-        if (customName?.startsWith('--glow-') || customName?.startsWith('--cover-') || customName === '--elevation-overlay') {
+        if (customName && isEffectToken(customName)) {
           if (!tokensFile || !token) report(`${customName} is not an approved token definition`);
         }
         for (const name of effects) {
@@ -110,7 +111,7 @@ function markupViolations(filename: string, source: string) {
   for (const match of source.matchAll(/\b(?:shadow|drop-shadow|ring|bg-linear|bg-radial|bg-conic|bg-gradient)(?:-[\w[\]/.%-]+)?\b/g)) issues.push(`${filename}: forbidden effect utility ${match[0]}`);
   for (const match of source.matchAll(/\b(?:boxShadow|textShadow|box-shadow|text-shadow)["']?\s*:/gi)) issues.push(`${filename}: forbidden inline shadow ${match[0]}`);
   for (const match of source.matchAll(/[\w-]*(?:gradient|drop-shadow)\s*\(/gi)) issues.push(`${filename}: forbidden inline effect ${match[0]}`);
-  for (const match of source.matchAll(/--(?:glow|cover)-[\w-]+/g)) issues.push(`${filename}: effect token ${match[0]} belongs in effects.css`);
+  for (const match of source.matchAll(/--(?:(?:glow|cover)-[\w-]+|accent-fill(?![\w-]))/g)) issues.push(`${filename}: effect token ${match[0]} belongs in effects.css`);
   return issues;
 }
 
@@ -142,6 +143,8 @@ test('effect policy rejects stray gradients, shadows, aliases, and selector esca
     '[data-variant="primary"], .sidebar-link { box-shadow: var(--glow-primary) }',
     '[aria-selected="false"] { box-shadow: var(--glow-active) }',
     '.sidebar-link { --wash: var(--cover-wash) }',
+    '.sidebar-link { background: var(--accent-fill) }',
+    '.sidebar-link { --accent-fill: red }',
     '.sidebar-link { box-shadow: var(--elevation-overlay, 0 0 12px blue) }',
     '.sidebar-link { filter: drop-shadow(0 0 12px blue) }',
     '.sidebar-link { --wash: linear-gradient(red, blue) }',
@@ -153,7 +156,7 @@ test('effect policy rejects stray gradients, shadows, aliases, and selector esca
 });
 
 test('effect policy permits only scoped effect tokens and neutral overlay elevation', () => {
-  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--glow-primary-fill); box-shadow: var(--glow-primary) } [aria-current], [aria-selected="true"], [aria-pressed="true"] { box-shadow: var(--glow-active) } .project-cover { background: var(--cover-wash) }'), []);
+  assert.deepEqual(stylesheetViolations('effects.css', '[data-variant="primary"]:hover { background: var(--accent-fill); box-shadow: var(--glow-primary) } [aria-current], [aria-selected="true"], [aria-pressed="true"] { box-shadow: var(--glow-active) } .project-cover { background: var(--cover-wash) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.artifact-menu { box-shadow: var(--elevation-overlay) }'), []);
   assert.deepEqual(stylesheetViolations('panel.css', '.project-filter-links { box-shadow: var(--elevation-overlay) }'), []);
 });
@@ -176,18 +179,18 @@ test('markup policy rejects effect utilities and inline shadows', () => {
   for (const source of [
     '<div style="box-shadow: 0 0 4px blue" />',
     '<div style={{ boxShadow: "0 0 4px blue" }} />',
-    '<div class="bg-[linear-gradient(var(--blue),var(--red))]" />',
-    '<div class="[background:linear-gradient(var(--blue),var(--red))]" />',
-    '<div className="hover:bg-[image:radial-gradient(var(--blue),var(--red))]" />',
-    '<div className="[background-image:conic-gradient(var(--blue),var(--red))]" />',
+    '<div class="bg-[linear-gradient(var(--accent),var(--danger))]" />',
+    '<div class="[background:linear-gradient(var(--accent),var(--danger))]" />',
+    '<div className="hover:bg-[image:radial-gradient(var(--accent),var(--danger))]" />',
+    '<div className="[background-image:conic-gradient(var(--accent),var(--danger))]" />',
     '<div class="bg-conic-180" />',
-    '<div class="bg-[-webkit-gradient(linear,left_top,left_bottom,from(var(--blue)),to(var(--red)))]" />',
-    '<div class="[filter:DROP-SHADOW(0_0_4px_var(--blue))]" />',
-    '<div class="[BOX-SHADOW:0_0_4px_var(--blue)]" />',
+    '<div class="bg-[-webkit-gradient(linear,left_top,left_bottom,from(var(--accent)),to(var(--danger)))]" />',
+    '<div class="[filter:DROP-SHADOW(0_0_4px_var(--accent))]" />',
+    '<div class="[BOX-SHADOW:0_0_4px_var(--accent)]" />',
     '<div class="bg-[var(--cover-wash)]" />',
-    '<div className="bg-(--glow-primary-fill)" />',
+    '<div className="bg-(--accent-fill)" />',
     '<div className="[box-shadow:var(--glow-primary)]" />',
-    '<div style={{ backgroundImage: "repeating-linear-gradient(var(--blue),var(--red))" }} />',
+    '<div style={{ backgroundImage: "repeating-linear-gradient(var(--accent),var(--danger))" }} />',
   ]) assert(markupViolations('fixture.tsx', source).length > 0, source);
   assert.deepEqual(markupViolations('fixture.astro', '<button data-variant="primary">Publicar</button>'), []);
 });

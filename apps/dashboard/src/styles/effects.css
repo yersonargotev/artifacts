@@ -1,6 +1,6 @@
 [data-variant="primary"] {
-  background: var(--glow-primary-fill);
-  color: var(--crust);
+  background: var(--accent-fill);
+  color: var(--on-accent);
   box-shadow: var(--glow-primary);
 }
 
@@ -17,6 +17,6 @@
 }
 
 [data-variant="primary"].destructive-button {
-  background: var(--red);
+  background: var(--danger);
   box-shadow: none;
 }
