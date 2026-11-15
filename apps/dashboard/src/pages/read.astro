@@ -7,6 +7,7 @@ import { libraryHref, nextOffset, pageOffset, readReaderUrl, readerHref } from '
 import { groupCards } from '../components/library/groups.ts';
 import { detachedRow, readerRows } from '../components/reader/rows.ts';
 import Panel from '../layouts/Panel.astro';
+import '../styles/views.css';
 import StatusTabs from '../components/library/StatusTabs.astro';
 import ProjectFilter from '../components/library/ProjectFilter.astro';
 import ReaderPane from '../components/reader/ReaderPane.astro';
@@ -80,4 +81,5 @@ const paged = Boolean(page.next || page.continued);
 </Panel>
 <script>
   import '../components/reader/reader.ts';
+  import '../components/shell/views.ts';
 </script>
