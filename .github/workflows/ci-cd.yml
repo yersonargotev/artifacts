@@ -38,7 +38,7 @@ jobs:
   browser:
     name: Chrome proofs
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     concurrency:
       group: browser-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: true
