@@ -50,7 +50,7 @@ The focus ring is `2px solid var(--accent)` with a 2px offset. Shadows come only
 
 ## Motion
 
-Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` (260ms), and two curves, `--ease-out` and `--ease-in-out`. Buttons, links, rows, inputs, and menu items transition color, background, border, and transform over `--dur-1` with `--ease-out`. A pressed button scales to 97%. Under `prefers-reduced-motion: reduce`, the panel removes every transition and animation.
+Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` (260ms), and two curves, `--ease-out` and `--ease-in-out`. Buttons, links, rows, inputs, and menu items transition color, background, border, and transform over `--dur-1` with `--ease-out`. A pressed button scales to 97%. Row actions slide in over `--dur-2`. The command palette fades its scrim and pops in over `--dur-2`, and the publish confirmation pops in the same way. The pending banner drops in and the reader's document rises in over `--dur-3`. The library and read mode cross-fade into each other with a same-origin view transition over `--dur-3` with `--ease-in-out`. `views.css` opts those two pages in from CSS, and a `pageswap` script skips the transition for any other move, such as a filter or the next page. Under `prefers-reduced-motion: reduce`, the panel removes every transition and animation, and the view transition opt-in sits inside `prefers-reduced-motion: no-preference`, so it is off too.
 
 ## Conventions test
 
@@ -67,7 +67,7 @@ Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` 
 - a Tailwind shadow, ring, gradient, off-scale size, or off-scale radius class, or an inline shadow, font family, font size, or radius in markup;
 - a `<link>` in markup other than the same-origin icon, so no layout loads a font or font stylesheet through a link tag.
 
-It also checks that both theme blocks in `tokens.css` define the same tokens and their own `color-scheme`, that the `theme-color` values match each theme's `--bg`, that `tokens.css` defines the exact scale values and the two font tokens, that `fonts.css` declares exactly the four packaged faces, that both font packages are pinned to an exact version, and that `panel.css` holds the reduced-motion rule.
+It also checks that both theme blocks in `tokens.css` define the same tokens and their own `color-scheme`, that the `theme-color` values match each theme's `--bg`, that `tokens.css` defines the exact scale values and the two font tokens, that `fonts.css` declares exactly the four packaged faces, that both font packages are pinned to an exact version, that `panel.css` holds the reduced-motion rule, and that the only view transition opt-in sits inside `prefers-reduced-motion: no-preference`.
 
 ## Library behavior
 
