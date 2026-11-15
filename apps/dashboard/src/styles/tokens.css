@@ -38,6 +38,9 @@
   --ok-a1: color-mix(in srgb, var(--ok) 9%, transparent);
   --ok-a3: color-mix(in srgb, var(--ok) 30%, transparent);
 
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
   --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 13px;

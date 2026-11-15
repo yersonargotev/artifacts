@@ -8,7 +8,7 @@ The reference website is [catppuccin/website](https://github.com/catppuccin/webs
 
 The application adapts those choices to a compact dashboard. Base, mantle, and crust establish depth. Text and subtext establish hierarchy. Blue identifies actions and focus. Sapphire provides the endpoint of the 120-degree gradient on the primary action. Status colors retain semantic meaning. Mauve is not an action accent.
 
-The native font stack avoids remote font requests. The publication wrapper retains its independent stylesheet. Its trusted header is separated from the authenticated content iframe so the library link can navigate while the document keeps its own network denial policy. Tabler outline icons provide consistent geometry; their local notices retain attribution.
+The panel serves its own fonts, so it makes no remote font request. The publication wrapper retains its independent stylesheet and fonts. Its trusted header is separated from the authenticated content iframe so the library link can navigate while the document keeps its own network denial policy. Tabler outline icons provide consistent geometry; their local notices retain attribution.
 
 ## Tokens and scales
 
@@ -17,6 +17,12 @@ The native font stack avoids remote font requests. The publication wrapper retai
 Translucent color comes from three steps mixed from the accent with `color-mix`. `--accent-a1` (9%) fills selected rows and tinted surfaces. `--accent-a2` (16%) fills the active navigation item, a highlighted menu item, and a pressed toggle. `--accent-a3` (32%) draws tinted borders and the text selection. Warning and success use the same pattern with `--warn-a1`, `--warn-a3`, `--ok-a1`, and `--ok-a3`. A surface that was a translucent neutral is now a solid surface token. Because every step derives from its base color, another theme gets the steps by redefining the base color only.
 
 The panel uses seven font sizes, `--text-2xs` (11px) to `--text-2xl` (28px), with body text at `--text-md` (14px). It uses four radii, `--r-sm` (6px), `--r-md` (8px), `--r-lg` (12px), and `--r-full`, plus `0` and `50%` for a true circle. Tailwind's font size and radius namespaces point at the same tokens, so a utility class in `ui/*.tsx` lands on the same scale as `panel.css`.
+
+## Typography
+
+The panel uses two variable fonts: Inter Variable for text and JetBrains Mono Variable for code, slugs, and identifiers. This replaces the native font stack, which rendered a different face on each operating system. The `@fontsource-variable/inter` and `@fontsource-variable/jetbrains-mono` packages, pinned to exact versions, supply the files. `fonts.css` declares only the latin and latin-ext subsets in the normal style, because the Spanish interface needs nothing else and uses no italics. The build emits the four `woff2` files as same-origin assets in both the Node and the Cloudflare builds, and `unicode-range` makes the browser fetch latin-ext only for a character outside latin. The panel makes no request to another origin, and the CSP stays unchanged. Both families use the SIL Open Font License, and `styles/OFL.txt` keeps their copyright lines and the license text.
+
+`--font-sans` and `--font-mono` in `tokens.css` name each family with a system fallback, and every `font-family` in the panel styles comes from one of them. Tailwind's font namespace points at the same tokens. Faces use `font-display: swap` with no preload, because a measured cold load with the fonts held back 800ms showed no layout shift on the main pages. Body text uses a letter spacing of -0.006em and grayscale antialiasing on macOS, and monospace text uses a letter spacing of 0. Counts, revisions, and times use tabular numerals so digits align in columns and do not shift as they change.
 
 ## Panel effects
 
@@ -37,11 +43,14 @@ Motion uses three durations, `--dur-1` (90ms), `--dur-2` (160ms), and `--dur-3` 
 - a glow token or any shadow other than `none` or one shadow token on its allowed subject;
 - a gradient outside its effect token, or an effect token outside its selector scope;
 - a font size or `font` shorthand that does not resolve to a `--text-*` step, and a radius that is not an `--r-*` step, `0`, or `50%`;
+- a `font-family` or `font` shorthand whose family is not `--font-sans` or `--font-mono`, a `--font-*` definition outside `tokens.css`, or an `@font-face` outside `fonts.css`;
+- a `url()` or `@import` that points at another origin;
 - a transition or animation duration or easing that does not come from the motion tokens;
 - a literal color outside `tokens.css`;
-- a Tailwind shadow, ring, gradient, off-scale size, or off-scale radius class, or an inline shadow, font size, or radius in markup.
+- a Tailwind shadow, ring, gradient, off-scale size, or off-scale radius class, or an inline shadow, font family, font size, or radius in markup;
+- a `<link>` in markup other than the same-origin icon, so no layout loads a font or font stylesheet through a link tag.
 
-It also checks that `tokens.css` defines the exact scale values and that `panel.css` holds the reduced-motion rule.
+It also checks that `tokens.css` defines the exact scale values and the two font tokens, that `fonts.css` declares exactly the four packaged faces, that both font packages are pinned to an exact version, and that `panel.css` holds the reduced-motion rule.
 
 ## Library behavior
 
