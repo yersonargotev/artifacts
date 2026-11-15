@@ -40,7 +40,8 @@ body {
   letter-spacing: -.006em;
   -webkit-font-smoothing: antialiased;
 }
-::selection { background: var(--accent-a3); }
+::selection { background: var(--accent-a2); color: var(--text); }
+[data-variant="primary"]::selection, [data-variant="primary"] *::selection, .skip-link::selection { color: var(--on-accent); }
 a { color: inherit; text-underline-offset: 3px; }
 button, input, select { font: inherit; }
 time, .project-count, .library-stats dd, .library-filters a > span, .tab-count, .project-header-counts, .project-card-counts, .unfiled-count, .selection-bar > p, .artifact-table td, .artifact-card-footer p, .revision-title, .selected-publication { font-variant-numeric: tabular-nums; }
@@ -149,7 +150,7 @@ p { max-width: 75ch; margin: 12px 0; line-height: 1.6; }
 .sidebar-content footer { gap: 6px; }
 .sidebar-content footer button { gap: 7px; padding: 8px; font-size: var(--text-xs); }
 .sidebar-content footer a { display: flex; align-items: center; min-height: 44px; font-size: var(--text-xs); }
-.account-avatar { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--border-strong); color: var(--text); font-size: var(--text-xs); font-weight: 700; }
+.account-avatar { user-select: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--border-strong); color: var(--text); font-size: var(--text-xs); font-weight: 700; }
 .account-summary { display: flex; flex-direction: column; min-width: 0; color: var(--text); font-weight: 600; }
 .account-summary .session-indicator { font-weight: 400; }
 .library-shell .panel-main { width: 100%; max-width: 1240px; padding: 32px 32px 56px; }
