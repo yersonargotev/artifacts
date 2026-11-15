@@ -568,10 +568,11 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
 .choice-list { position: absolute; z-index: 15; top: calc(100% + 6px); right: 0; display: grid; min-width: 220px; max-width: calc(100vw - 32px); padding: 6px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--bg-chrome); box-shadow: var(--shadow-2); }
 .choice-list a { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px 6px 32px; border-radius: var(--r-md); color: var(--text); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; }
 .choice-list a:hover { background: var(--bg-hover); }
+.choice-list a.destructive-menu-item { color: var(--danger); }
 .choice-list a[aria-current] { padding-left: 10px; color: var(--accent); }
 .choice-list a > svg { flex: none; }
 .view-toggle { display: inline-flex; flex: none; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--r-md); }
-.view-toggle a { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; border-radius: var(--r-sm); color: var(--text-2); text-decoration: none; }
+.view-toggle a { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 22px; border-radius: var(--r-sm); color: var(--text-2); text-decoration: none; }
 .view-toggle a:hover { color: var(--text); }
 .view-toggle a[aria-current] { background: var(--bg-raised); color: var(--text); }
 .view-toggle a > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

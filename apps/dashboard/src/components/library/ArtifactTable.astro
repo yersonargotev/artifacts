@@ -12,7 +12,7 @@ const grouped = page.scope.kind === 'all' && !query.group;
 const showProject = page.scope.kind === 'all' && !grouped;
 const groups = grouped ? groupCards(page.cards, workspace.projects) : [{ project: undefined, cards: page.cards }];
 const paged = Boolean(page.next || page.continued);
-const columns = 5 + Number(selectable) + Number(showProject) + 1;
+const columns = 6 + Number(selectable) + Number(showProject);
 const sortable = (sort: LibrarySort) => {
   const active = page.sort === sort;
   const direction = active ? (page.direction === 'asc' ? 'desc' : 'asc') : defaultDirections[sort];
