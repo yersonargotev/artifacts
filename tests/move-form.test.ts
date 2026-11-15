@@ -135,4 +135,8 @@ test('publication and deletion keep strict singleton fields after the parser mig
       await assert.rejects(parse(request(invalid), 'artifact-one'), (error: unknown) => error instanceof Response && error.status === 400);
     }
   }
+  const body = new URLSearchParams({ artifactId: 'artifact-one', revisionId: 'revision-one', expectedPublicationVersion: '0', requestId: 'singleton-request' }).toString();
+  assert.equal((await parsePublicationForm(request(body), 'artifact-one')).returnPath, undefined);
+  assert.equal((await parsePublicationForm(request(`${body}&return=%2Fread%3Fartifact%3Done`), 'artifact-one')).returnPath, '/read?artifact=one', 'a publication form can name one return path');
+  await assert.rejects(parsePublicationForm(request(`${body}&return=%2Fread&return=%2F`), 'artifact-one'), (error: unknown) => error instanceof Response && error.status === 400);
 });
