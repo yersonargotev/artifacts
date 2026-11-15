@@ -26,10 +26,10 @@ async function assertPreviewInViewport(page: Page) {
 
 async function assertDetailHeaders(page: Page) {
   assert.equal(await page.locator('header').count(), 2, 'Detail renders the workspace header and artifact toolbar');
-  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Detail has one shared shell header');
+  assert.equal(await page.locator('header.top-bar').count(), 1, 'Detail has one shared shell header');
   assert.equal(await page.locator('header.detail-header').count(), 1, 'Detail has one artifact toolbar');
-  assert.equal(await page.locator('header.workspace-toolbar').getByRole('navigation', { name: 'Ruta', exact: true }).count(), 1);
-  assert.equal(await page.locator('header.workspace-toolbar').getByRole('search').count(), 1);
+  assert.equal(await page.locator('header.top-bar').getByRole('navigation', { name: 'Ruta', exact: true }).count(), 1);
+  assert.equal(await page.locator('header.top-bar').getByRole('search').count(), 1);
   assert.equal(await page.locator('h1').count(), 1);
 }
 
@@ -683,7 +683,6 @@ try {
   await anonymous.close();
   await panel.goto(dashboard);
   await panel.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
-  await panel.locator('.library-navigation > summary').click();
   await panel.locator('summary[aria-label="Mi cuenta"]').click();
   await panel.getByRole('link', { name: 'Cerrar todas las sesiones', exact: true }).click();
   await panel.getByRole('button', { name: 'Cerrar todas las sesiones', exact: true }).click();

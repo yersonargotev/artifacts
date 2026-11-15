@@ -2,19 +2,17 @@
 import type { NavLocation } from '../../presentation.ts';
 import { projectTone, scopeOf } from '../../presentation.ts';
 import { scopeHref } from '../../urls.ts';
-import Icon from '../Icon.astro';
 interface Props { location: NavLocation; title: string }
 const { location, title } = Astro.props;
 const scope = scopeOf(location);
-const nested = location.kind === 'artifact' || location.kind === 'task' || location.kind === 'read';
-const scoped = scope.kind !== 'all';
-const scopeName = scope.kind === 'project' ? scope.name : 'Sin proyecto';
+const leaf = location.kind === 'artifact' || location.kind === 'task' || location.kind === 'read';
+const scopeName = scope.kind === 'project' ? scope.name : scope.kind === 'unfiled' ? 'Sin proyecto' : undefined;
+const tone = scope.kind === 'project' ? projectTone(scope.name) : undefined;
 ---
-<nav class="workspace-breadcrumb" aria-label="Ruta">
+<nav class="breadcrumb" aria-label="Ruta">
   <ol>
-    <li>{location.kind === 'library' ? <><Icon name="home" size={17} /><span>Biblioteca</span></> : <a href="/">Biblioteca</a>}</li>
-    {location.kind === 'projects' && <li><Icon name="chevron-right" size={14} /><span>Proyectos</span></li>}
-    {scoped && <li><Icon name="chevron-right" size={14} />{nested ? <a href={scopeHref(scope)} title={scopeName}>{scope.kind === 'project' && <span class="project-dot" data-tone={projectTone(scope.name)}></span>}<span>{scopeName}</span></a> : <span title={scopeName}>{scopeName}</span>}</li>}
-    {nested && <li><Icon name="chevron-right" size={14} /><span title={title}>{title}</span></li>}
+    <li><a href="/">Biblioteca</a></li>
+    {scopeName && <li><span class="breadcrumb-separator" aria-hidden="true">/</span>{leaf ? <a href={scopeHref(scope)} title={scopeName}>{tone && <span class="project-dot" data-tone={tone}></span>}<span>{scopeName}</span></a> : <span aria-current="page" title={scopeName}>{tone && <span class="project-dot" data-tone={tone}></span>}<span>{scopeName}</span></span>}</li>}
+    {leaf && <li><span class="breadcrumb-separator" aria-hidden="true">/</span><span aria-current="page" title={title}>{title}</span></li>}
   </ol>
 </nav>

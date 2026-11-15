@@ -7,7 +7,7 @@ const { theme } = Astro.props;
 <form class="theme-toggle" method="post" action="/theme" data-theme-cookie={themeCookie}>
   <input type="hidden" name="theme" value={themeToggle[theme].next} />
   <input type="hidden" name="return" value={`${Astro.url.pathname}${Astro.url.search}`} />
-  <button type="submit">{themes.map((current) => <span data-theme-label={current} hidden={current !== theme}><Icon name={themeToggle[current].icon} size={18} />{themeToggle[current].label}</span>)}</button>
+  <button class="rail-link" type="submit" title={themeToggle[theme].label}>{themes.map((current) => <span data-theme-label={current} hidden={current !== theme}><Icon name={themeToggle[current].icon} size={18} /><span class="sr-only">{themeToggle[current].label}</span></span>)}</button>
 </form>
 <script>
   // With JavaScript the theme flips in place, so the page keeps its scroll, selection, and open disclosures; the form is the fallback.
@@ -20,7 +20,10 @@ const { theme } = Astro.props;
     root.dataset.theme = next;
     document.cookie = `${form.dataset.themeCookie}=${next}; path=/; max-age=31536000; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`;
     field.value = next === 'dark' ? 'light' : 'dark';
-    for (const label of form.querySelectorAll<HTMLElement>('[data-theme-label]')) label.hidden = label.dataset.themeLabel !== next;
+    for (const label of form.querySelectorAll<HTMLElement>('[data-theme-label]')) {
+      label.hidden = label.dataset.themeLabel !== next;
+      if (!label.hidden) form.querySelector('button')!.title = label.textContent!;
+    }
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim());
   });
 </script>

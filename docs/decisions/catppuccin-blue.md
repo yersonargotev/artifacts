@@ -22,7 +22,7 @@ The panel uses seven font sizes, `--text-2xs` (11px) to `--text-2xl` (28px), wit
 
 The panel has two themes. Dark is the default. This replaces the earlier decision that the panel is dark only.
 
-The owner switches the theme with a button in the sidebar. The choice persists in the `panel_theme` cookie for a year. The server reads the cookie, accepts only `dark` or `light`, renders anything else as dark, and writes the result as `data-theme` on `<html>`. The first byte of markup therefore carries the stored theme, so a cold load paints that theme first and needs no inline script. The button is a form that posts to `/theme`, which sets the cookie and redirects to the same-origin path and query that sent it. It works without JavaScript. With JavaScript, the click flips `data-theme` in place, writes the same cookie, and keeps the page state. The button names the action, such as Cambiar a tema claro, and shows a sun in the dark theme and a moon in the light theme. `meta name="theme-color"` takes the theme's `--bg`.
+The owner switches the theme with a button in the navigation rail. The choice persists in the `panel_theme` cookie for a year. The server reads the cookie, accepts only `dark` or `light`, renders anything else as dark, and writes the result as `data-theme` on `<html>`. The first byte of markup therefore carries the stored theme, so a cold load paints that theme first and needs no inline script. The button is a form that posts to `/theme`, which sets the cookie and redirects to the same-origin path and query that sent it. It works without JavaScript. With JavaScript, the click flips `data-theme` in place, writes the same cookie, and keeps the page state. The button names the action, such as Cambiar a tema claro, in its accessible name and title, and shows a sun in the dark theme and a moon in the light theme. `meta name="theme-color"` takes the theme's `--bg`.
 
 `tokens.css` defines every color token once in `[data-theme="dark"]` and once in `[data-theme="light"]`, with the same names, and each block sets `color-scheme`. The alpha steps, the cover wash, and the project tones derive from those tokens, so no other stylesheet branches on the theme. The sandboxed preview and the publication Worker keep their own appearance. The preview iframe keeps a white background in both themes.
 
@@ -42,9 +42,9 @@ The panel uses two variable fonts: Inter Variable for text and JetBrains Mono Va
 
 ## Panel effects
 
-`effects.css` applies the 120-degree gradient to `[data-variant="primary"]` with no shadow, the cover wash to `.project-cover`, and the indicator to current or selected items. Destructive primary actions keep a solid red background. Other buttons use `--bg-raised` with a `--border` outline.
+`effects.css` applies the 120-degree gradient to `[data-variant="primary"]` and the rail's brand mark with no shadow, the cover wash to `.project-cover`, and the indicator to current or selected items. Destructive primary actions keep a solid red background. Other buttons use `--bg-raised` with a `--border` outline.
 
-Current and selected items have no glow. A current navigation item, the current reader item, the current project filter, and a selected table row or card show a 3px `--accent` bar on their leading edge over an `--accent-a1` or `--accent-a2` surface. Detail tabs keep their underline, and the status filters and view toggle keep their tinted or raised fill. This replaces the earlier decision to mark active items with a blue glow.
+Current and selected items have no glow. A current rail item, the current reader item, the current project filter, and a selected table row or card show a 3px `--accent` bar on their leading edge over an `--accent-a1` or `--accent-a2` surface. Detail tabs keep their underline, and the status filters and view toggle keep their tinted or raised fill. This replaces the earlier decision to mark active items with a blue glow.
 
 The focus ring is `2px solid var(--accent)` with a 2px offset. Shadows come only from `--shadow-1`, for the reader pane, and `--shadow-2`, for menus, dialogs, and popups. A dialog dims the page with `--scrim`.
 
@@ -71,7 +71,7 @@ It also checks that both theme blocks in `tokens.css` define the same tokens and
 
 ## Library behavior
 
-The existing shadcn Base UI menus remain responsible for focus, keyboard interaction, and positioning. The [shadcn dashboard block](https://ui.shadcn.com/blocks) informs the sidebar, header, summary, and list composition. The dashboard presents artifact information rather than unrelated chart fixtures.
+The existing shadcn Base UI menus remain responsible for focus, keyboard interaction, and positioning. The approved panel prototype sets the shell: a navigation rail, a top bar, and a status bar, described in [Dashboard and publication controls](dashboard-ui.md#shell). The [shadcn dashboard block](https://ui.shadcn.com/blocks) informs the summary and list composition. The dashboard presents artifact information rather than unrelated chart fixtures.
 
 Library search and publication filters use server-rendered GET navigation. Filtering runs before pagination across the owner's records. Filtering only the current page in React would hide matching artifacts on later pages. Search parameters survive pagination and can be bookmarked. Native forms remain usable before hydration.
 

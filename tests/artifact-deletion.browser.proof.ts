@@ -118,7 +118,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator('header').count(), 1, 'Confirmation renders one panel header');
-  assert.equal(await page.locator('header.workspace-toolbar').count(), 1, 'Confirmation uses the shared shell header');
+  assert.equal(await page.locator('header.top-bar').count(), 1, 'Confirmation uses the shared shell header');
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await writeFile(`${evidence}/confirmation-mobile.aria.yml`, await page.locator('body').ariaSnapshot());
   await page.screenshot({ path: `${evidence}/confirmation-mobile.png`, fullPage: true });

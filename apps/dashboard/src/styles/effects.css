@@ -3,6 +3,11 @@
   color: var(--on-accent);
 }
 
+.rail-brand {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
 [data-variant="primary"]:hover {
   background: var(--accent-fill);
   filter: brightness(1.06);
@@ -16,7 +21,7 @@
   background: var(--danger);
 }
 
-.sidebar-link[aria-current]::before,
+.rail-link[aria-current]::before,
 .project-filter-links a[aria-current]::before,
 .reader-item[aria-current]::before,
 .artifact-card:has(input:checked)::before,
@@ -35,4 +40,22 @@
   top: 0;
   bottom: 0;
   border-radius: 0;
+}
+
+.rail-link[aria-current]::before {
+  top: 9px;
+  bottom: 9px;
+  left: -10px;
+}
+
+@media (max-width: 760px) {
+  .rail-link[aria-current]::before {
+    top: -6px;
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    width: auto;
+    height: 3px;
+    border-radius: 0 0 var(--r-sm) var(--r-sm);
+  }
 }

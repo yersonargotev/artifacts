@@ -2,7 +2,7 @@
 
 ## Problem and decision
 
-Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel sidebar group the owner's artifacts by that column. MCP, REST, and the CLI move one artifact through the public store command. The panel uses a private batch command over the same project column. There is no project table, no command that creates or deletes a project, and no empty project.
+Owners need to group related artifacts and browse one group at a time from MCP, the CLI, and the panel. An artifact carries an optional project name in a nullable `project` column on its `artifact` row. A project exists while at least one of the owner's artifacts carries its name. `projects_list`, `GET /v1/projects`, and the panel's Proyectos page and project filter group the owner's artifacts by that column. MCP, REST, and the CLI move one artifact through the public store command. The panel uses a private batch command over the same project column. There is no project table, no command that creates or deletes a project, and no empty project.
 
 ## Derived label instead of a project table
 

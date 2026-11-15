@@ -100,7 +100,7 @@ try {
       'identical-historical-zip-and-sha256',
       'protected-publication-renders-original-revision',
       'create-with-project-filter-list-and-move',
-      'panel-sidebar-groups-moved-artifact',
+      'panel-project-filter-groups-moved-artifact',
       'remove-from-project-leaves-no-verification-project',
       'own-credential-logout-and-denied-whoami',
     ]) assert(evidence.checks.includes(check), `First-use harness proves ${check}`);

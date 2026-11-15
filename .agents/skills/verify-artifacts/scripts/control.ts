@@ -462,7 +462,6 @@ async function drive(feature: Feature) {
         await capture(page, 'signed-in');
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(instance.panel);
-        await page.locator('.library-navigation > summary').click();
         await page.locator('summary[aria-label="Mi cuenta"]').click();
         await page.getByTestId('user-id').waitFor();
         assert.equal(await page.getByTestId('user-id').textContent(), instance.ownerId);

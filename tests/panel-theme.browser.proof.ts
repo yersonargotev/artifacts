@@ -112,6 +112,28 @@ function textContrast(root: Element, mode: Mode): Row[] {
   return rows;
 }
 
+/** Runs in the page. Reports the box and paint of the rail, top bar, status bar, and current rail item against the theme tokens. */
+function shellGeometry() {
+  const paint = (property: 'backgroundColor' | 'color', value: string) => { const probe = document.createElement('i'); probe.style[property] = value; document.body.append(probe); const result = getComputedStyle(probe)[property]; probe.remove(); return result; };
+  const box = (selector: string) => {
+    const element = document.querySelector(selector)!;
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height, bottom: rect.bottom, position: style.position, background: style.backgroundColor };
+  };
+  const current = document.querySelector('.rail a[aria-current]')!;
+  const indicator = getComputedStyle(current, '::before');
+  const currentBox = current.getBoundingClientRect();
+  const indicatorBox = { left: Number.parseFloat(indicator.left), top: Number.parseFloat(indicator.top) };
+  return {
+    viewport: { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth > innerWidth },
+    tokens: { chrome: paint('backgroundColor', 'var(--bg-chrome)'), bg: paint('backgroundColor', 'var(--bg)'), accentA2: paint('backgroundColor', 'var(--accent-a2)'), accent: paint('color', 'var(--accent)') },
+    rail: box('.rail'), bar: box('.top-bar'), status: box('.status-bar'),
+    keys: getComputedStyle(document.querySelector('.status-keys')!).display,
+    current: { href: current.getAttribute('href'), name: current.getAttribute('aria-label'), background: getComputedStyle(current).backgroundColor, color: getComputedStyle(current).color, size: [currentBox.width, currentBox.height], indicator: { width: indicator.width, height: indicator.height, background: indicator.backgroundColor, ...indicatorBox } },
+  };
+}
+
 await control(['launch', '--allow-guests', '--run', run]);
 const evidence = resolve(process.env.PANEL_THEME_EVIDENCE ?? join(run, 'panel-theme'));
 await mkdir(evidence, { recursive: true });
@@ -122,6 +144,7 @@ const contexts: BrowserContext[] = [];
 const errors: string[] = [];
 const checks: string[] = [];
 const measured: Measured[] = [];
+const shells: (ReturnType<typeof shellGeometry> & { theme: Theme; width: number; scrolled?: boolean })[] = [];
 let active: Page | undefined;
 
 async function call(name: string, input: unknown, token = credentials.accessToken): Promise<Record<string, any>> {
@@ -280,6 +303,25 @@ try {
 
       await page.goto(`${instance.panel}/?view=table`);
       await settle(page);
+      shells.push({ theme, width, ...await page.evaluate(shellGeometry) });
+      await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+      shells.push({ theme, width, scrolled: true, ...await page.evaluate(shellGeometry) });
+      await page.evaluate(() => scrollTo(0, 0));
+      for (const [label, summary, panel] of [['rail-tools', '#connect-tools > summary', '#connect-tools .rail-panel'], ['rail-account', 'summary[aria-label="Mi cuenta"]', '.identity .rail-panel']] as const) {
+        await page.locator(summary).click();
+        await page.locator(panel).waitFor();
+        const box = (await page.locator(panel).boundingBox())!;
+        const viewport = page.viewportSize()!;
+        assert(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height, `${label} opens inside the ${width}px viewport: ${JSON.stringify(box)}`);
+        await measure(page, theme, label, 'static', page.locator(panel));
+        for (const control of await page.locator(`${panel} a, ${panel} button`).all()) { await control.hover(); await measure(page, theme, label, 'hover', control); await control.focus(); await measure(page, theme, label, 'focus', control); }
+        await page.locator(summary).focus();
+        await page.keyboard.press('Escape');
+        await page.locator(panel).waitFor({ state: 'hidden' });
+        assert.equal(await page.locator(summary).evaluate((element) => element === document.activeElement), true, `Escape closes ${label} and keeps focus on its rail button`);
+      }
+      await page.goto(`${instance.panel}/?view=table`);
+      await settle(page);
       await page.getByRole('button', { name: 'Menú de Unfiled notes', exact: true }).first().click();
       const menu = page.locator('[data-slot=dropdown-menu-content]');
       await menu.waitFor();
@@ -316,6 +358,29 @@ try {
       await page.close();
     }
   }
+  for (const shell of shells) {
+    const label = `${shell.theme} ${shell.width}${shell.scrolled ? ' scrolled' : ''}`;
+    const { rail, bar, status, tokens, current, viewport } = shell;
+    assert.equal(viewport.overflow, false, `${label}: no horizontal overflow`);
+    assert.equal(rail.background, tokens.chrome, `${label}: the rail sits on --bg-chrome`);
+    assert.equal(status.background, tokens.chrome, `${label}: the status bar sits on --bg-chrome`);
+    assert.equal(bar.background, tokens.bg, `${label}: the top bar sits on --bg`);
+    assert.deepEqual([current.href, current.name, current.background, current.color], ['/', 'Biblioteca', tokens.accentA2, tokens.accent], `${label}: Biblioteca is the current rail item on --accent-a2 in --accent`);
+    assert.equal(current.indicator.background, tokens.accent, `${label}: the current item carries the accent indicator`);
+    if (shell.width === 1440) {
+      assert.deepEqual([rail.left, rail.top, rail.width, rail.height], [0, 0, 56, viewport.height], `${label}: the rail is 56px wide and fills the viewport height`);
+      assert.deepEqual([bar.left, bar.top, bar.height], [56, 0, 52], `${label}: the top bar is 52px tall beside the rail`);
+      assert.deepEqual([status.left, status.height, status.bottom], [56, 30, viewport.height], `${label}: the status bar is 30px tall at the bottom of the viewport`);
+      assert.deepEqual([current.size, current.indicator.width, current.indicator.left], [[36, 36], '3px', -10], `${label}: a 36px item with a 3px indicator on the rail edge`);
+      assert.equal(shell.keys, 'flex', `${label}: the status bar keeps a slot for shortcut hints`);
+    } else {
+      assert.deepEqual([rail.left, rail.width, rail.height, rail.bottom, rail.position], [0, viewport.width, 56, viewport.height, 'fixed'], `${label}: the rail becomes a 56px bottom bar`);
+      assert.deepEqual([bar.position, current.indicator.height], ['static', '3px'], `${label}: the top bar scrolls away and the indicator sits on the top edge`);
+      assert.equal(shell.keys, 'none', `${label}: the status bar drops the shortcut hints`);
+    }
+  }
+  await writeFile(join(evidence, 'shell.json'), JSON.stringify(shells, null, 1));
+  checks.push('the rail, top bar, and status bar keep their size, position, and tokens in both themes at 1440 and 390, before and after scrolling; the tools and account panels open inside the viewport, measure every text node, and close on Escape');
   assert.deepEqual(previews.light, previews.dark, 'The sandboxed preview keeps its own document background in both panel themes');
   assert.equal((previews.dark as { iframe: string }).iframe, 'rgb(255, 255, 255)');
   checks.push(`the preview iframe keeps a white background and its own document in both themes: ${JSON.stringify(previews.dark)}`);

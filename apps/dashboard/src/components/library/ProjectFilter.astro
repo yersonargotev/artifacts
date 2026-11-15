@@ -1,10 +1,11 @@
 ---
 import type { LibraryPage, ScopeRequest, Workspace } from '@artifacts/artifacts/panel/model';
 import { projectTone, searchFor } from '../../presentation.ts';
-import { libraryHref, type ListView } from '../../urls.ts';
+import { libraryHref, readerHref, type ListView } from '../../urls.ts';
 import Icon from '../Icon.astro';
-interface Props { workspace: Workspace; page: LibraryPage; namedView?: ListView }
-const { workspace, page, namedView } = Astro.props;
+interface Props { workspace: Workspace; page: LibraryPage; namedView?: ListView; reader?: boolean }
+const { workspace, page, namedView, reader = false } = Astro.props;
+const href = reader ? readerHref : libraryHref;
 const query = searchFor(page, namedView);
 const label = page.scope.kind === 'project' ? page.scope.project.name : page.scope.kind === 'vanishedProject' ? page.scope.name : page.scope.kind === 'unfiled' ? 'Sin proyecto' : 'Todos los proyectos';
 const choices: readonly { label: string; count: number; scope: ScopeRequest }[] = [
@@ -17,7 +18,7 @@ const isCurrent = (scope: ScopeRequest) => scope.kind === query.scope.kind && (s
 <details class="project-filter">
   <summary><Icon name="folder" size={17} /><span>{label}</span><Icon name="chevron-down" size={15} /></summary>
   <nav class="project-filter-links" aria-label="Filtrar por proyecto">
-    {choices.map((choice) => <a href={libraryHref(query, { scope: choice.scope })} aria-current={isCurrent(choice.scope) ? 'page' : undefined} title={choice.label}>
+    {choices.map((choice) => <a href={href(query, { scope: choice.scope })} aria-current={isCurrent(choice.scope) ? 'page' : undefined} aria-label={`${choice.label} (${choice.count})`} title={choice.label}>
       <span class="project-dot" data-tone={choice.scope.kind === 'project' ? projectTone(choice.scope.name) : undefined} aria-hidden="true"></span><span>{choice.label}</span><span class="project-count">{choice.count}</span>
     </a>)}
   </nav>
