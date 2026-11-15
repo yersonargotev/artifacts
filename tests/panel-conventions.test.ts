@@ -38,6 +38,9 @@ const scaleValues = {
   '--r-sm': '6px', '--r-md': '8px', '--r-lg': '12px', '--r-full': '999px',
   '--dur-1': '90ms', '--dur-2': '160ms', '--dur-3': '260ms', '--ease-out': 'cubic-bezier(.2, .8, .2, 1)', '--ease-in-out': 'cubic-bezier(.4, 0, .2, 1)',
 };
+const fontTokens = ['--font-sans', '--font-mono'];
+const fontKeywords = new Set(['inherit', 'normal', 'italic', 'bold']);
+const crossOrigin = (url: string) => /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url);
 const radiusProperties = new Set(['border-radius', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius']);
 const motionProperties = new Set(['transition', 'transition-duration', 'transition-timing-function', 'transition-delay', 'animation', 'animation-duration', 'animation-timing-function', 'animation-delay']);
 
@@ -64,7 +67,7 @@ function scaleViolation(property: string, declaration: { property: string; value
     if (declaration.property !== 'unparsed') return 'must use a --text-* size step';
     const keyword = nodes.some((node) => node.type === 'ident' && ['inherit', 'unset', 'initial'].includes(node.value as string));
     if (!variables.length && !keyword) return 'must use a --text-* size step';
-    if (variables.some((name) => !scales['font-size'].includes(name))) return 'uses a size outside the --text-* scale';
+    if (variables.some((name) => !scales['font-size'].includes(name) && !(property === 'font' && fontTokens.includes(name)))) return 'uses a size outside the --text-* scale';
     if (lengths.some((node) => (node.value as { unit?: string }).unit !== 'vw')) return 'mixes a literal length into a scale size';
   }
   if (radiusProperties.has(property)) {
@@ -87,6 +90,15 @@ function scaleViolation(property: string, declaration: { property: string; value
   return null;
 }
 
+function familyViolation(declaration: { property: string; value: unknown }, variables: string[], nodes: Record<string, unknown>[]) {
+  if (declaration.property === 'font-family') return JSON.stringify(declaration.value) === '["inherit"]' ? null : 'must take its family from --font-sans or --font-mono';
+  const words = nodes.filter((node) => node.type === 'token' && ['ident', 'string'].includes((node.value as { type: string }).type)).map((node) => node.value as { type: string; value: string });
+  const literal = words.some((word) => word.type === 'string' || !fontKeywords.has(word.value));
+  if (!literal && !variables.length && words.some((word) => word.value === 'inherit')) return null;
+  if (literal || variables.filter((name) => fontTokens.includes(name)).length !== 1 || variables.some((name) => name.startsWith('--font-') && !fontTokens.includes(name))) return 'must take its family from --font-sans or --font-mono';
+  return null;
+}
+
 function stylesheetViolations(filename: string, source: string) {
   const issues: string[] = [];
   const tokensFile = filename === 'tokens.css';
@@ -100,6 +112,11 @@ function stylesheetViolations(filename: string, source: string) {
         const line = rule.type === 'style' ? rule.value.loc.line + 1 : 1;
         const offset = rule.type === 'style' ? lineOffsets[line - 1] + rule.value.loc.column - 1 : 0;
         rules.push({ selectors: rule.type === 'style' ? rule.value.selectors : [], label: rule.type === 'style' ? source.slice(offset).split('{')[0].trim() : `@${rule.type}`, line, offset });
+        if (rule.type === 'import' && crossOrigin(rule.value.url)) issues.push(`${filename}: @import ${rule.value.url} leaves the panel origin`);
+        if (rule.type === 'font-face' && filename !== 'fonts.css') issues.push(`${filename}: @font-face belongs in fonts.css`);
+      },
+      Url(url) {
+        if (crossOrigin(url.url)) issues.push(`${filename}: url(${url.url}) leaves the panel origin`);
       },
       RuleExit() { rules.pop(); },
       Declaration(declaration) {
@@ -120,6 +137,11 @@ function stylesheetViolations(filename: string, source: string) {
         if ([customName, ...variables].some((name) => name && /glow/i.test(name))) report(`${customName ?? property} names a glow token; current and selected items use the side indicator`);
         if (hasGradient && !(tokensFile && token && effectPolicy[token].property === 'background')) report(`${customName ?? property} contains a gradient outside its effect token`);
         if (hasDropShadow) report(`${property} contains a drop shadow`);
+        if (customName?.startsWith('--font-') && !tokensFile) report(`${customName} is defined outside tokens.css`);
+        if (!customName && (property === 'font-family' || property === 'font')) {
+          const problem = familyViolation(declaration, variables, nodes);
+          if (problem) report(`${property} ${problem}`);
+        }
         if (customName && isEffectToken(customName)) {
           if (!tokensFile || !token) report(`${customName} is not an approved token definition`);
         }
@@ -155,7 +177,8 @@ function markupViolations(filename: string, source: string) {
   for (const match of source.matchAll(/--(?:(?:glow|cover|shadow)-[\w-]+|accent-fill(?![\w-]))/g)) issues.push(`${filename}: effect token ${match[0]} belongs in the stylesheets`);
   for (const [utility] of source.matchAll(/(?<![\w-])text-[\w[\]().%/-]+/g)) if (/^text-(?:base|\d*xl|xs|sm|md|lg|\[.*\]|\(.*\))$/.test(utility) && !/^text-(?:2xs|xs|sm|md|lg|xl|2xl)$/.test(utility)) issues.push(`${filename}: font size ${utility} is outside the type scale`);
   for (const [utility] of source.matchAll(/(?<![\w-])rounded(?:-[\w[\]().%/-]+)?(?![\w-])/g)) if (!/^rounded(?:-(?:[trbl]|tl|tr|br|bl|[se]|ss|se|es|ee))?-(?:sm|md|lg|full|none)$/.test(utility)) issues.push(`${filename}: radius ${utility} is outside the radius scale`);
-  for (const match of source.matchAll(/\b(?:fontSize|font-size|borderRadius|border-radius)["']?\s*:/gi)) issues.push(`${filename}: inline ${match[0]} bypasses the scales`);
+  for (const match of source.matchAll(/\b(?:fontSize|font-size|fontFamily|font-family|borderRadius|border-radius)["']?\s*:/gi)) issues.push(`${filename}: inline ${match[0]} bypasses the scales`);
+  for (const [tag] of source.matchAll(/<link\b[^>]*>/gi)) if (!/\brel=["']icon["']/i.test(tag) || !/\bhref=["']\/(?!\/)/i.test(tag)) issues.push(`${filename}: ${tag} loads a resource outside the panel stylesheets`);
   return issues;
 }
 
@@ -223,12 +246,12 @@ test('effect policy permits scoped effect tokens and shadow tokens on their subj
 
 test('scale policy accepts only scale steps for sizes, radii, and motion', () => {
   for (const declaration of [
-    'font-size: var(--text-sm)', 'font: var(--text-md)/1.5 a, b', 'font: inherit', 'font-size: clamp(var(--text-xl), 6vw, var(--text-2xl))',
+    'font-size: var(--text-sm)', 'font: var(--text-md)/1.5 var(--font-sans)', 'font: inherit', 'font-size: clamp(var(--text-xl), 6vw, var(--text-2xl))',
     'border-radius: var(--r-md)', 'border-radius: var(--r-lg) var(--r-lg) 0 0', 'border-radius: 50%', 'border-radius: 0',
     'transition: color var(--dur-1) var(--ease-out), transform var(--dur-2) var(--ease-in-out)', 'transition: none', 'animation: none',
   ]) assert.deepEqual(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`), [], declaration);
   for (const declaration of [
-    'font-size: 13px', 'font-size: 1rem', 'font: 12px/1.6 mono', 'font-size: var(--text-3xl)', 'font-size: calc(var(--text-sm) + 1px)', 'font-size: clamp(36px, 6vw, 54px)',
+    'font-size: 13px', 'font-size: 1rem', 'font: 12px/1.6 var(--font-mono)', 'font-size: var(--text-3xl)', 'font-size: calc(var(--text-sm) + 1px)', 'font-size: clamp(36px, 6vw, 54px)',
     'border-radius: 4px', 'border-radius: 30%', 'border-radius: var(--r-xl)', 'border-radius: var(--r-md) 4px', 'border-top-left-radius: 3px',
     'transition: color 90ms ease', 'transition: color var(--dur-1) ease-in', 'transition: color 200ms var(--ease-out)', 'transition-duration: .2s', 'animation: spin 1s linear infinite', 'transition: color var(--dur-1) cubic-bezier(0, 0, 1, 1)',
   ]) assert(stylesheetViolations('panel.css', `.sidebar-link { ${declaration} }`).length > 0, declaration);
@@ -256,6 +279,49 @@ test('markup policy rejects effect utilities, off-scale sizes and radii, and inl
   ]) assert(markupViolations('fixture.tsx', source).length > 0, source);
   assert.deepEqual(markupViolations('fixture.tsx', '<div className="rounded-md rounded-t-lg text-sm text-muted-foreground text-foreground rounded-full text-2xs" />'), []);
   assert.deepEqual(markupViolations('fixture.astro', '<button data-variant="primary">Publicar</button>'), []);
+});
+
+test('tokens and fonts.css define two self-hosted variable families', async () => {
+  const tokens = await readFile(resolve(styleRoot, 'tokens.css'), 'utf8');
+  assert.match(tokens, /--font-sans: 'Inter Variable', [^;]+, sans-serif;/);
+  assert.match(tokens, /--font-mono: 'JetBrains Mono Variable', [^;]+, monospace;/);
+  const fonts = await readFile(resolve(styleRoot, 'fonts.css'), 'utf8');
+  const faces = [...fonts.matchAll(/@font-face \{([^}]*)\}/g)].map(([, body]) => Object.fromEntries([...body!.matchAll(/([\w-]+): ([^;]+);/g)].map((match) => [match[1], match[2]])));
+  assert.deepEqual(faces.map((face) => [face['font-family'], face.src]), [
+    ["'Inter Variable'", "url('@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2') format('woff2-variations')"],
+    ["'Inter Variable'", "url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations')"],
+    ["'JetBrains Mono Variable'", "url('@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-ext-wght-normal.woff2') format('woff2-variations')"],
+    ["'JetBrains Mono Variable'", "url('@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations')"],
+  ]);
+  assert(faces.every((face) => face['font-style'] === 'normal' && face['font-display'] === 'swap'));
+  const { dependencies } = JSON.parse(await readFile(resolve('apps/dashboard/package.json'), 'utf8')) as { dependencies: Record<string, string> };
+  for (const name of ['@fontsource-variable/inter', '@fontsource-variable/jetbrains-mono']) assert.match(dependencies[name] ?? '', /^\d+\.\d+\.\d+$/, `${name} is pinned to an exact version`);
+});
+
+test('font policy rejects other families, remote URLs, and font links', () => {
+  for (const source of [
+    ".sidebar-link { font-family: 'Inter' }",
+    '.sidebar-link { font-family: var(--font-sans), serif }',
+    '.sidebar-link { font-family: var(--font-display) }',
+    '.sidebar-link { font: var(--text-md)/1.5 a, b }',
+    ".sidebar-link { font: 600 var(--text-xs) 'JetBrains Mono' }",
+    '.sidebar-link { --font-sans: serif }',
+    '.sidebar-link { background: url(https://cdn.test/a.png) }',
+    '.sidebar-link { background: url(//cdn.test/a.png) }',
+    '@import url(https://fonts.googleapis.com/css2?family=Inter);',
+    "@font-face { font-family: 'Inter Variable'; src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') }",
+  ]) assert(stylesheetViolations('panel.css', source).length > 0, source);
+  assert(stylesheetViolations('fonts.css', "@font-face { font-family: 'Inter Variable'; src: url(https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) }").length > 0);
+  for (const source of ['.sidebar-link { font-family: var(--font-mono) }', '.sidebar-link { font: 600 var(--text-xs) var(--font-mono) }', '.sidebar-link { font: inherit }', '.sidebar-link { font-family: inherit }', "@import 'tailwindcss';"]) assert.deepEqual(stylesheetViolations('panel.css', source), [], source);
+  assert.deepEqual(stylesheetViolations('fonts.css', "@font-face { font-family: 'Inter Variable'; src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations') }"), []);
+  for (const source of [
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter">',
+    '<link rel="preload" as="font" href="/_astro/inter-latin-wght-normal.woff2" crossorigin>',
+    '<link rel="icon" href="//cdn.test/favicon.svg">',
+    '<div style="font-family: serif" />',
+    '<div style={{ fontFamily: "serif" }} />',
+  ]) assert(markupViolations('fixture.astro', source).length > 0, source);
+  assert.deepEqual(markupViolations('fixture.astro', '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />'), []);
 });
 
 function readerViolations(filename: string, source: string) {
