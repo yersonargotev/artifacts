@@ -112,7 +112,7 @@ Identical files stay unchanged. Differing files require --force.
 
 class UsageError extends Error {}
 
-const commandOptions: Record<string, readonly string[]> = {
+export const commandOptions: Record<string, readonly string[]> = {
   login: ['no-browser'], logout: [], whoami: [],
   create: ['snapshot', 'project', 'slug', 'request-id', 'response', 'command'],
   list: ['limit', 'cursor', 'project'], projects: [], search: ['project', 'limit', 'cursor'], read: ['slug', 'project', 'revision', 'response', 'out', 'quiet'],
@@ -319,10 +319,12 @@ function errorBody(error: unknown): { code: string; message: string; status?: nu
       : { code: error instanceof UsageError || error instanceof TypeError || error instanceof SyntaxError ? 'invalid_arguments' : 'local_error', message: error instanceof Error ? error.message : 'Command failed', details: {} };
 }
 
-try {
-  const result = await main();
-  if (result !== undefined) process.stdout.write(`${JSON.stringify(result)}\n`);
-} catch (error) {
-  process.stderr.write(`${JSON.stringify({ error: errorBody(error) })}\n`);
-  process.exitCode = 1;
+if (import.meta.main !== false) {
+  try {
+    const result = await main();
+    if (result !== undefined) process.stdout.write(`${JSON.stringify(result)}\n`);
+  } catch (error) {
+    process.stderr.write(`${JSON.stringify({ error: errorBody(error) })}\n`);
+    process.exitCode = 1;
+  }
 }
