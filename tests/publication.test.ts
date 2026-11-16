@@ -140,7 +140,7 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.equal(content.headers.get('cross-origin-opener-policy'), 'same-origin');
   assert((await content.text()).includes('<script>window.secret = 1</script>'));
   assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie } }))).status, 403);
-  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }))).status, 403);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }))).status, 404);
   const inert = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
   const inertBody = await inert.text();
   assert(inertBody.includes('sandbox=""'));
@@ -156,9 +156,35 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.match(download.headers.get('content-disposition')!, /^attachment;/);
   assert.equal(download.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await handler(flow.request)).status, 403);
-  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 403);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 404);
   assert.equal((await handler(new Request(`${publish}/a/artifact-b`, { headers: { cookie } }))).status, 303);
   assert.equal(calls.filter((url) => url.endsWith('/read')).length, 8);
+});
+
+test('a stale revision link after a republish keeps the viewer cookie, and a revoked share still clears it', async () => {
+  let current = artifact;
+  let revoked = false;
+  const backend: typeof fetch = async (input, init) => {
+    if (String(input).endsWith('/consume')) return Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+    const { revisionId } = JSON.parse(String(init?.body)) as { revisionId?: string };
+    if (revoked || (revisionId && revisionId !== current.revision.id)) return new Response(null, { status: 404 });
+    return Response.json(current);
+  };
+  const handler = createPublicationApp(environment(), backend);
+  const cookie = cookieHeader((await authorize(handler)).admitted);
+  current = { ...artifact, headRevisionId: 'revision-2', publication: { ...artifact.publication!, revisionId: 'revision-2', version: 2 }, revision: { ...artifact.revision, id: 'revision-2', sequence: 2 } };
+  for (const path of ['/r/revision-1/content', '/r/revision-1/files/nested/file.html']) {
+    const stale = await handler(new Request(`${publish}/a/artifact-a${path}`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }));
+    assert.equal(stale.status, 404, path);
+    assert.deepEqual(stale.headers.getSetCookie(), [], path);
+  }
+  const page = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie } }));
+  assert.equal(page.status, 200);
+  assert((await page.text()).includes('src="/a/artifact-a/r/revision-2/content"'));
+  revoked = true;
+  const denied = await handler(new Request(`${publish}/a/artifact-a/r/revision-2/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }));
+  assert.equal(denied.status, 403);
+  assert(denied.headers.getSetCookie().some((value) => value.includes('Max-Age=0')));
 });
 
 test('anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes', async () => {
@@ -174,6 +200,66 @@ test('anonymous files, cookie tampering, callback mismatch and missing transacti
   assert.equal((await handler(new Request(callback.replace(state, 'b'.repeat(43)), { headers: { cookie: cookieHeader(begin) } }))).status, 403);
   assert.equal((await handler(new Request(callback.replace('artifact-a', 'artifact-b'), { headers: { cookie: cookieHeader(begin) } }))).status, 403);
   assert.equal(calls, 0);
+});
+
+/** A browser cookie jar: the last Set-Cookie for a name wins, and Max-Age=0 removes it. */
+function cookieJar() {
+  const cookies = new Map<string, string>();
+  return {
+    apply(response: Response) {
+      for (const line of response.headers.getSetCookie()) {
+        const [pair] = line.split(';');
+        const name = pair!.slice(0, pair!.indexOf('='));
+        if (line.includes('Max-Age=0')) cookies.delete(name);
+        else cookies.set(name, pair!.slice(name.length + 1));
+      }
+    },
+    header: () => [...cookies].map(([name, value]) => `${name}=${value}`).join('; '),
+    get size() { return cookies.size; },
+  };
+}
+
+async function openTab(handler: ReturnType<typeof createPublicationApp>, browser: ReturnType<typeof cookieJar>, artifactId: string, code = 'a'.repeat(43)) {
+  const begin = await handler(new Request(`${publish}/a/${artifactId}`, { headers: { cookie: browser.header() } }));
+  browser.apply(begin);
+  const state = new URL(begin.headers.get('location')!).searchParams.get('state')!;
+  return `${publish}/callback?${new URLSearchParams({ artifactId, state, code })}`;
+}
+
+test('concurrent publication tabs keep their own transactions, and a failed callback clears only its own', async () => {
+  const backend: typeof fetch = async (_input, init) => {
+    const grant = JSON.parse(String(init?.body)) as { artifactId: string; code: string };
+    if (grant.code.startsWith('x')) return new Response(null, { status: 403 });
+    return Response.json({ artifactId: grant.artifactId, userId: 'guest-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+  };
+  const handler = createPublicationApp(environment(), backend);
+  const browser = cookieJar();
+  const callback = async (url: string) => {
+    const response = await handler(new Request(url, { headers: { cookie: browser.header() } }));
+    browser.apply(response);
+    return response.status;
+  };
+  const first = await openTab(handler, browser, 'artifact-a');
+  const second = await openTab(handler, browser, 'artifact-b');
+  const sameLink = await openTab(handler, browser, 'artifact-a');
+  const denied = await openTab(handler, browser, 'artifact-c', 'x'.repeat(43));
+  assert.equal(await callback(denied), 403);
+  assert.equal(await callback(first), 303);
+  assert.equal(await callback(second), 303);
+  assert.equal(await callback(sameLink), 303);
+  assert.equal(browser.size, 2, 'only the two viewer cookies remain');
+});
+
+test('a publication transaction outlives a ten-minute panel sign-in and then expires', async (t) => {
+  const backend: typeof fetch = async () => Response.json({ artifactId: 'artifact-a', userId: 'guest-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+  const handler = createPublicationApp(environment(), backend);
+  const browser = cookieJar();
+  const now = Date.now();
+  const callback = await openTab(handler, browser, 'artifact-a');
+  const clock = t.mock.method(Date, 'now', () => now + 599_000);
+  assert.equal((await handler(new Request(callback, { headers: { cookie: browser.header() } }))).status, 303);
+  clock.mock.mockImplementation(() => now + 601_000);
+  assert.equal((await handler(new Request(callback, { headers: { cookie: browser.header() } }))).status, 403);
 });
 
 test('backend outages, redirects and malformed content fail closed after valid admission', async (t) => {

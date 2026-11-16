@@ -95,3 +95,17 @@ test('lost committed results retain a retry while list failures cannot undo conf
     assert.deepEqual(await submitShare(store, actor, artifactId, { ...command, email: 'other@example.test' }), { outcome: 'conflict' });
   } finally { await app.close(); }
 });
+
+test('a second tab removing an already removed share confirms it, while a missing or foreign artifact stays denied', async () => {
+  const { app, actor, store, artifactId } = await setup();
+  try {
+    await submitShare(store, actor, artifactId, command);
+    const [{ shareId }] = (await store.listShares(actor, { artifactId })).items;
+    assert.deepEqual(await submitShare(store, actor, artifactId, { intent: 'unshare', requestId: randomUUID(), shareId }), { outcome: 'confirmed' });
+    assert.deepEqual(await submitShare(store, actor, artifactId, { intent: 'unshare', requestId: randomUUID(), shareId }), { outcome: 'confirmed' });
+    assert.deepEqual((await store.listShares(actor, { artifactId })).items, []);
+    const stale: ShareCommand = { intent: 'unshare', requestId: randomUUID(), shareId };
+    await assert.rejects(submitShare(store, actor, 'missing-artifact', stale), (error: unknown) => error instanceof ArtifactError && error.code === 'not_found');
+    await assert.rejects(submitShare(store, { ...actor, userId: 'foreign-owner' }, artifactId, stale), (error: unknown) => error instanceof ArtifactError);
+  } finally { await app.close(); }
+});
