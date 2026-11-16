@@ -8,7 +8,7 @@ import { unzipSync } from 'fflate';
 import { fixture, grant } from './helpers.ts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
-import { ArtifactError, type ArtifactRead, type Share, type Snapshot } from '../packages/contracts/src/index.ts';
+import { type ArtifactRead, type Share, type Snapshot } from '../packages/contracts/src/index.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 
 const snapshot: Snapshot = { metadata: { title: 'HTTP retained artifact', description: 'A complete REST snapshot', custom: { preserved: ['one', 2] } }, content: { kind: 'html', text: '<h1>REST first revision</h1>' }, files: [{ path: 'data/raw.bin', mediaType: 'application/octet-stream', encoding: 'base64', data: 'AAEC/w==' }] };
