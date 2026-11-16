@@ -111,6 +111,40 @@ test('a database exchange remains bounded after its invoking Worker request ends
   } finally { gate.resolve(); await simulator.dispose(); }
 });
 
+test('a shared database client keeps serving after clients cancel many in-flight requests', { timeout: 30_000 }, async () => {
+  const source = `import { openDatabase } from '@artifacts/db';
+    let connection;
+    export default { async fetch() {
+      connection ??= openDatabase({ url: 'libsql://disposable.invalid' });
+      const { client } = await connection;
+      for (let index = 0; index < 4; index++) await client.execute('SELECT 1');
+      return Response.json({ healthy: true });
+    }};`;
+  const bundled = await build({ stdin: { contents: source, resolveDir: new URL('../apps/auth/', import.meta.url).pathname }, bundle: true, write: false, format: 'esm', platform: 'browser', conditions: ['workerd', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2024' });
+  const simulator = new Miniflare(convertV4MiniflareOptions({
+    unsafeDirectSockets: [{ host: '127.0.0.1' }], modules: true, script: bundled.outputFiles[0]!.text,
+    compatibilityDate: workerCompatibility.compatibilityDate, compatibilityFlags: workerCompatibility.compatibilityFlags, bindings,
+    outboundService: async (request) => {
+      const pipeline = await request.json() as Pipeline;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return WorkerResponse.json(reply(pipeline));
+    },
+  }));
+  try {
+    await simulator.ready;
+    const origin = await simulator.unsafeGetDirectURL();
+    for (let press = 0; press < 60; press++) {
+      const cancelled = new AbortController();
+      void fetch(origin, { signal: cancelled.signal }).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      cancelled.abort();
+    }
+    const after = await fetch(origin, { signal: AbortSignal.timeout(10_000) });
+    assert.equal(after.status, 200, 'requests after a burst of cancelled requests still reach the database');
+    assert.deepEqual(await after.json(), { healthy: true });
+  } finally { await simulator.dispose(); }
+});
+
 test('the Worker database transport preserves a supplied fetch and its response metadata', async () => {
   const source = `import { openDatabase } from '@artifacts/db';
     export default { async fetch(request, env) {
