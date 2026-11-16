@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, customFetch, errors, jwtVerify } from 'jose';
 import { z } from 'zod';
 export type BearerConfig = Readonly<{ issuer: string; resource: string; clientId: string; clientSecret: string }>;
+export type ReportError = (error: unknown) => void;
 
 const principalBrand: unique symbol = Symbol('verified-principal');
 export type Principal = Readonly<{ userId: string; sessionId: string; clientId: string; scopes: readonly string[]; [principalBrand]: true }>;
@@ -15,7 +16,7 @@ const claimsSchema = z.object({
   aud: z.union([z.string(), z.array(z.string())]), exp: z.number(),
 });
 
-export function createBearerAuthorizer(config: BearerConfig) {
+export function createBearerAuthorizer(config: BearerConfig, reportError: ReportError = () => {}) {
   const jwks = createRemoteJWKSet(new URL(`${config.issuer}/jwks`), { timeoutDuration: 3000, [customFetch]: (url, options) => fetch(url, { ...options, redirect: 'manual' }) });
   return async (request: Request, required: readonly string[]): Promise<AccessDecision> => {
     const authorization = request.headers.get('authorization');
@@ -29,6 +30,7 @@ export function createBearerAuthorizer(config: BearerConfig) {
       claims = parsed.data;
     } catch (error) {
       if (error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed || error instanceof errors.JWSInvalid || error instanceof errors.JWSSignatureVerificationFailed || error instanceof errors.JWTInvalid || error instanceof errors.JWKSNoMatchingKey || error instanceof errors.JOSENotSupported) return { kind: 'unauthenticated' };
+      reportError(error);
       return { kind: 'unavailable' };
     }
     try {
@@ -39,13 +41,13 @@ export function createBearerAuthorizer(config: BearerConfig) {
         signal: AbortSignal.timeout(3000),
         redirect: 'manual',
       });
-      if (response.status !== 200) return { kind: 'unavailable' };
+      if (response.status !== 200) throw new Error(`Token introspection returned HTTP ${response.status}`);
       const body: unknown = await response.json();
       const status = z.object({ active: z.boolean() }).safeParse(body);
-      if (!status.success) return { kind: 'unavailable' };
+      if (!status.success) throw new Error('Token introspection returned an invalid body');
       if (!status.data.active) return { kind: 'unauthenticated' };
       const live = claimsSchema.safeParse(body);
-      if (!live.success) return { kind: 'unavailable' };
+      if (!live.success) throw new Error('Token introspection returned invalid claims');
       const sameScopes = (a: string, b: string) => [...new Set(a.split(' ').filter(Boolean))].sort().join(' ') === [...new Set(b.split(' ').filter(Boolean))].sort().join(' ');
       const audiences = Array.isArray(live.data.aud) ? live.data.aud : [live.data.aud];
       if (live.data.sub !== claims.sub || live.data.sid !== claims.sid || live.data.client_id !== claims.client_id || live.data.azp !== claims.azp || live.data.iss !== config.issuer || !audiences.includes(config.resource) || live.data.exp !== claims.exp || !sameScopes(live.data.scope, claims.scope)) return { kind: 'unauthenticated' };
@@ -53,7 +55,8 @@ export function createBearerAuthorizer(config: BearerConfig) {
       const missing = required.filter((scope) => !granted.includes(scope));
       if (missing.length) return { kind: 'insufficient-scope', required: missing };
       return { kind: 'authorized', principal: { userId: claims.sub, sessionId: claims.sid, clientId: claims.client_id, scopes: granted, [principalBrand]: true } };
-    } catch {
+    } catch (error) {
+      reportError(error);
       return { kind: 'unavailable' };
     }
   };

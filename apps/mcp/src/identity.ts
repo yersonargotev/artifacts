@@ -1,1 +1,1 @@
-export { createBearerAuthorizer as createMcpAuthorizer, type Principal, type AccessDecision } from '@artifacts/rest/identity';
+export { createBearerAuthorizer as createMcpAuthorizer, type Principal, type AccessDecision, type ReportError } from '@artifacts/rest/identity';

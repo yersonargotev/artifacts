@@ -9,7 +9,7 @@ const runtimes = new WeakMap<McpWorkerEnvironment, Promise<ReturnType<typeof cre
 async function createRuntime(env: McpWorkerEnvironment) {
   const config = mcpConfig(env);
   const { db } = await openDatabase({ url: required('DATABASE_URL', env), authToken: env.DATABASE_AUTH_TOKEN });
-  return createResourceApp(config, createArtifactStore(db, { access: accessPolicy(env), publishOrigin: serviceUrl('PUBLISH_URL', env), sendInvitation: createEmailSender(env, serviceUrl('MCP_URL', env)) }));
+  return createResourceApp(config, createArtifactStore(db, { access: accessPolicy(env), publishOrigin: serviceUrl('PUBLISH_URL', env), sendInvitation: createEmailSender(env, serviceUrl('MCP_URL', env)) }), { reportError: console.error });
 }
 
 export default {
@@ -22,7 +22,8 @@ export default {
     context?.waitUntil(runtime.then(() => undefined, () => undefined));
     try {
       return await (await runtime)(request);
-    } catch {
+    } catch (error) {
+      console.error(error);
       return new Response('MCP unavailable', { status: 503, headers: { 'cache-control': 'no-store' } });
     }
   },

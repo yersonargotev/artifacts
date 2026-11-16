@@ -19,6 +19,8 @@ const fetch = createArtifactRestApp({
 }, store);
 ```
 
+An optional third argument, `{ reportError }`, receives every unexpected error behind a 503 `unavailable` response, including a failed token introspection. Expected outcomes, such as an `ArtifactError`, invalid input, or a rejected token, are never reported. The response does not change. Pass `console.error` or an error tracker's capture function.
+
 The canonical REST resource is the `API_URL` origin. Routes live at `${API_URL}/v1`. MCP uses the same origin with `/mcp` as its separate OAuth resource. Request a token for the REST origin when calling this adapter. Direct consumers need no MCP session. The default `artifacts-api` Worker composes both adapters over one store.
 
 `pnpm dev:rest` starts the REST-only Node listener using `DATABASE_URL`, optional `DATABASE_AUTH_TOKEN`, `AUTH_URL`, `API_URL`, `MCP_URL`, `PUBLISH_URL`, both introspection credentials, and the existing `MCP_PORT` and `MCP_BIND_HOST` variables. `MCP_PORT=0` binds any free port, and the startup line reports the bound port once the listener accepts connections. `API_URL` must be an origin, and `MCP_URL` must be the same origin followed by `/mcp`. Without `API_URL`, older configurations retain `MCP_URL` as the REST resource and expose `${MCP_URL}/v1`. This entry point reads explicit environment variables and does not load `.env`.

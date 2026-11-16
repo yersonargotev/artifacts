@@ -33,7 +33,8 @@ export default {
       const current = await runtime;
       if (current.emailEnabled && !context) throw new Error('Email delivery requires a request execution context');
       return await withEmailCodeRequest(request, request.headers.get('cf-connecting-ip') ?? undefined, (task) => context!.waitUntil(task), current.handler);
-    } catch {
+    } catch (error) {
+      console.error(error);
       return new Response('Authorization unavailable', { status: 503, headers: { 'cache-control': 'no-store' } });
     }
   },
