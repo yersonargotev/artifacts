@@ -88,8 +88,9 @@ try {
   await hydrated(page);
   assert.deepEqual(await visibleHints(page), ['j k mover', '↵ leer', 'p publicar', 't tema'], 'the library lists the prototype hints for the keys that work on it');
   const trigger = page.getByRole('button', { name: 'Abrir la paleta de comandos', exact: true });
-  assert.equal(await trigger.textContent(), '⌘K');
-  assert.equal(await trigger.getAttribute('aria-keyshortcuts'), 'Meta+K');
+  const mac = process.platform === 'darwin';
+  assert.equal(await trigger.textContent(), mac ? '⌘K' : 'Ctrl K');
+  assert.equal(await trigger.getAttribute('aria-keyshortcuts'), mac ? 'Meta+K' : 'Control+K');
   assert.equal(await page.locator('a.reader-link .kbd').textContent(), 'r');
   assert.equal(await page.locator('a.reader-link .kbd').isVisible(), true, 'Modo lectura shows its r key');
   checks.push('with JavaScript the library shows j k mover, ↵ leer, p publicar, t tema, the ⌘K trigger in the search field, and r on Modo lectura');
@@ -321,6 +322,19 @@ try {
     const filter = await probe.evaluate(() => sessionStorage.getItem('reveal'));
     motion[label] = { banner, palette: paletteAnimations, rowActions, readerDocument: document_, viewTransition: { libraryToRead: toRead, readToLibrary: toLibrary, libraryFilter: filter } };
   }
+  const late = await moving.newPage();
+  late.on('pageerror', (error) => errors.push(error.message));
+  await late.goto(`${app.dashboard}/?project=Lectura`);
+  await hydrated(late);
+  let held = 0;
+  await late.route('**/*.css', async (route) => { held += 1; await new Promise((done) => setTimeout(done, 300)); await route.continue(); });
+  await Promise.all([late.waitForURL(/\/read\?/), late.keyboard.press('r')]);
+  await late.waitForLoadState('load');
+  await late.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  assert(held > 0, 'the stylesheet of read mode arrived after its body');
+  assert.deepEqual([...errors], [], 'a transition that Chrome drops before pagereveal reaches the page as no error');
+  motion.lateStylesheet = { held, viewTransition: await late.evaluate(() => sessionStorage.getItem('reveal')) };
+  await late.close();
   await json('motion.json', motion);
   assert.deepEqual(motion.reduce, { banner: 'none', palette: [], rowActions: '0s', readerDocument: 'none', viewTransition: { libraryToRead: 'false', readToLibrary: 'false', libraryFilter: 'false' } }, 'with reduced motion nothing animates or transitions, view transitions included');
   assert.deepEqual(motion['no-preference'], { banner: 'drop', palette: ['fade', 'pop'], rowActions: '0.16s, 0.16s', readerDocument: 'rise', viewTransition: { libraryToRead: 'true', readToLibrary: 'true', libraryFilter: 'false' } }, 'without a preference the banner drops, the palette pops, row actions ease in, the document rises, and library and read mode cross-fade');

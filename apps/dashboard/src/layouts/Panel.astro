@@ -34,7 +34,7 @@ const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).
 ---
 <!doctype html>
 <html lang="es" data-theme={theme}>
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content={themeColors[theme]} /><link rel="icon" type="image/svg+xml" href="/favicon.svg" /><title>{title} · Artifacts</title></head>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content={themeColors[theme]} /><link rel="icon" type="image/svg+xml" href="/favicon.svg" /><title>{title} · Artifacts</title><script is:inline src="/views.js"></script></head>
   <body class:list={['panel', { 'app-shell': Boolean(identity), 'reader-shell': location.kind === 'read' }]}>
     <a class="skip-link" href="#main-content">Ir al contenido</a>
     {identity && <Rail identity={identity} authUrl={authUrl} location={location} theme={theme} reader={reader} />}
@@ -53,8 +53,5 @@ const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).
     {identity && <><Palette data={JSON.stringify(palette)} client:load /><dialog class="publish-dialog" aria-labelledby="publish-dialog-title" data-publish-dialog></dialog></>}
     {share && <ShareDialog client:load />}
     {move && workspace && <MoveDialog projects={JSON.stringify(workspace.projects.map(({ name }) => name))} client:load />}
-    <script>
-      import '../components/shell/views.ts';
-    </script>
   </body>
 </html>

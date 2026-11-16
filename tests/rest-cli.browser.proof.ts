@@ -64,7 +64,7 @@ try {
   assert.equal(publication.version, 1);
   await page.goto(app.dashboard);
   await page.getByRole('link', { name: 'Iniciar sesión', exact: true }).click();
-  await page.getByRole('link', { name: 'CLI browser artifact', exact: true }).click();
+  await page.locator('[data-library-item]').getByRole('link', { name: 'CLI browser artifact', exact: true }).click();
   await page.frameLocator('.preview').getByRole('heading', { name: 'CLI second revision', exact: true }).waitFor();
   assert.equal(await page.locator('.artifact-detail').getAttribute('data-revision-id'), updated.revision.id);
   assert.equal(await page.locator('.artifact-detail').getAttribute('data-publication-version'), '1');
