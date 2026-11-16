@@ -153,7 +153,7 @@ test('closed default keeps owner email-code and password access while suppressin
   } finally { await app.close(); }
 });
 
-test('open mode still denies an isolated account and rechecks a removed invitation on existing tokens', async () => {
+test('open mode still denies an isolated account, and removing the invitation revokes existing tokens for good', async () => {
   const { app, ownerClient, artifact, share, cookie, tokens } = await invited();
   try {
     await app.auth.api.signUpEmail({ body: { name: 'Uninvited', email: 'isolated@example.test', password: app.password } });
@@ -163,6 +163,6 @@ test('open mode still denies an isolated account and rechecks a removed invitati
     assert.equal((await callWhoami(app.config.resource, tokens.access_token)).status, 401);
     assert.equal(await fetch(`${app.config.issuer}/get-session`, { headers: { cookie } }).then((response) => response.json()), null);
     await ownerClient.share({ requestId: randomUUID(), artifactId: artifact.artifactId, email: guestEmail });
-    assert.equal((await callWhoami(app.config.resource, tokens.access_token)).status, 200);
+    assert.equal((await callWhoami(app.config.resource, tokens.access_token)).status, 401, 'a new share does not revive revoked tokens');
   } finally { await app.close(); }
 });

@@ -393,8 +393,13 @@ test('revocation denies delivery and redemption while owned artifacts retain for
     assert.equal((await app.messages()).length, 0);
     const denied = await app.post('/sign-in/email-otp', { email, otp: await app.seed(email) });
     assert.equal(denied.status, 400);
-    const actor = { ...app.actor, userId: guest.user.id, sessionId: central.session.id };
+    assert.equal(await app.auth.api.getSession({ headers: new Headers({ cookie }) }), null, 'the last unshare revoked the central session');
     const restored = await app.invite(email);
+    const again = await app.post('/sign-in/email-otp', { email, otp: await app.seed(email) });
+    assert.equal(again.status, 200);
+    const renewed = await app.auth.api.getSession({ headers: new Headers({ cookie: again.headers.getSetCookie()[0].split(';')[0] }) });
+    assert(renewed);
+    const actor = { ...app.actor, userId: guest.user.id, sessionId: renewed.session.id };
     const owned = await app.store.create(actor, { requestId: randomUUID(), snapshot });
     await app.store.unshare(app.actor, { requestId: randomUUID(), artifactId: app.artifact.artifactId, shareId: restored.shareId });
     assert.equal((await app.post('/email-otp/send-verification-otp', { email, type: 'sign-in' })).status, 200);
