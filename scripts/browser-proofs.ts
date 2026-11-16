@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 
-// Seconds each proof took in CI. The shards balance on these weights, so refresh them from a CI run when a proof's time changes a lot.
+// Seconds each proof took in CI. The shards balance on these weights. Each run warns when a proof's time drifts past the tolerance below; refresh the weights from that log.
 const proofs: { file: string; seconds: number; test?: true }[] = [
   { file: 'tests/browser.proof.ts', seconds: 7 },
   { file: 'tests/sign-in-code.browser.proof.ts', seconds: 79 },
@@ -25,6 +25,9 @@ const proofs: { file: string; seconds: number; test?: true }[] = [
   { file: 'tests/invitations.browser.proof.ts', seconds: 18 },
 ];
 
+// A proof drifts when its measured time differs from its weight by more than 25% and more than 10 s.
+const tolerance = { ratio: 0.25, seconds: 10 };
+
 const { values } = parseArgs({ options: { shard: { type: 'string' } } });
 const [index, count] = (values.shard ?? '1/1').split('/').map(Number);
 assert.ok(Number.isInteger(index) && Number.isInteger(count) && index >= 1 && index <= count, 'Pass --shard as <index>/<count>, for example 2/3');
@@ -41,6 +44,12 @@ console.log(`Shard ${index}/${count} runs ${shard.files.length} proofs, about ${
 for (const proof of proofs.filter((proof) => shard.files.includes(proof))) {
   const started = Date.now();
   const result = spawnSync(process.execPath, ['--import', 'tsx', ...(proof.test ? ['--test'] : []), proof.file], { stdio: 'inherit' });
-  console.log(`${proof.file} ${result.status === 0 ? 'passed' : 'failed'} in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+  const seconds = (Date.now() - started) / 1000;
+  console.log(`${proof.file} ${result.status === 0 ? 'passed' : 'failed'} in ${seconds.toFixed(1)} s, weight ${proof.seconds} s`);
   if (result.status !== 0) process.exit(result.status ?? 1);
+  const drift = seconds - proof.seconds;
+  if (Math.abs(drift) > tolerance.seconds && Math.abs(drift) > proof.seconds * tolerance.ratio) {
+    const message = `${proof.file} took ${seconds.toFixed(1)} s against a weight of ${proof.seconds} s (${drift > 0 ? '+' : ''}${drift.toFixed(1)} s). Refresh its weight in scripts/browser-proofs.ts.`;
+    console.log(process.env.GITHUB_ACTIONS ? `::warning file=scripts/browser-proofs.ts,title=Browser proof weight drift::${message}` : `Weight drift: ${message}`);
+  }
 }
