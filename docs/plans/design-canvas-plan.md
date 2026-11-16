@@ -76,7 +76,7 @@ Boards live in `snapshot.files`, so the store, the 1 MiB budget, the 32 file lim
 
 - [x] Resolve the forge once. Default to `gh`; if `command -v origin` succeeds and Origin can resolve the repository, use `origin pr` for every PR operation. Record any fallback to `gh`. Never require `gt`.
 - [ ] Open the PR ready, never draft, per **Opening a PR**. Use the run's built-in PR tool when it has one, else `origin pr create --status open --base <parent-branch>` or `gh pr create --base <parent-branch>` according to the resolved forge. A stack child targets its parent branch.
-- [ ] Run `pnpm check` and `pnpm test` once before the PR-facing push. The repository has no lint script. Push with hooks on.
+- [ ] Run `pnpm check`, `pnpm lint`, and `pnpm test` once before the PR-facing push. Push with hooks on.
 - [ ] Run `/deslop` before each commit and `/no-comments` before review. When `cursor-team-kit` is absent, apply the same checks by hand and record that in the PR body.
 - [ ] Triage every Bugbot and security-reviewer comment per `.claude/skills/poteto-mode/references/bugbot-triage.md`.
 - [ ] Rebase onto the parent branch before the code-ready report and babysit. Keep that merge base in fix rounds. Rebase again only at stack prep, on a `git merge-tree` conflict with the parent, or on a CI failure that comes from a change on the parent.
