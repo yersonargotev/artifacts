@@ -245,7 +245,7 @@ export async function smokeProduction(serviceSecret: string, options: SmokeOptio
     const target = new URL(response.headers.get('location')!);
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(response.status === 303 && target.origin === workerOrigins.DASHBOARD_URL && target.pathname === '/publication/open' && target.searchParams.size === 2 && target.searchParams.get('artifactId') === artifactId && /^[A-Za-z0-9_-]{43}$/.test(target.searchParams.get('state') ?? ''));
-    expect(cookie.startsWith('__Host-artifacts-publication-transaction=') && /; Path=\//.test(cookie) && /; Secure; HttpOnly; SameSite=Lax/.test(cookie) && !/Domain=/i.test(cookie) && response.headers.get('cache-control') === 'private, no-store');
+    expect(/^__Host-artifacts-transaction-[\w-]{16}=/.test(cookie) && /; Path=\//.test(cookie) && /; Secure; HttpOnly; SameSite=Lax/.test(cookie) && !/Domain=/i.test(cookie) && response.headers.get('cache-control') === 'private, no-store');
   });
   await probe('anonymous attachment denial', async () => {
     const response = await send(`${workerOrigins.PUBLISH_URL}/a/${artifactId}/r/${randomUUID()}/files/probe.txt`);

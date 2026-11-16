@@ -4,8 +4,9 @@ import { getRuntime } from '../../runtime.ts';
 
 export const GET: APIRoute = async ({ cookies, url, redirect }) => {
   const { identity, cookieOptions } = await getRuntime();
-  const transaction = cookies.get(transactionCookie)?.value;
-  cookies.delete(transactionCookie, { path: '/' });
+  const name = transactionCookie(url.searchParams.get('state'));
+  const transaction = name ? cookies.get(name)?.value : undefined;
+  if (name) cookies.delete(name, { path: '/' });
   try {
     const session = await identity.completeLogin(url, transaction);
     cookies.set(panelCookie, session.token, { ...cookieOptions, expires: session.expiresAt });

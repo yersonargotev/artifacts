@@ -7,7 +7,8 @@ import { oidcTransaction, panelSession, session, user } from '@artifacts/db/sche
 import type { dashboardConfig } from '@artifacts/config';
 
 export const panelCookie = 'artifacts-panel';
-export const transactionCookie = 'artifacts-login';
+/** One cookie per login transaction keeps concurrent tabs apart; a state prefix keeps its name short. */
+export const transactionCookie = (state: string | null) => state && /^[\w-]{16,}$/.test(state) ? `artifacts-login-${state.slice(0, 16)}` : undefined;
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const random = () => randomBytes(32).toString('base64url');
 export type PanelIdentity = Readonly<{ userId: string; sessionId: string; name: string; clientId: string; scopes: string[]; expiresAt: Date }>;
@@ -38,11 +39,12 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
       const verifier = oidc.randomPKCECodeVerifier();
       await db.insert(oidcTransaction).values({ tokenHash: hash(token), state, nonce, verifier, returnPath, expiresAt: new Date(Date.now() + 600_000) });
       const url = oidc.buildAuthorizationUrl(client, { redirect_uri: `${config.origin}/auth/callback`, scope: 'openid profile', state, nonce, code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256' });
-      return { token, url };
+      return { cookie: transactionCookie(state)!, token, url };
     },
     async completeLogin(url: URL, token: string | undefined) {
-      if (!token || !/^[\w-]{43}$/.test(token)) throw new Error('Invalid login transaction');
-      const transactions = await db.delete(oidcTransaction).where(and(eq(oidcTransaction.tokenHash, hash(token)), gt(oidcTransaction.expiresAt, new Date()))).returning();
+      const state = url.searchParams.get('state');
+      if (!token || !/^[\w-]{43}$/.test(token) || !state) throw new Error('Invalid login transaction');
+      const transactions = await db.delete(oidcTransaction).where(and(eq(oidcTransaction.tokenHash, hash(token)), eq(oidcTransaction.state, state), gt(oidcTransaction.expiresAt, new Date()))).returning();
       const transaction = transactions[0];
       if (!transaction) throw new Error('Expired or used login transaction');
       const tokens = await oidc.authorizationCodeGrant(await getProvider(), url, { expectedState: transaction.state, expectedNonce: transaction.nonce, pkceCodeVerifier: transaction.verifier, idTokenExpected: true });

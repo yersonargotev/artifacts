@@ -109,16 +109,17 @@ The notification has its own outcome: `skipped(disabled)`, `skipped(rate_limited
 
 ## Panel login transaction
 
-An `oidc_transaction` row, bound to the browser by the `artifacts-login` cookie, which holds a random token whose hash is the row key.
+An `oidc_transaction` row, bound to the browser by an `artifacts-login-<state prefix>` cookie, which holds a random token whose hash is the row key. Each login has its own cookie, so concurrent tabs keep separate transactions.
 
 States: `Pending`, `Expired` (row present, past `expiresAt`), `Consumed` (row deleted).
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
-| — | `GET /auth/login` | none | `Pending` (600 s); the cookie is overwritten | `apps/dashboard/src/identity.ts` `startLogin` |
-| `Pending` | `GET /auth/callback` | cookie token matches, not expired, `state` and code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
+| — | `GET /auth/login` | none | `Pending` (600 s) with its own cookie | `apps/dashboard/src/identity.ts` `startLogin` |
+| `Pending` | `GET /auth/callback` | the `state` cookie's token and the `state` match the row, not expired, code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
+| `Pending` | another tab's callback | `state` differs | stays `Pending` | `identity.ts` `completeLogin` |
 | `Pending` | 600 s pass | — | `Expired` | no transition removes the row |
-| any | callback | — | cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
+| any | callback | — | the callback `state`'s cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
 
 ## Panel session
 
@@ -148,14 +149,14 @@ Better Auth owns these rows. The app adds admission checks on sign-in, refresh, 
 
 The publication Worker admits a viewer through three stages: a transaction cookie, a one-use grant row, and a viewer cookie.
 
-States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `Grant` (`publication_grant` row, at most 60 s, one use), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
+States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie named by a state prefix, one per open, 600 s), `Grant` (`publication_grant` row, at most 60 s, one use), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
-| `NoCookie` | `GET /a/:id` without a viewer | — | `Transaction`; overwrites an earlier one | `apps/publication/src/http.ts` `begin` |
+| `NoCookie` | `GET /a/:id` without a viewer | — | a new `Transaction` beside any earlier one | `apps/publication/src/http.ts` `begin` |
 | `Transaction` | panel `/publication/open` | panel identity, `canView`, published | `Grant` | `index.ts` `issuePublicationGrant` |
-| `Grant` | `/callback` | cookie state and artifact match, not expired | grant deleted, `Viewer` set, transaction cookie cleared | `http.ts`, `index.ts` `consumePublicationGrant` |
-| `Transaction` | `/callback` that fails | — | transaction cookie cleared | `http.ts` |
+| `Grant` | `/callback` | the `state` cookie's state and artifact match, not expired | grant deleted, `Viewer` set, that transaction cookie cleared | `http.ts`, `index.ts` `consumePublicationGrant` |
+| `Transaction` | `/callback` that fails | — | only the callback `state`'s cookie cleared | `http.ts` |
 | `Viewer` | read | live session, admitted, `canView`, revision matches | page | `index.ts` `readPublished` |
 | `Viewer` | backend answers 401, 403, 404, or 409 | — | viewer cookie cleared | `http.ts` |
 
