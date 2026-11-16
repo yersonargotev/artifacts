@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import auth from '../apps/auth/cloudflare.config.ts';
@@ -37,7 +37,7 @@ if (import.meta.main) for (const name of names) {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(configPath, JSON.stringify({
       name: worker.name,
-      main: '@astrojs/cloudflare/entrypoints/server',
+      main: relative(dirname(configPath), resolve(directory, worker.entrypoint)),
       compatibility_date: worker.compatibilityDate,
       compatibility_flags: worker.compatibilityFlags,
       vars: Object.fromEntries(Object.entries(worker.env).flatMap(([key, binding]) => binding.type === 'text' ? [[key, binding.value]] : [])),

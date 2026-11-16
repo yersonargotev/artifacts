@@ -116,7 +116,7 @@ For another task, run `cf cli search "<task>"` once and then `<command> --help`.
 
 ### Read errors in Sentry
 
-The auth, API, and publication Workers send unexpected errors to the `artifacts` project in the Sentry organization `sparkydevs`. Each event has a `service` tag with the Worker name. `SENTRY_DSN` is a text binding in each `cloudflare.config.ts`, set from `sentryDsn` in `scripts/cloudflare.ts`. Without it, the Worker skips Sentry. Read the issues with the Sentry CLI.
+The four Workers send unexpected errors to the `artifacts` project in the Sentry organization `sparkydevs`. Each event has a `service` tag with the Worker name. `SENTRY_DSN` is a text binding in each `cloudflare.config.ts`, set from `sentryDsn` in `scripts/cloudflare.ts`. Without it, the Worker skips Sentry. Read the issues with the Sentry CLI.
 
 ```sh
 sentry issue list sparkydevs/artifacts

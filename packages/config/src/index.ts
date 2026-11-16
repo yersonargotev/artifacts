@@ -12,7 +12,7 @@ type MonitoringEnvironment = { SENTRY_DSN?: string };
 type PublicOrigins = { AUTH_URL: string; API_URL: string; MCP_URL: string; DASHBOARD_URL: string; PUBLISH_URL: string };
 export type AuthWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'API_URL' | 'MCP_URL' | 'DASHBOARD_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & MonitoringEnvironment & { BETTER_AUTH_SECRET: string };
 export type McpWorkerEnvironment = Pick<PublicOrigins, 'AUTH_URL' | 'API_URL' | 'MCP_URL' | 'PUBLISH_URL'> & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & MonitoringEnvironment & { MCP_INTROSPECTION_CLIENT_ID: string; MCP_INTROSPECTION_CLIENT_SECRET: string };
-export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
+export type DashboardWorkerEnvironment = PublicOrigins & DatabaseEnvironment & SenderEnvironment & AccessEnvironment & MonitoringEnvironment & { PANEL_CLIENT_ID: string; PANEL_CLIENT_SECRET: string; PUBLICATION_SERVICE_SECRET: string };
 export type PublicationWorkerEnvironment = Pick<PublicOrigins, 'DASHBOARD_URL' | 'PUBLISH_URL'> & MonitoringEnvironment & { PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 
 export function required(name: string, env: Environment = process.env): string {

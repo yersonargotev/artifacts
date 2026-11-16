@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { serviceUrl } from '@artifacts/config';
+import { reportError } from '@artifacts/monitoring';
 import { panelCookie } from './identity.ts';
 import { getRuntime } from './runtime.ts';
 import { publicationServiceAuthorized, servicePaths } from './publication.ts';
@@ -27,7 +28,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     response.headers.set('cross-origin-opener-policy', 'same-origin');
     if (!response.headers.has('content-security-policy')) response.headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
     return response;
-  } catch {
+  } catch (error) {
+    reportError(error);
     return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: { 'cache-control': 'no-store' } });
   }
 });
