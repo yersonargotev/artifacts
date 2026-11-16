@@ -27,6 +27,7 @@ export type LibraryQuery = {
   readonly cursor?: string;
 };
 
+/** Published, pending, and the unpublished remainder partition `count`, the same split as the library's status tabs. */
 export type Tally = { readonly count: number; readonly published: number; readonly pending: number };
 export type ProjectAggregate = Tally & { readonly name: ProjectName; readonly updatedAt: Date };
 export type Workspace = {
