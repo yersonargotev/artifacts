@@ -7,6 +7,9 @@ import { restBase } from '../packages/contracts/src/http.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 import { createMcpApp } from '../apps/mcp/src/http.ts';
+import { artifactErrorResponse } from '../apps/dashboard/src/publication.ts';
+import { publishSelectedRevision } from '../apps/dashboard/src/publish.ts';
+import { ArtifactError } from '../packages/contracts/src/index.ts';
 
 const fullScope = 'openid profile offline_access artifacts:read artifacts:write artifacts:publish';
 
@@ -114,4 +117,21 @@ test('the MCP Worker logs a failed startup and keeps its 503 response', async ()
   const { response, stderr } = await failedWorkerStartup('mcp');
   assert.deepEqual(response, { status: 503, body: 'MCP unavailable' });
   assert.match(stderr, /URL_SCHEME_NOT_SUPPORTED/);
+});
+
+test('the panel reports an unexpected store error behind a 503 or an uncertain outcome and keeps the response', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const failure = new Error('database connection lost');
+  const response = artifactErrorResponse(failure);
+  assert.equal(response.status, 503);
+  assert.equal(await response.text(), 'El servicio no está disponible.');
+  assert.equal(artifactErrorResponse(new ArtifactError('not_found', 'Artifact not found')).status, 404);
+  assert.deepEqual(logged.mock.calls.map((call) => call.arguments[0]), [failure], 'only the unexpected error is reported');
+
+  logged.mock.resetCalls();
+  const actor = { userId: 'user', sessionId: 'session', clientId: 'panel', scopes: [] };
+  const command = { requestId: 'publish-uncertain', artifactId: 'artifact', revisionId: 'revision', expectedPublicationVersion: 0 };
+  const failing = { publish: async () => { throw failure; }, read: async () => { throw failure; } };
+  assert.deepEqual(await publishSelectedRevision(failing, actor, command), { kind: 'uncertain' });
+  assert.deepEqual(logged.mock.calls.map((call) => call.arguments[0]), [failure]);
 });

@@ -2,6 +2,7 @@
 import { ArtifactError, type DeleteInput } from '@yargote/artifacts-contracts';
 import Panel from '../../../layouts/Panel.astro';
 import { getRuntime } from '../../../runtime.ts';
+import { reportError } from '@artifacts/monitoring';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 import { parseDeletionForm } from '../../../delete.ts';
 import { workspaceQuery } from '../../../presentation.ts';
@@ -24,6 +25,7 @@ if (Astro.request.method === 'POST') {
       outcome = 'conflict';
       Astro.response.status = 409;
     } else {
+      reportError(error);
       outcome = 'uncertain';
       Astro.response.status = 503;
     }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ArtifactError, viewerSchema, readByIdSchema } from '@yargote/artifacts-contracts';
 import type { Actor } from '@yargote/artifacts-contracts';
 import type { PanelIdentity } from './identity.ts';
+import { reportError } from '@artifacts/monitoring';
 
 export const publicationReadSchema = z.strictObject({ viewer: viewerSchema, ...readByIdSchema.shape });
 export const servicePaths = new Set(['/internal/publication/consume', '/internal/publication/read']);
@@ -19,5 +20,6 @@ export function panelActor(identity: PanelIdentity): Actor {
 
 export function artifactErrorResponse(error: unknown) {
   const status = error instanceof z.ZodError ? 400 : error instanceof ArtifactError ? ({ forbidden: 403, not_found: 404, conflict: 409, request_conflict: 409, slug_conflict: 409, invalid_grant: 403 })[error.code] : 503;
+  if (status === 503) reportError(error);
   return new Response(status === 503 ? 'El servicio no está disponible.' : 'No se puede abrir este artefacto.', { status, headers: { 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } });
 }

@@ -2,6 +2,7 @@ import { ArtifactError, shareSchema, unshareSchema, type Actor, type Share, type
 import type { ArtifactStore } from '@artifacts/artifacts';
 import type { Panel } from '@artifacts/artifacts/panel';
 import { readForm } from './form.ts';
+import { reportError } from '@artifacts/monitoring';
 
 export type ShareCommand = Readonly<{ requestId: string } & ({ intent: 'share'; email: string; notify?: true; requireNew?: true } | { intent: 'unshare'; shareId: string })>;
 export type ShareNotice = 'requested' | 'disabled' | 'rate_limited';
@@ -49,7 +50,10 @@ export async function submitShare(store: Store, actor: Actor, artifactId: string
     await store.unshare(actor, input.data);
     return { outcome: 'confirmed' };
   } catch (error) {
-    if (!(error instanceof ArtifactError)) return { outcome: 'uncertain' };
+    if (!(error instanceof ArtifactError)) {
+      reportError(error);
+      return { outcome: 'uncertain' };
+    }
     if (error.code === 'request_conflict') return { outcome: 'conflict' };
     if (error.code === 'conflict' && error.details.reason === 'share_limit' && (error.details.scope === 'artifact' || error.details.scope === 'owner')) return { outcome: 'share_limit', scope: error.details.scope };
     throw error;
@@ -61,6 +65,7 @@ export async function loadShareView(panel: Pick<Panel, 'artifact'>, store: Pick<
     panel.artifact(actor, { artifactId, includeComparison: false }),
     store.listShares(actor, { artifactId }).then(({ items }) => ({ kind: 'ready' as const, items })).catch((error: unknown) => {
       if (error instanceof ArtifactError) throw error;
+      reportError(error);
       return { kind: 'unavailable' as const };
     }),
   ]);

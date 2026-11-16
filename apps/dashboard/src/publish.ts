@@ -2,6 +2,7 @@ import type { createArtifactStore } from '@artifacts/artifacts';
 import { ArtifactError, publishSchema, type Actor, type ArtifactRead, type Publication } from '@yargote/artifacts-contracts';
 
 import { readForm } from './form.ts';
+import { reportError } from '@artifacts/monitoring';
 
 export type PublishCommand = { artifactId: string; revisionId: string; expectedPublicationVersion: number; requestId: string };
 export type PublicationOutcome =
@@ -24,7 +25,10 @@ export async function publishSelectedRevision(store: Pick<ReturnType<typeof crea
   try {
     committed = await store.publish(actor, command);
   } catch (error) {
-    if (!(error instanceof ArtifactError)) return { kind: 'uncertain' };
+    if (!(error instanceof ArtifactError)) {
+      reportError(error);
+      return { kind: 'uncertain' };
+    }
     if (error.code !== 'conflict' && error.code !== 'request_conflict') throw error;
     const observed = await store.read(actor, { artifactId: command.artifactId, revisionId: command.revisionId }).catch(() => undefined);
     return { kind: 'conflict', observed };
@@ -33,5 +37,8 @@ export async function publishSelectedRevision(store: Pick<ReturnType<typeof crea
     const observed = await store.read(actor, { artifactId: command.artifactId, revisionId: command.revisionId });
     const current = observed.publication;
     return { kind: current?.revisionId === committed.revisionId && current.version === committed.version && current.url === committed.url ? 'published' : 'superseded', committed, observed };
-  } catch { return { kind: 'uncertain' }; }
+  } catch (error) {
+    reportError(error);
+    return { kind: 'uncertain' };
+  }
 }
