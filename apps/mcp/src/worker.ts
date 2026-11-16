@@ -1,4 +1,5 @@
 import { createEmailSender } from '@artifacts/config/email-sender';
+import { reportError, withMonitoring } from '@artifacts/monitoring';
 import { accessPolicy, mcpConfig, required, serviceUrl, type McpWorkerEnvironment } from '@artifacts/config';
 import { openDatabase } from '@artifacts/db';
 import { createArtifactStore } from '@artifacts/artifacts';
@@ -9,10 +10,10 @@ const runtimes = new WeakMap<McpWorkerEnvironment, Promise<ReturnType<typeof cre
 async function createRuntime(env: McpWorkerEnvironment) {
   const config = mcpConfig(env);
   const { db } = await openDatabase({ url: required('DATABASE_URL', env), authToken: env.DATABASE_AUTH_TOKEN });
-  return createResourceApp(config, createArtifactStore(db, { access: accessPolicy(env), publishOrigin: serviceUrl('PUBLISH_URL', env), sendInvitation: createEmailSender(env, serviceUrl('MCP_URL', env)) }), { reportError: console.error });
+  return createResourceApp(config, createArtifactStore(db, { access: accessPolicy(env), publishOrigin: serviceUrl('PUBLISH_URL', env), sendInvitation: createEmailSender(env, serviceUrl('MCP_URL', env)) }), { reportError });
 }
 
-export default {
+export default withMonitoring('artifacts-api', {
   async fetch(request: Request, env: McpWorkerEnvironment, context?: { waitUntil(task: Promise<void>): void }): Promise<Response> {
     let runtime = runtimes.get(env);
     if (!runtime) {
@@ -23,8 +24,8 @@ export default {
     try {
       return await (await runtime)(request);
     } catch (error) {
-      console.error(error);
+      reportError(error);
       return new Response('MCP unavailable', { status: 503, headers: { 'cache-control': 'no-store' } });
     }
   },
-};
+});

@@ -15,6 +15,7 @@ A command passes through these layers. The test beside each layer covers it.
 | Client and CLI | `packages/client/src`, `apps/cli/src` | `tests/cli-client*.test.ts` |
 | Panel | `apps/dashboard/src` | `tests/panel*.test.ts`, `tests/panel-*.browser.proof.ts` |
 | Publication page | `apps/publication/src` | `tests/publication.test.ts` |
+| Error monitoring | `packages/monitoring/src` | `tests/monitoring.test.ts`, `tests/error-reporting.test.ts` |
 | Database | `packages/db/src`, `packages/db/migrations` | `tests/database.test.ts` |
 
 Packy installs the skills in `.claude/skills/` and `.agents/skills/` from `packy.json` and `packy.lock.json`. Don't edit them. The project owns only `verify-artifacts` and `verify-batch-concurrency`, which live in `.agents/skills/` and are symlinked from `.claude/skills/`. To prove a change in the real panel, publication page, MCP, and CLI, use `verify-artifacts`.

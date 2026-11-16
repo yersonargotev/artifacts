@@ -1,5 +1,5 @@
 import type { AuthWorkerEnvironment } from '@artifacts/config';
-import { workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
+import { sentryDsn, workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
 
 export default {
   worker: {
@@ -7,6 +7,7 @@ export default {
     ...workerCompatibility,
     entrypoint: './src/worker.ts',
     env: {
+      SENTRY_DSN: { type: 'text', value: sentryDsn },
       ALLOW_GUEST_ACCESS: { type: 'text', value: 'false' },
       EMAIL_TRANSPORT: { type: 'text', value: 'resend' },
       EMAIL_FROM: { type: 'secret' },
