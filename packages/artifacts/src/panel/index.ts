@@ -131,7 +131,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
     },
     async moveSubject(actor: Actor, value: readonly string[]): Promise<MoveSubject> {
       const ids = panelMoveIdsSchema.parse(value);
-      return access.transaction(async (connection) => {
+      return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const items = await connection.select({ artifactId: artifact.id, title, project: artifact.project }).from(artifact).innerJoin(artifactRevision, headJoin)
           .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, ids))).orderBy(artifact.id);
@@ -139,7 +139,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       });
     },
     async projectsIndex(actor: Actor): Promise<ProjectsSnapshot> {
-      return access.transaction(async (connection) => {
+      return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const workspace = await readWorkspace(connection, actor.userId);
         const ranked = connection.select({ artifactId: artifact.id, project: artifact.project, title: title.as('title'), createdAt: artifactRevision.createdAt,
@@ -162,7 +162,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
     },
     async artifact(actor: Actor, value: z.input<typeof panelDetailQuerySchema>): Promise<DetailSnapshot> {
       const input = panelDetailQuerySchema.parse(value);
-      return access.transaction(async (connection) => {
+      return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const [owned] = await connection.select({
           artifactId: artifact.id, project: artifact.project, slug: artifact.slug, createdAt: artifact.createdAt,
@@ -212,7 +212,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
     },
     async preview(actor: Actor, value: z.input<typeof exportSchema>): Promise<PreviewSnapshot> {
       const input = exportSchema.parse(value);
-      return access.transaction(async (connection) => {
+      return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const [found] = await connection.select({ project: artifact.project, slug: artifact.slug, row: artifactRevision }).from(artifactRevision)
           .innerJoin(artifact, eq(artifact.id, artifactRevision.artifactId))
@@ -224,7 +224,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
     },
     async library(actor: Actor, value: z.input<typeof panelLibraryQuerySchema> = {}): Promise<LibrarySnapshot> {
       const input = panelLibraryQuerySchema.parse(value);
-      return access.transaction(async (connection) => {
+      return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const workspace = await readWorkspace(connection, actor.userId);
         const scope = resolveScope(workspace, input.scope);

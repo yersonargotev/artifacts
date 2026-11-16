@@ -95,7 +95,7 @@ const artifactReceiptSchema = artifactReadSchema.extend({ project: artifactReadS
 
 export function createArtifactStore(db: Database, options: { publishOrigin: string; access: AccessPolicy; sendInvitation?: InvitationSender }) {
   const admission = createAdmission(db, options.access);
-  const { transaction, authorize, liveSession, command, receipt, replay, projectSpelling, ownedProjects, bySlug, claimSlug, publicationUrl: urlFor, callback } = createAccess(db, options);
+  const { transaction, read, authorize, liveSession, command, receipt, replay, projectSpelling, ownedProjects, bySlug, claimSlug, publicationUrl: urlFor, callback } = createAccess(db, options);
   const publication = (artifactId: string, row: typeof artifactPublication.$inferSelect | undefined): Publication | null => row ? { revisionId: row.revisionId, version: row.version, url: urlFor(artifactId) } : null;
   const summary = (row: { artifact: typeof artifact.$inferSelect; title: string; publication: typeof artifactPublication.$inferSelect | null }): ArtifactSummary => ({ artifactId: row.artifact.id, title: row.title, headRevisionId: row.artifact.headRevisionId, createdAt: row.artifact.createdAt.toISOString(), project: row.artifact.project, slug: row.artifact.slug, publication: publication(row.artifact.id, row.publication ?? undefined) });
   const shareOf = (row: typeof artifactShare.$inferSelect): Share => ({ shareId: row.id, artifactId: row.artifactId, kind: row.kind, value: row.value, createdAt: row.createdAt.toISOString() });
@@ -147,7 +147,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
 
     async read(actor: Actor, value: z.input<typeof readSchema>): Promise<ArtifactRead> {
       const input = readSchema.parse(value);
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         if (input.artifactId !== undefined) return readOwned(connection, actor.userId, input.artifactId, input.revisionId);
         const project = input.project === undefined ? null : await projectSpelling(connection, actor.userId, input.project);
@@ -312,7 +312,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
 
     async listShares(actor: Actor, value: z.input<typeof listSharesSchema>): Promise<{ items: Share[] }> {
       const input = listSharesSchema.parse(value);
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:publish');
         await owned(connection, actor.userId, input.artifactId);
         const rows = await connection.select().from(artifactShare).where(eq(artifactShare.artifactId, input.artifactId)).orderBy(asc(artifactShare.kind), asc(artifactShare.value));
@@ -321,7 +321,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     },
 
     async listSharedWithMe(actor: Actor): Promise<{ items: SharedArtifactSummary[] }> {
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         const viewer = alias(user, 'viewer');
         const owner = alias(user, 'owner');
@@ -366,7 +366,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     },
 
     async projects(actor: Actor): Promise<{ items: ProjectSummary[] }> {
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         return { items: await ownedProjects(connection, actor.userId) };
       });
@@ -374,7 +374,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
 
     async list(actor: Actor, value: z.input<typeof listSchema> = {}): Promise<{ items: ArtifactSummary[]; nextCursor: string | null }> {
       const input = listSchema.parse(value);
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
         const rows = await connection.select({ artifact, title: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String), publication: artifactPublication }).from(artifact)
@@ -389,7 +389,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
     async search(actor: Actor, value: z.input<typeof searchSchema>): Promise<SearchResult> {
       const input = searchSchema.parse(value);
       const offset = Number(input.cursor ?? 0);
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
         const rank = sql<number>`bm25(${artifactSearch})`.mapWith(Number);
@@ -403,7 +403,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
 
     async history(actor: Actor, value: z.input<typeof historySchema>): Promise<{ items: Revision[]; nextBeforeSequence: number | null }> {
       const input = historySchema.parse(value);
-      return transaction(async (connection) => {
+      return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         await owned(connection, actor.userId, input.artifactId);
         const rows = await connection.select().from(artifactRevision).where(and(eq(artifactRevision.artifactId, input.artifactId), input.beforeSequence ? lt(artifactRevision.sequence, input.beforeSequence) : undefined)).orderBy(desc(artifactRevision.sequence)).limit(input.limit + 1);
