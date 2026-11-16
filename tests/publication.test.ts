@@ -161,6 +161,32 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.equal(calls.filter((url) => url.endsWith('/read')).length, 8);
 });
 
+test('a stale revision link after a republish keeps the viewer cookie, and a revoked share still clears it', async () => {
+  let current = artifact;
+  let revoked = false;
+  const backend: typeof fetch = async (input, init) => {
+    if (String(input).endsWith('/consume')) return Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+    const { revisionId } = JSON.parse(String(init?.body)) as { revisionId?: string };
+    if (revoked || (revisionId && revisionId !== current.revision.id)) return new Response(null, { status: 404 });
+    return Response.json(current);
+  };
+  const handler = createPublicationApp(environment(), backend);
+  const cookie = cookieHeader((await authorize(handler)).admitted);
+  current = { ...artifact, headRevisionId: 'revision-2', publication: { ...artifact.publication!, revisionId: 'revision-2', version: 2 }, revision: { ...artifact.revision, id: 'revision-2', sequence: 2 } };
+  for (const path of ['/r/revision-1/content', '/r/revision-1/files/nested/file.html']) {
+    const stale = await handler(new Request(`${publish}/a/artifact-a${path}`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }));
+    assert.equal(stale.status, 404, path);
+    assert.deepEqual(stale.headers.getSetCookie(), [], path);
+  }
+  const page = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie } }));
+  assert.equal(page.status, 200);
+  assert((await page.text()).includes('src="/a/artifact-a/r/revision-2/content"'));
+  revoked = true;
+  const denied = await handler(new Request(`${publish}/a/artifact-a/r/revision-2/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }));
+  assert.equal(denied.status, 403);
+  assert(denied.headers.getSetCookie().some((value) => value.includes('Max-Age=0')));
+});
+
 test('anonymous files, cookie tampering, callback mismatch and missing transaction cannot expose publication bytes', async () => {
   let calls = 0;
   const handler = createPublicationApp(environment(), async () => { calls++; return new Response(null, { status: 503 }); });
