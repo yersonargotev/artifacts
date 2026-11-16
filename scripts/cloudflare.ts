@@ -11,6 +11,8 @@ export const workerOrigins = {
   PUBLISH_URL: 'https://artifacts-view.yersonargotev.workers.dev',
 };
 
+export const sentryProject = { org: 'sparkydevs', project: 'artifacts' };
+export const sentryRelease = (sha: string) => `artifacts@${sha}`;
 export const sentryDsn = 'https://23b90a7438e30796f9f34f1c967b6562@o4509117618913280.ingest.us.sentry.io/4512442691682304';
 
 type Binding = { type: 'text'; value: string } | { type: 'secret' };

@@ -49,8 +49,9 @@ assert.deepEqual([monitored.status, monitored.body], [503, unavailable], 'Sentry
 assert.equal(monitored.outbound.length, 1, `one envelope reaches the DSN host, saw ${monitored.outbound.map(({ url }) => url).join(', ')}`);
 const [envelope] = monitored.outbound;
 assert.match(envelope!.url, /^https:\/\/sentry\.example\.test\/api\/1\/envelope\//);
-const event = envelope!.body.split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line) as { tags?: Record<string, string>; exception?: { values?: { value?: string }[] } }).find((item) => item.exception);
+const event = envelope!.body.split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line) as { release?: string; tags?: Record<string, string>; exception?: { values?: { value?: string }[] } }).find((item) => item.exception);
 assert.equal(event?.tags?.service, 'artifacts-panel');
+assert.match(event?.release ?? '', /^artifacts@[0-9a-f]{40}$/, 'the event carries the release that the source maps are uploaded under');
 assert.match(event?.exception?.values?.[0]?.value ?? '', /URL_SCHEME_NOT_SUPPORTED/);
 for (const [name, value] of Object.entries(secrets)) assert(!envelope!.body.includes(value), `${name} reached Sentry`);
 console.log('The panel Worker reports a failed startup to Sentry in workerd without user data');

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,7 +11,7 @@ import auth from '../apps/auth/cloudflare.config.ts';
 import mcp from '../apps/mcp/cloudflare.config.ts';
 import panel from '../apps/dashboard/cloudflare.config.ts';
 import view from '../apps/publication/cloudflare.config.ts';
-import { workerOrigins } from './cloudflare.ts';
+import { sentryProject, sentryRelease, workerOrigins } from './cloudflare.ts';
 
 const services = { auth, mcp, view, panel };
 type Service = keyof typeof services;
@@ -23,6 +23,7 @@ type ReleaseOptions = {
   temporaryRoot?: string;
   dryRun?: boolean;
   deployWorker?: (service: Service, secretsFile: string, dryRun: boolean) => Promise<void>;
+  uploadSourceMaps?: (directory: string, release: string) => Promise<void>;
   verifyAccount?: () => Promise<void>;
   currentMain?: () => Promise<string>;
   smoke?: (serviceSecret: string) => Promise<void>;
@@ -93,6 +94,12 @@ async function validateBundles(root: string) {
     if (!isDeepStrictEqual(config, expected) || !isDeepStrictEqual(build, { buildContext: { isPreview: false } }) || !isDeepStrictEqual(source, services[service])) throw new Error(`${service} bundle configuration does not match the checked source`);
     const bundle = await stat(join(output, 'workers/default/bundle/worker.mjs'));
     if (!bundle.isFile() || bundle.size === 0) throw new Error(`${service} Worker bundle is empty`);
+    if ((await readdir(output, { recursive: true })).some((path) => path.endsWith('.map'))) throw new Error(`${service} deployment output must not contain source maps`);
+    const debugId = (await readFile(join(output, 'workers/default/bundle/worker.mjs'), 'utf8')).match(/\n\/\/# debugId=([0-9a-f-]{36})\s*$/)?.[1];
+    let map: unknown;
+    try { map = JSON.parse(await readFile(join(directory, 'sourcemaps/worker.mjs.map'), 'utf8')); }
+    catch { throw new Error(`${service} source map is missing`); }
+    if (!debugId || !map || typeof map !== 'object' || !('debugId' in map) || map.debugId !== debugId) throw new Error(`${service} source map does not match its bundle`);
     if (service === 'panel' && (await readdir(join(output, 'workers/default/assets'))).length === 0) throw new Error('Panel assets are missing');
   }
 }
@@ -101,7 +108,9 @@ function githubRelease(environment: Environment) {
   if (environment.GITHUB_EVENT_NAME !== 'push' || environment.GITHUB_REF !== 'refs/heads/main') throw new Error('Production releases require a push to main');
   if (!environment.GITHUB_SHA || !/^[a-f0-9]{40}$/.test(environment.GITHUB_SHA)) throw new Error('GITHUB_SHA is missing or malformed');
   if (!environment.GITHUB_REPOSITORY || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(environment.GITHUB_REPOSITORY) || !environment.GITHUB_TOKEN) throw new Error('GitHub repository and read token are required');
-  return { sha: environment.GITHUB_SHA, repository: environment.GITHUB_REPOSITORY, token: environment.GITHUB_TOKEN };
+  // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
+  if (!environment.SENTRY_AUTH_TOKEN || /[\s\x00-\x1f\x7f]/.test(environment.SENTRY_AUTH_TOKEN)) throw new Error('SENTRY_AUTH_TOKEN is missing or malformed');
+  return { sha: environment.GITHUB_SHA, repository: environment.GITHUB_REPOSITORY, token: environment.GITHUB_TOKEN, sentryToken: environment.SENTRY_AUTH_TOKEN };
 }
 
 export async function releaseProduction(options: ReleaseOptions = {}) {
@@ -120,7 +129,7 @@ export async function releaseProduction(options: ReleaseOptions = {}) {
       await writeFile(files[service], JSON.stringify(projected[service]), { mode: 0o600, flag: 'wx' });
     }
     const deployWorker = options.deployWorker ?? (async (service: Service, secretsFile: string, dryRun: boolean) => {
-      const { ARTIFACTS_RUNTIME_SECRETS: _runtime, GITHUB_TOKEN: _github, ...childEnvironment } = environment;
+      const { ARTIFACTS_RUNTIME_SECRETS: _runtime, GITHUB_TOKEN: _github, SENTRY_AUTH_TOKEN: _sentry, ...childEnvironment } = environment;
       await new Promise<void>((accept, reject) => {
         const child = spawn('pnpm', ['deploy:worker', service, '--secrets-file', secretsFile, ...(dryRun ? ['--dry-run'] : [])], { cwd: root, env: childEnvironment, stdio: 'ignore', timeout: 240_000 });
         child.on('error', () => reject(new Error(`${service} deployment command could not start`)));
@@ -143,6 +152,21 @@ export async function releaseProduction(options: ReleaseOptions = {}) {
       console.log('Skipped superseded release. The revision is no longer current main.');
       return;
     }
+    const sourceMaps = join(directory, 'sourcemaps');
+    for (const service of releaseOrder) {
+      await mkdir(join(sourceMaps, service), { recursive: true });
+      await copyFile(join(root, 'dist/workers', service, '.cloudflare/output/v0/workers/default/bundle/worker.mjs'), join(sourceMaps, service, 'worker.mjs'));
+      await copyFile(join(root, 'dist/workers', service, 'sourcemaps/worker.mjs.map'), join(sourceMaps, service, 'worker.mjs.map'));
+    }
+    const sentryToken = github.sentryToken;
+    await (options.uploadSourceMaps ?? (async (sourceDirectory: string, release: string) => {
+      await new Promise<void>((accept, reject) => {
+        const child = spawn('pnpm', ['exec', 'sentry-cli', 'sourcemaps', 'upload', '--org', sentryProject.org, '--project', sentryProject.project, '--release', release, sourceDirectory], { cwd: root, env: { PATH: environment.PATH, HOME: environment.HOME, SENTRY_AUTH_TOKEN: sentryToken }, stdio: ['ignore', 'inherit', 'inherit'], timeout: 240_000 });
+        child.on('error', () => reject(new Error('Source map upload could not start')));
+        child.on('exit', (code) => code === 0 ? accept() : reject(new Error('Source map upload failed')));
+      });
+    }))(sourceMaps, sentryRelease(github.sha));
+    console.log('Uploaded source maps');
     for (const service of releaseOrder) {
       await deployWorker(service, files[service], false);
       console.log(`Deployed ${service}`);

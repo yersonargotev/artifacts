@@ -37,6 +37,7 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
 export function sentryOptions(service: string) {
   return (env: MonitoringEnvironment): CloudflareOptions => ({
     dsn: env.SENTRY_DSN,
+    release: process.env.SENTRY_RELEASE,
     environment: 'production',
     dataCollection: {
       userInfo: false,

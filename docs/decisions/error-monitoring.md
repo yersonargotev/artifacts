@@ -1,6 +1,6 @@
 # Error monitoring
 
-Status: accepted on 2026-11-16. Rollout steps 2, 3, and 4 are implemented.
+Status: accepted on 2026-11-16. Rollout steps 2 to 5 are implemented. Step 6 waits for the first release.
 
 Production has no error monitoring and no alerts. The four Workers write to Workers Observability, which the operator reads with `pnpm exec cf o11y telemetry query`, and the release runs a read-only smoke once after deployment. A failure between releases surfaces only when someone notices it.
 
@@ -59,7 +59,7 @@ Events go to the `artifacts` project in the `sparkydevs` organization, in the US
 
 `SENTRY_DSN` is a text binding in each Worker's `cloudflare.config.ts`, declared next to the service origins in `scripts/cloudflare.ts`. A DSN only allows sending events, and Sentry documents it as safe to publish, so it does not belong in `ARTIFACTS_RUNTIME_SECRETS`, and the runtime secret contract does not change. The Node servers do not read these configurations, and Sentry stays off without a DSN, so local runs and tests send nothing. Anyone could use the public DSN to spend the event quota. If that happens, rate-limit the key in Sentry or rotate it.
 
-`scripts/build-workers.ts` turns on esbuild source maps. The release uploads them with `sentry-cli` under the release name `artifacts@<git SHA>`, then deletes them from the bundle before deployment, so the deployed Worker does not serve them. The upload uses a `SENTRY_AUTH_TOKEN` environment secret in GitHub, scoped to release and source map upload only. A failed upload fails the release before any deployment.
+`scripts/build-workers.ts` turns on esbuild source maps, and the panel also turns them on for its Vite server build, so its map reaches the original sources. `sentry-cli sourcemaps inject` gives each bundle and its map one debug ID, which lets Sentry pair them without a release match. The build moves the map out of the deployment output into `dist/workers/<service>/sourcemaps/`, so the deployed Worker never carries it, and embeds the release name `artifacts@<git SHA>` in the bundle. The release uploads the bundles and maps with `sentry-cli` under that release name before the first deployment. The upload uses a `SENTRY_AUTH_TOKEN` environment secret in GitHub, scoped to release and source map upload only. A failed upload fails the release before any deployment.
 
 `environment` is `production`. The options set no `tracesSampleRate` and no `tracesSampler`, so tracing is off and Sentry records errors only. A rate of `0` would still enable tracing, and a client's sampled `sentry-trace` header would then make the Worker send spans that skip `beforeSend`. With tracing off, the project stays within the 5,000 errors per month of the organization's Developer plan. Tracing can be enabled later if Workers Observability is not enough for latency.
 
