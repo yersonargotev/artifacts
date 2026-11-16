@@ -71,6 +71,19 @@ test('OIDC state tampering and expired or deleted central sessions cannot establ
   } finally { await app.close(); }
 });
 
+test('two panel tabs signing in keep their own transactions, and a callback cannot consume the other tab', async () => {
+  const app = await fixture();
+  try {
+    const browser = await panel(app);
+    const first = await browser.login();
+    const second = await browser.login();
+    await assert.rejects(browser.identity.completeLogin(first.callback, second.transaction.token));
+    assert((await browser.identity.completeLogin(second.callback, second.transaction.token)).token);
+    assert((await browser.identity.completeLogin(first.callback, first.transaction.token)).token);
+    assert.notEqual(first.transaction.cookie, second.transaction.cookie);
+  } finally { await app.close(); }
+});
+
 test('a callback released after central revocation cannot create a panel session', async () => {
   const app = await fixture();
   try {

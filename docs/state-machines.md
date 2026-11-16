@@ -109,16 +109,17 @@ The notification has its own outcome: `skipped(disabled)`, `skipped(rate_limited
 
 ## Panel login transaction
 
-An `oidc_transaction` row, bound to the browser by the `artifacts-login` cookie, which holds a random token whose hash is the row key.
+An `oidc_transaction` row, bound to the browser by an `artifacts-login-<state prefix>` cookie, which holds a random token whose hash is the row key. Each login has its own cookie, so concurrent tabs keep separate transactions.
 
 States: `Pending`, `Expired` (row present, past `expiresAt`), `Consumed` (row deleted).
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
-| — | `GET /auth/login` | none | `Pending` (600 s); the cookie is overwritten | `apps/dashboard/src/identity.ts` `startLogin` |
-| `Pending` | `GET /auth/callback` | cookie token matches, not expired, `state` and code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
+| — | `GET /auth/login` | none | `Pending` (600 s) with its own cookie | `apps/dashboard/src/identity.ts` `startLogin` |
+| `Pending` | `GET /auth/callback` | the `state` cookie's token and the `state` match the row, not expired, code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
 | `Pending` | 600 s pass | — | `Expired`; the next `GET /auth/login` deletes the row | `identity.ts` `startLogin` |
-| any | callback | — | cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
+| `Pending` | 600 s pass | — | `Expired`; the next `GET /auth/login` deletes the row | `identity.ts` `startLogin` |
+| any | callback | — | the callback `state`'s cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
 
 ## Panel session
 
@@ -152,12 +153,13 @@ States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `G
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
-| `NoCookie` | `GET /a/:id` without a viewer | — | `Transaction`; overwrites an earlier one | `apps/publication/src/http.ts` `begin` |
+| `NoCookie` | `GET /a/:id` without a viewer | — | a new `Transaction` beside any earlier one | `apps/publication/src/http.ts` `begin` |
 | `Transaction` | panel `/publication/open` | panel identity, `canView`, published | `Grant` | `index.ts` `issuePublicationGrant` |
-| `Grant` | `/callback` | cookie state and artifact match, not expired | grant deleted, `Viewer` set, transaction cookie cleared | `http.ts`, `index.ts` `consumePublicationGrant` |
-| `Transaction` | `/callback` that fails | — | transaction cookie cleared | `http.ts` |
-| `Viewer` | read | live session, admitted, `canView`, revision matches | page | `index.ts` `readPublished` |
-| `Viewer` | backend answers 401, 403, 404, or 409 | — | viewer cookie cleared | `http.ts` |
+| `Grant` | `/callback` | the `state` cookie's state and artifact match, not expired | grant deleted, `Viewer` set, that transaction cookie cleared | `http.ts`, `index.ts` `consumePublicationGrant` |
+| `Transaction` | `/callback` that fails | — | only the callback `state`'s cookie cleared | `http.ts` |
+| `Viewer` | read | live session, admitted, `canView`, published | page | `index.ts` `readPublished` |
+| `Viewer` | content or file request for a revision that is no longer published | — | `Viewer`; answers 404 | `http.ts` |
+| `Viewer` | backend answers 401, 403, 404, or 409 to the current-publication read | — | viewer cookie cleared | `http.ts` |
 
 ## CLI credential profile
 
@@ -206,10 +208,10 @@ Ranked by impact. Each confirmed finding has a runtime repro.
 
 | # | Finding | Impact | Status |
 | --- | --- | --- | --- |
-| 1 | The publication transaction cookie is one per browser. A second publication tab overwrites it, and a failed callback clears whichever transaction is current. | A guest who opens two shared links, or clicks one twice, gets "El enlace de acceso ha vencido" in both tabs. | Confirmed, [#186](https://github.com/yersonargotev/artifacts/issues/186) |
-| 2 | The panel login transaction is one per browser, and `completeLogin` deletes the row before it checks `state`. A callback from the other tab consumes the current transaction. | Two panel tabs signing in both land on `/?login=failed` after a correct sign-in. | Confirmed, [#186](https://github.com/yersonargotev/artifacts/issues/186) |
-| 3 | A stale revision URL makes `readPublished` answer `not_found`. The Worker treats it as a revocation and clears a valid viewer cookie. | After a republish, an open page or an old attachment link logs the viewer out of the artifact. | Confirmed, [#187](https://github.com/yersonargotev/artifacts/issues/187) |
-| 4 | The publication transaction lasts 300 s while the panel login lasts 600 s and an email code 5 min. | A first-time guest who waits for the code signs in and still gets "El enlace de acceso ha vencido". | Confirmed, [#186](https://github.com/yersonargotev/artifacts/issues/186) |
+| 1 | The publication transaction cookie is one per browser. A second publication tab overwrites it, and a failed callback clears whichever transaction is current. | A guest who opens two shared links, or clicks one twice, gets "El enlace de acceso ha vencido" in both tabs. | Fixed in [#194](https://github.com/yersonargotev/artifacts/pull/194) |
+| 2 | The panel login transaction is one per browser, and `completeLogin` deletes the row before it checks `state`. A callback from the other tab consumes the current transaction. | Two panel tabs signing in both land on `/?login=failed` after a correct sign-in. | Fixed in [#194](https://github.com/yersonargotev/artifacts/pull/194) |
+| 3 | A stale revision URL makes `readPublished` answer `not_found`. The Worker treats it as a revocation and clears a valid viewer cookie. | After a republish, an open page or an old attachment link logs the viewer out of the artifact. | Fixed in [#193](https://github.com/yersonargotev/artifacts/pull/193) |
+| 4 | The publication transaction lasts 300 s while the panel login lasts 600 s and an email code 5 min. | A first-time guest who waits for the code signs in and still gets "El enlace de acceso ha vencido". | Fixed in [#194](https://github.com/yersonargotev/artifacts/pull/194) |
 | 5 | Expired `oidc_transaction` rows and unconsumed `publication_grant` rows are never deleted, and anonymous `GET /auth/login` creates the former. | Unbounded table growth from an unthrottled endpoint. | Fixed in [#192](https://github.com/yersonargotev/artifacts/pull/192) |
 | 6 | A second "Quitar" on a share another tab already removed returns `not_found`. The share dialog maps it to `denied`. | The owner sees "No se puede abrir este artefacto." for an artifact that is fine. | Confirmed, [#189](https://github.com/yersonargotev/artifacts/issues/189) |
 | 7 | Removing a guest's last share leaves their sessions and refresh tokens inert. Sharing again revives them. | None while unadmitted. A design question. | Suspected |

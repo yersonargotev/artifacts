@@ -42,7 +42,7 @@ The three publication methods call `canView` inside their own transaction on eve
 
 No cookie, grant, viewer, or cache holds an email, a verification state, or an access decision. A revocation, an unverified email, or a deletion therefore denies the next request.
 
-A denied user sees one of two fixed results. A fresh open goes through the panel's `/publication/open`, which answers `404` with `No se puede abrir este artefacto.` A request that still carries a viewer cookie gets `403` from the publication Worker with `Tu sesión o esta publicación ya no están disponibles.`, and the Worker clears that artifact's viewer cookie. Error messages never reach the browser.
+A denied user sees one of two fixed results. A fresh open goes through the panel's `/publication/open`, which answers `404` with `No se puede abrir este artefacto.` A request that still carries a viewer cookie gets `403` from the publication Worker with `Tu sesión o esta publicación ya no están disponibles.`, and the Worker clears that artifact's viewer cookie. The Worker always reads the current publication and compares a content or file request's revision itself, so a link to a revision that a republish replaced answers `404` and keeps the viewer cookie. Error messages never reach the browser.
 
 The publication Worker parses the read response as either the owner shape or the shared shape, each strictly. It still compares `ownerId` with the viewer's user ID when the response has the owner shape. That check costs nothing and turns a store bug that sends the owner shape to a viewer into a `503` instead of a page with the owner's project.
 
