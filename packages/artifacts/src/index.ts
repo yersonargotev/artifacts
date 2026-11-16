@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { alias, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import { zipSync, type Zippable } from 'fflate';
@@ -439,7 +439,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         if (!await canView(connection, actor.userId, input.artifactId)) throw new ArtifactError('not_found', 'Artifact not found');
         const [published] = await connection.select({ revisionId: artifactPublication.revisionId }).from(artifactPublication).where(eq(artifactPublication.artifactId, input.artifactId)).limit(1);
         if (!published) throw new ArtifactError('not_found', 'Artifact is not published');
-        const expiresAt = Math.min(Date.now() + 60_000, current.expiresAt.getTime());
+        const now = Date.now();
+        const expiresAt = Math.min(now + 60_000, current.expiresAt.getTime());
+        await connection.delete(publicationGrant).where(lte(publicationGrant.expiresAt, new Date(now)));
         await connection.insert(publicationGrant).values({ codeHash, state: input.state, artifactId: input.artifactId, userId: actor.userId, sessionId: actor.sessionId, callback, expiresAt: new Date(expiresAt) });
         return { code, expiresAt };
       });

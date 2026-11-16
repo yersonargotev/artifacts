@@ -10,7 +10,8 @@ export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: strin
 const transactionSchema = z.strictObject({ purpose: z.literal('transaction'), artifactId: z.string().min(1).max(128), state: z.string().min(32).max(128), expiresAt: z.number().int().positive() });
 const viewerCookieSchema = z.strictObject({ purpose: z.literal('viewer'), viewer: viewerSchema });
 const publishedReadSchema = z.union([artifactReadSchema, sharedReadSchema]);
-const transactionCookie = '__Host-artifacts-publication-transaction';
+/** One cookie per transaction keeps concurrent tabs apart; a state prefix keeps its name short. */
+const transactionCookie = (state: string | null) => state && /^[\w-]{16,}$/.test(state) ? `__Host-artifacts-transaction-${state.slice(0, 16)}` : undefined;
 const cookieName = (artifactId: string) => `__Host-artifacts-viewer-${base64url(new TextEncoder().encode(artifactId))}`;
 const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
@@ -61,10 +62,10 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
     } catch { return; }
   }
   async function begin(artifactId: string) {
-    const transaction = transactionSchema.parse({ purpose: 'transaction', artifactId, state: random(), expiresAt: Date.now() + 300_000 });
+    const transaction = transactionSchema.parse({ purpose: 'transaction', artifactId, state: random(), expiresAt: Date.now() + 600_000 });
     const target = new URL('/publication/open', dashboardOrigin);
     target.search = new URLSearchParams({ artifactId, state: transaction.state }).toString();
-    return new Response(null, { status: 303, headers: { ...privateHeaders, location: target.href, 'set-cookie': setCookie(transactionCookie, await encrypt(transaction, transaction.expiresAt), transaction.expiresAt) } });
+    return new Response(null, { status: 303, headers: { ...privateHeaders, location: target.href, 'set-cookie': setCookie(transactionCookie(transaction.state)!, await encrypt(transaction, transaction.expiresAt), transaction.expiresAt) } });
   }
   const unavailable = () => new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
   return async function handle(request: Request): Promise<Response> {
@@ -73,22 +74,24 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       if (url.origin !== publishOrigin) return new Response('Invalid host', { status: 400, headers: privateHeaders });
       if (request.method !== 'GET') return new Response('Method not allowed', { status: 405, headers: { ...privateHeaders, allow: 'GET' } });
       if (url.pathname === '/callback') {
+        const transactionName = transactionCookie(url.searchParams.get('state'));
         try {
           const parameters = consumeGrantSchema.parse(Object.fromEntries(url.searchParams));
           if (url.searchParams.size !== 3) throw new Error('Invalid callback');
-          const transaction = transactionSchema.parse(await decrypt(cookie(request, transactionCookie)));
+          if (!transactionName) throw new Error('Invalid callback');
+          const transaction = transactionSchema.parse(await decrypt(cookie(request, transactionName)));
           if (transaction.expiresAt <= Date.now() || parameters.artifactId !== transaction.artifactId || parameters.state !== transaction.state) throw new Error('Invalid callback transaction');
           const result = await backend('consume', parameters);
           if ('denied' in result) throw new Error('Invalid publication grant');
           const viewer = viewerSchema.parse(result.value);
           if (viewer.artifactId !== transaction.artifactId || viewer.expiresAt <= Date.now()) throw new Error('Invalid publication viewer');
           const headers = new Headers({ ...privateHeaders, location: `${publishOrigin}/a/${encodeURIComponent(viewer.artifactId)}` });
-          headers.append('set-cookie', setCookie(transactionCookie, '', 0));
+          headers.append('set-cookie', setCookie(transactionName, '', 0));
           headers.append('set-cookie', setCookie(cookieName(viewer.artifactId), await encrypt({ purpose: 'viewer', viewer }, viewer.expiresAt), viewer.expiresAt));
           return new Response(null, { status: 303, headers });
         } catch (error) {
           if (error instanceof Error && error.message === 'Publication backend unavailable') throw error;
-          return new Response('El enlace de acceso ha vencido. Abre de nuevo la publicación.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(transactionCookie, '', 0) } });
+          return new Response('El enlace de acceso ha vencido. Abre de nuevo la publicación.', { status: 403, headers: { ...privateHeaders, ...(transactionName ? { 'set-cookie': setCookie(transactionName, '', 0) } : {}) } });
         }
       }
       const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/(content|files\/(.+)))?$/.exec(url.pathname);
@@ -102,10 +105,12 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       const contentRequest = route[3] === 'content';
       const viewer = await admit(request, artifactId);
       if (!viewer) return path || contentRequest ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
-      const result = await backend('read', { viewer, artifactId, ...(revisionId ? { revisionId } : {}) });
+      // The backend reads the current publication, so a denial always means lost access, never a republished revision.
+      const result = await backend('read', { viewer, artifactId });
       if ('denied' in result) return new Response('Tu sesión o esta publicación ya no están disponibles.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(cookieName(artifactId), '', 0) } });
       const artifact = publishedReadSchema.parse(result.value);
-      if (artifact.artifactId !== artifactId || ('ownerId' in artifact && artifact.ownerId !== viewer.userId) || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId || (revisionId && artifact.revision.id !== revisionId)) throw new Error('Invalid published artifact');
+      if (artifact.artifactId !== artifactId || ('ownerId' in artifact && artifact.ownerId !== viewer.userId) || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId) throw new Error('Invalid published artifact');
+      if (revisionId && artifact.revision.id !== revisionId) return new Response('Esta versión ya no está publicada. Abre de nuevo la publicación.', { status: 404, headers: privateHeaders });
       if (path) {
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });

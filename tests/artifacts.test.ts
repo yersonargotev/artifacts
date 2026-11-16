@@ -539,6 +539,21 @@ test('grant consumption races admit once and expired sessions and grants fail cl
   } finally { await app.close(); }
 });
 
+test('issuing a publication grant deletes expired grants and keeps live ones', async () => {
+  const app = await artifactFixture();
+  try {
+    const created = await app.store.create(app.actor, createInput());
+    await app.store.publish(app.actor, { requestId: randomUUID(), artifactId: created.artifactId, revisionId: created.revision.id, expectedPublicationVersion: 0 });
+    const state = randomUUID();
+    for (let index = 0; index < 3; index++) await app.store.issuePublicationGrant(app.actor, { artifactId: created.artifactId, state });
+    await app.db.update(publicationGrant).set({ expiresAt: new Date(Date.now() - 1) });
+    const live = await app.store.issuePublicationGrant(app.actor, { artifactId: created.artifactId, state });
+    await app.store.issuePublicationGrant(app.actor, { artifactId: created.artifactId, state });
+    assert.equal((await app.db.select().from(publicationGrant).all()).length, 2);
+    assert.equal((await app.store.consumePublicationGrant({ artifactId: created.artifactId, state, code: live.code })).userId, app.actor.userId);
+  } finally { await app.close(); }
+});
+
 const page = (title: string, text: string, kind: Snapshot['content']['kind'] = 'markdown', description = ''): Snapshot => ({ metadata: { title, description }, content: { kind, text }, files: [] });
 
 test('search finds owned Markdown and text heads without accents and follows update, move, and delete', async () => {

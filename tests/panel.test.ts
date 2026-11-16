@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { eq } from 'drizzle-orm';
 import { decodeJwt } from 'jose';
 import { createPanelIdentity } from '../apps/dashboard/src/identity.ts';
-import { session } from '../packages/db/src/schema.ts';
+import { oidcTransaction, session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
 async function panel(app: Awaited<ReturnType<typeof fixture>>) {
@@ -39,6 +39,20 @@ test('OIDC validates signed identity and durable one-use state, then panel logou
   } finally { await app.close(); }
 });
 
+test('a new login deletes expired login transactions and keeps live ones', async () => {
+  const app = await fixture();
+  try {
+    const browser = await panel(app);
+    for (let index = 0; index < 3; index++) await browser.identity.startLogin();
+    await app.db.update(oidcTransaction).set({ expiresAt: new Date(Date.now() - 1000) });
+    const live = await browser.login();
+    await browser.identity.startLogin();
+    assert.equal((await app.db.select().from(oidcTransaction).all()).length, 2);
+    const local = await browser.identity.completeLogin(live.callback, live.transaction.token);
+    assert.equal((await browser.identity.load(local.token))?.userId, app.ownerId);
+  } finally { await app.close(); }
+});
+
 test('OIDC state tampering and expired or deleted central sessions cannot establish or retain panel access', async () => {
   const app = await fixture();
   try {
@@ -54,6 +68,19 @@ test('OIDC state tampering and expired or deleted central sessions cannot establ
     assert.equal(await browser.identity.load(local.token), undefined);
     await app.db.delete(session).where(eq(session.id, identity.sessionId));
     assert.equal(await browser.identity.load(local.token), undefined);
+  } finally { await app.close(); }
+});
+
+test('two panel tabs signing in keep their own transactions, and a callback cannot consume the other tab', async () => {
+  const app = await fixture();
+  try {
+    const browser = await panel(app);
+    const first = await browser.login();
+    const second = await browser.login();
+    await assert.rejects(browser.identity.completeLogin(first.callback, second.transaction.token));
+    assert((await browser.identity.completeLogin(second.callback, second.transaction.token)).token);
+    assert((await browser.identity.completeLogin(first.callback, first.transaction.token)).token);
+    assert.notEqual(first.transaction.cookie, second.transaction.cookie);
   } finally { await app.close(); }
 });
 
