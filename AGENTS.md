@@ -37,6 +37,7 @@ node scripts/prepare-native.mjs --check && pnpm install --frozen-lockfile
 ## Run checks
 
 - `pnpm check` type-checks the workspace and the panel.
+- `pnpm lint` runs Oxlint with the vendored anti-slop rules in `tools/oxlint/anti-slop/`. Errors fail CI. Warnings come from Oxlint's default rules and do not.
 - `pnpm test` runs `tests/*.test.ts`.
 - `pnpm test:rest-cli` runs the REST and CLI tests.
 - `pnpm test:cli-skills` builds the packages and checks the skills that the CLI ships.

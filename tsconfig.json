@@ -20,6 +20,8 @@
     "tests/**/*.ts",
     ".agents/skills/verify-artifacts/scripts/**/*.ts",
     "apps/cli/**/*.ts",
-    "apps/rest/**/*.ts"
+    "apps/rest/**/*.ts",
+    "tools/**/*.ts",
+    "oxlint.config.ts"
   ]
 }

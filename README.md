@@ -175,6 +175,7 @@ ARTIFACTS_ENV_FILE=.env.deploy pnpm identity:bootstrap
 
 ```sh
 pnpm check
+pnpm lint
 pnpm test
 pnpm test:browser
 pnpm test:rest-cli:browser

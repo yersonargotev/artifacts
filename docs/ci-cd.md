@@ -8,7 +8,7 @@ Each job runs in its own Ubuntu 24.04 workspace with Node 24 and the package man
 
 | Job | Commands and evidence |
 | --- | --- |
-| `checks` | Frozen dependency installation, `pnpm check`, and `pnpm test`. A newer validation can cancel stale checks for the same ref. |
+| `checks` | Frozen dependency installation, `pnpm check`, `pnpm lint`, and `pnpm test`. A newer validation can cancel stale checks for the same ref. |
 | `browser` | Three matrix shards. Each runs a frozen installation, `playwright install --with-deps chrome`, and `pnpm test:browser --shard <n>/3`, then uploads its evidence as `browser-<n>-…`. Shard 1 also runs the REST and CLI browser proof. The proofs require real Google Chrome, IPv6 loopback, and an active UDP control. |
 | `workers` | Frozen installation, `pnpm build:workers`, and `deploy:worker --dry-run` for all four services without production credentials. |
 
