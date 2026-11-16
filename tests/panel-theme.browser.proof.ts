@@ -230,14 +230,17 @@ async function hoverStates(page: Page, theme: Theme, label: string) {
   });
   for (let index = 0; index < count; index++) {
     const target = page.locator(`[data-contrast-target="${index}"]`);
-    // The skip link sits above the viewport until focused and sr-only labels lie under their control, so a pointer cannot reach them.
-    const reachable = await target.evaluate((element) => {
+    const reach = await target.evaluate((element) => {
       element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       const box = element.getBoundingClientRect();
       const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-      return Boolean(hit && element.contains(hit));
+      return { reachable: Boolean(hit && element.contains(hit)), name: `${element.tagName.toLowerCase()}.${[...element.classList].join('.')} "${element.textContent!.trim().slice(0, 40)}"`, hit: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join('.')}` : 'nothing', expected: element.matches('a.skip-link, label.sr-only') };
     });
-    if (!reachable) continue;
+    if (!reach.reachable) {
+      // The skip link sits above the viewport until focused and sr-only labels lie under their control, so a pointer cannot reach them. Any other target must be hoverable.
+      assert(reach.expected, `${theme} ${label}: hover target ${reach.name} is covered by ${reach.hit}`);
+      continue;
+    }
     await target.hover({ timeout: 2_000 });
     await measure(page, theme, label, 'hover', target);
   }
