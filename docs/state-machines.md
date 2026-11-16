@@ -103,7 +103,7 @@ A share is an `artifact_share` row: `Absent`, `Active`, `Removed`. Removing a sh
 | `Active` | `share` | `requireNew` | unchanged, `conflict` (`share_exists`) | `index.ts` `share` |
 | `Active` | `share` | not `requireNew` | unchanged, success | `index.ts` `share` |
 | `Active` | `unshare` | — | `Removed` | `index.ts` `unshare` |
-| `Removed` | `unshare` with a new request ID | — | `not_found`; the panel reports it as confirmed because it read the artifact first | `index.ts` `unshare`, `share.ts` `submitShare` |
+| `Removed` | `unshare` with a new request ID | — | `not_found` | `index.ts` `unshare` |
 
 The notification has its own outcome: `skipped(disabled)`, `skipped(rate_limited)`, or `requested`. The day budget resets when `date('now')` differs from the stored day, and it is read and written in the share's transaction. The email is sent after the commit and only on a fresh receipt. A lost send stays `requested`, and an exact retry does not resend it.
 
@@ -117,7 +117,7 @@ States: `Pending`, `Expired` (row present, past `expiresAt`), `Consumed` (row de
 | --- | --- | --- | --- | --- |
 | — | `GET /auth/login` | none | `Pending` (600 s) with its own cookie | `apps/dashboard/src/identity.ts` `startLogin` |
 | `Pending` | `GET /auth/callback` | the `state` cookie's token and the `state` match the row, not expired, code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
-| `Pending` | 600 s pass | — | `Expired`; the next `GET /auth/login` deletes the row | `identity.ts` `startLogin` |
+| `Pending` | another tab's callback | `state` differs | stays `Pending` | `identity.ts` `completeLogin` |
 | `Pending` | 600 s pass | — | `Expired`; the next `GET /auth/login` deletes the row | `identity.ts` `startLogin` |
 | any | callback | — | the callback `state`'s cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
 
@@ -149,7 +149,7 @@ Better Auth owns these rows. The app adds admission checks on sign-in, refresh, 
 
 The publication Worker admits a viewer through three stages: a transaction cookie, a one-use grant row, and a viewer cookie.
 
-States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `Grant` (`publication_grant` row, at most 60 s, one use; once expired, the next `issuePublicationGrant` deletes it), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
+States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie named by a state prefix, one per open, 600 s), `Grant` (`publication_grant` row, at most 60 s, one use; once expired, the next `issuePublicationGrant` deletes it), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
@@ -200,7 +200,7 @@ Every panel mutation is a server-rendered POST followed by a redirect, so the pa
 | Selection bar removal | on each submit | as move |
 | Share dialog | per loaded view | confirmed, invalid, conflict, share limit, uncertain, denied |
 
-The share dialog moves `Loading → Ready → Submitting → Ready | Uncertain | Denied`. `Uncertain` disables the inputs and allows only a retry of the same command. A generation counter discards a load that lands while a submit is in flight. Removing a share that another tab already removed confirms and reloads the list. `Denied` comes only from an artifact the owner cannot read.
+The share dialog moves `Loading → Ready → Submitting → Ready | Uncertain | Denied`. `Uncertain` disables the inputs and allows only a retry of the same command. A generation counter discards a load that lands while a submit is in flight.
 
 ## Findings
 
@@ -213,7 +213,7 @@ Ranked by impact. Each confirmed finding has a runtime repro.
 | 3 | A stale revision URL makes `readPublished` answer `not_found`. The Worker treats it as a revocation and clears a valid viewer cookie. | After a republish, an open page or an old attachment link logs the viewer out of the artifact. | Fixed in [#193](https://github.com/yersonargotev/artifacts/pull/193) |
 | 4 | The publication transaction lasts 300 s while the panel login lasts 600 s and an email code 5 min. | A first-time guest who waits for the code signs in and still gets "El enlace de acceso ha vencido". | Fixed in [#194](https://github.com/yersonargotev/artifacts/pull/194) |
 | 5 | Expired `oidc_transaction` rows and unconsumed `publication_grant` rows are never deleted, and anonymous `GET /auth/login` creates the former. | Unbounded table growth from an unthrottled endpoint. | Fixed in [#192](https://github.com/yersonargotev/artifacts/pull/192) |
-| 6 | A second "Quitar" on a share another tab already removed returns `not_found`. The share dialog maps it to `denied`. | The owner sees "No se puede abrir este artefacto." for an artifact that is fine. | Fixed in [#191](https://github.com/yersonargotev/artifacts/pull/191) |
+| 6 | A second "Quitar" on a share another tab already removed returns `not_found`. The share dialog maps it to `denied`. | The owner sees "No se puede abrir este artefacto." for an artifact that is fine. | Confirmed, [#189](https://github.com/yersonargotev/artifacts/issues/189) |
 | 7 | Removing a guest's last share leaves their sessions and refresh tokens inert. Sharing again revives them. | None while unadmitted. A design question. | Suspected |
 | 8 | The selection bar mints a request ID per submit, so a double click sends two commands. | An extra receipt. The command is absolute, so nothing changes twice. | Suspected, harmless |
 | 9 | A batch that exhausts its constraint retries throws a raw constraint error, which REST reports as 503 and Sentry. | Noise under heavy contention. A retry with the same request ID is safe. | Suspected |
