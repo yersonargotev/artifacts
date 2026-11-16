@@ -172,9 +172,11 @@ Worker builds select a database entrypoint that retains each HTTP exchange with 
 
 The current auth startup performs four exchanges when bootstrap has already provisioned both resources. Four five-second budgets fit within twenty seconds, below [Cloudflare's thirty-second retention allowance](https://developers.cloudflare.com/workers/runtime-apis/context/#waituntil) after the initiating request ends. This is a bound for the current startup sequence, not an overall deadline for arbitrary application requests. Review that bound when adding startup queries. Node and native database callers keep their existing transport behavior.
 
+The Worker entrypoint also turns off the client's limit of 20 concurrent operations. Each Worker shares one client across requests, and the limiter frees a slot in a continuation of the request that took it. When a browser cancels that request, workerd drops the continuation and the slot never comes back. Once 20 slots leak, every later query waits forever. Fast j/k presses in the reader cancel one preview request per press. Cloudflare still caps simultaneous connections per request, and the five-second deadline still bounds each exchange.
+
 This policy adds no SQL retries and does not extend the three-second JWKS or introspection deadlines. A timed-out mutation may have committed remotely. Recover it with the existing retained request ID and exact arguments rather than preparing another mutation.
 
-Run `node --import tsx --test tests/database-worker.test.ts` to exercise actual workerd recovery after stalled headers, stalled bodies, and OAuth resource initialization. The same tests check that exchanges outlive their initiating invocation, release the client's concurrent-operation slots, and permit healthy reads afterward.
+Run `node --import tsx --test tests/database-worker.test.ts` to exercise actual workerd recovery after stalled headers, stalled bodies, and OAuth resource initialization. The same tests check that exchanges outlive their initiating invocation, permit healthy reads afterward, and keep serving after clients cancel many in-flight requests.
 
 ## Local native database correction
 
