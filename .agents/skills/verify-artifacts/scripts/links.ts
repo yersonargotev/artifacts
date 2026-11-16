@@ -32,7 +32,7 @@ export async function driveLinks({ page, panel, checks, call, login, capture, re
 
   const messages: string[] = [];
   await page.exposeFunction('recordFrameMessage', (message: string) => { messages.push(message); });
-  await page.addInitScript(() => addEventListener('message', (event) => (window as unknown as { recordFrameMessage(message: string): void }).recordFrameMessage(String(event.data))));
+  await page.addInitScript(() => addEventListener('message', (event) => (window as Window & { recordFrameMessage?: (message: string) => void }).recordFrameMessage?.(String(event.data))));
   await login(page);
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   await record('Open the source page detail', { artifactId: source.artifactId });

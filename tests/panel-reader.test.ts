@@ -138,7 +138,7 @@ test('workspace and pages isolate owners even for empty searches, status filters
 
 test('the library groups a page by workspace project order and the URL turns grouping off', () => {
   const card = (title: string, project: string | null) => ({ artifactId: title, title, project: project as ProjectName | null }) as ArtifactCard;
-  const projects = [{ name: 'Alpha' }, { name: 'Beta' }] as unknown as Workspace['projects'];
+  const projects: Workspace['projects'] = ['Alpha', 'Beta'].map((name) => ({ name: name as ProjectName, updatedAt: new Date(0), count: 0, published: 0, pending: 0 }));
   const groups = groupCards([card('b1', 'beta'), card('u1', null), card('g1', 'Gamma'), card('a1', 'Alpha'), card('b2', 'Beta')], projects);
   assert.deepEqual(groups.map(({ project, cards }) => [project, cards.map(({ title }) => title)]), [['Alpha', ['a1']], ['Beta', ['b1', 'b2']], ['Gamma', ['g1']], [null, ['u1']]]);
   assert.deepEqual(groupCards([], projects), []);
@@ -202,7 +202,7 @@ test('reader URLs round-trip scope, filters, cursor, and selection, and filter l
 
 test('read mode numbers rows from an offset that the page counts confirm and links each row to its neighbors', () => {
   const card = (artifactId: string) => ({ artifactId }) as ArtifactCard;
-  const page = (cards: number, { continued, next, total }: { continued: boolean; next: boolean; total: number }) => ({ status: 'pending', counts: { all: 99, published: 0, unpublished: 0, pending: total }, cards: Array.from({ length: cards }, (_, index) => card(`c${index}`)), continued, next: next ? 'n' : null }) as unknown as LibraryPage;
+  const page = (cards: number, { continued, next, total }: { continued: boolean; next: boolean; total: number }) => ({ status: 'pending', counts: { all: 99, published: 0, unpublished: 0, pending: total }, cards: Array.from({ length: cards }, (_, index) => card(`c${index}`)), continued, next: next ? 'n' : null, scope: { kind: 'all' }, q: '', sort: 'updated', direction: 'desc' }) satisfies LibraryPage;
   const first = page(25, { continued: false, next: true, total: 60 });
   const middle = page(25, { continued: true, next: true, total: 60 });
   const last = page(10, { continued: true, next: false, total: 60 });

@@ -169,7 +169,8 @@ try {
   await current.waitForURL(`${app.dashboard}/?project=Delta`, { waitUntil: 'commit' });
   await current.locator('[data-selection-count]').getByText('2 seleccionados', { exact: true }).waitFor();
   assert.deepEqual((await formIds(current)).sort(), selectedIds);
-  const restoredShows: boolean[] = await current.evaluate(() => Reflect.get(window, 'selectionPageShows'));
+  const restoredShows = await current.evaluate(() => (window as Window & { selectionPageShows?: boolean[] }).selectionPageShows);
+  assert.ok(restoredShows, 'The page records its pageshow events');
   assert.equal(restoredShows.at(-1), true, 'The actual browser restored this document from its back-forward cache');
   await checkbox(current, 'Alpha second').uncheck();
   await current.locator('[data-selection-count]').getByText('1 seleccionados', { exact: true }).waitFor();

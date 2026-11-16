@@ -596,12 +596,12 @@ try {
   assert.deepEqual(await theme(), ['dark', '#1e1e2e']);
   await page.getByRole('button', { name: 'Cambiar a tema claro', exact: true }).waitFor();
   await page.getByRole('checkbox', { name: 'Seleccionar Alpha notes', exact: true }).check();
-  await page.evaluate(() => Reflect.set(window, 'samePage', true));
+  await page.evaluate(() => { (window as Window & { samePage?: boolean }).samePage = true; });
   await page.getByRole('button', { name: 'Cambiar a tema claro', exact: true }).click();
   await page.getByRole('button', { name: 'Cambiar a tema oscuro', exact: true }).waitFor();
   assert.deepEqual(await theme(), ['light', '#eff1f5']);
   assert.equal(await stored(), 'light');
-  assert.equal(await page.evaluate(() => Reflect.get(window, 'samePage')), true, 'The toggle flips the theme without a navigation');
+  assert.equal(await page.evaluate(() => (window as Window & { samePage?: boolean }).samePage), true, 'The toggle flips the theme without a navigation');
   assert.equal(await page.getByRole('checkbox', { name: 'Seleccionar Alpha notes', exact: true }).isChecked(), true, 'The page keeps its selection');
   await page.reload();
   assert.deepEqual(await theme(), ['light', '#eff1f5']);

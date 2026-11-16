@@ -30,6 +30,7 @@ jobs:
       - uses: ./.github/actions/prepare-native
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: pnpm lint
       - run: pnpm test
       - run: pnpm test:packages
       - run: pnpm test:packages:native

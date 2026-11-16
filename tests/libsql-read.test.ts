@@ -14,7 +14,7 @@ const nativeRequire = createRequire(sdkPath);
 const Native = nativeRequire('libsql') as typeof import('libsql');
 function field(row: unknown, name: string): unknown {
   assert.ok(row && typeof row === 'object' && name in row);
-  return Reflect.get(row, name);
+  return (row as Record<string, unknown>)[name];
 }
 const entrypoints = [
   ['ESM', (await import('@libsql/client')).createClient, import.meta.resolve('@libsql/client')],
