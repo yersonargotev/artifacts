@@ -20,7 +20,7 @@ A command passes through these layers. The test beside each layer covers it.
 
 Packy installs the skills in `.claude/skills/` and `.agents/skills/` from `packy.json` and `packy.lock.json`. Don't edit them. The project owns only `verify-artifacts` and `verify-batch-concurrency`, which live in `.agents/skills/` and are symlinked from `.claude/skills/`. To prove a change in the real panel, publication page, MCP, and CLI, use `verify-artifacts`.
 
-Decisions live in `docs/decisions/`. Put reproduction scripts and scratch databases in `.test-artifacts/`, which git ignores. `packages/artifacts/src/index.ts` and `docs/decisions/wiki-pages.md` overflow one read. List the sections first, then read one range:
+Decisions live in `docs/decisions/`. [docs/state-machines.md](docs/state-machines.md) lists every state machine with its invariants, transitions, and known findings; update it when you change a transition. Put reproduction scripts and scratch databases in `.test-artifacts/`, which git ignores. `packages/artifacts/src/index.ts` and `docs/decisions/wiki-pages.md` overflow one read. List the sections first, then read one range:
 
 ```sh
 grep -n '^    async ' packages/artifacts/src/index.ts
