@@ -549,11 +549,12 @@ async function drive(feature: Feature) {
           await capture(page, 'published-r2');
           await record('Open Archivos', {});
           await page.locator('.title-menu > summary').click();
-          await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
+          // The menu opens over the out-of-process iframe, and Chrome can route a click there to the iframe before it repaints the menu, so the menu items use the keyboard.
+          await page.locator('summary').filter({ hasText: /^Archivos \(/ }).press('Enter');
           const attachment = new URL((await page.getByRole('link', { name: 'notes.txt', exact: true }).getAttribute('href'))!, instance.view).href;
           await record('Download publication attachment', { name: 'notes.txt', url: attachment });
           const downloadPromise = page.waitForEvent('download');
-          await page.getByRole('link', { name: 'notes.txt', exact: true }).click();
+          await page.getByRole('link', { name: 'notes.txt', exact: true }).press('Enter');
           await (await downloadPromise).saveAs(join(directory, 'notes.txt'));
           assert.equal(await readFile(join(directory, 'notes.txt'), 'utf8'), firstSnapshot.files[0]!.data);
           const anonymous = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -595,7 +596,7 @@ async function drive(feature: Feature) {
               await filters.getByRole('link', { name: /^Cambios pendientes \(/ }).click();
               await page.waitForURL((url) => url.searchParams.get('status') === 'pending');
               assert.equal(await page.locator('.artifact-card .artifact-status[data-state=pending]').count(), 1);
-              await page.getByRole('link', { name: 'Guía de revisión de entregas', exact: true }).waitFor();
+              await page.locator('.artifact-card').getByRole('link', { name: 'Guía de revisión de entregas', exact: true }).waitFor();
               await filters.getByRole('link', { name: /^Sin publicar \(/ }).click();
               await page.waitForURL((url) => url.searchParams.get('status') === 'unpublished');
               assert.equal(await page.locator('.artifact-card').count(), 1);
