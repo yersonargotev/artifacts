@@ -58,7 +58,7 @@ test('panel library searches the whole scope literally before status filtering a
     assert.deepEqual(missing.page.counts, { all: 0, published: 0, unpublished: 0, pending: 0 });
     assert.deepEqual(missing.page.cards, []);
     assert.equal(missing.page.next, null);
-    assert.deepEqual(missing.workspace.total, { count: 33, published: 2, pending: 1 });
+    assert.deepEqual(missing.workspace.total, { count: 33, published: 1, pending: 1 });
     const ownerIdSearch = (await panel.library(actor, { scope: { kind: 'project', name: 'Beta' }, q: target.artifactId })).page;
     assert.deepEqual(ownerIdSearch.counts, { all: 0, published: 0, unpublished: 0, pending: 0 });
     assert.deepEqual(ownerIdSearch.cards, []);

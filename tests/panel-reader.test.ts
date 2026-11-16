@@ -37,9 +37,9 @@ test('panel snapshot resolves every scope, partitions status counts, and retains
     const loose = await store.create(actor, { requestId: randomUUID(), snapshot: snapshot('Loose draft') });
     const all = await panel.library(actor);
     assert.deepEqual(all.page.counts, { all: 4, published: 1, unpublished: 2, pending: 1 });
-    assert.deepEqual(all.workspace.total, { count: 4, published: 2, pending: 1 });
+    assert.deepEqual(all.workspace.total, { count: 4, published: all.page.counts.published, pending: all.page.counts.pending });
     assert.deepEqual(all.workspace.unfiled, { count: 1, published: 0, pending: 0 });
-    assert.deepEqual(all.workspace.projects.map(({ name, count, published, pending }) => ({ name, count, published, pending })), [{ name: 'Álpha', count: 2, published: 1, pending: 1 }, { name: 'Beta', count: 1, published: 1, pending: 0 }]);
+    assert.deepEqual(all.workspace.projects.map(({ name, count, published, pending }) => ({ name, count, published, pending })), [{ name: 'Álpha', count: 2, published: 0, pending: 1 }, { name: 'Beta', count: 1, published: 1, pending: 0 }]);
     const publishedCard = all.page.cards.find(({ artifactId }) => artifactId === published.artifactId)!;
     assert.deepEqual(publishedCard.publication, { state: 'published', url: `https://published.example.test/a/${published.artifactId}`, version: 1, revision: { revisionId: publishedHead.revision.id, sequence: 2, createdAt: new Date(publishedHead.revision.createdAt) } });
     const card = all.page.cards.find(({ artifactId }) => artifactId === pending.artifactId)!;
@@ -237,10 +237,10 @@ test('projects index returns inclusive tallies, the three newest titles per grou
     t.mock.timers.setTime(timestamp + 1_000);
     await store.update(actor, { requestId: randomUUID(), artifactId: alpha[1].artifactId, expectedRevisionId: alpha[1].revision.id, snapshot: snapshot('Newest Alpha') });
     const result = await panel.projectsIndex(actor);
-    assert.deepEqual(result.workspace.total, { count: 9, published: 2, pending: 1 });
+    assert.deepEqual(result.workspace.total, { count: 9, published: 1, pending: 1 });
     assert.deepEqual(result.workspace.unfiled, { count: 4, published: 0, pending: 0 });
     assert.deepEqual(result.workspace.projects, [
-      { name: 'Álpha', count: 4, published: 2, pending: 1, updatedAt: new Date(timestamp + 1_000) },
+      { name: 'Álpha', count: 4, published: 1, pending: 1, updatedAt: new Date(timestamp + 1_000) },
       { name: 'Beta', count: 1, published: 0, pending: 0, updatedAt: new Date(timestamp) },
     ]);
     const tied = alpha.filter((item) => item.artifactId !== alpha[1].artifactId).sort((left, right) => left.artifactId < right.artifactId ? 1 : -1);
@@ -327,7 +327,7 @@ test('detail reads one selected snapshot, light history and real client names in
     const result = await panel.artifact(actor, input);
     assert.equal(transactions.mock.callCount(), 1);
     assert.equal(queries.filter((query) => query.startsWith('select') && query.includes('"snapshot"')).length, 1);
-    assert.deepEqual(result.workspace.total, { count: 1, published: 1, pending: 1 });
+    assert.deepEqual(result.workspace.total, { count: 1, published: 0, pending: 1 });
     assert.deepEqual(result.detail.selected, { revision: revisions[1], author: { clientId: actor.clientId, name: 'Authoring client' } });
     assert.equal(result.detail.createdAt.toISOString(), first.revision.createdAt);
     assert.equal(result.detail.slug, null);

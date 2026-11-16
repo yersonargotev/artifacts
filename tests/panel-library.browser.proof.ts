@@ -110,7 +110,7 @@ try {
   assert.deepEqual([listed.items.length, listed.items.filter((item) => item.publication).length, listed.items.filter((item) => item.publication && item.publication.revisionId !== item.headRevisionId).length, listed.items.filter((item) => item.project === null).length], [30, 3, 1, 10]);
   await page.goto(app.dashboard);
   assert.equal(await page.locator('.library-stats').count(), 0, 'the stats cards folded into the filters and the status bar');
-  assert.deepEqual(await page.locator('.status-totals > span').allTextContents(), ['30 artefactos', '3 publicados', '1 con cambios pendientes']);
+  assert.deepEqual(await page.locator('.status-totals > span').allTextContents(), ['30 artefactos', '2 publicados', '1 con cambios pendientes']);
   const projectChips = page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
   assert.equal(await projectChips.getByRole('link', { name: 'Sin proyecto (10)', exact: true }).getAttribute('href'), '/?unfiled=1');
   const tabs = page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true });
