@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 
 // Seconds each proof took in CI. The shards balance on these weights. Each run warns when a proof's time drifts past the tolerance below; refresh the weights from that log.
 const proofs: { file: string; seconds: number; test?: true }[] = [
-  { file: 'tests/browser.proof.ts', seconds: 7 },
+  { file: 'tests/browser.proof.ts', seconds: 60 },
   { file: 'tests/sign-in-code.browser.proof.ts', seconds: 79 },
   { file: 'tests/artifact-browser.proof.ts', seconds: 23 },
   { file: 'tests/artifact-deletion.browser.proof.ts', seconds: 5 },
