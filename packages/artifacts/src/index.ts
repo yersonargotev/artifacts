@@ -6,7 +6,7 @@ import { Parser } from 'htmlparser2';
 import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
-import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
+import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, oauthAccessToken, oauthConsent, oauthRefreshToken, publicationGrant, session, user } from '@artifacts/db/schema';
 import { ArtifactError, artifactReadSchema, batchResultSchema, batchSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type BatchResult, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer, type SharedArtifactSummary } from '@yargote/artifacts-contracts';
 import { canonicalJson, sha256 } from '@yargote/artifacts-contracts/serialization';
 import { createAccess, isBusy, isConstraint, writeTransaction, type Connection } from './access.ts';
@@ -113,6 +113,19 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       .where(and(eq(artifactShare.artifactId, artifact.id), eq(artifactShare.kind, 'email'), eq(artifactShare.value, sql`lower(${user.email})`)));
     const [found] = await connection.select().from(artifact).where(and(eq(artifact.id, artifactId), or(eq(artifact.ownerId, userId), exists(sharedWithViewer)))).limit(1);
     return found;
+  }
+
+  // A guest's credentials outlive their admission, so a later share would revive them; deleting them makes a new share require a new sign-in.
+  async function revokeUnadmitted(connection: Connection, emails: readonly string[]) {
+    for (const email of new Set(emails)) {
+      if (await admission.email(email, connection)) continue;
+      const ids = (await connection.select({ id: user.id }).from(user).where(eq(sql`lower(${user.email})`, email))).map(({ id }) => id);
+      if (!ids.length) continue;
+      await connection.delete(session).where(inArray(session.userId, ids));
+      await connection.delete(oauthAccessToken).where(inArray(oauthAccessToken.userId, ids));
+      await connection.delete(oauthRefreshToken).where(inArray(oauthRefreshToken.userId, ids));
+      await connection.delete(oauthConsent).where(inArray(oauthConsent.userId, ids));
+    }
   }
 
   async function readArtifact(connection: Connection, found: typeof artifact.$inferSelect, revisionId = found.headRevisionId): Promise<ArtifactRead> {
@@ -304,8 +317,9 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       const input = unshareSchema.parse(value);
       return command(actor, 'artifacts:publish', 'unshare', input, unshareResultSchema, async (connection) => {
         await owned(connection, actor.userId, input.artifactId);
-        const removed = await connection.delete(artifactShare).where(and(eq(artifactShare.id, input.shareId), eq(artifactShare.artifactId, input.artifactId))).returning({ shareId: artifactShare.id });
+        const removed = await connection.delete(artifactShare).where(and(eq(artifactShare.id, input.shareId), eq(artifactShare.artifactId, input.artifactId))).returning({ shareId: artifactShare.id, value: artifactShare.value });
         if (removed.length !== 1) throw new ArtifactError('not_found', 'Share not found');
+        await revokeUnadmitted(connection, removed.map(({ value }) => value));
         return { artifactId: input.artifactId, shareId: input.shareId };
       });
     },
@@ -347,8 +361,10 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         const named = or(sql`json_extract(${artifactCommand.result}, '$.artifactId') = ${input.artifactId}`, sql`exists (select 1 from json_each(${artifactCommand.result}, '$.results') where json_extract(value, '$.artifactId') = ${input.artifactId})`);
         const matching = and(eq(artifactCommand.ownerId, actor.userId), named);
         await connection.update(artifactCommand).set({ payloadHash: '', result: canonicalJson({ kind: 'artifact_deleted', artifactId: input.artifactId }) }).where(matching);
+        const recipients = await connection.select({ value: artifactShare.value }).from(artifactShare).where(eq(artifactShare.artifactId, input.artifactId));
         const removed = await connection.delete(artifact).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId))).returning({ artifactId: artifact.id });
         if (removed.length !== 1) throw new ArtifactError('not_found', 'Artifact not found');
+        await revokeUnadmitted(connection, recipients.map(({ value }) => value));
         return { artifactId: input.artifactId };
       });
     },
