@@ -176,6 +176,66 @@ test('anonymous files, cookie tampering, callback mismatch and missing transacti
   assert.equal(calls, 0);
 });
 
+/** A browser cookie jar: the last Set-Cookie for a name wins, and Max-Age=0 removes it. */
+function cookieJar() {
+  const cookies = new Map<string, string>();
+  return {
+    apply(response: Response) {
+      for (const line of response.headers.getSetCookie()) {
+        const [pair] = line.split(';');
+        const name = pair!.slice(0, pair!.indexOf('='));
+        if (line.includes('Max-Age=0')) cookies.delete(name);
+        else cookies.set(name, pair!.slice(name.length + 1));
+      }
+    },
+    header: () => [...cookies].map(([name, value]) => `${name}=${value}`).join('; '),
+    get size() { return cookies.size; },
+  };
+}
+
+async function openTab(handler: ReturnType<typeof createPublicationApp>, browser: ReturnType<typeof cookieJar>, artifactId: string, code = 'a'.repeat(43)) {
+  const begin = await handler(new Request(`${publish}/a/${artifactId}`, { headers: { cookie: browser.header() } }));
+  browser.apply(begin);
+  const state = new URL(begin.headers.get('location')!).searchParams.get('state')!;
+  return `${publish}/callback?${new URLSearchParams({ artifactId, state, code })}`;
+}
+
+test('concurrent publication tabs keep their own transactions, and a failed callback clears only its own', async () => {
+  const backend: typeof fetch = async (_input, init) => {
+    const grant = JSON.parse(String(init?.body)) as { artifactId: string; code: string };
+    if (grant.code.startsWith('x')) return new Response(null, { status: 403 });
+    return Response.json({ artifactId: grant.artifactId, userId: 'guest-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+  };
+  const handler = createPublicationApp(environment(), backend);
+  const browser = cookieJar();
+  const callback = async (url: string) => {
+    const response = await handler(new Request(url, { headers: { cookie: browser.header() } }));
+    browser.apply(response);
+    return response.status;
+  };
+  const first = await openTab(handler, browser, 'artifact-a');
+  const second = await openTab(handler, browser, 'artifact-b');
+  const sameLink = await openTab(handler, browser, 'artifact-a');
+  const denied = await openTab(handler, browser, 'artifact-c', 'x'.repeat(43));
+  assert.equal(await callback(denied), 403);
+  assert.equal(await callback(first), 303);
+  assert.equal(await callback(second), 303);
+  assert.equal(await callback(sameLink), 303);
+  assert.equal(browser.size, 2, 'only the two viewer cookies remain');
+});
+
+test('a publication transaction outlives a ten-minute panel sign-in and then expires', async (t) => {
+  const backend: typeof fetch = async () => Response.json({ artifactId: 'artifact-a', userId: 'guest-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+  const handler = createPublicationApp(environment(), backend);
+  const browser = cookieJar();
+  const now = Date.now();
+  const callback = await openTab(handler, browser, 'artifact-a');
+  const clock = t.mock.method(Date, 'now', () => now + 599_000);
+  assert.equal((await handler(new Request(callback, { headers: { cookie: browser.header() } }))).status, 303);
+  clock.mock.mockImplementation(() => now + 601_000);
+  assert.equal((await handler(new Request(callback, { headers: { cookie: browser.header() } }))).status, 403);
+});
+
 test('backend outages, redirects and malformed content fail closed after valid admission', async (t) => {
   t.mock.method(console, 'error', () => {});
   for (const failure of ['outage', 'redirect', 'malformed', 'revoked']) {
