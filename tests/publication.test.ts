@@ -140,7 +140,7 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.equal(content.headers.get('cross-origin-opener-policy'), 'same-origin');
   assert((await content.text()).includes('<script>window.secret = 1</script>'));
   assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie } }))).status, 403);
-  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }))).status, 403);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe' } }))).status, 404);
   const inert = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
   const inertBody = await inert.text();
   assert(inertBody.includes('sandbox=""'));
@@ -156,7 +156,7 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   assert.match(download.headers.get('content-disposition')!, /^attachment;/);
   assert.equal(download.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await handler(flow.request)).status, 403);
-  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 403);
+  assert.equal((await handler(new Request(`${publish}/a/artifact-a/r/obsolete/files/nested/file.html`, { headers: { cookie } }))).status, 404);
   assert.equal((await handler(new Request(`${publish}/a/artifact-b`, { headers: { cookie } }))).status, 303);
   assert.equal(calls.filter((url) => url.endsWith('/read')).length, 8);
 });

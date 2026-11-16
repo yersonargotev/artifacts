@@ -102,10 +102,12 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       const contentRequest = route[3] === 'content';
       const viewer = await admit(request, artifactId);
       if (!viewer) return path || contentRequest ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
-      const result = await backend('read', { viewer, artifactId, ...(revisionId ? { revisionId } : {}) });
+      // The backend reads the current publication, so a denial always means lost access, never a republished revision.
+      const result = await backend('read', { viewer, artifactId });
       if ('denied' in result) return new Response('Tu sesión o esta publicación ya no están disponibles.', { status: 403, headers: { ...privateHeaders, 'set-cookie': setCookie(cookieName(artifactId), '', 0) } });
       const artifact = publishedReadSchema.parse(result.value);
-      if (artifact.artifactId !== artifactId || ('ownerId' in artifact && artifact.ownerId !== viewer.userId) || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId || (revisionId && artifact.revision.id !== revisionId)) throw new Error('Invalid published artifact');
+      if (artifact.artifactId !== artifactId || ('ownerId' in artifact && artifact.ownerId !== viewer.userId) || !artifact.publication || artifact.revision.id !== artifact.publication.revisionId) throw new Error('Invalid published artifact');
+      if (revisionId && artifact.revision.id !== revisionId) return new Response('Esta versión ya no está publicada. Abre de nuevo la publicación.', { status: 404, headers: privateHeaders });
       if (path) {
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });

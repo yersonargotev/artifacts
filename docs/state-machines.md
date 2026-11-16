@@ -156,8 +156,9 @@ States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `G
 | `Transaction` | panel `/publication/open` | panel identity, `canView`, published | `Grant` | `index.ts` `issuePublicationGrant` |
 | `Grant` | `/callback` | cookie state and artifact match, not expired | grant deleted, `Viewer` set, transaction cookie cleared | `http.ts`, `index.ts` `consumePublicationGrant` |
 | `Transaction` | `/callback` that fails | — | transaction cookie cleared | `http.ts` |
-| `Viewer` | read | live session, admitted, `canView`, revision matches | page | `index.ts` `readPublished` |
-| `Viewer` | backend answers 401, 403, 404, or 409 | — | viewer cookie cleared | `http.ts` |
+| `Viewer` | read | live session, admitted, `canView`, published | page | `index.ts` `readPublished` |
+| `Viewer` | content or file request for a revision that is no longer published | — | `Viewer`; answers 404 | `http.ts` |
+| `Viewer` | backend answers 401, 403, 404, or 409 to the current-publication read | — | viewer cookie cleared | `http.ts` |
 
 ## CLI credential profile
 
