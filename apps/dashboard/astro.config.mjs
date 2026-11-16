@@ -25,7 +25,7 @@ export default defineConfig({
   },
   server: { host: '127.0.0.1' },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), ...(worker ? [{ name: 'artifacts-worker-sourcemaps', configEnvironment: (name) => name === 'ssr' ? { build: { sourcemap: true } } : undefined }] : [])],
     ssr: worker ? { noExternal: workspaceEntries } : { external: workspaceEntries },
   },
 });

@@ -1,12 +1,13 @@
 import type { DashboardWorkerEnvironment } from '@artifacts/config';
-import { workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
+import { sentryDsn, workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
 
 export default {
   worker: {
     name: 'artifacts-panel',
     ...workerCompatibility,
-    entrypoint: '@astrojs/cloudflare/entrypoints/server',
+    entrypoint: './src/worker.ts',
     env: {
+      SENTRY_DSN: { type: 'text', value: sentryDsn },
       OWNER_EMAIL: { type: 'secret' },
       ALLOW_GUEST_ACCESS: { type: 'text', value: 'false' },
       EMAIL_TRANSPORT: { type: 'text', value: 'resend' },

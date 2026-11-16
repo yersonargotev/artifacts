@@ -176,7 +176,8 @@ test('anonymous files, cookie tampering, callback mismatch and missing transacti
   assert.equal(calls, 0);
 });
 
-test('backend outages, redirects and malformed content fail closed after valid admission', async () => {
+test('backend outages, redirects and malformed content fail closed after valid admission', async (t) => {
+  t.mock.method(console, 'error', () => {});
   for (const failure of ['outage', 'redirect', 'malformed', 'revoked']) {
     const handler = createPublicationApp(environment(), async (input) => {
       if (String(input).endsWith('/consume')) return Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
@@ -196,6 +197,28 @@ test('backend outages, redirects and malformed content fail closed after valid a
   }
   const outage = createPublicationApp(environment(), async () => { throw new Error('Disconnected'); });
   assert.equal((await authorize(outage)).admitted.status, 503);
+});
+
+test('the view reports a backend failure behind its 503 page and does not report a malformed route', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const handler = createPublicationApp(environment(), async (input) => {
+    if (String(input).endsWith('/consume')) return Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 });
+    throw new Error('Disconnected');
+  });
+  const flow = await authorize(handler);
+  logged.mock.resetCalls();
+  const response = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie: cookieHeader(flow.admitted) } }));
+  assert.equal(response.status, 503);
+  assert.equal(await response.text(), 'El servicio no está disponible. Inténtalo de nuevo.');
+  assert.equal(logged.mock.callCount(), 1);
+  const [reported] = logged.mock.calls[0]!.arguments as [Error];
+  assert.equal(reported.message, 'Publication backend unavailable');
+  assert.equal((reported.cause as Error).message, 'Disconnected');
+  for (const path of ['/a/%E0%A4%A', `/a/${'x'.repeat(300)}`]) {
+    const malformed = await handler(new Request(`${publish}${path}`, { headers: { cookie: cookieHeader(flow.admitted) } }));
+    assert.equal(malformed.status, 503, path);
+  }
+  assert.equal(logged.mock.callCount(), 1, 'a malformed route is a client error and is not reported');
 });
 
 test('service admission precedes browser Origin exemption and OIDC return paths stay local', () => {

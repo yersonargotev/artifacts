@@ -1,0 +1,11 @@
+{
+  "name": "@artifacts/monitoring",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@sentry/cloudflare": "11.10.0"
+  }
+}

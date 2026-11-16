@@ -4,6 +4,7 @@ import type { MoveSubject, PanelMoveResult, SlugConflict } from '@artifacts/arti
 import { ArtifactError, moveSchema, projectNameSchema, type Actor } from '@yargote/artifacts-contracts';
 import { readForm } from './form.ts';
 import { moveHref, readMoveUrl, scopeHref } from './urls.ts';
+import { reportError } from '@artifacts/monitoring';
 
 export type MoveForm = { artifactIds: string[]; requestId: string; project: string | undefined; intent: 'move' | 'remove' };
 export type MoveOutcome =
@@ -38,7 +39,10 @@ export async function submitMove(panel: Pick<Panel, 'move'>, actor: Actor, form:
     const location = scopeHref(result.project === null ? { kind: 'unfiled' } : { kind: 'project', name: result.project });
     return result.missing.length ? { kind: 'partial', result, location } : { kind: 'moved', location };
   } catch (error) {
-    if (!(error instanceof ArtifactError)) return { kind: 'uncertain' };
+    if (!(error instanceof ArtifactError)) {
+      reportError(error);
+      return { kind: 'uncertain' };
+    }
     if (error.code === 'request_conflict') return { kind: 'conflict' };
     const conflict = error.code === 'slug_conflict' ? panelSlugConflictSchema.safeParse(error.details) : undefined;
     if (!conflict?.success) throw error;
@@ -53,6 +57,7 @@ export async function prepareMovePage(panel: Pick<Panel, 'move' | 'moveSubject'>
   const ids = submitted?.artifactIds ?? readMoveUrl(new URL(request.url));
   const subject = await panel.moveSubject(actor, ids).catch((error: unknown) => {
     if (!submitted || error instanceof ArtifactError || error instanceof z.ZodError) throw error;
+    reportError(error);
     return undefined;
   });
   const form = submitted ?? { artifactIds: ids, requestId: crypto.randomUUID(), project: subject?.items.length === 1 ? subject.items[0].project ?? '' : '', intent: 'move' as const };

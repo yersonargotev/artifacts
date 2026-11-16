@@ -1,4 +1,5 @@
 import { authConfig, type AuthWorkerEnvironment } from '@artifacts/config';
+import { reportError, withMonitoring } from '@artifacts/monitoring';
 import { resendEmailSender, type EmailEnvironment } from '@artifacts/config/email';
 import { withEmailCodeRequest } from './email-code-context.ts';
 import { openDatabase } from '@artifacts/db';
@@ -21,7 +22,7 @@ async function createRuntime(env: AuthRuntimeEnvironment) {
   } catch (error) { client.close(); throw error; }
 }
 
-export default {
+export default withMonitoring('artifacts-auth', {
   async fetch(request: Request, env: AuthRuntimeEnvironment, context?: { waitUntil(task: Promise<void>): void }): Promise<Response> {
     let runtime = runtimes.get(env);
     if (!runtime) {
@@ -33,8 +34,9 @@ export default {
       const current = await runtime;
       if (current.emailEnabled && !context) throw new Error('Email delivery requires a request execution context');
       return await withEmailCodeRequest(request, request.headers.get('cf-connecting-ip') ?? undefined, (task) => context!.waitUntil(task), current.handler);
-    } catch {
+    } catch (error) {
+      reportError(error);
       return new Response('Authorization unavailable', { status: 503, headers: { 'cache-control': 'no-store' } });
     }
   },
-};
+});

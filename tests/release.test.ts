@@ -25,7 +25,7 @@ function environment() {
   secrets.EMAIL_FROM = 'invitations@example.test';
   return {
     CLOUDFLARE_API_TOKEN: 't'.repeat(40), CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), ARTIFACTS_RUNTIME_SECRETS: JSON.stringify(secrets),
-    GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: sha, GITHUB_REPOSITORY: 'owner/artifacts', GITHUB_TOKEN: 'test-token',
+    GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: sha, GITHUB_REPOSITORY: 'owner/artifacts', GITHUB_TOKEN: 'test-token', SENTRY_AUTH_TOKEN: 'sntrys_test-token',
   };
 }
 
@@ -45,13 +45,16 @@ async function releaseFixture() {
       ...(service === 'panel' ? { env: { ...worker.env, ASSETS: { type: 'assets' } }, assets: { runWorkerFirst: true } } : {}),
       manifest: { type: 'complete', mainModule: 'worker.mjs', modules: { 'worker.mjs': { type: 'esm' } } },
     }));
-    await writeFile(join(output, 'bundle/worker.mjs'), 'export default { fetch() { return new Response("fixture"); } };');
+    const debugId = `00000000-0000-4000-8000-${String(Object.keys(services).indexOf(service)).padStart(12, '0')}`;
+    await writeFile(join(output, 'bundle/worker.mjs'), `export default { fetch() { return new Response("fixture"); } };\n//# sourceMappingURL=worker.mjs.map\n//# debugId=${debugId}\n`);
+    await mkdir(join(directory, 'sourcemaps'));
+    await writeFile(join(directory, 'sourcemaps/worker.mjs.map'), JSON.stringify({ version: 3, sources: ['worker.ts'], mappings: '', debugId }));
     if (service === 'panel') {
       await mkdir(join(output, 'assets'));
       await writeFile(join(output, 'assets/style.css'), 'body { color: black; }');
     }
   }
-  return { root, temporaryRoot, verifyAccount: async () => {}, close: () => rm(root, { recursive: true, force: true }) };
+  return { root, temporaryRoot, verifyAccount: async () => {}, uploadSourceMaps: async () => {}, close: () => rm(root, { recursive: true, force: true }) };
 }
 
 test('runtime secret projection follows the service declarations and keeps the viewer free of database and authoring credentials', () => {
@@ -134,6 +137,7 @@ test('every bundle and every dry run must pass before the first deployment, and 
   const commands: string[] = [];
   try {
     const bundle = join(app.root, 'dist/workers/view/.cloudflare/output/v0/workers/default/bundle/worker.mjs');
+    const source = await readFile(bundle, 'utf8');
     await rm(bundle);
     const deployWorker = async (service: string, file: string, dryRun: boolean) => {
       commands.push(`${service}:${dryRun ? 'dry' : 'deploy'}`);
@@ -143,7 +147,7 @@ test('every bundle and every dry run must pass before the first deployment, and 
     };
     await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker }), /ENOENT/);
     assert.deepEqual(commands, []);
-    await writeFile(bundle, 'export default {};');
+    await writeFile(bundle, source);
     await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker }), /Dry run failed/);
     assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry']);
     assert.deepEqual(await readdir(app.temporaryRoot), []);
@@ -179,6 +183,56 @@ test('dry-run mode needs no Cloudflare token and superseded releases skip after 
     commands.length = 0;
     await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker, currentMain: async () => '', smoke }), /Could not verify current main/);
     assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry']);
+    assert.deepEqual(await readdir(app.temporaryRoot), []);
+  } finally { await app.close(); }
+});
+
+test('a release uploads every source map under the commit release before the first deployment, and a failed upload deploys nothing', async () => {
+  const app = await releaseFixture();
+  const commands: string[] = [];
+  try {
+    const deployWorker = async (service: string, _file: string, dryRun: boolean) => { commands.push(`${service}:${dryRun ? 'dry' : 'deploy'}`); };
+    const currentMain = async () => { commands.push('main'); return sha; };
+    const smoke = async () => { commands.push('smoke'); };
+    const uploadSourceMaps = async (directory: string, release: string) => {
+      commands.push(`upload:${release}`);
+      for (const service of Object.keys(services)) {
+        const bundle = await readFile(join(directory, service, 'worker.mjs'), 'utf8');
+        const map = JSON.parse(await readFile(join(directory, service, 'worker.mjs.map'), 'utf8')) as { debugId: string };
+        assert(bundle.endsWith(`//# debugId=${map.debugId}\n`), `${service} uploads its bundle with its own map`);
+      }
+    };
+    await releaseProduction({ ...app, environment: environment(), deployWorker, currentMain, smoke, uploadSourceMaps });
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main', `upload:artifacts@${sha}`, 'auth:deploy', 'mcp:deploy', 'view:deploy', 'panel:deploy', 'smoke']);
+    commands.length = 0;
+    await assert.rejects(releaseProduction({ ...app, environment: environment(), deployWorker, currentMain, smoke, uploadSourceMaps: async () => { commands.push('upload'); throw new Error('Source map upload failed'); } }), /Source map upload failed/);
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry', 'main', 'upload']);
+    commands.length = 0;
+    await releaseProduction({ ...app, environment: { ...environment(), SENTRY_AUTH_TOKEN: '' }, dryRun: true, deployWorker, currentMain, smoke, uploadSourceMaps });
+    assert.deepEqual(commands, ['auth:dry', 'mcp:dry', 'view:dry', 'panel:dry'], 'a dry run needs no Sentry token and uploads nothing');
+    commands.length = 0;
+    await assert.rejects(releaseProduction({ ...app, environment: { ...environment(), SENTRY_AUTH_TOKEN: '' }, deployWorker, currentMain, smoke, uploadSourceMaps }), /SENTRY_AUTH_TOKEN is missing/);
+    assert.deepEqual(commands, []);
+    assert.deepEqual(await readdir(app.temporaryRoot), []);
+  } finally { await app.close(); }
+});
+
+test('a bundle that ships a source map, lacks its map, or has a mismatched map fails preflight without commands', async () => {
+  const app = await releaseFixture();
+  let commands = 0;
+  try {
+    const options = { ...app, environment: environment(), deployWorker: async () => { commands++; } };
+    const output = join(app.root, 'dist/workers/mcp/.cloudflare/output/v0/workers/default');
+    const map = join(app.root, 'dist/workers/mcp/sourcemaps/worker.mjs.map');
+    const original = await readFile(map, 'utf8');
+    await writeFile(join(output, 'bundle/worker.mjs.map'), original);
+    await assert.rejects(releaseProduction(options), /mcp deployment output must not contain source maps/);
+    await rm(join(output, 'bundle/worker.mjs.map'));
+    await rm(map);
+    await assert.rejects(releaseProduction(options), /mcp source map is missing/);
+    await writeFile(map, JSON.stringify({ ...JSON.parse(original), debugId: '00000000-0000-4000-8000-999999999999' }));
+    await assert.rejects(releaseProduction(options), /mcp source map does not match its bundle/);
+    assert.equal(commands, 0);
     assert.deepEqual(await readdir(app.temporaryRoot), []);
   } finally { await app.close(); }
 });

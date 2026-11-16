@@ -31,6 +31,7 @@ Production installs frozen dependencies without a package cache. Only the releas
 | `CLOUDFLARE_API_TOKEN` | Secret | Cloudflare deployment authorization with access to the selected account. |
 | `CLOUDFLARE_ACCOUNT_ID` | Variable | The selected account's 32-character hexadecimal ID. |
 | `ARTIFACTS_RUNTIME_SECRETS` | Secret | A JSON object containing exactly the union of declared runtime secret bindings. Every value is a nonempty string. |
+| `SENTRY_AUTH_TOKEN` | Secret | The Sentry organization token `artifacts-ci-release` with the `org:ci` scope. Only the source map upload receives it. It is not a runtime binding. |
 
 The runtime bindings come from the [auth](../apps/auth/cloudflare.config.ts), [MCP](../apps/mcp/cloudflare.config.ts), [panel](../apps/dashboard/cloudflare.config.ts), and [viewer](../apps/publication/cloudflare.config.ts) configurations. This command lists the declarations.
 
@@ -40,7 +41,7 @@ rg "type: 'secret'" apps/{auth,mcp,dashboard,publication}/cloudflare.config.ts
 
 `scripts/release-production.ts` derives each service's allowlist from those configurations. It rejects missing bindings, extra keys, invalid value types, short application secrets, and a local database URL. It writes separate mode-0600 JSON files in a private runner temporary directory and removes that directory in `finally`.
 
-The viewer receives only its declared publication secrets. It receives no database or authoring credentials. The complete runtime JSON and GitHub read token do not enter the deployment subprocess environment. The release command suppresses CLI output to keep secret values out of logs.
+The viewer receives only its declared publication secrets. It receives no database or authoring credentials. The complete runtime JSON, the GitHub read token, and the Sentry token do not enter the deployment subprocess environment. The release command suppresses CLI output to keep secret values out of logs.
 
 ## Release behavior
 
@@ -48,11 +49,15 @@ The release command validates all inputs and all four downloaded configurations 
 
 All four `deploy:worker --dry-run` commands must succeed before the first deployment. Dry runs validate the local bundles but do not validate Cloudflare API authorization. Immediately before deployment, the release command reads the current `main` SHA through GitHub. A superseded revision logs a successful skip and deploys no Workers.
 
+`pnpm build:workers` builds each bundle with a source map, and `sentry-cli sourcemaps inject` writes the same debug ID into both. The build then moves the map to `dist/workers/<service>/sourcemaps/worker.mjs.map`, outside the deployment output, so no deployed Worker carries a map. Each bundle also embeds the release name `artifacts@<git SHA>`. Release preflight fails when a deployment output contains a `.map` file, or when a service's map is missing or has a different debug ID than its bundle.
+
+After the `main` check, the release command uploads the four bundles and maps with `sentry-cli sourcemaps upload` to the `artifacts` project in `sparkydevs`, under the release name `artifacts@<git SHA>`. The upload subprocess receives only `PATH`, `HOME`, and `SENTRY_AUTH_TOKEN`. A failed upload stops the release before the first deployment.
+
 The command deploys `auth`, `mcp`, `view`, and `panel` in that order through the existing `pnpm deploy:worker` command. Once deployment starts, it completes that quartet without checking `main` again. A newer eligible release waits for the running release to finish.
 
 The four deployments are separate Cloudflare operations. A failure after an earlier service succeeds leaves a partial release. The command stops and reports the failed service. It does not roll back. A retry reruns preflight, all dry runs, and the quartet while the revision remains current `main`. An older revision skips after `main` advances. A failed current release can be retried through the original push run; manual dispatch remains validation-only.
 
-`pnpm release:production --dry-run` validates the runtime JSON and checked bundles, creates projected secret files, and runs the four CLI dry runs. It makes no account-access request, requires no deployment token, and deploys nothing.
+`pnpm release:production --dry-run` validates the runtime JSON and checked bundles, creates projected secret files, and runs the four CLI dry runs. It makes no account-access request, requires no deployment token or Sentry token, uploads no source map, and deploys nothing.
 
 ## Read-only production smoke
 

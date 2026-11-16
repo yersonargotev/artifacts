@@ -4,9 +4,9 @@ import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, 
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '@yargote/artifacts-contracts/http';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 import type { ArtifactStore } from '@artifacts/artifacts';
-import { createBearerAuthorizer, type BearerConfig } from './identity.ts';
+import { createBearerAuthorizer, type BearerConfig, type ReportError } from './identity.ts';
 
-export { createBearerAuthorizer, type AccessDecision, type BearerConfig, type Principal } from './identity.ts';
+export { createBearerAuthorizer, type AccessDecision, type BearerConfig, type Principal, type ReportError } from './identity.ts';
 
 const bodyLimit = 8_388_608;
 const shareBodySchema = shareSchema.omit({ artifactId: true });
@@ -73,12 +73,12 @@ function query(url: URL, allowed: readonly string[], integers: readonly string[]
   return result;
 }
 
-export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactStore) {
+export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactStore, { reportError = () => {} }: { reportError?: ReportError } = {}) {
   const resource = new URL(canonicalResource(config.resource));
   canonicalResource(config.issuer);
   const base = new URL(restBase(config.resource)).pathname;
   const metadataPath = protectedResourceMetadataUrl(config.resource).pathname;
-  const authorize = createBearerAuthorizer(config);
+  const authorize = createBearerAuthorizer(config, reportError);
   return async (request: Request): Promise<Response> => {
     try {
       const url = new URL(request.url);
@@ -187,6 +187,7 @@ export function createArtifactRestApp(config: BearerConfig, artifacts: ArtifactS
       if (error instanceof HttpFailure) return failure(error.status, error.code, error.message, error.details);
       if (error instanceof z.ZodError) return failure(400, 'invalid_input', 'Input does not match the command schema', { issues: error.issues.map(({ code, path, message }) => ({ code, path, message })) });
       if (error instanceof ArtifactError) return failure(error.code === 'forbidden' ? 403 : error.code === 'not_found' ? 404 : error.code === 'invalid_grant' ? 400 : 409, error.code, error.message, error.details);
+      reportError(error);
       return failure(503, 'unavailable', 'Artifact service unavailable');
     }
   };

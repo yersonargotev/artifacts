@@ -114,6 +114,16 @@ pnpm exec cf accounts subscriptions get
 
 For another task, run `cf cli search "<task>"` once and then `<command> --help`. Nested `--help` output starts with a notice that asks agents to search instead.
 
+### Read errors in Sentry
+
+The four Workers send unexpected errors to the `artifacts` project in the Sentry organization `sparkydevs`. Each event has a `service` tag with the Worker name. `SENTRY_DSN` is a text binding in each `cloudflare.config.ts`, set from `sentryDsn` in `scripts/cloudflare.ts`. Without it, the Worker skips Sentry. Read the issues with the Sentry CLI.
+
+```sh
+sentry issue list sparkydevs/artifacts
+```
+
+The [error monitoring decision](decisions/error-monitoring.md) describes what each event keeps and what it removes.
+
 ### Keep the account on Workers Paid
 
 Every measured batch command needs more than 10 ms of CPU, which is the Workers Free limit per invocation. On Free, Cloudflare fails all requests with `exceededCpu` after a short burst. Workers Paid allows up to 5 minutes of CPU per request. The [batch commands decision](decisions/wiki-pages.md#batch-commands) records the measurement.

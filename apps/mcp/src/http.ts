@@ -1,13 +1,13 @@
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
-import { createMcpAuthorizer } from './identity.ts';
+import { createMcpAuthorizer, type ReportError } from './identity.ts';
 import type { ArtifactStore } from '@artifacts/artifacts';
 import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
 import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 
-export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
-  const authorize = createMcpAuthorizer(config);
+export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore, { reportError = () => {} }: { reportError?: ReportError } = {}) {
+  const authorize = createMcpAuthorizer(config, reportError);
   const resource = new URL(config.resource);
   const metadataPath = `/.well-known/oauth-protected-resource${resource.pathname}`;
   return async (request: Request): Promise<Response> => {
@@ -40,6 +40,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
             const result = await operation();
             return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result };
           } catch (error) {
+            if (!(error instanceof ArtifactError)) reportError(error);
             const result = error instanceof ArtifactError
               ? { error: error.code, message: error.message, ...error.details }
               : { error: 'unavailable', message: 'Artifact service unavailable' };

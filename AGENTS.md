@@ -15,6 +15,7 @@ A command passes through these layers. The test beside each layer covers it.
 | Client and CLI | `packages/client/src`, `apps/cli/src` | `tests/cli-client*.test.ts` |
 | Panel | `apps/dashboard/src` | `tests/panel*.test.ts`, `tests/panel-*.browser.proof.ts` |
 | Publication page | `apps/publication/src` | `tests/publication.test.ts` |
+| Error monitoring | `packages/monitoring/src` | `tests/monitoring.test.ts`, `tests/error-reporting.test.ts` |
 | Database | `packages/db/src`, `packages/db/migrations` | `tests/database.test.ts` |
 
 Packy installs the skills in `.claude/skills/` and `.agents/skills/` from `packy.json` and `packy.lock.json`. Don't edit them. The project owns only `verify-artifacts` and `verify-batch-concurrency`, which live in `.agents/skills/` and are symlinked from `.claude/skills/`. To prove a change in the real panel, publication page, MCP, and CLI, use `verify-artifacts`.
@@ -37,6 +38,7 @@ A new worktree has no `node_modules` and no native libsql build. Run `cp -R <mai
 - `pnpm test` runs `tests/*.test.ts`. `pnpm test:rest-cli` runs the REST and CLI tests. `pnpm test:cli-skills` builds the packages and checks the skills that the CLI ships.
 - `pnpm test:browser` builds the panel and runs the Chrome proofs listed in `scripts/browser-proofs.ts`.
 - `pnpm verify <feature...>` builds the panel, runs each verify-artifacts drive in a fresh instance, and cleans up. CI runs every drive except `screens`. Run it after a panel UI or copy change.
+- `pnpm test:panel-monitoring` builds the panel Worker and runs it in workerd to prove that it reports an error to Sentry without user data. Run it after a change to `packages/monitoring` or the panel's Worker entry.
 - `node .agents/skills/verify-batch-concurrency/scripts/check.ts` model-checks the batch command with TLA+. Run it after a change to the batch command or its tables.
 
 pnpm 12 rejects `-s`. To shorten output, pipe it to `tail`, for example `pnpm check 2>&1 | tail -5`. Run the local CLI as `pnpm artifacts …`. A global `artifacts` binary can be an older beta, so check it with `which -a artifacts`.

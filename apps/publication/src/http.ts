@@ -1,5 +1,6 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
 import { publicationConfig } from '@artifacts/config';
+import { reportError } from '@artifacts/monitoring';
 import { z } from 'zod';
 import { artifactReadSchema, consumeGrantSchema, readByIdSchema, sharedReadSchema, viewerSchema } from '@yargote/artifacts-contracts';
 import type { Viewer } from '@yargote/artifacts-contracts';
@@ -44,7 +45,7 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         throw new Error('Publication backend unavailable');
       }
       return { value: await response.json() as unknown };
-    } catch { throw new Error('Publication backend unavailable'); }
+    } catch (error) { throw new Error('Publication backend unavailable', { cause: error }); }
   }
   async function admit(request: Request, artifactId: string): Promise<Viewer | undefined> {
     try {
@@ -59,6 +60,7 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
     target.search = new URLSearchParams({ artifactId, state: transaction.state }).toString();
     return new Response(null, { status: 303, headers: { ...privateHeaders, location: target.href, 'set-cookie': setCookie(transactionCookie, await encrypt(transaction, transaction.expiresAt), transaction.expiresAt) } });
   }
+  const unavailable = () => new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
   return async function handle(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
@@ -85,9 +87,12 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
       }
       const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/(content|files\/(.+)))?$/.exec(url.pathname);
       if (!route || url.search) return new Response('No encontrado', { status: 404, headers: privateHeaders });
-      const { artifactId, revisionId } = readByIdSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) });
+      let artifactId: string, revisionId: string | undefined, path: string | undefined;
+      try {
+        ({ artifactId, revisionId } = readByIdSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) }));
+        path = route[4] ? decodeURIComponent(route[4]) : undefined;
+      } catch { return unavailable(); }
       const contentRequest = route[3] === 'content';
-      const path = route[4] ? decodeURIComponent(route[4]) : undefined;
       const viewer = await admit(request, artifactId);
       if (!viewer) return path || contentRequest ? new Response('Acceso denegado', { status: 401, headers: privateHeaders }) : await begin(artifactId);
       const result = await backend('read', { viewer, artifactId, ...(revisionId ? { revisionId } : {}) });
@@ -115,8 +120,9 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         content: `${revisionPath}/content`,
         attachment: (file) => `${revisionPath}/files/${file.split('/').map(encodeURIComponent).join('/')}`,
       }, interactive), { headers: { ...headers, 'content-security-policy': documentPolicy } });
-    } catch {
-      return new Response('El servicio no está disponible. Inténtalo de nuevo.', { status: 503, headers: privateHeaders });
+    } catch (error) {
+      reportError(error);
+      return unavailable();
     }
   };
 }
