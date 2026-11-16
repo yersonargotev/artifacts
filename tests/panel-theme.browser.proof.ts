@@ -230,7 +230,15 @@ async function hoverStates(page: Page, theme: Theme, label: string) {
   });
   for (let index = 0; index < count; index++) {
     const target = page.locator(`[data-contrast-target="${index}"]`);
-    if (!(await target.hover({ timeout: 2_000 }).then(() => true, () => false))) continue;
+    // The skip link sits above the viewport until focused and sr-only labels lie under their control, so a pointer cannot reach them.
+    const reachable = await target.evaluate((element) => {
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return Boolean(hit && element.contains(hit));
+    });
+    if (!reachable) continue;
+    await target.hover({ timeout: 2_000 });
     await measure(page, theme, label, 'hover', target);
   }
   await page.mouse.move(0, 0);
