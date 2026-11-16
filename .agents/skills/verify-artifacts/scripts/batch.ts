@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Page } from 'playwright';
-import { artifactReadSchema, batchResultSchema, searchResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, batchResultSchema, searchResultSchema } from '../../../../packages/contracts/src/index.ts';
 
 type CliResult = { code: number | null; stdout: string; stderr: string };
 interface BatchDrive {

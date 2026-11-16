@@ -5,7 +5,7 @@ import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 import { loadShareView, parseShareForm, submitShare, shareNotices, type ShareNotice, type ShareCommand, type ShareSubmission } from '../../../share.ts';
 import { shareHref } from '../../../urls.ts';
-import { shareSchema } from '@artifacts/artifacts/contracts';
+import { shareSchema } from '@yargote/artifacts-contracts';
 if (!['GET', 'POST'].includes(Astro.request.method)) return new Response('Método no permitido.', { status: 405, headers: { allow: 'GET, POST' } });
 if (!Astro.locals.identity) return new Response('Acceso denegado.', { status: 401 });
 const { panel, artifacts } = await getRuntime();

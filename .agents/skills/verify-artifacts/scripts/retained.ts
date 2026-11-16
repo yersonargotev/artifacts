@@ -4,7 +4,7 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { unzipSync, zipSync, type Zippable } from 'fflate';
 import type { BrowserContext, Frame, Locator, Page, Response as BrowserResponse } from 'playwright';
-import { artifactReadSchema, decodeFile, type ArtifactRead } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, decodeFile, type ArtifactRead } from '../../../../packages/contracts/src/index.ts';
 import { documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, supportsInteractiveHtml } from '../../../../apps/publication/src/document.ts';
 import { markdownPreviewPolicy } from '../../../../apps/dashboard/src/preview.ts';
 import { markdownDocument } from '../../../../packages/artifacts/src/panel/markdown.ts';

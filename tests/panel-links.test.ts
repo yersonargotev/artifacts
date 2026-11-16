@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { createArtifactStore, type Actor } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import type { Actor } from '../packages/contracts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
 import { pageLinks } from '../packages/artifacts/src/panel/links.ts';
 import { fixture } from './helpers.ts';

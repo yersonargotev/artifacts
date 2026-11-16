@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { unzipSync } from 'fflate';
 import { fixture, grant } from './helpers.ts';
 import { canonicalResource, protectedResourceMetadataUrl, restBase } from '../packages/contracts/src/http.ts';
-import { createArtifactStore, ArtifactError as StoreError } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { ArtifactError, type ArtifactRead, type Share, type Snapshot } from '../packages/contracts/src/index.ts';
 import { createArtifactRestApp } from '../packages/rest/src/index.ts';
 
@@ -549,9 +549,8 @@ test('REST ownership, scopes, and central revocation apply before command receip
   } finally { await app.close(); }
 });
 
-test('canonical root audiences remain compatible and ArtifactError keeps one runtime identity', async () => {
+test('canonical root audiences remain compatible', async () => {
   assert.equal(canonicalResource('https://artifacts.example'), 'https://artifacts.example');
-  assert.equal(StoreError, ArtifactError);
   const app = await fixture({ allowGuests: true, transport: 'combined', resourcePath: '' });
   try {
     const tokens = await grant(app, fullScope);

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { createArtifactStore, ArtifactError, type Actor } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { ArtifactError, type Actor } from '../packages/contracts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
 import { loadShareView, parseShareForm, submitShare, encodeShareCommand, type ShareCommand } from '../apps/dashboard/src/share.ts';
 import { fixture } from './helpers.ts';

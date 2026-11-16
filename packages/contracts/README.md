@@ -16,7 +16,7 @@ The root export contains domain schemas and types. `/workflow` contains `prepare
 
 `batchSchema` takes a `requestId` and 1 to 25 `operations` of `batchOperationSchema`, a union on `op` of `create`, with the create fields, `update`, with a complete `snapshot`, an optional `expectedRevisionId`, and the `readSchema` locator rule, and `move`, with the nullable `moveSchema` fields and exactly one of `artifactId` or `from: { project?, slug }`. Its refinement caps the sum of `snapshotBytes` over the snapshot-bearing operations at 4 MiB. `snapshotBytes` counts decoded content and metadata exactly as the 1 MiB revision limit does. `batchResultSchema` holds `results` of `{ index, artifactId, revisionId }`.
 
-The existing `@artifacts/artifacts` root, `/contracts`, and `/workflow` exports re-export these implementations. Store and REST packages share one `ArtifactError` runtime.
+`@artifacts/artifacts` does not re-export these implementations. Every caller imports them from this package, so the store and REST packages share one `ArtifactError` runtime.
 
 This package is MIT licensed. The license applies to this package and does not license the private Artifacts application repository.
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createSchema, parseCanvas, snapshotSchema, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createSchema, parseCanvas, snapshotSchema, type Snapshot } from '../packages/contracts/src/index.ts';
 import { designSnapshot } from './helpers.ts';
 
 type Entry = Record<string, unknown> | null;

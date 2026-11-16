@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { panelSlugConflictSchema, type Panel } from '@artifacts/artifacts/panel';
 import type { MoveSubject, PanelMoveResult, SlugConflict } from '@artifacts/artifacts/panel/model';
-import { ArtifactError, moveSchema, projectNameSchema, type Actor } from '@artifacts/artifacts/contracts';
+import { ArtifactError, moveSchema, projectNameSchema, type Actor } from '@yargote/artifacts-contracts';
 import { readForm } from './form.ts';
 import { moveHref, readMoveUrl, scopeHref } from './urls.ts';
 

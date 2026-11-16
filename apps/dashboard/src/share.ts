@@ -1,4 +1,4 @@
-import { ArtifactError, shareSchema, unshareSchema, type Actor, type Share, type ShareResult } from '@artifacts/artifacts/contracts';
+import { ArtifactError, shareSchema, unshareSchema, type Actor, type Share, type ShareResult } from '@yargote/artifacts-contracts';
 import type { ArtifactStore } from '@artifacts/artifacts';
 import type { Panel } from '@artifacts/artifacts/panel';
 import { readForm } from './form.ts';

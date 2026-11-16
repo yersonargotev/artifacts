@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { ArtifactError, createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { ArtifactError, type Actor, type Snapshot } from '../packages/contracts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
 import { parseMoveForm, prepareMovePage, submitMove, type MoveForm } from '../apps/dashboard/src/move.ts';
 import { readForm } from '../apps/dashboard/src/form.ts';

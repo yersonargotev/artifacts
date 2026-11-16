@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { chromium, type Browser } from 'playwright';
-import { artifactReadSchema, publishResultSchema } from '../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema } from '../packages/contracts/src/index.ts';
 
 type Instance = { mcp: string };
 type Credentials = { accessToken: string; password: string };

@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
 import { chromium, type Browser } from 'playwright';
 import { unzipSync, zipSync } from 'fflate';
-import type { ArtifactRead } from '../packages/artifacts/src/contracts.ts';
+import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 import { previewDocument, previewPolicy, documentPolicy, publicationDocument } from '../apps/publication/src/document.ts';
 import { escapeHtml } from '../apps/publication/src/markup.ts';
 import { expectedRetainedArchive, verifyRetainedArtifact, type RetainedVerificationConfig } from '../.agents/skills/verify-artifacts/scripts/retained.ts';

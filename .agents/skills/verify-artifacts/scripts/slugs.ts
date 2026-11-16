@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Page } from 'playwright';
-import { artifactReadSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema } from '../../../../packages/contracts/src/index.ts';
 import { waitForMoveReadiness } from './move-readiness.ts';
 
 type Snapshot = ReturnType<typeof artifactReadSchema.parse>['revision']['snapshot'];

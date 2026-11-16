@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { unzipSync, zipSync } from 'fflate';
-import type { ArtifactRead } from '../packages/artifacts/src/contracts.ts';
+import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 import { compareRetainedArchive, expectedRetainedArchive, parseRetainedVerificationConfig, type RetainedVerificationConfig } from '../.agents/skills/verify-artifacts/scripts/retained.ts';
 
 const snapshot = { metadata: { title: 'Retained cost document', description: 'Exact complete snapshot', custom: { retained: true } }, content: { kind: 'html' as const, text: '<h1>Retained revision</h1><button id="change">Change cost</button><output id="total">5.00</output><script>document.querySelector("#change").onclick=()=>document.querySelector("#total").textContent="28.40"</script>' }, files: [{ path: 'nested/bytes.bin', mediaType: 'application/octet-stream', encoding: 'base64' as const, data: 'AAH/' }] };

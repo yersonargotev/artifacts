@@ -4,8 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { unzipSync, strFromU8 } from 'fflate';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactCommand, artifactRevision, artifactPublication, artifactShare, publicationGrant, session, user } from '../packages/db/src/schema.ts';
-import { createArtifactStore, createSchema, moveSchema, projectNameSchema, readSchema, searchSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
-import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { createSchema, moveSchema, projectNameSchema, readSchema, searchSchema, slugSchema, snapshotSchema, type Actor, type Snapshot } from '../packages/contracts/src/index.ts';
+import { canonicalJson, sha256 } from '../packages/contracts/src/serialization.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
 

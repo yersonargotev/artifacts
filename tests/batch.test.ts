@@ -3,8 +3,9 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactCommand } from '../packages/db/src/schema.ts';
-import { batchSchema, createArtifactStore, type Actor, type BatchInput, type Snapshot } from '../packages/artifacts/src/index.ts';
-import { canonicalJson, sha256 } from '../packages/artifacts/src/serialization.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { batchSchema, type Actor, type BatchInput, type Snapshot } from '../packages/contracts/src/index.ts';
+import { canonicalJson, sha256 } from '../packages/contracts/src/serialization.ts';
 import { fixture } from './helpers.ts';
 
 const page = (title: string, text: string): Snapshot => ({ metadata: { title, description: '' }, content: { kind: 'markdown', text }, files: [] });

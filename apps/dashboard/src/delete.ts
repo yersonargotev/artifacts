@@ -1,4 +1,4 @@
-import { deleteSchema, type DeleteInput } from '@artifacts/artifacts/contracts';
+import { deleteSchema, type DeleteInput } from '@yargote/artifacts-contracts';
 import { readForm } from './form.ts';
 
 export async function parseDeletionForm(request: Request, artifactId: string | undefined): Promise<DeleteInput> {

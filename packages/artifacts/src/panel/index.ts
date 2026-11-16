@@ -4,12 +4,12 @@ import { z } from 'zod';
 import type { AccessPolicy } from '@artifacts/config';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactPublication, artifactRevision, oauthClient } from '@artifacts/db/schema';
-import { ArtifactError, exportSchema, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor, type Revision } from '../contracts.ts';
+import { ArtifactError, exportSchema, historySchema, moveSchema, projectNameSchema, readByIdSchema, type Actor, type Revision } from '@yargote/artifacts-contracts';
 import { createAccess, projectOrder, type Connection } from '../access.ts';
 import { defaultDirections, libraryPageSize, librarySorts, libraryStatuses, projectKey, type LibrarySort, type ArtifactCard, type ArtifactDetail, type DetailSnapshot, type RevisionRef, type ContentKind, type LibraryScope, type LibrarySnapshot, type ProjectName, type ProjectsSnapshot, type RecentArtifact, type ScopeRequest, type Tally, type Workspace, type PanelMoveInput, type PanelMoveResult, type MoveSubject, type SlugConflict, type PageLink, type PreviewSnapshot } from './model.ts';
 import { pageLinks } from './links.ts';
 import { revision } from '../revision.ts';
-import { compareRevisions } from '../workflow.ts';
+import { compareRevisions } from '@yargote/artifacts-contracts/workflow';
 
 // A cursor is `<ms>:<id>` for the default order, and `<key>.<ms>:<id>` when another column sorts the list.
 // The key is the sort value of the last card: base64url UTF-8 for a title, an integer for a state rank or revision.

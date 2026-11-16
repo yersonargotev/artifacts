@@ -8,7 +8,7 @@ Two independent designs compared shared-core adapters with MCP consuming REST. T
 
 ## Package ownership
 
-`@artifacts/contracts` owns domain schemas, errors and workflow helpers without database dependencies. Existing artifacts exports remain compatible. `@artifacts/rest` owns the Fetch handler and shared bearer verification. `@artifacts/client` owns authenticated requests, response validation and archive verification. The CLI owns OAuth login, credentials, complete operation files and terminal output.
+`@artifacts/contracts` owns domain schemas, errors and workflow helpers without database dependencies. Callers import them from it directly. The store does not re-export them. `@artifacts/rest` owns the Fetch handler and shared bearer verification. `@artifacts/client` owns authenticated requests, response validation and archive verification. The CLI owns OAuth login, credentials, complete operation files and terminal output.
 
 The database store keeps every mutation and receipt in one transaction. Neither HTTP adapter contains artifact SQL. The panel retains its separate OIDC session policy and direct store access. Publication retains its independent Worker and protected viewer admission.
 

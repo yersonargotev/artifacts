@@ -1,4 +1,4 @@
-import { ArtifactError, type BatchInput, type BatchResult, type Snapshot } from './contracts.ts';
+import { ArtifactError, type BatchInput, type BatchResult, type Snapshot } from '@yargote/artifacts-contracts';
 import { projectKey } from './panel/model.ts';
 
 export type StoredPage = { artifactId: string; project: string | null; slug: string | null; headRevisionId: string; sequence: number };
