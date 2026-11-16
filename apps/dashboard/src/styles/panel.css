@@ -804,7 +804,8 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
 [data-library-item]:focus { outline: none; }
 .artifact-card[data-selected] { border-color: var(--accent-a3); }
 .pending-banner { animation: drop var(--dur-3) var(--ease-out) both; }
-.reader-document { animation: rise var(--dur-3) var(--ease-out) both; }
+/* A pane swapped in by a step shows at once; rising from opacity 0 would flash the panel background between documents. */
+.reader-pane:not([data-reader-swapped]) > .reader-document { animation: rise var(--dur-3) var(--ease-out) both; }
 @media (hover: hover) and (min-width: 721px) {
   .artifact-table tbody tr[data-selected] .artifact-actions { opacity: 1; transform: none; }
 }
