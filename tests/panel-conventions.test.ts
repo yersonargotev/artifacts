@@ -3,21 +3,37 @@ import { readFile, readdir } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { test } from 'node:test';
 import { transform, type Selector } from 'lightningcss';
-import { projectTone, projectTones } from '../apps/dashboard/src/presentation.ts';
+import { projectPalette, projectTones } from '../apps/dashboard/src/presentation.ts';
 import { themeColors, themes } from '../apps/dashboard/src/theme.ts';
 
 const sourceRoot = resolve('apps/dashboard/src');
 const styleRoot = resolve(sourceRoot, 'styles');
 
-test('project tones have stylesheet rules and ignore letter case', async () => {
+test('project tones have stylesheet rules', async () => {
   const tokens = await readFile(resolve(styleRoot, 'tokens.css'), 'utf8');
-  for (const tone of projectTones) assert(tokens.includes(`[data-tone="${tone}"]`), `Missing project tone rule for ${tone}`);
-  assert.equal(projectTone('Beta'), projectTone('beta'));
-  assert.equal(projectTone('Beta'), 'maroon');
-  assert.equal(projectTone('Éxito'), projectTone('ÉXITO'));
-  assert.equal(projectTone('Éxito'), 'sky');
-  assert.equal(new Set(projectTones).size, 8);
-  assert(projectTones.every((tone) => !['green', 'yellow', 'mauve'].includes(tone)));
+  for (const tone of projectPalette) assert(tokens.includes(`[data-tone="${tone}"]`), `Missing project tone rule for ${tone}`);
+  assert.equal(new Set(projectPalette).size, 8);
+  assert(projectPalette.every((tone) => !['green', 'yellow', 'mauve'].includes(tone)));
+});
+
+test('project tones ignore letter case', () => {
+  const tone = projectTones([{ name: 'Beta' }]);
+  assert.equal(tone('Beta'), tone('beta'));
+  assert.equal(tone('Éxito'), tone('ÉXITO'));
+});
+
+test('projects in one workspace get distinct tones while the palette lasts', () => {
+  const tone = projectTones([{ name: 'Investigación' }, { name: 'Wiki' }]);
+  assert.notEqual(tone('Investigación'), tone('Wiki'));
+  const eight = Array.from({ length: 8 }, (_, index) => ({ name: `Proyecto ${index}` }));
+  const eightTones = projectTones(eight);
+  assert.equal(new Set(eight.map(({ name }) => eightTones(name))).size, 8);
+});
+
+test('neighboring projects never share a tone beyond the palette size', () => {
+  const twenty = Array.from({ length: 20 }, (_, index) => ({ name: `Proyecto ${String(index).padStart(2, '0')}` }));
+  const tone = projectTones(twenty);
+  for (let index = 1; index < twenty.length; index++) assert.notEqual(tone(twenty[index]!.name), tone(twenty[index - 1]!.name), `${twenty[index]!.name} shares a tone with its neighbor`);
 });
 const effectPolicy = {
   '--accent-fill': { property: 'background', subject: 'primary' },
