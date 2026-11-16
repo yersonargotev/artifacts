@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { strFromU8, unzipSync } from 'fflate';
-import { artifactReadSchema, publishResultSchema, revisionSchema } from '../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, revisionSchema } from '../packages/contracts/src/index.ts';
 
 type Call = { tool: string; input: Record<string, unknown>; result: Record<string, unknown> };
 type Evidence = { artifactId: string; firstRevisionId: string; publicationUrl: string; calls: Call[] };

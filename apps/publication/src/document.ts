@@ -1,4 +1,4 @@
-import type { ArtifactRead, SharedRead, Snapshot } from '@artifacts/artifacts/contracts';
+import type { ArtifactRead, SharedRead, Snapshot } from '@yargote/artifacts-contracts';
 import { canvasDocument } from './canvas.ts';
 import { escapeHtml, sourceBlock } from './markup.ts';
 

@@ -7,16 +7,13 @@ import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, artifactInvitationBudget, artifactPublication, artifactRevision, artifactShare, publicationGrant, session, user } from '@artifacts/db/schema';
-import { ArtifactError, artifactReadSchema, batchResultSchema, batchSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type BatchResult, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer } from './contracts.ts';
-import { canonicalJson, sha256 } from './serialization.ts';
+import { ArtifactError, artifactReadSchema, batchResultSchema, batchSchema, consumeGrantSchema, createSchema, decodeFile, deleteSchema, deleteResultSchema, exportSchema, historySchema, issueGrantSchema, listSchema, listSharesSchema, moveResultSchema, moveSchema, publishResultSchema, publishSchema, readByIdSchema, readSchema, searchSchema, shareCommandResultSchema, shareSchema, unshareResultSchema, unshareSchema, updateSchema, viewerSchema, type Actor, type Archive, type ArtifactRead, type ArtifactSummary, type BatchResult, type MoveResult, type ProjectSummary, type Publication, type Revision, type SearchResult, type Share, type ShareResult, type SharedRead, type Snapshot, type UnshareResult, type UpdateInput, type Viewer, type SharedArtifactSummary } from '@yargote/artifacts-contracts';
+import { canonicalJson, sha256 } from '@yargote/artifacts-contracts/serialization';
 import { createAccess, isBusy, isConstraint, writeTransaction, type Connection } from './access.ts';
 import { planBatch } from './batch.ts';
 import { projectKey } from './panel/model.ts';
 import { revision } from './revision.ts';
 import { invitation, type InvitationSender } from './invitation.ts';
-import type { SharedArtifactSummary } from './contracts.ts';
-
-export * from './contracts.ts';
 
 // drizzle-kit does not model FTS5, so the table lives here instead of schema.ts and migration 0006 creates it by hand.
 const artifactSearch = sqliteTable('artifact_search', { artifactId: text('artifact_id').notNull(), title: text('title').notNull(), description: text('description').notNull(), body: text('body').notNull() });

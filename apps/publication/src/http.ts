@@ -1,8 +1,8 @@
 import { EncryptJWT, jwtDecrypt } from 'jose';
 import { publicationConfig } from '@artifacts/config';
 import { z } from 'zod';
-import { artifactReadSchema, consumeGrantSchema, readByIdSchema, sharedReadSchema, viewerSchema } from '@artifacts/artifacts/contracts';
-import type { Viewer } from '@artifacts/artifacts/contracts';
+import { artifactReadSchema, consumeGrantSchema, readByIdSchema, sharedReadSchema, viewerSchema } from '@yargote/artifacts-contracts';
+import type { Viewer } from '@yargote/artifacts-contracts';
 import { attachmentResponse, documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
 
 export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: string; PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };

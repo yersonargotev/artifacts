@@ -1,5 +1,5 @@
 import { marked, type Token } from 'marked';
-import { slugSchema } from '../contracts.ts';
+import { slugSchema } from '@yargote/artifacts-contracts';
 
 export type BrokenLinkReason = 'missing' | 'outside' | 'unslugged';
 export type LinkCandidate =

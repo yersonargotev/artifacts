@@ -8,6 +8,7 @@
   "dependencies": {
     "@artifacts/artifacts": "workspace:*",
     "@artifacts/config": "workspace:*",
+    "@yargote/artifacts-contracts": "workspace:*",
     "jose": "6.2.12",
     "zod": "4.6.5"
   }

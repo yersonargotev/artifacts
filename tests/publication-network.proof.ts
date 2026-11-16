@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { serve } from '@hono/node-server';
 import { chromium } from 'playwright';
 import { documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from '../apps/publication/src/document.ts';
-import type { ArtifactRead } from '../packages/artifacts/src/contracts.ts';
+import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 
 const collector = createSocket('udp4');
 let packets = 0;

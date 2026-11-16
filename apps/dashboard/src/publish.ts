@@ -1,5 +1,5 @@
 import type { createArtifactStore } from '@artifacts/artifacts';
-import { ArtifactError, publishSchema, type Actor, type ArtifactRead, type Publication } from '@artifacts/artifacts/contracts';
+import { ArtifactError, publishSchema, type Actor, type ArtifactRead, type Publication } from '@yargote/artifacts-contracts';
 
 import { readForm } from './form.ts';
 

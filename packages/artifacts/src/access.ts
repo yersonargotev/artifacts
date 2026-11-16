@@ -4,8 +4,8 @@ import type { AccessPolicy } from '@artifacts/config';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { artifact, artifactCommand, session } from '@artifacts/db/schema';
-import { ArtifactError, type Actor, type ProjectSummary } from './contracts.ts';
-import { canonicalJson, sha256 } from './serialization.ts';
+import { ArtifactError, type Actor, type ProjectSummary } from '@yargote/artifacts-contracts';
+import { canonicalJson, sha256 } from '@yargote/artifacts-contracts/serialization';
 import { projectKey, type PanelMoveInput, type PanelMoveResult } from './panel/model.ts';
 
 export type Connection = Pick<Database, 'select' | 'insert' | 'update' | 'delete'>;

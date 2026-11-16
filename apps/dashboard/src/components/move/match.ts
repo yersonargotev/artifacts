@@ -1,4 +1,4 @@
-import { projectNameSchema } from '@artifacts/artifacts/contracts';
+import { projectNameSchema } from '@yargote/artifacts-contracts';
 import { projectKey } from '@artifacts/artifacts/panel/model';
 
 const searchable = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();

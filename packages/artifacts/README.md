@@ -1,6 +1,6 @@
 # Artifact store
 
-`createArtifactStore(db, { publishOrigin })` owns retained snapshots, draft heads, publication pointers, retry receipts, and publication grants. MCP, REST, and panel callers use this API. `@yargote/artifacts-contracts` owns the database-free schemas and workflow helpers. The existing `@artifacts/artifacts/contracts` and `/workflow` exports remain compatible re-exports of the same runtime. HTTP consumers use [the client package](../client/README.md).
+`createArtifactStore(db, { publishOrigin })` owns retained snapshots, draft heads, publication pointers, retry receipts, and publication grants. MCP, REST, and panel callers use this API. `@yargote/artifacts-contracts` owns the database-free schemas and workflow helpers. Import them from that package. This package does not re-export them. HTTP consumers use [the client package](../client/README.md).
 
 A snapshot contains `metadata`, `content`, and `files`. Metadata retains the title, description, and optional JSON custom value. Content contains its kind and text. Files retain normalized relative paths, media types, the original UTF-8 or base64 encoding, and their data. Each revision stores the entire snapshot, parent, sequence, author, creation time, and SHA-256 of canonical snapshot JSON. Unknown fields are rejected.
 
@@ -57,7 +57,7 @@ Create and update return complete snapshots and save complete command receipts. 
 
 Response modes are part of the exact create and update arguments. Omission, `"full"`, and `"compact"` have distinct request identities. A retry must preserve the original mode. Reusing a request ID with a different mode fails with `request_conflict`. While the artifact exists, an identical retry returns the original receipt's head and publication state, even after later edits or publication changes. Preexisting requests with no response mode keep their original hashes.
 
-`@artifacts/artifacts/workflow` exports `summarizeRevision(revision)`, `compactArtifactRead(document)`, and `compareRevisions(before, after)`. These asynchronous helpers share the summaries used by MCP and the panel. Comparisons include changed metadata rows, before and after content with `kindChanged` and `textChanged`, and added, removed, or changed attachments sorted by path. A file changes when its decoded bytes, media type, or encoding change. Custom JSON comparison ignores object key order.
+`@yargote/artifacts-contracts/workflow` exports `summarizeRevision(revision)`, `compactArtifactRead(document)`, and `compareRevisions(before, after)`. These asynchronous helpers share the summaries used by MCP and the panel. Comparisons include changed metadata rows, before and after content with `kindChanged` and `textChanged`, and added, removed, or changed attachments sorted by path. A file changes when its decoded bytes, media type, or encoding change. Custom JSON comparison ignores object key order.
 
 ## Prepare and retry an edit
 
@@ -72,8 +72,8 @@ With an authenticated `store`, `actor`, and `artifactId`, prepare and save the e
 ```ts
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { updateSchema } from '@artifacts/artifacts/contracts';
-import { prepareArtifactEdit } from '@artifacts/artifacts/workflow';
+import { updateSchema } from '@yargote/artifacts-contracts';
+import { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 
 const command = await prepareArtifactEdit(
 	{ read: (input) => store.read(actor, input) },

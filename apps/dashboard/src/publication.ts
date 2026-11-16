@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { ArtifactError, viewerSchema, readByIdSchema } from '@artifacts/artifacts/contracts';
-import type { Actor } from '@artifacts/artifacts/contracts';
+import { ArtifactError, viewerSchema, readByIdSchema } from '@yargote/artifacts-contracts';
+import type { Actor } from '@yargote/artifacts-contracts';
 import type { PanelIdentity } from './identity.ts';
 
 export const publicationReadSchema = z.strictObject({ viewer: viewerSchema, ...readByIdSchema.shape });

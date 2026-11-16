@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { exportSchema } from '@artifacts/artifacts/contracts';
+import { exportSchema } from '@yargote/artifacts-contracts';
 import { getRuntime } from '../../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../../publication.ts';
 

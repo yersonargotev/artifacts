@@ -3,8 +3,13 @@ import node from '@astrojs/node';
 import cloudflare from '@astrojs/cloudflare';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'node:fs';
 
 const worker = process.env.ARTIFACTS_BUILD_TARGET === 'worker';
+const manifest = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+const workspaceEntries = Object.entries(manifest('package.json').dependencies)
+  .filter(([, version]) => version.startsWith('workspace:'))
+  .flatMap(([name]) => Object.keys(manifest(`node_modules/${name}/package.json`).exports).map((entry) => name + entry.slice(1)));
 
 export default defineConfig({
   output: 'server',
@@ -21,6 +26,6 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   vite: {
     plugins: [tailwindcss()],
-    ...(worker ? { ssr: { noExternal: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts', '@artifacts/artifacts/panel', '@artifacts/artifacts/panel/model'] } } : { ssr: { external: ['@artifacts/db', '@artifacts/db/schema', '@artifacts/config', '@artifacts/artifacts', '@artifacts/artifacts/contracts', '@artifacts/artifacts/panel', '@artifacts/artifacts/panel/model'] } }),
+    ssr: worker ? { noExternal: workspaceEntries } : { external: workspaceEntries },
   },
 });

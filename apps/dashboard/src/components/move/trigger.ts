@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { moveSchema, projectNameSchema } from '@artifacts/artifacts/contracts';
+import { moveSchema, projectNameSchema } from '@yargote/artifacts-contracts';
 
 const itemSchema = z.object({ artifactId: moveSchema.shape.artifactId, title: z.string(), project: projectNameSchema.nullable() });
 export type MoveItem = z.infer<typeof itemSchema>;

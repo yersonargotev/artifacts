@@ -6,8 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { artifactCommand, session } from '../packages/db/src/schema.ts';
-import { createArtifactStore, createSchema, historySchema, readSchema, updateSchema, type Actor, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from '../packages/artifacts/src/index.ts';
-import { BatchOperationError, compactArtifactRead, compareRevisions, prepareArtifactEdit, prepareBatch, summarizeRevision, type CompactArtifactRead, type RevisionSummary } from '../packages/artifacts/src/workflow.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { createSchema, historySchema, readSchema, updateSchema, type Actor, type ArtifactRead, type Revision, type Snapshot, type UpdateInput } from '../packages/contracts/src/index.ts';
+import { BatchOperationError, compactArtifactRead, compareRevisions, prepareArtifactEdit, prepareBatch, summarizeRevision, type CompactArtifactRead, type RevisionSummary } from '../packages/contracts/src/workflow.ts';
 import { compactArtifactReadSchema, summaryHistoryResultSchema } from '../packages/contracts/src/http.ts';
 import { designSnapshot, fixture, grant } from './helpers.ts';
 

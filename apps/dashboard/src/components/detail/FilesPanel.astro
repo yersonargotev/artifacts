@@ -1,5 +1,5 @@
 ---
-import type { summarizeRevision } from '@artifacts/artifacts/workflow';
+import type { summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 interface Props { files: Awaited<ReturnType<typeof summarizeRevision>>['files']; sequence: number }
 const { files, sequence } = Astro.props;
 ---

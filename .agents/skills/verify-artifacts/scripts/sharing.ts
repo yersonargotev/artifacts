@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from 'playwright';
-import { artifactReadSchema, publishResultSchema, shareResultSchema, unshareResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, shareResultSchema, unshareResultSchema } from '../../../../packages/contracts/src/index.ts';
 
 type Snapshot = ReturnType<typeof artifactReadSchema.parse>['revision']['snapshot'];
 export type Account = { userId: string; email: string; emailVerified: boolean; accessToken: string };

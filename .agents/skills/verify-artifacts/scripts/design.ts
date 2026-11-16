@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 import type { BrowserContext, Page } from 'playwright';
-import { artifactReadSchema, publishResultSchema, snapshotSchema, type CanvasIndex } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, snapshotSchema, type CanvasIndex } from '../../../../packages/contracts/src/index.ts';
 import { parseRetainedVerificationConfig, verifyRetainedArtifact } from './retained.ts';
 
 interface DesignDrive {

@@ -22,7 +22,7 @@ import { fixture, grant } from '../../../../tests/helpers.ts';
 import { createArtifactStore } from '../../../../packages/artifacts/src/index.ts';
 import { createPublicationApp } from '../../../../apps/publication/src/http.ts';
 import { session, user } from '../../../../packages/db/src/schema.ts';
-import { artifactReadSchema, publishResultSchema, shareSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, publishResultSchema, shareSchema } from '../../../../packages/contracts/src/index.ts';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const entry = join(root, 'apps/dashboard/dist/server/entry.mjs');

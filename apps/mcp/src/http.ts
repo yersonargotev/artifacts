@@ -2,8 +2,9 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { identityScope, scopes, type mcpConfig } from '@artifacts/config';
 import { createMcpAuthorizer } from './identity.ts';
-import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema, type ArtifactStore } from '@artifacts/artifacts';
-import { compactArtifactRead, summarizeRevision } from '@artifacts/artifacts/workflow';
+import type { ArtifactStore } from '@artifacts/artifacts';
+import { ArtifactError, batchSchema, createSchema, exportSchema, historySchema, listSchema, listSharesSchema, moveSchema, publishSchema, readSchema, searchSchema, shareSchema, unshareSchema, updateSchema } from '@yargote/artifacts-contracts';
+import { compactArtifactRead, summarizeRevision } from '@yargote/artifacts-contracts/workflow';
 
 export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: ArtifactStore) {
   const authorize = createMcpAuthorizer(config);

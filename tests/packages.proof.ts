@@ -121,10 +121,8 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileEmailSender } from '@artifacts/config/email-node';
 import { openDatabase } from '@artifacts/db';
-import { createArtifactStore, ArtifactError as StoreError } from '@artifacts/artifacts';
-import { ArtifactError } from '@yargote/artifacts-contracts';
+import { createArtifactStore } from '@artifacts/artifacts';
 import { createArtifactRestApp } from '@artifacts/rest';
-assert.equal(StoreError, ArtifactError);
 const config = JSON.parse(await readFile('fixture.json','utf8'));
 const connection = await openDatabase({url:config.databaseUrl});
 const app = createArtifactRestApp(config,createArtifactStore(connection.db,{ access: { ownerEmail: 'owner@example.test', allowGuests: false },publishOrigin:'https://published.example.test',sendInvitation:fileEmailSender(config.sink)}));
@@ -164,7 +162,7 @@ if(config.native){
  assert.ok(nativePath.includes('/node_modules/@artifacts/db/node_modules/libsql/'));
 }
 console.log(JSON.stringify({profile:config.native?.kind??'portable',sdkPath,nativePath,binarySha256:config.native?.binarySha256,notify:'requested',receipts:1,sinkMessages:messages.length,replay:'identical'}));
-console.log('Packed store and REST preserve ArtifactError identity, real notify, quota, immutable receipt and no resend');
+console.log('Packed store and REST map store errors, real notify, quota, immutable receipt and no resend');
 } finally { connection.client.close(); }
 `);
   console.log((await run(process.execPath, ['server.mjs'], serverDirectory)).trim());
@@ -209,7 +207,7 @@ console.log('Packed store and REST preserve ArtifactError identity, real notify,
 
   await writeFile(join(serverDirectory, 'server.ts'), `import { openDatabase } from '@artifacts/db';
 import { createArtifactStore, type ArtifactStore } from '@artifacts/artifacts';
-import { prepareArtifactEdit } from '@artifacts/artifacts/workflow';
+import { prepareArtifactEdit } from '@yargote/artifacts-contracts/workflow';
 import { createArtifactRestApp } from '@artifacts/rest';
 const {db} = await openDatabase({url:'file:example.db'});
 const store: ArtifactStore = createArtifactStore(db,{ access: { ownerEmail: 'owner@example.test', allowGuests: false },publishOrigin:'https://published.example.test'});

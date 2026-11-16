@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { eq } from 'drizzle-orm';
 import { artifactShare, session, user } from '../packages/db/src/schema.ts';
-import { createArtifactStore, libraryQuerySchema, listSchema, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import { libraryQuerySchema, listSchema, type Actor, type Snapshot } from '../packages/contracts/src/index.ts';
 import { createPanel } from '../packages/artifacts/src/panel/index.ts';
 import { fixture, historicalSignIn } from './helpers.ts';
 

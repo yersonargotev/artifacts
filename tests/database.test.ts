@@ -9,7 +9,8 @@ import { migrate } from 'drizzle-orm/libsql/migrator';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { migrateDatabase } from '../packages/db/src/migrate.ts';
 import { panelSession, session, user } from '../packages/db/src/schema.ts';
-import { reindexSearch, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { reindexSearch } from '../packages/artifacts/src/index.ts';
+import type { Snapshot } from '../packages/contracts/src/index.ts';
 import { designSnapshot } from './helpers.ts';
 
 test('migrations are repeatable and central-session deletion cascades to panel sessions', async () => {

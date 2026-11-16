@@ -6,7 +6,7 @@ import { canvasDocument } from '../apps/publication/src/canvas.ts';
 import { previewDocument } from '../apps/publication/src/document.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { escapeHtml } from '../apps/publication/src/markup.ts';
-import { snapshotSchema, type ArtifactRead } from '../packages/artifacts/src/contracts.ts';
+import { snapshotSchema, type ArtifactRead } from '../packages/contracts/src/index.ts';
 import { localReturnPath } from '../apps/dashboard/src/identity.ts';
 import { publicationServiceAuthorized } from '../apps/dashboard/src/publication.ts';
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { artifactReadSchema, searchResultSchema } from '../../../../packages/artifacts/src/contracts.ts';
+import { artifactReadSchema, searchResultSchema } from '../../../../packages/contracts/src/index.ts';
 
 type CliResult = { code: number | null; stdout: string; stderr: string };
 interface SearchDrive {

@@ -1,5 +1,5 @@
-import type { contentKinds, Revision } from '../contracts.ts';
-import type { RevisionComparison } from '../workflow.ts';
+import type { contentKinds, Revision } from '@yargote/artifacts-contracts';
+import type { RevisionComparison } from '@yargote/artifacts-contracts/workflow';
 
 export type ProjectName = string & { readonly __brand: 'ProjectName' };
 export type ContentKind = typeof contentKinds[number];

@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { artifact, artifactShare, artifactCommand, artifactPublication, artifactRevision, publicationGrant, session } from '../packages/db/src/schema.ts';
-import { createArtifactStore, type Actor, type Snapshot } from '../packages/artifacts/src/index.ts';
+import { createArtifactStore } from '../packages/artifacts/src/index.ts';
+import type { Actor, Snapshot } from '../packages/contracts/src/index.ts';
 import { openDatabase } from '../packages/db/src/index.ts';
 import { fixture } from './helpers.ts';
 
