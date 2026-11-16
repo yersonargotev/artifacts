@@ -13,3 +13,9 @@ export function previewResponse({ revision: { snapshot }, links }: PreviewSnapsh
   const connections: Record<string, string> = markdown ? {} : { 'connection-allowlist': '()' };
   return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-store', 'content-security-policy': policy, ...connections, 'x-dns-prefetch-control': 'off', vary: 'User-Agent' } });
 }
+
+// The panel shows a preview error inside its iframe, and the panel's default policy forbids framing.
+export function framedPreviewError(response: Response) {
+  response.headers.set('content-security-policy', inertPreviewPolicy);
+  return response;
+}

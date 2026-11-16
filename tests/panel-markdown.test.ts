@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { previewResponse } from '../apps/dashboard/src/preview.ts';
+import { framedPreviewError, previewResponse } from '../apps/dashboard/src/preview.ts';
 import { inertPreviewPolicy, previewDocument, previewPolicy } from '../apps/publication/src/document.ts';
 import { markdownDocument } from '../packages/artifacts/src/panel/markdown.ts';
 import { brokenLinks, markdownPreviewSandbox, type PageLink } from '../packages/artifacts/src/panel/model.ts';
@@ -81,6 +81,15 @@ test('the panel preview of HTML and text keeps its document and policy', async (
     assert.equal(unsupported.headers.get('content-security-policy'), inertPreviewPolicy);
     assert.equal(await unsupported.text(), previewDocument({ revision: { snapshot: snapshot(kind, text) } }, false));
   }
+});
+
+test('a preview error keeps its status and can render inside the panel frame', async () => {
+  const response = framedPreviewError(new Response('El servicio no está disponible.', { status: 503, headers: { 'cache-control': 'private, no-store' } }));
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('content-security-policy'), inertPreviewPolicy);
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  assert(inertPreviewPolicy.includes("frame-ancestors 'self'"));
+  assert.equal(await response.text(), 'El servicio no está disponible.');
 });
 
 test('brokenLinks keeps only the links the Enlaces card lists', () => {
