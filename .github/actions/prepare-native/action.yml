@@ -5,12 +5,15 @@ runs:
   steps:
     - id: image
       shell: bash
-      run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+      # The provenance pins the glibc that built the binary, so a runner image with another glibc must miss the cache and rebuild.
+      run: |
+        echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+        echo "glibc=$(node -p 'process.report.getReport().header.glibcVersionRuntime ?? "none"')" >> "$GITHUB_OUTPUT"
     - id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
       with:
         path: .native/libsql
-        key: native-libsql-${{ steps.image.outputs.os }}-${{ runner.arch }}-${{ hashFiles('native/libsql/inputs.json', 'native/libsql/native-reset.patch', 'scripts/prepare-native.mjs') }}
+        key: native-libsql-${{ steps.image.outputs.os }}-${{ runner.arch }}-glibc${{ steps.image.outputs.glibc }}-${{ hashFiles('native/libsql/inputs.json', 'native/libsql/native-reset.patch', 'scripts/prepare-native.mjs') }}
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: rustup toolchain install 1.93.0 --profile minimal
