@@ -70,6 +70,7 @@ node --import tsx .agents/skills/verify-artifacts/scripts/control.ts account --e
 - Better Auth stores every account email in lowercase, so live runs cannot exercise a mixed-case account email. `tests/sharing.test.ts` covers it with a direct row update.
 - The guest sees `metadata.custom`, the title, the description, the revision ID, its creation time, its SHA-256, and the publication version, because they describe the published revision.
 - Run one drive per fresh run. The drive takes the run's `drive.lock`.
+- No drive calls the CLI `share`, `shares`, or `unshare` commands. `tests/cli-client.test.ts` covers them. Report them as unverified by this drive.
 
 ## Panel share proof
 
