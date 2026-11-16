@@ -63,7 +63,7 @@ const publicationJoin = eq(artifactPublication.artifactId, artifact.id);
 const title = sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String);
 const tally = {
   count: count(),
-  published: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is not null then 1 else 0 end), 0)`.mapWith(Number),
+  published: sql<number>`coalesce(sum(case when ${artifactPublication.revisionId} = ${artifact.headRevisionId} then 1 else 0 end), 0)`.mapWith(Number),
   pending: sql<number>`coalesce(sum(case when ${artifactPublication.artifactId} is not null and ${artifactPublication.revisionId} != ${artifact.headRevisionId} then 1 else 0 end), 0)`.mapWith(Number),
 };
 const zeroTally = (): Tally => ({ count: 0, published: 0, pending: 0 });
@@ -263,7 +263,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
         }));
         const last = cards.at(-1);
         const lastKey = !last || sort === 'updated' ? '' : `${sort === 'title' ? encodeTitle(last.title) : sort === 'revision' ? last.head.sequence : stateRanks[last.publication.state]}.`;
-        return { workspace, page: { scope, status: input.status, q: input.q, sort, direction, counts: { all: counts.count, published: counts.published - counts.pending, unpublished: counts.count - counts.published, pending: counts.pending }, cards,
+        return { workspace, page: { scope, status: input.status, q: input.q, sort, direction, counts: { all: counts.count, published: counts.published, unpublished: counts.count - counts.published - counts.pending, pending: counts.pending }, cards,
           next: rows.length > libraryPageSize && last ? `${lastKey}${last.head.createdAt.getTime()}:${last.artifactId}` : null, continued: Boolean(input.cursor) } };
       });
     },
