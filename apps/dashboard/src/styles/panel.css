@@ -704,7 +704,7 @@ footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-
 .reader { display: grid; flex: 1; grid-template-columns: 388px minmax(0, 1fr); min-width: 0; min-height: 0; }
 .reader-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--border-subtle); }
 .reader-filters { display: grid; flex: none; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); }
-.reader-filters .library-filters, .reader-filters .project-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.reader-filters .library-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
 .reader-filters .library-filters a, .reader-filters .project-filter a { gap: 4px; height: 24px; padding: 0 8px; border-radius: var(--r-full); font-size: var(--text-xs); }
 .reader-filters .project-filter .project-filter-clear { width: 24px; padding: 0; }
 .reader-rows { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }

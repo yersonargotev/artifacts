@@ -75,6 +75,7 @@ try {
   for (const read of [published, pendingFirst]) await mcp('artifacts_publish', { requestId: randomUUID(), artifactId: read.artifactId, revisionId: read.headRevisionId, expectedPublicationVersion: 0 });
   const pending = artifactReadSchema.parse(await mcp('artifacts_update', { requestId: randomUUID(), artifactId: pendingFirst.artifactId, expectedRevisionId: pendingFirst.headRevisionId, snapshot: snapshot('Borrador con cambios', 'Contenido nuevo del borrador') }));
   await create('Otra nota', 'Otro');
+  await create('Plan del trimestre', 'Investigación de mercado');
   const archive = [];
   for (let index = 0; index < 26; index++) archive.push(await create(`Archivo ${String(index).padStart(2, '0')}`, 'Archivo'));
   await mcp('artifacts_publish', { requestId: randomUUID(), artifactId: archive[25]!.artifactId, revisionId: archive[25]!.headRevisionId, expectedPublicationVersion: 0 });
@@ -113,6 +114,10 @@ try {
   const readerProjects = page.locator('.reader-list').getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
   assert.equal(await readerProjects.getByRole('link', { name: 'Otro (1)', exact: true }).getAttribute('href'), '/read?project=Otro');
   assert.equal(await readerProjects.getByRole('link', { name: /^Todos los proyectos/ }).getAttribute('href'), '/read');
+  assert.deepEqual(await readerProjects.evaluate((nav) => {
+    const box = nav.getBoundingClientRect();
+    return [...nav.querySelectorAll('a')].filter((chip) => { const rect = chip.getBoundingClientRect(); return rect.left < box.left || rect.right > box.right; }).map((chip) => chip.getAttribute('aria-label'));
+  }), [], 'every project chip fits inside the 1440 px reader list');
   await capture(page, 'read-1440');
   checks.push('the library link opens read mode for the project, listing all its artifacts with status badges and previewing the first head revision, with one h1, a back link, the position, Publicar for the pending head, and a fullscreen button that puts the same sandboxed frame in fullscreen');
 
