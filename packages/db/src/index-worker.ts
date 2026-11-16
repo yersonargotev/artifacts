@@ -8,6 +8,8 @@ export function openDatabase(config: Config) {
   const transport = config.fetch ?? fetch;
   return open({
     ...config,
+    // The client's slot limiter frees a slot in the continuation of the request that took it, and workerd drops that continuation when the request is cancelled, so the slots leak until every query queues forever.
+    concurrency: Infinity,
     fetch(request: Request) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(new DOMException('Database HTTP exchange timed out', 'TimeoutError')), httpExchangeTimeoutMs);
