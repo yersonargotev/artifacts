@@ -67,6 +67,8 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
   }
 
   const transaction = <T>(work: (connection: Connection) => Promise<T>) => writeTransaction(db, work);
+  // libSQL opens every transaction with BEGIN IMMEDIATE, so a read inside one would wait for the database write lock.
+  const read = <T>(work: (connection: Connection) => Promise<T>) => work(db);
 
   async function replay<T>(connection: Connection, ownerId: string, requestId: string, payloadHash: string, output: z.ZodType<T>): Promise<{ result: T } | undefined> {
     const [receipt] = await connection.select().from(artifactCommand).where(and(eq(artifactCommand.ownerId, ownerId), eq(artifactCommand.requestId, requestId))).limit(1);
@@ -97,5 +99,5 @@ export function createAccess(db: Database, options: { publishOrigin: string; acc
     return receipt(actor, 'artifacts:write', 'panel_move', input, output, work).then(({ result }) => result);
   }
 
-  return { transaction, authorize, liveSession, command, receipt, replay, panelMove, projectSpelling, ownedProjects, bySlug, claimSlug, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
+  return { transaction, read, authorize, liveSession, command, receipt, replay, panelMove, projectSpelling, ownedProjects, bySlug, claimSlug, callback: `${origin}/callback`, publicationUrl: (artifactId: string) => `${origin}/a/${encodeURIComponent(artifactId)}` };
 }

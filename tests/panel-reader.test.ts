@@ -306,7 +306,7 @@ test('projects index filters owners before ranking and rejects missing scope, mi
 });
 
 
-test('detail reads one selected snapshot, light history and real client names in one transaction', async (t) => {
+test('detail reads one selected snapshot, light history and real client names', async () => {
   const app = await fixture({ allowGuests: true });
   try {
     const actor = await actorFor(app);
@@ -322,11 +322,9 @@ test('detail reads one selected snapshot, light history and real client names in
     await store.publish(actor, { requestId: randomUUID(), artifactId: first.artifactId, revisionId: first.revision.id, expectedPublicationVersion: 0 });
     const queries: string[] = [];
     const db = drizzle(app.client, { schema, logger: { logQuery(query) { queries.push(query); } } });
-    const transactions = t.mock.method(db, 'transaction');
     const panel = createPanel(db, options);
     const input = { artifactId: first.artifactId, revisionId: revisions[1].id, includeComparison: false };
     const result = await panel.artifact(actor, input);
-    assert.equal(transactions.mock.callCount(), 1);
     assert.equal(queries.filter((query) => query.startsWith('select') && query.includes('"snapshot"')).length, 1);
     assert.deepEqual(result.workspace.total, { count: 1, published: 0, pending: 1 });
     assert.deepEqual(result.detail.selected, { revision: revisions[1], author: { clientId: actor.clientId, name: 'Authoring client' } });
