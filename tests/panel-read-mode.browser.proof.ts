@@ -130,8 +130,8 @@ try {
   assert.deepEqual(await titles(page), ['Borrador con cambios', 'Notas sin publicar', 'Guía publicada']);
   checks.push('the status filter narrows the list and stays in read mode');
 
-  await page.evaluate(() => { (window as unknown as { readerDocument: string }).readerDocument = 'first'; });
-  const sameDocument = () => page.evaluate(() => (window as unknown as { readerDocument?: string }).readerDocument === 'first');
+  await page.evaluate(() => { (window as Window & { readerDocument?: string }).readerDocument = 'first'; });
+  const sameDocument = () => page.evaluate(() => (window as Window & { readerDocument?: string }).readerDocument === 'first');
   await list(page).getByRole('link', { name: /^Notas sin publicar/ }).click();
   await showsPreview(page, draft, 'Cuerpo de Notas sin publicar');
   assert.equal(await sameDocument(), true, 'clicking a row swaps the preview without a navigation');

@@ -108,14 +108,15 @@ try {
     const opener = await context.newPage();
     await opener.goto(`http://localhost:${address.port}/opener`);
     for (const kind of ['control', 'publication'] as const) {
-      await opener.evaluate(() => { (window as unknown as { received: string[] }).received = []; });
+      await opener.evaluate(() => { (window as Window & { received?: string[] }).received = []; });
       const opened = opener.waitForEvent('popup');
       await opener.getByRole('button', { name: `Open ${kind}`, exact: true }).click();
       const popup = await opened;
       const content = kind === 'control' ? popup : popup.frameLocator('iframe');
       await content.locator('#ready').filter({ hasText: 'executed' }).waitFor();
       await opener.waitForTimeout(200);
-      const received = await opener.evaluate(() => (window as unknown as { received: string[] }).received);
+      const received = await opener.evaluate(() => (window as Window & { received?: string[] }).received);
+      assert.ok(received, 'The opener page records its messages');
       assert.deepEqual(received, kind === 'control' ? ['retained-opener-secret'] : [], `${kind} must prove the cross-origin opener boundary`);
       observations.push({ opener: kind, receivedMessages: received.length });
       await popup.close();

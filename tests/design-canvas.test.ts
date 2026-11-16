@@ -185,7 +185,7 @@ test('each malformed note, page, or board field reports its own path and code, w
     [(canvas) => { canvas.notes = { ['n'.repeat(41)]: note }; }, ['notes', 'n'.repeat(41)], 'invalid_key', idMessage],
     [(canvas) => { canvas.notes = { 'bad id': note }; }, ['notes', 'bad id'], 'invalid_key', idMessage],
     [(canvas) => { canvas.notes = { 'bad id': null }; }, ['notes', 'bad id'], 'invalid_key', idMessage],
-    [(canvas) => { canvas.boards = [canvas.boards[first]] as unknown as CanvasJson['boards']; }, ['boards'], 'invalid_type'],
+    [(canvas) => { Object.assign(canvas, { boards: [canvas.boards[first]] }); }, ['boards'], 'invalid_type'],
     [(canvas) => { canvas.notes = JSON.parse('{"__proto__":{"x":0,"y":0,"text":"Idea"}}'); }, ['notes', '__proto__'], 'invalid_key', protoMessage],
     [(canvas) => { canvas.pages = [{ id: 'p'.repeat(41), name: 'Page' }]; }, ['pages', 0, 'id'], 'invalid_format', idMessage],
     [(canvas) => { canvas.pages = [{ id: '__proto__', name: 'Page' }]; }, ['pages', 0, 'id'], 'custom', protoMessage],

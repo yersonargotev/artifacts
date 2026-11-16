@@ -26,11 +26,13 @@ async function batchFixture() {
         if (pending) { pending = false; await before(); }
         return target.batch(...args);
       };
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- a Proxy get trap forwards an arbitrary key to its target
       const value = Reflect.get(target, key);
       return typeof value === 'function' ? value.bind(target) : value;
     } });
     const db = new Proxy(app.db, { get(target, key) {
       if (key === '$client') return client;
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- a Proxy get trap forwards an arbitrary key to its target
       const value = Reflect.get(target, key);
       return typeof value === 'function' ? value.bind(target) : value;
     } });
