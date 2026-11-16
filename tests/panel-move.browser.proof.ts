@@ -52,12 +52,10 @@ try {
   await login.getByRole('heading', { level: 1, name: 'Biblioteca', exact: true }).waitFor();
   const state = await setup.storageState();
   await setup.close();
-  const context = await browser.newContext({ storageState: state, javaScriptEnabled: false, viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(evidence, 'videos'), size: { width: 1440, height: 900 } } });
+  const context = await browser.newContext({ storageState: state, javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
-  const video = page.video()!;
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const started = Date.now();
   const href = (ids: string[]) => `${app.dashboard}/move?${new URLSearchParams(ids.map((id) => ['artifactId', id]))}`;
   const fieldsFromPage = async (intent = 'move') => {
     const fields = new URLSearchParams(await page.locator('form[action="/move"] input').evaluateAll((nodes) => nodes.map((node) => { const input = node as HTMLInputElement; return [input.name, input.value]; })));
@@ -95,7 +93,6 @@ try {
   };
   const createdReadback = await readbacks('Gamma');
   await json('create-readback.json', createdReadback);
-  await page.waitForTimeout(3500);
   await page.goto(href([item.artifactId]));
   await page.getByRole('button', { name: 'Quitar del proyecto', exact: true }).press('Enter');
   await page.waitForURL(`${app.dashboard}/?unfiled=1`);
@@ -103,14 +100,8 @@ try {
   await capture('remove-readback');
   const removedReadback = await readbacks(null);
   await json('remove-readback.json', removedReadback);
-  await page.waitForTimeout(3500);
   assert.deepEqual(await immutable(), unchanged);
-  const escape = (value: unknown) => JSON.stringify(value, null, 2).replaceAll('&', '&amp;').replaceAll('<', '&lt;');
-  await writeFile(join(evidence, 'public-readback.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><title>Recorded public readback</title><style>body{font:16px system-ui;padding:32px;background:#1e1e2e;color:#cdd6f4}pre{font:15px monospace;white-space:pre-wrap}main{display:grid;grid-template-columns:1fr 1fr;gap:30px}</style><h1>Actual CLI and HTTP MCP readback</h1><p>Recorded from this disposable run after each native panel action.</p><main><section><h2>Created by move</h2><pre>${escape({ cliProjects: createdReadback.cliProjects, mcpProjects: createdReadback.mcpProjects, artifact: { id: item.artifactId, project: createdReadback.read.project, head: item.headRevisionId, publicationVersion: 1 } })}</pre></section><section><h2>Removed last member</h2><pre>${escape({ cliProjects: removedReadback.cliProjects, mcpProjects: removedReadback.mcpProjects, artifact: { id: item.artifactId, project: removedReadback.read.project, head: item.headRevisionId, publicationVersion: 1 } })}</pre></section></main>`);
-  await page.goto(`file://${join(evidence, 'public-readback.html')}`);
-  await page.waitForTimeout(Math.max(5000, 32_000 - (Date.now() - started)));
   await context.close();
-  await video.saveAs(join(evidence, 'review.webm'));
   checks.push('no-JS keyboard native create-by-move and removal, CLI/MCP equality, unchanged revision/publication');
   const native = await browser.newContext({ storageState: state, javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const mobile = await native.newPage();

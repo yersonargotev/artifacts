@@ -79,11 +79,9 @@ try {
   const selected = [first, second];
   const selectedIds = idsOf(selected);
   const before = await immutable();
-  const recording = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(evidence, 'videos'), size: { width: 1440, height: 900 } } });
-  const page = active = await recording.newPage();
+  const desktop = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 } });
+  const page = active = await desktop.newPage();
   observe(page);
-  const video = page.video()!;
-  const started = Date.now();
   await page.goto(`${app.dashboard}/?project=Alpha`);
   await page.locator('#selection[hidden]').waitFor({ state: 'attached' });
   assert.equal(await page.locator('#selection input[name="artifactId"]').count(), 0);
@@ -108,16 +106,13 @@ try {
   assert(effects.every(({ checked, shadow, indicator, ariaSelected }) => shadow === 'none' && (checked ? indicator === '3px' : indicator === 'auto') && ariaSelected === null));
   await json('selected-effects.json', effects);
   await capture(page, 'bulk-1440');
-  await page.waitForTimeout(3500);
   await page.setViewportSize({ width: 390, height: 844 });
   await capture(page, 'selection-390');
-  await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Limpiar selección', exact: true }).press('Enter');
   await page.locator('#selection[hidden]').waitFor({ state: 'attached' });
   assert.equal(await page.getByRole('checkbox', { checked: true }).count(), 0);
   assert.equal(await page.locator('[data-selection-count]').textContent(), '0 seleccionados');
   await capture(page, 'clear-selection');
-  await page.waitForTimeout(1000);
   for (const item of selected) await checkbox(page, item.revision.snapshot.metadata.title).check();
   const initialId = await page.locator('#selection input[name="requestId"]').inputValue();
   const successfulIds = await formIds(page);
@@ -137,7 +132,6 @@ try {
   await json('bulk-remove-readback.json', removed);
   await page.setViewportSize({ width: 1440, height: 900 });
   await capture(page, 'bulk-remove-readback');
-  await page.waitForTimeout(3500);
   for (const item of selected) await checkbox(page, item.revision.snapshot.metadata.title).check();
   await page.getByRole('button', { name: 'Mover a otro proyecto', exact: true }).press('Enter');
   await page.getByRole('dialog').waitFor();
@@ -156,14 +150,7 @@ try {
   assert.deepEqual(await immutable(), before);
   await json('bulk-create-readback.json', created);
   await capture(page, 'bulk-create');
-  await page.waitForTimeout(3500);
-  const escape = (value: unknown) => JSON.stringify(value, null, 2).replaceAll('&', '&amp;').replaceAll('<', '&lt;');
-  const publicReadback = { removed: removed.cli.map(({ artifactId, project }) => ({ artifactId, project })), cliProjects: created.cliProjects, mcpProjects: created.mcpProjects, deltaArtifactIds: idsOf(created.list.items), retainedRevisionsAndPublications: 'unchanged' };
-  await writeFile(join(evidence, 'public-readback.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><title>Actual public readback</title><style>body{font:18px system-ui;padding:32px;background:#1e1e2e;color:#cdd6f4}pre{font:16px monospace;white-space:pre-wrap}</style><h1>Actual CLI and HTTP MCP readback</h1><p>Recorded after the native panel bulk actions in this disposable run.</p><pre>${escape(publicReadback)}</pre>`);
-  await page.goto(`file://${join(evidence, 'public-readback.html')}`);
-  await page.waitForTimeout(Math.max(6000, 35_000 - (Date.now() - started)));
-  await recording.close();
-  await video.saveAs(join(evidence, 'review.webm'));
+  await desktop.close();
   checks.push('native two-ID removal, new Delta count 2 through CLI and HTTP MCP, complete revision/publication immutability', 'external FormData cardinality, fresh request ID, labels and keyboard focus, checked-card effects, 1440/390 and native reset');
   const context = await browser.newContext({ storageState: state, viewport: { width: 1440, height: 900 } });
   await context.addInitScript(() => {

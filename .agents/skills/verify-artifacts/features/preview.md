@@ -57,7 +57,7 @@ Preconditions:
 
 After `pnpm build`, run `node --import tsx tests/panel-detail.browser.proof.ts`. Set `PANEL_DETAIL_EVIDENCE` to an unused evidence directory when retaining a named run. The proof creates the first revision with the source CLI and the second through HTTP MCP, so the history checks real client names. It exercises keyboard GET tabs at 1440px and 390px, all publication states, actual clipboard and fullscreen calls, CSS preview sizing, history selection, publication, and selected ZIP bytes against MCP export. A separate context disables JavaScript and checks tabs, revision selection, selected export, and the native move link.
 
-The proof waits for the served iframe's heading, fonts, and two animation frames before capturing it. It records internal frame dimensions, verifies page overflow, retains each changed tab and a browser video, and runs the unchanged retained verifier at both widths. It fails on panel console errors or non-GET requests during tab browsing. Cleanup stops its isolated fixture and removes temporary credentials while preserving evidence.
+The proof waits for the served iframe's heading, fonts, and two animation frames before capturing it. It records internal frame dimensions, verifies page overflow, retains each changed tab, and runs the unchanged retained verifier at both widths. It fails on panel console errors or non-GET requests during tab browsing. Cleanup stops its isolated fixture and removes temporary credentials while preserving evidence.
 
 ## Extended library proof
 
@@ -65,7 +65,7 @@ After `pnpm build`, run `node --import tsx tests/panel-library.browser.proof.ts`
 
 The proof checks the project chips, the folded totals in the status bar and the Sin proyecto chip, search and status preservation, cursor reset, empty owner, no results, vanished project, empty Sin proyecto, exhausted continuation, and recent pagination as 25 then 5 cards. It opens the shared card menu with Space and Enter, checks arrow focus, Escape return, the final destructive item, and the head download against MCP ZIP bytes. A 256-character title, an 8192-character description, and an unbroken project name must clamp without horizontal overflow at 390px.
 
-A separate browser context disables JavaScript and exercises the project chips, GET search, status links, title navigation, pagination, the fresh account's native tool disclosure, and the pending-changes banner, whose Publicar button posts the existing publish form. Without JavaScript each card and row menu falls back to a native disclosure with the same links. Evidence includes screenshots at 1440px and 390px, the browser video, literal CLI output, HTTP MCP requests, result, and cleanup receipt. This proof is included in `pnpm test:browser`. It pins the card view with the `panel_view=cards` cookie, as do the selection, sharing, and artifact proofs.
+A separate browser context disables JavaScript and exercises the project chips, GET search, status links, title navigation, pagination, the fresh account's native tool disclosure, and the pending-changes banner, whose Publicar button posts the existing publish form. Without JavaScript each card and row menu falls back to a native disclosure with the same links. Evidence includes screenshots at 1440px and 390px, literal CLI output, HTTP MCP requests, result, and cleanup receipt. This proof is included in `pnpm test:browser`. It pins the card view with the `panel_view=cards` cookie, as do the selection, sharing, and artifact proofs.
 
 ## Table view proof
 
