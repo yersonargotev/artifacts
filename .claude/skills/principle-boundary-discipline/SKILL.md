@@ -4,11 +4,11 @@ description: "Apply when wiring validation, error handling, or framework adapter
 disable-model-invocation: true
 ---
 
-## Claude Code execution
+## Host execution
 
 Apply this workflow when explicitly requested.
 
-Claude manual-only dependencies must be read as files; do not invoke them through the Skill tool or preload them as model-invoked skills.
+On Agents, this workflow assumes Codex capabilities; a shared Agents binding does not provide Codex tools, model choice, or delegation. Use only capabilities authorized and available in the actual client. On Claude Code, read manual-only pstack dependencies as files; do not invoke them through the Skill tool or preload them as model-invoked skills.
 
 # Boundary Discipline
 
