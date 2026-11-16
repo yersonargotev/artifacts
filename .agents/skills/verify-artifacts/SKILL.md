@@ -29,6 +29,15 @@ Every viewport reloads the real frame before content expectations. The verifier 
 
 Run the pure config/archive tests with `node --import tsx --test tests/retained-verification.test.ts`. Run the Chrome contract tests with `node --import tsx --test tests/retained-verification.browser.proof.ts`. Run the actual local application proof with `pnpm build && node --import tsx tests/retained-browser.proof.ts`. The proof uses the existing migrated disposable fixture, completes setup/login first, invokes the same callable verifier, then compares persisted authoring/account/session rows and browser methods to prove no mutations during verification.
 
+## Run a feature
+
+```sh
+pnpm verify preview
+pnpm verify preview projects links
+```
+
+`pnpm verify` builds the panel, then runs `control.ts run`. For each feature, `run` starts a fresh instance, drives the feature, and cleans up the instance even when the drive fails. It launches `sharing` with `--allow-guests`. A failure prints the feature, the failed assertion, and the evidence path. The command exits with code 1 when any feature fails. Each run keeps its evidence under `.test-artifacts/verify-artifacts/<run>/<feature>/`, including `<feature>/result.json`. CI runs every feature except `screens` in the `Verify drives` job. Use the separate commands below to inspect a running instance between steps.
+
 ## Launch
 
 Run from the repository root with Node 24+, pnpm 12.8.1, installed workspace dependencies, and actual Chrome 152+ for interactive HTML. Before the first dependency installation, run `node scripts/prepare-native.mjs`, then `pnpm install --frozen-lockfile`. The [native preparation guide](../../../native/libsql/README.md) lists the required host tools and targets.

@@ -23,6 +23,7 @@
     "dev:mcp": "tsx apps/mcp/src/server.ts",
     "dev:dashboard": "tsx scripts/dashboard.ts",
     "test:browser": "pnpm build && tsx scripts/browser-proofs.ts",
+    "verify": "pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts run",
     "verify:turso": "tsx scripts/verify-turso.ts",
     "dev": "tsx scripts/dev.ts",
     "build:workers": "tsx scripts/build-workers.ts",

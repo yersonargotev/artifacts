@@ -201,7 +201,9 @@ async function supervisor() {
   }
 }
 
-async function launch() {
+const launchFlags = () => ['--email-code', '--invitations', '--allow-guests'].filter((flag) => args.includes(flag));
+
+async function launch(flags = launchFlags()) {
   const build = await readFile(entry, 'utf8').catch(() => undefined);
   assert(build !== undefined, 'Panel not built; run pnpm build');
   assert(build.includes('"adapterName":"@astrojs/node"'), 'Panel built for Workers, not Node; run pnpm build');
@@ -209,7 +211,7 @@ async function launch() {
   await mkdir(run, { mode: 0o700 });
   await mkdir(runtime, { mode: 0o700 });
   const log = await open(join(run, 'supervisor.log'), 'a', 0o600);
-  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run, ...['--email-code', '--invitations', '--allow-guests'].filter((flag) => args.includes(flag))], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
+  const child = spawn(process.execPath, ['--import', 'tsx', script, 'serve', '--run', run, ...flags], { cwd: root, detached: true, stdio: ['ignore', log.fd, log.fd], env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR } });
   await log.close();
   child.unref();
   try {
@@ -734,6 +736,33 @@ async function drive(feature: Feature) {
   }
 }
 
+async function runFeatures(names: string[], base: string) {
+  const requested = [...new Set(names)];
+  const unknown = requested.filter((feature) => !features.includes(feature as Feature));
+  assert(requested.length > 0 && unknown.length === 0, `Choose run ${features.join('|')}${unknown.length ? `; unknown: ${unknown.join(', ')}` : ''}`);
+  const failures: string[] = [];
+  for (const feature of requested as Feature[]) {
+    run = join(base, feature);
+    runtime = join(run, 'runtime');
+    let launched = false;
+    try {
+      await launch(feature === 'sharing' ? [...new Set([...launchFlags(), '--allow-guests'])] : launchFlags());
+      launched = true;
+      await drive(feature);
+    } catch (error) {
+      failures.push(feature);
+      console.error(`FAILED ${feature}: ${error instanceof Error ? error.message : String(error)}\nEvidence: ${join(run, feature)} (result.json, actions.jsonl, failure*.png, trace.zip); logs: ${run}`);
+    } finally {
+      if (launched) await cleanup().catch((error) => {
+        if (!failures.includes(feature)) failures.push(feature);
+        console.error(`FAILED ${feature} cleanup: ${error instanceof Error ? error.message : String(error)}\nRun: ${run}`);
+      });
+    }
+  }
+  console.log(JSON.stringify({ status: failures.length ? 'failed' : 'passed', passed: requested.filter((feature) => !failures.includes(feature)), failed: failures, runs: base }));
+  if (failures.length) process.exitCode = 1;
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === script) try {
   args = process.argv.slice(2);
   const command = args[0];
@@ -745,6 +774,7 @@ if (process.argv[1] && resolve(process.argv[1]) === script) try {
   else if (command === 'serve') await supervisor();
   else if (command === 'doctor') { const { proof } = await doctor(); console.log(JSON.stringify(proof)); }
   else if (command === 'cleanup') await cleanup();
+  else if (command === 'run') await runFeatures(args.slice(1).filter((value, index, all) => !value.startsWith('--') && all[index - 1] !== '--run'), run);
   else if (command === 'drive') { const feature = args[1]; assert(features.includes(feature as Feature), `Choose drive ${features.join('|')}`); await drive(feature as Feature); }
   else if (command === 'account') {
     const email = args[args.indexOf('--email') + 1];
@@ -752,7 +782,7 @@ if (process.argv[1] && resolve(process.argv[1]) === script) try {
     const { accessToken: _accessToken, ...created } = await account(email, !args.includes('--unverified'));
     console.log(JSON.stringify({ ...created, credentials: accountFile(created.email) }));
   }
-  else throw new Error('Usage: control.ts launch [--email-code] [--invitations] [--allow-guests] [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
+  else throw new Error('Usage: control.ts run FEATURE... [--headed] [--run PATH] | launch [--email-code] [--invitations] [--allow-guests] [--run PATH] | doctor --run PATH | drive FEATURE [--headed] --run PATH | account --email ADDRESS [--unverified] --run PATH | cleanup --run PATH');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
