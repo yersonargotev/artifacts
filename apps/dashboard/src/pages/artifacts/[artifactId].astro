@@ -1,7 +1,7 @@
 ---
 import { getRuntime } from '../../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../../publication.ts';
-import { retainedMarkers } from '../../presentation.ts';
+import { projectTones, retainedMarkers } from '../../presentation.ts';
 import { readDetailUrl, detailQuery } from '../../urls.ts';
 import { summarizeRevision } from '@artifacts/artifacts/workflow';
 import { brokenLinks } from '@artifacts/artifacts/panel/model';
@@ -40,7 +40,7 @@ const summary = url.tab === 'files' ? await summarizeRevision(detail.selected.re
         {url.tab === 'compare' && <ComparePanel detail={detail} url={url} />}
         {url.tab === 'information' && <InformationPanel detail={detail} />}
       </div>
-      <aside class="detail-aside"><PublicationCard detail={detail} url={url} /><HistoryCard detail={detail} url={url} /><FactsCard detail={detail} /></aside>
+      <aside class="detail-aside"><PublicationCard detail={detail} url={url} /><HistoryCard detail={detail} url={url} /><FactsCard detail={detail} tone={detail.project === null ? undefined : projectTones(workspace.projects)(detail.project)} /></aside>
     </div>
   </section>
 </Panel>

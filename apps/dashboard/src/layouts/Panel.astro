@@ -14,7 +14,7 @@ import SearchForm from '../components/shell/SearchForm.astro';
 import StatusBar from '../components/shell/StatusBar.astro';
 import Palette from '../components/palette/Palette.tsx';
 import type { PaletteData } from '../components/palette/entries.ts';
-import { projectTone, scopeOf, type NavLocation } from '../presentation.ts';
+import { projectTones, scopeOf, type NavLocation } from '../presentation.ts';
 import { getRuntime } from '../runtime.ts';
 import { readTheme, themeColors, themeCookie } from '../theme.ts';
 import Icon from '../components/Icon.astro';
@@ -30,7 +30,8 @@ const query = search ?? { scope: scopeOf(location), q: '', status: 'all' };
 const theme = readTheme(Astro.cookies.get(themeCookie)?.value);
 const topLevel = location.kind === 'library' || location.kind === 'projects';
 const reader = readerHref({ scope: scopeOf(location), status: 'all', q: '' });
-const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).map(({ name, count }) => ({ name, count, tone: projectTone(name), href: scopeHref({ kind: 'project', name }) })), reader, readerKey };
+const tone = projectTones(workspace?.projects ?? []);
+const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).map(({ name, count }) => ({ name, count, tone: tone(name), href: scopeHref({ kind: 'project', name }) })), reader, readerKey };
 ---
 <!doctype html>
 <html lang="es" data-theme={theme}>
@@ -42,8 +43,8 @@ const palette: PaletteData = { artifacts, projects: (workspace?.projects ?? []).
       {identity ? <header class="top-bar">
         {topLevel ? <h1 id="page-title">{title}</h1> : back ? <>
           <a class="top-bar-back" href={back.href} aria-label={back.label} title={back.label}><Icon name="chevron-left" size={16} /></a>
-          <Breadcrumb location={location} title={title} heading /><h1 id="page-title">{title}</h1>
-        </> : <Breadcrumb location={location} title={title} />}
+          <Breadcrumb location={location} title={title} tone={tone} heading /><h1 id="page-title">{title}</h1>
+        </> : <Breadcrumb location={location} title={title} tone={tone} />}
         <SearchForm query={query} action={location.kind === 'read' ? '/read' : '/'} />
         {Astro.slots.has('bar') && <div class="top-bar-actions"><slot name="bar" /></div>}
       </header> : <header class="panel-header"><a class="wordmark" href="/">Artifacts</a><span>Biblioteca</span></header>}

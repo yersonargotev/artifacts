@@ -12,13 +12,34 @@ export type NavLocation =
   | { readonly kind: 'task' };
 
 export const workspaceQuery: LibraryQuery = { scope: { kind: 'all' }, status: 'all', q: '' };
-export const projectTones = ['peach', 'teal', 'pink', 'sky', 'lavender', 'flamingo', 'sapphire', 'maroon'] as const;
-export type ProjectTone = typeof projectTones[number];
+export const projectPalette = ['peach', 'teal', 'pink', 'sky', 'lavender', 'flamingo', 'sapphire', 'maroon'] as const;
+export type ProjectTone = typeof projectPalette[number];
 
-export function projectTone(name: string): ProjectTone {
+const toneAt = (index: number): ProjectTone => projectPalette[index % projectPalette.length]!;
+
+function hashIndex(name: string): number {
   let hash = 0x811c9dc5;
   for (const byte of new TextEncoder().encode(projectKey(name))) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
-  return projectTones[hash % projectTones.length]!;
+  return hash % projectPalette.length;
+}
+
+/**
+ * Walks `projects` in order and gives each its hashed tone unless an earlier project took it: while the palette has unused tones, the project
+ * takes the next unused one, and after that only its previous neighbor's tone is avoided. A project keeps its color until an earlier one claims it.
+ */
+export function projectTones(projects: readonly { readonly name: string }[]): (name: string) => ProjectTone {
+  const assigned = new Map<string, ProjectTone>();
+  const used = new Set<ProjectTone>();
+  let previous: ProjectTone | undefined;
+  for (const { name } of projects) {
+    let index = hashIndex(name);
+    if (used.size < projectPalette.length) while (used.has(toneAt(index))) index++;
+    else if (toneAt(index) === previous) index++;
+    previous = toneAt(index);
+    used.add(previous);
+    assigned.set(projectKey(name), previous);
+  }
+  return (name) => assigned.get(projectKey(name)) ?? toneAt(hashIndex(name));
 }
 
 export function shellQuote(value: string): string {

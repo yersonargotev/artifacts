@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
 import { observeMoveReadiness, waitForMoveReadiness } from '../.agents/skills/verify-artifacts/scripts/move-readiness.ts';
-import { projectTone, projectTones } from '../apps/dashboard/src/presentation.ts';
+import { projectPalette } from '../apps/dashboard/src/presentation.ts';
 
 const execute = promisify(execFile);
 const control = (command: string[]) => execute(process.execPath, ['--import', 'tsx', '.agents/skills/verify-artifacts/scripts/control.ts', ...command]);
@@ -261,8 +261,7 @@ try {
   const handbook = await call('artifacts_create', { requestId: randomUUID(), snapshot: { metadata: { title: 'Guest handbook', description: 'Shared by the guest.' }, content: { kind: 'markdown', text: '# Guest handbook\n' }, files: [] } }, guest.accessToken);
   await call('artifacts_publish', { requestId: randomUUID(), artifactId: handbook.artifactId, revisionId: handbook.revision.id, expectedPublicationVersion: 0 }, guest.accessToken);
   await call('artifacts_share', { requestId: randomUUID(), artifactId: handbook.artifactId, email: 'owner@example.test' }, guest.accessToken);
-  const toneProjects = projectTones.filter((tone) => tone !== projectTone('Alpha')).map((tone) => Array.from({ length: 400 }, (_, index) => `Tono ${index}`).find((name) => projectTone(name) === tone)!);
-  assert.equal(new Set([projectTone('Alpha'), ...toneProjects.map(projectTone)]).size, projectTones.length, 'the seed covers every project tone');
+  const toneProjects = Array.from({ length: projectPalette.length - 1 }, (_, index) => `Tono ${index}`);
   const html = (heading: string) => `<!doctype html><html lang="en"><meta charset="utf-8"><title>Theme</title><h1>${heading}</h1><p>Preview body.</p></html>`;
   const seeds = [
     { title: 'Alpha overview', project: 'Alpha', slug: 'alpha/overview', kind: 'html', publication: 'pending', files: true },
@@ -283,6 +282,9 @@ try {
   const setup = await context(undefined);
   const setupPage = await setup.newPage();
   await login(setupPage);
+  await setupPage.goto(`${instance.panel}/projects`);
+  const renderedTones = await setupPage.locator('.project-card').evaluateAll((cards) => cards.map((card) => card.getAttribute('data-tone')));
+  assert.equal(new Set(renderedTones).size, projectPalette.length, 'the seed covers every project tone');
   const owner = await setup.storageState();
 
   const overview = encodeURIComponent(ids['Alpha overview']!);
