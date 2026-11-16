@@ -2,7 +2,7 @@
 import { libraryPageSize, type ArtifactCard } from '@artifacts/artifacts/panel/model';
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
-import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime, searchFor } from '../presentation.ts';
+import { absoluteTime, contentLabels, projectTones, publicationStates, relativeTime, searchFor } from '../presentation.ts';
 import { libraryHref, nextOffset, pageOffset, readReaderUrl, readerHref } from '../urls.ts';
 import { groupCards } from '../components/library/groups.ts';
 import { detachedRow, readerRows } from '../components/reader/rows.ts';
@@ -31,6 +31,7 @@ if (result instanceof Response) return result;
 const { snapshot: { workspace, page }, query: { cursor }, artifactId, at, group, detached } = result;
 const query = searchFor(page, { group });
 const now = new Date();
+const tone = projectTones(workspace.projects);
 // Inside a project or Sin proyecto every row has the same project, so only the whole library groups, as the library table does.
 const groups = page.scope.kind === 'all' && !group ? groupCards(page.cards, workspace.projects) : [{ project: undefined, cards: page.cards }];
 const offset = pageOffset(result.offset, page);
@@ -46,7 +47,7 @@ const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
 const paged = Boolean(page.next || page.continued);
 ---
-<Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`} artifacts={rows.map(({ card, href }) => ({ title: card.title, project: card.project, tone: card.project ? projectTone(card.project) : undefined, href }))}>
+<Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`} artifacts={rows.map(({ card, href }) => ({ title: card.title, project: card.project, tone: card.project ? tone(card.project) : undefined, href }))}>
   <Fragment slot="status">
     <span data-key-hint="move" hidden><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span>
     <span data-key-hint="fullscreen" hidden><kbd class="kbd">f</kbd> pantalla completa</span>
@@ -60,7 +61,7 @@ const paged = Boolean(page.next || page.continued);
         <ProjectFilter workspace={workspace} query={query} reader />
       </div>
       {rows.length ? <nav class="reader-rows" aria-label="Artefactos">{groups.map((item) => <div class="reader-group">
-        {item.project !== undefined && <h2><span class="project-dot" data-tone={item.project === null ? undefined : projectTone(item.project)} aria-hidden="true"></span><span>{item.project ?? 'Sin proyecto'}</span> <span class="reader-group-count">{item.cards.length}{paged && ' en esta página'}</span></h2>}
+        {item.project !== undefined && <h2><span class="project-dot" data-tone={item.project === null ? undefined : tone(item.project)} aria-hidden="true"></span><span>{item.project ?? 'Sin proyecto'}</span> <span class="reader-group-count">{item.cards.length}{paged && ' en esta página'}</span></h2>}
         <ol class="reader-items">{rowsOf(item.cards).map(({ card, href }) => <li>
           <a class="reader-item" href={href} aria-current={selected?.card.artifactId === card.artifactId ? 'page' : undefined} data-reader-item data-artifact-id={card.artifactId}>
             <span class="reader-item-title" title={card.title}>{card.title}</span>

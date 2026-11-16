@@ -1,5 +1,6 @@
 ---
 import type { LibraryPage, Workspace } from '@artifacts/artifacts/panel/model';
+import { projectTones } from '../../presentation.ts';
 import { libraryHref, nextOffset, readerHref, type LibraryLink, type ListView } from '../../urls.ts';
 import ArtifactCard from './ArtifactCard.astro';
 import ArtifactTable from './ArtifactTable.astro';
@@ -13,6 +14,7 @@ const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
 const selectable = page.scope.kind === 'project' || page.scope.kind === 'unfiled';
 const clearHref = libraryHref(query, { q: '', status: 'all' });
+const tone = projectTones(workspace.projects);
 const reader = (artifactId: string) => readerHref(query, { cursor, offset, artifactId });
 const empty = page.continued
   ? { icon: 'layers-intersect', title: 'Llegaste al final de los resultados', text: 'Vuelve al inicio para ver los artefactos más recientes.' } as const
@@ -31,7 +33,7 @@ const empty = page.continued
   </div>}
   {selectable && page.cards.length > 0 && <SelectionBar />}
   {page.cards.length ? view === 'cards'
-    ? <ul class="artifact-grid">{page.cards.map((card) => <ArtifactCard card={card} reader={reader(card.artifactId)} now={now} selectable={selectable} />)}{page.scope.kind === 'project' && <CreateHereCard project={page.scope.project.name} />}</ul>
+    ? <ul class="artifact-grid">{page.cards.map((card) => <ArtifactCard card={card} tone={card.project ? tone(card.project) : undefined} reader={reader(card.artifactId)} now={now} selectable={selectable} />)}{page.scope.kind === 'project' && <CreateHereCard project={page.scope.project.name} />}</ul>
     : <ArtifactTable page={page} workspace={workspace} query={query} reader={reader} now={now} selectable={selectable} />
   : <div class="library-empty" data-slot="card">
     <span class="empty-icon" aria-hidden="true"><Icon name={empty.icon} size={30} /></span><h2>{empty.title}</h2><p>{empty.text}</p>

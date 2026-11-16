@@ -1,14 +1,14 @@
 ---
-import type { NavLocation } from '../../presentation.ts';
-import { projectTone, scopeOf } from '../../presentation.ts';
+import type { NavLocation, ProjectTone } from '../../presentation.ts';
+import { scopeOf } from '../../presentation.ts';
 import { scopeHref } from '../../urls.ts';
 /** With `heading` the page renders its title as the heading after the trail, so the trail stops at a separator. */
-interface Props { location: NavLocation; title: string; heading?: boolean }
-const { location, title, heading = false } = Astro.props;
+interface Props { location: NavLocation; title: string; tone: (project: string) => ProjectTone; heading?: boolean }
+const { location, title, tone: toneOf, heading = false } = Astro.props;
 const scope = scopeOf(location);
 const leaf = location.kind === 'artifact' || location.kind === 'task' || location.kind === 'read';
 const scopeName = scope.kind === 'project' ? scope.name : scope.kind === 'unfiled' ? 'Sin proyecto' : undefined;
-const tone = scope.kind === 'project' ? projectTone(scope.name) : undefined;
+const tone = scope.kind === 'project' ? toneOf(scope.name) : undefined;
 ---
 <nav class="breadcrumb" aria-label="Ruta">
   <ol>

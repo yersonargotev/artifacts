@@ -2,7 +2,7 @@
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
 import { libraryHref, pageOffset, readLibraryUrl, readListGroup, readListOffset, readListView, readerHref, viewCookie } from '../urls.ts';
-import { locationOf, projectTone, searchFor } from '../presentation.ts';
+import { locationOf, projectTones, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
 import LibraryHeading from '../components/library/LibraryHeading.astro';
 import LibraryFilters from '../components/library/LibraryFilters.astro';
@@ -32,7 +32,8 @@ const link = snapshot && searchFor(snapshot.page, { view: namedView, group: read
 const project = scope?.kind === 'project' ? scope.project.name : scope?.kind === 'vanishedProject' ? scope.name : undefined;
 const title = scope?.kind === 'unfiled' ? 'Sin proyecto' : project ?? 'Biblioteca';
 const offset = snapshot && pageOffset(readListOffset(Astro.url), snapshot.page);
-const paletteArtifacts = snapshot && link ? snapshot.page.cards.map((card) => ({ title: card.title, project: card.project, tone: card.project ? projectTone(card.project) : undefined, href: readerHref(link, { cursor: query.cursor, offset, artifactId: card.artifactId }) })) : [];
+const tone = projectTones(snapshot?.workspace.projects ?? []);
+const paletteArtifacts = snapshot && link ? snapshot.page.cards.map((card) => ({ title: card.title, project: card.project, tone: card.project ? tone(card.project) : undefined, href: readerHref(link, { cursor: query.cursor, offset, artifactId: card.artifactId }) })) : [];
 ---
 <Panel share move flush={Boolean(snapshot)} title={title} workspace={snapshot?.workspace} location={scope ? locationOf(scope) : undefined} search={link} artifacts={paletteArtifacts} readerKey={Boolean(link)}>
   {link && <a slot="bar" class="button secondary reader-link" href={readerHref(link)}><Icon name="book" size={16} /><span>Modo lectura</span><kbd class="kbd" data-key-hint="reader" aria-hidden="true" hidden>r</kbd></a>}
@@ -43,7 +44,7 @@ const paletteArtifacts = snapshot && link ? snapshot.page.cards.map((card) => ({
     <span data-key-hint="theme" hidden><kbd class="kbd">t</kbd> tema</span>
   </Fragment>}
   {snapshot && link ? <>
-    <LibraryHeading scope={snapshot.page.scope} />
+    <LibraryHeading scope={snapshot.page.scope} tone={tone} />
     <SharedWithMe items={shared.items} />
     {snapshot.workspace.total.count === 0 && shared.items.length > 0 && <p class="library-note">Aún no tienes artefactos propios. <a href="#connect-tools" data-open-tools>Conectar herramientas</a></p>}
     {(snapshot.workspace.total.count > 0 || shared.items.length === 0) && <>

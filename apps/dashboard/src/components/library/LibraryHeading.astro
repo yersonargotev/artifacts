@@ -1,12 +1,12 @@
 ---
 import type { LibraryScope } from '@artifacts/artifacts/panel/model';
-import { createCommand, projectTone } from '../../presentation.ts';
+import { createCommand, type ProjectTone } from '../../presentation.ts';
 import Icon from '../Icon.astro';
 import TallyBar from '../projects/TallyBar.astro';
-interface Props { scope: LibraryScope }
-const { scope } = Astro.props;
+interface Props { scope: LibraryScope; tone: (project: string) => ProjectTone }
+const { scope, tone } = Astro.props;
 ---
-{scope.kind === 'project' ? <header class="library-header project-header" data-tone={projectTone(scope.project.name)}>
+{scope.kind === 'project' ? <header class="library-header project-header" data-tone={tone(scope.project.name)}>
   <div class="project-cover" aria-hidden="true"><svg viewBox="0 0 1000 120" preserveAspectRatio="none" fill="none"><path d="M-10 20 C150 0 300 50 500 24 S820 -6 1010 18 M-10 40 C160 18 320 72 520 44 S830 14 1010 38 M-10 60 C170 38 340 92 540 64 S840 34 1010 58 M-10 80 C180 58 360 112 560 84 S850 54 1010 78 M-10 100 C190 78 380 132 580 104 S860 74 1010 98" /></svg></div>
   <div class="project-header-body">
     <span class="project-folder" aria-hidden="true"><Icon name="folder" size={24} /></span>

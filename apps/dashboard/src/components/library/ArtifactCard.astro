@@ -1,10 +1,10 @@
 ---
 import type { ArtifactCard as Card } from '@artifacts/artifacts/panel/model';
-import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
+import { absoluteTime, contentLabels, publicationStates, relativeTime, type ProjectTone } from '../../presentation.ts';
 import { scopeHref } from '../../urls.ts';
 import ArtifactActions from './ArtifactActions.astro';
-interface Props { card: Card; reader: string; now: Date; selectable: boolean }
-const { card, reader, now, selectable } = Astro.props;
+interface Props { card: Card; tone: ProjectTone | undefined; reader: string; now: Date; selectable: boolean }
+const { card, tone, reader, now, selectable } = Astro.props;
 const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
 const status = publicationStates[card.publication.state];
 ---
@@ -16,7 +16,7 @@ const status = publicationStates[card.publication.state];
   </div>
   <p class="artifact-description">{card.description}</p>
   <div class="artifact-card-labels">
-    <a class="project-chip" data-tone={card.project ? projectTone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a>
+    <a class="project-chip" data-tone={tone} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a>
     {card.slug && <span class="artifact-slug" title={`Slug ${card.slug}`}>{card.slug}</span>}
     <span class="artifact-status" data-state={card.publication.state}>{status.label}</span>
   </div>

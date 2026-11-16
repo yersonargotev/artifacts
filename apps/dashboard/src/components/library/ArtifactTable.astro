@@ -1,6 +1,6 @@
 ---
 import { defaultDirections, type LibraryPage, type LibrarySort, type Workspace } from '@artifacts/artifacts/panel/model';
-import { absoluteTime, contentLabels, projectTone, publicationStates, relativeTime } from '../../presentation.ts';
+import { absoluteTime, contentLabels, projectTones, publicationStates, relativeTime } from '../../presentation.ts';
 import { libraryHref, scopeHref, type LibraryLink } from '../../urls.ts';
 import { groupCards } from './groups.ts';
 import ArtifactActions from './ArtifactActions.astro';
@@ -11,6 +11,7 @@ const { page, workspace, query, reader, now, selectable } = Astro.props;
 const grouped = page.scope.kind === 'all' && !query.group;
 const showProject = page.scope.kind === 'all' && !grouped;
 const groups = grouped ? groupCards(page.cards, workspace.projects) : [{ project: undefined, cards: page.cards }];
+const tone = projectTones(workspace.projects);
 const paged = Boolean(page.next || page.continued);
 const columns = 6 + Number(selectable) + Number(showProject);
 const sortable = (sort: LibrarySort) => {
@@ -34,7 +35,7 @@ const sorts = { title: sortable('title'), state: sortable('state'), revision: so
     </tr></thead>
     {groups.map((group) => <tbody>
       {group.project !== undefined && <tr class="artifact-table-group"><th scope="rowgroup" colspan={columns}>
-        <span class="project-dot" data-tone={group.project === null ? undefined : projectTone(group.project)} aria-hidden="true"></span><span>{group.project ?? 'Sin proyecto'}</span>{' '}<em>{group.cards.length}{paged && ' en esta página'}</em>
+        <span class="project-dot" data-tone={group.project === null ? undefined : tone(group.project)} aria-hidden="true"></span><span>{group.project ?? 'Sin proyecto'}</span>{' '}<em>{group.cards.length}{paged && ' en esta página'}</em>
       </th></tr>}
       {group.cards.map((card) => {
         const detailUrl = `/artifacts/${encodeURIComponent(card.artifactId)}`;
@@ -44,7 +45,7 @@ const sorts = { title: sortable('title'), state: sortable('state'), revision: so
             <a href={detailUrl} title={card.title}>{card.title}</a>
             {card.slug ? <code class="artifact-table-slug" title={card.description || `Slug ${card.slug}`}>{card.slug}</code> : card.description && <p title={card.description}>{card.description}</p>}
           </div></td>
-          {showProject && <td class="artifact-table-project"><a class="project-chip" data-tone={card.project ? projectTone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a></td>}
+          {showProject && <td class="artifact-table-project"><a class="project-chip" data-tone={card.project ? tone(card.project) : undefined} href={scopeHref(card.project ? { kind: 'project', name: card.project } : { kind: 'unfiled' })} title={card.project ?? 'Sin proyecto'}>{card.project ?? 'Sin proyecto'}</a></td>}
           <td class="artifact-table-state"><span class="artifact-status" data-state={card.publication.state}>{publicationStates[card.publication.state].label}</span></td>
           <td class="artifact-table-kind"><span class="artifact-kind">{contentLabels[card.kind]}</span></td>
           <td class="artifact-table-revision"><span class="artifact-table-compact">Rev. </span>{card.head.sequence}</td>
