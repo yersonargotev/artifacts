@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import * as oidc from 'openid-client';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, lte } from 'drizzle-orm';
 import { createAdmission } from '@artifacts/db/admission';
 import type { Database } from '@artifacts/db';
 import { oidcTransaction, panelSession, session, user } from '@artifacts/db/schema';
@@ -37,7 +37,11 @@ export function createPanelIdentity(db: Database, config: ReturnType<typeof dash
       const state = oidc.randomState();
       const nonce = oidc.randomNonce();
       const verifier = oidc.randomPKCECodeVerifier();
-      await db.insert(oidcTransaction).values({ tokenHash: hash(token), state, nonce, verifier, returnPath, expiresAt: new Date(Date.now() + 600_000) });
+      const now = new Date();
+      await db.batch([
+        db.delete(oidcTransaction).where(lte(oidcTransaction.expiresAt, now)),
+        db.insert(oidcTransaction).values({ tokenHash: hash(token), state, nonce, verifier, returnPath, expiresAt: new Date(now.getTime() + 600_000) }),
+      ]);
       const url = oidc.buildAuthorizationUrl(client, { redirect_uri: `${config.origin}/auth/callback`, scope: 'openid profile', state, nonce, code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256' });
       return { cookie: transactionCookie(state)!, token, url };
     },
