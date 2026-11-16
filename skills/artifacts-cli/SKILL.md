@@ -17,7 +17,7 @@ Run `artifacts whoami` before the first mutation when the current identity is no
 
 A revision is a complete snapshot with `metadata`, `content`, and `files`. The command reference contains its JSON shape. Use the requested title, language, content, and attachments. Do not include unrelated files or credentials.
 
-Use self-contained HTML for interactive content. For several HTML boards in one canvas, use `design` and follow the design skill's `references/canvas.md`. Inline styles and scripts and embed required assets as data URLs. External requests, CDN dependencies, relative executable assets, forms, browser storage, and multi-file websites are unsupported. Attachments are downloads, not importable website resources. Markdown and text display inertly.
+Use self-contained HTML for interactive content. For several HTML boards in one canvas, use `design` and follow the design skill's `references/canvas.md`. Inline styles and scripts and embed required assets as data URLs. External requests, CDN dependencies, relative executable assets, forms, browser storage, and multi-file websites are unsupported. Attachments are downloads, not importable website resources. Markdown renders without scripts, and text displays inertly.
 
 Keep the whole revision within 1 MiB of decoded content, metadata, attachment paths, media types, and attachment bytes. At most 32 attachments are accepted. Base64 changes wire size, not the decoded limit. If required content exceeds a limit, explain the constraint without silently removing it.
 

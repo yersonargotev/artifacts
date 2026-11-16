@@ -4,7 +4,7 @@ import { reportError } from '@artifacts/monitoring';
 import { z } from 'zod';
 import { artifactReadSchema, consumeGrantSchema, readByIdSchema, sharedReadSchema, viewerSchema } from '@yargote/artifacts-contracts';
 import type { Viewer } from '@yargote/artifacts-contracts';
-import { attachmentResponse, documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, publicationDocument, supportsInteractiveHtml } from './document.ts';
+import { attachmentResponse, documentPolicy, publicationContent, publicationDocument, supportsInteractiveHtml, type ContentView } from './document.ts';
 
 export type PublicationEnvironment = { DASHBOARD_URL: string; PUBLISH_URL: string; PUBLICATION_SERVICE_SECRET: string; PUBLICATION_COOKIE_SECRET: string };
 const transactionSchema = z.strictObject({ purpose: z.literal('transaction'), artifactId: z.string().min(1).max(128), state: z.string().min(32).max(128), expiresAt: z.number().int().positive() });
@@ -18,6 +18,12 @@ const privateHeaders = { 'cache-control': 'private, no-store', 'x-content-type-o
 
 function cookie(request: Request, name: string) {
   return request.headers.get('cookie')?.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1);
+}
+
+/** A page or its content takes no query except `view=source`; files take none. */
+function parseView(search: string, route: RegExpExecArray | null): ContentView | null {
+  if (search === '') return 'render';
+  return search === '?view=source' && !route?.[4] ? 'source' : null;
 }
 
 function setCookie(name: string, value: string, expiresAt: number) {
@@ -86,7 +92,8 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         }
       }
       const route = /^\/a\/([^/]+)(?:\/r\/([^/]+)\/(content|files\/(.+)))?$/.exec(url.pathname);
-      if (!route || url.search) return new Response('No encontrado', { status: 404, headers: privateHeaders });
+      const view = parseView(url.search, route);
+      if (!route || !view) return new Response('No encontrado', { status: 404, headers: privateHeaders });
       let artifactId: string, revisionId: string | undefined, path: string | undefined;
       try {
         ({ artifactId, revisionId } = readByIdSchema.parse({ artifactId: decodeURIComponent(route[1]!), ...(route[2] ? { revisionId: decodeURIComponent(route[2]) } : {}) }));
@@ -103,11 +110,16 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
         const file = artifact.revision.snapshot.files.find((candidate) => candidate.path === path);
         return file ? attachmentResponse(file) : new Response('Archivo no encontrado', { status: 404, headers: privateHeaders });
       }
+      if (view === 'source' && artifact.revision.snapshot.content.kind !== 'markdown') return new Response('No encontrado', { status: 404, headers: privateHeaders });
       const interactive = supportsInteractiveHtml(request.headers.get('user-agent'));
       const headers = { ...privateHeaders, 'content-type': 'text/html; charset=utf-8', 'x-dns-prefetch-control': 'off', vary: 'User-Agent' };
+      const viewQuery = (target: ContentView) => target === 'source' ? '?view=source' : '';
       if (contentRequest) {
         if (request.headers.get('sec-fetch-dest') !== 'iframe') return new Response('El contenido solo está disponible dentro de su publicación.', { status: 403, headers: privateHeaders });
-        return new Response(previewDocument(artifact, interactive), { headers: { ...headers, 'content-security-policy': interactive ? previewPolicy : inertPreviewPolicy, 'connection-allowlist': '()' } });
+        const content = publicationContent(artifact.revision.snapshot, interactive, view);
+        // An empty connection allowlist also blocks link navigations, so content that follows its links omits it. That content runs no scripts.
+        const connections: Record<string, string> = content.navigates ? {} : { 'connection-allowlist': '()' };
+        return new Response(content.document, { headers: { ...headers, 'content-security-policy': content.policy, ...connections } });
       }
       const revisionPath = `/a/${encodeURIComponent(artifactId)}/r/${encodeURIComponent(artifact.revision.id)}`;
       return new Response(publicationDocument(artifact, {
@@ -117,9 +129,10 @@ export function createPublicationApp(environment: PublicationEnvironment, fetchB
           target.searchParams.set('project', name);
           return target.href;
         },
-        content: `${revisionPath}/content`,
+        content: `${revisionPath}/content${viewQuery(view)}`,
         attachment: (file) => `${revisionPath}/files/${file.split('/').map(encodeURIComponent).join('/')}`,
-      }, interactive), { headers: { ...headers, 'content-security-policy': documentPolicy } });
+        view: (target) => `/a/${encodeURIComponent(artifactId)}${viewQuery(target)}`,
+      }, interactive, view), { headers: { ...headers, 'content-security-policy': documentPolicy } });
     } catch (error) {
       reportError(error);
       return unavailable();

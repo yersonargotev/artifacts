@@ -36,4 +36,4 @@ The authorization Worker's metadata transport allows only the two exact trusted 
 
 ## Initial scope
 
-HTML is self-contained; attachments are retained downloads rather than relative executable website assets. Markdown and text render inertly. Complete history is paginated at five revisions by default and ten maximum; lists use lightweight summaries. This scope supports the first accepted end-to-end artifact without an object-storage or compilation layer.
+HTML is self-contained; attachments are retained downloads rather than relative executable website assets. Text renders inertly. Markdown renders without scripts, as [wiki-pages.md](wiki-pages.md) describes. Complete history is paginated at five revisions by default and ten maximum; lists use lightweight summaries. This scope supports the first accepted end-to-end artifact without an object-storage or compilation layer.

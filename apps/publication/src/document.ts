@@ -1,13 +1,23 @@
 import type { ArtifactRead, SharedRead, Snapshot } from '@yargote/artifacts-contracts';
 import { canvasDocument } from './canvas.ts';
+import { markdownDocument } from '@artifacts/artifacts/panel/markdown';
 import { escapeHtml, sourceBlock } from './markup.ts';
 
-export type PublicationUrls = Readonly<{ library: string; project: (name: string) => string; content: string; attachment: (path: string) => string }>;
+export type PublicationUrls = Readonly<{ library: string; project: (name: string) => string; content: string; attachment: (path: string) => string; view: (view: ContentView) => string }>;
 
 export const documentPolicy = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; connect-src 'none'; frame-src 'self'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const framePolicy = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 export const previewPolicy = `${framePolicy}; frame-ancestors 'self'; sandbox allow-scripts`;
 export const inertPreviewPolicy = `${framePolicy.replace("script-src 'unsafe-inline'", "script-src 'none'")}; frame-ancestors 'self'; sandbox`;
+
+// Rendered Markdown stays script-free; these tokens only let a reader's click follow a link out of the frame.
+export const markdownPreviewSandbox = 'allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox';
+export const markdownPolicy = `${inertPreviewPolicy} ${markdownPreviewSandbox}`;
+
+/** A Markdown publication opens rendered; `source` shows the stored text. Other kinds have only `render`. */
+export const contentViews = ['render', 'source'] as const;
+export type ContentView = typeof contentViews[number];
+const viewLabels: Record<ContentView, string> = { render: 'Vista', source: 'Código' };
 
 export function supportsInteractiveHtml(userAgent: string | null) {
   if (!userAgent || /Edg|OPR|SamsungBrowser|CriOS|FxiOS/.test(userAgent)) return false;
@@ -30,12 +40,36 @@ export function previewDocument(artifact: { revision: { snapshot: RenderedSnapsh
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><meta name="referrer" content="no-referrer"></head><body>${body}</body></html>`;
 }
 
-export function publicationDocument(artifact: ArtifactRead | SharedRead, urls: PublicationUrls, interactive = false) {
+const rendersMarkdown = (snapshot: RenderedSnapshot, view: ContentView) => snapshot.content.kind === 'markdown' && view === 'render';
+
+export const frameSandbox = (snapshot: RenderedSnapshot, interactive: boolean, view: ContentView) =>
+  rendersMarkdown(snapshot, view) ? markdownPreviewSandbox : interactive ? 'allow-scripts' : '';
+
+/** The framed content of a publication and the policy that serves it. `navigates` content follows its links, so it must not get an empty connection allowlist. */
+export function publicationContent(snapshot: RenderedSnapshot, interactive: boolean, view: ContentView) {
+  // A viewer may not be able to open a relative link's target, so the rendered page shows those links as text.
+  if (rendersMarkdown(snapshot, view)) return { document: markdownDocument(snapshot.content.text, []), policy: markdownPolicy, navigates: true };
+  return { document: previewDocument({ revision: { snapshot } }, interactive), policy: interactive ? previewPolicy : inertPreviewPolicy, navigates: false };
+}
+
+const viewIcons: Record<ContentView, string> = {
+  render: '<path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>',
+  source: '<path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/>',
+};
+
+function viewSwitch(current: ContentView, url: PublicationUrls['view']) {
+  const links = contentViews.map((view) => `<a href="${escapeHtml(url(view))}"${view === current ? ' aria-current="page"' : ''} title="${viewLabels[view]}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${viewIcons[view]}</svg><span>${viewLabels[view]}</span></a>`).join('');
+  return `<nav class="view-switch" aria-label="Modo de lectura">${links}</nav>`;
+}
+
+export function publicationDocument(artifact: ArtifactRead | SharedRead, urls: PublicationUrls, interactive = false, view: ContentView = 'render') {
   const { snapshot } = artifact.revision;
   const owner = 'ownerId' in artifact ? artifact : null;
   const guest = 'ownerName' in artifact ? artifact : null;
   const library = guest ? new URL('#shared-with-me', urls.library).href : urls.library;
   const attribution = guest ? `<p class="shared-owner">Compartido por ${escapeHtml(guest.ownerName)}</p>` : '';
+  const markdown = snapshot.content.kind === 'markdown';
+  const switchStyle = markdown ? '.view-switch{flex:none;flex-wrap:nowrap;gap:0;padding:0;border:1px solid var(--surface0);border-radius:8px;overflow:hidden}.view-switch>a{gap:6px;min-height:42px;padding:0 12px;color:var(--subtext0);text-decoration:none}.view-switch>a:hover{color:var(--text)}.view-switch>a[aria-current=page]{background:var(--surface0);color:var(--text)}.view-switch>a:focus-visible{outline-offset:-2px}.view-switch svg{flex:none}@media(max-width:620px){.view-switch>a{padding:0 11px}.view-switch span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}}' : '';
   const guestStyle = guest ? '.shared-owner{margin:0 10px 6px 64px;color:var(--subtext0);overflow-wrap:anywhere}@media(max-width:620px){.shared-owner{margin-left:58px}}' : '';
   const files = snapshot.files.map((file) => `<a href="${escapeHtml(urls.attachment(file.path))}" download>${escapeHtml(file.path)}</a>`).join('');
   const projectName = owner?.project ?? null;
@@ -54,7 +88,7 @@ main{min-height:0;min-width:0;display:grid}main>iframe{display:block;width:100%;
 nav{display:flex;gap:8px 20px;flex-wrap:wrap;padding:8px 0 16px}a{display:inline-flex;align-items:center;min-height:44px;color:var(--blue);overflow-wrap:anywhere;max-width:100%;text-underline-offset:3px}nav a:hover{color:var(--sapphire)}a:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .project-navigation{flex:0 1 auto;align-items:center;flex-wrap:nowrap;gap:4px;max-width:28%;min-width:0;padding:0}.project-navigation>a{flex:1 1 auto;gap:7px;min-width:44px;padding:0 6px;border-radius:7px;color:var(--subtext0);text-decoration:none}.project-navigation>a:hover{background:var(--surface0);color:var(--text)}.project-navigation svg{flex:none;width:16px;height:16px}.project-navigation>a>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.route-separator{flex:none;color:var(--surface0);font-size:17px;user-select:none}
 @media(max-width:620px){header{padding:6px}.title-row{gap:3px}.title-menu>summary{gap:4px;padding:0 4px}h1{font-size:13px}.revision{padding:0 4px 0 5px;font-size:11px}.revision-full{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.revision-short{display:inline}.project-navigation{gap:3px}.project-navigation>a{padding:0 5px}.project-navigation svg{display:none}.route-separator{font-size:15px}.disclosures{left:12px;max-width:calc(100% - 24px)}dl{grid-template-columns:minmax(0,1fr);gap:4px}dd+dt{margin-top:8px}}
-${guestStyle}</style></head><body><header><div class="title-row"><a class="home" href="${escapeHtml(library)}" rel="noreferrer" aria-label="Volver a la biblioteca" title="Volver a la biblioteca"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/></svg></a>${project}<details class="title-menu"><summary aria-label="Menú de ${escapeHtml(snapshot.metadata.title)}" title="${escapeHtml(snapshot.metadata.title)}"><h1>${escapeHtml(snapshot.metadata.title)}</h1><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 9 6 6 6-6" /></svg></summary><div class="disclosures"><p class="menu-title">${escapeHtml(snapshot.metadata.title)}</p><details class="information"><summary>Información</summary>${metadata}</details><details class="files"><summary>Archivos (${snapshot.files.length})</summary>${files ? `<nav aria-label="Archivos adjuntos">${files}</nav>` : '<p>Esta revisión no tiene archivos adjuntos.</p>'}</details></div></details>${owner ? `<span class="revision" aria-label="Revisión ${owner.revision.sequence}"><span class="revision-full">Revisión ${owner.revision.sequence}</span><span class="revision-short" aria-hidden="true">R${owner.revision.sequence}</span></span>` : ''}</div>${attribution}</header><main data-artifact-id="${escapeHtml(artifact.artifactId)}" data-revision-id="${escapeHtml(artifact.revision.id)}" data-revision-sha256="${escapeHtml(artifact.revision.sha256)}" data-publication-version="${escapeHtml(String(artifact.publication?.version ?? 0))}"><iframe title="Contenido del artefacto" sandbox="${interactive ? 'allow-scripts' : ''}" referrerpolicy="no-referrer" src="${escapeHtml(urls.content)}"></iframe></main></body></html>`;
+${switchStyle}${guestStyle}</style></head><body><header><div class="title-row"><a class="home" href="${escapeHtml(library)}" rel="noreferrer" aria-label="Volver a la biblioteca" title="Volver a la biblioteca"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/></svg></a>${project}<details class="title-menu"><summary aria-label="Menú de ${escapeHtml(snapshot.metadata.title)}" title="${escapeHtml(snapshot.metadata.title)}"><h1>${escapeHtml(snapshot.metadata.title)}</h1><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 9 6 6 6-6" /></svg></summary><div class="disclosures"><p class="menu-title">${escapeHtml(snapshot.metadata.title)}</p><details class="information"><summary>Información</summary>${metadata}</details><details class="files"><summary>Archivos (${snapshot.files.length})</summary>${files ? `<nav aria-label="Archivos adjuntos">${files}</nav>` : '<p>Esta revisión no tiene archivos adjuntos.</p>'}</details></div></details>${markdown ? viewSwitch(view, urls.view) : ''}${owner ? `<span class="revision" aria-label="Revisión ${owner.revision.sequence}"><span class="revision-full">Revisión ${owner.revision.sequence}</span><span class="revision-short" aria-hidden="true">R${owner.revision.sequence}</span></span>` : ''}</div>${attribution}</header><main data-artifact-id="${escapeHtml(artifact.artifactId)}" data-revision-id="${escapeHtml(artifact.revision.id)}" data-revision-sha256="${escapeHtml(artifact.revision.sha256)}" data-publication-version="${escapeHtml(String(artifact.publication?.version ?? 0))}"><iframe title="Contenido del artefacto" sandbox="${frameSandbox(snapshot, interactive, view)}" referrerpolicy="no-referrer" src="${escapeHtml(urls.content)}"></iframe></main></body></html>`;
 }
 
 export function attachmentResponse(file: { path: string; mediaType: string; encoding: 'utf8' | 'base64'; data: string }) {

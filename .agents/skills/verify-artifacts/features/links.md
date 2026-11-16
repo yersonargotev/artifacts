@@ -2,7 +2,7 @@
 
 Build the panel and start a fresh run with `pnpm build && node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/links-run`.
 
-An owner keeps a wiki of cross-linked Markdown pages in one project. The panel preview renders a Markdown revision for the owner. A relative link resolves as a path against the page's slug, without its `.md` suffix and fragment, among the owner's pages in the same project at their current slugs. A resolved link inside the preview navigates the main window to the target's detail after the owner's click. A missing target, a link that leaves the project, and a relative link from a page without a slug render as marked text, not links. `http:` and `https:` links open a new tab without opener or referrer. Other schemes render as text. Raw HTML in the page renders as escaped text. The `Enlaces` section under the preview lists only the broken links and is absent when there are none. The publication keeps rendering the Markdown as inert text.
+An owner keeps a wiki of cross-linked Markdown pages in one project. The panel preview renders a Markdown revision for the owner. A relative link resolves as a path against the page's slug, without its `.md` suffix and fragment, among the owner's pages in the same project at their current slugs. A resolved link inside the preview navigates the main window to the target's detail after the owner's click. A missing target, a link that leaves the project, and a relative link from a page without a slug render as marked text, not links. `http:` and `https:` links open a new tab without opener or referrer. Other schemes render as text. Raw HTML in the page renders as escaped text. The `Enlaces` section under the preview lists only the broken links and is absent when there are none. The publication renders the Markdown with relative links as plain text, and its `Código` view shows the source.
 
 ## Sub-features
 
@@ -12,6 +12,7 @@ An owner keeps a wiki of cross-linked Markdown pages in one project. The panel p
 - `links-broken` sees `missing page` as a `.broken-link` titled `No existe`, not a link, and `Enlaces` holds only that item with its raw href.
 - `links-navigate` clicks `the RAG concept` inside the preview and lands on the `RAG` detail in the main window, still signed in. `RAG` has no broken links, so it has no `Enlaces` section.
 - `links-mobile` goes back, and the 390px detail with `Enlaces` does not overflow.
+- `links-published` publishes `Karpathy` and opens its publication. It opens in `Vista` with the Markdown rendered, the relative links as plain text, no broken-link marker, and raw HTML as text. `Código` loads `?view=source` with the stored text, Back returns to `Vista`, and the 390px page with the switch does not overflow.
 
 Unslugged and outside-the-project links, the renderer's scheme and image rules, and the preview response's CSP are covered by `tests/panel-links.test.ts` and `tests/panel-markdown.test.ts`, not driven here.
 
