@@ -94,7 +94,7 @@ function textContrast(root: Element, mode: Mode): Row[] {
   for (let offset = 0; pending.size; offset += innerHeight) {
     const last = offset + innerHeight >= document.documentElement.scrollHeight;
     if (offset !== scrollY) scrollTo(0, offset);
-    for (const target of [...pending]) {
+    for (const target of pending) {
       const rect = target.rect();
       if (!rect) { pending.delete(target); continue; }
       const y = rect.top + rect.height / 2;
@@ -168,7 +168,7 @@ const evidence = resolve(process.env.PANEL_THEME_EVIDENCE ?? join(run, 'panel-th
 await mkdir(evidence, { recursive: true });
 const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { panel: string; mcp: string };
 const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { password: string; accessToken: string };
-const browser = await chromium.launch({ ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' }) });
+const browser = await chromium.launch(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : { channel: 'chrome' });
 const contexts: BrowserContext[] = [];
 const errors: string[] = [];
 const checks: string[] = [];

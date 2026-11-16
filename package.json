@@ -9,7 +9,7 @@
   "scripts": {
     "prepare:native": "node scripts/prepare-native.mjs",
     "check": "tsc --noEmit && pnpm --filter @artifacts/dashboard check",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "build": "pnpm --filter @artifacts/dashboard build",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:owner-access": "node --import tsx --test tests/owner-access.test.ts tests/auth-rate-limit.test.ts",

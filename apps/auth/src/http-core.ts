@@ -29,7 +29,7 @@ export function createAuthHandler(db: Database, config: ReturnType<typeof authCo
         if (typeof uri !== 'string') return false;
         try { const parsed = new URL(uri); return parsed.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname) && !parsed.username && !parsed.password && !parsed.hash; } catch { return false; }
       })) {
-        request = new Request(request, { body: JSON.stringify({ ...body, application_type: 'native' }), headers: { ...Object.fromEntries(request.headers), 'content-type': 'application/json' } });
+        request = new Request(request, { method: 'POST', body: JSON.stringify({ ...body, application_type: 'native' }), headers: { ...Object.fromEntries(request.headers), 'content-type': 'application/json' } });
       }
     }
     return auth.handler(request);

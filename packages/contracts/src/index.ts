@@ -4,6 +4,7 @@ const identifier = z.string().min(1).max(128);
 const requestId = z.string().min(8).max(128);
 export const contentKinds = ['html', 'markdown', 'text', 'design'] as const;
 const fileSchema = z.strictObject({
+  // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
   path: z.string().min(1).max(240).refine((path) => path === path.normalize('NFC') && !/[:\\%\x00-\x1f\x7f]/.test(path) && path.split('/').every((part) => part !== '' && part !== '.' && part !== '..'), 'Use a normalized relative file path'),
   mediaType: z.string().max(128).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
   encoding: z.enum(['utf8', 'base64']),

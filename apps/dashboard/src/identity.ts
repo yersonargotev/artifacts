@@ -13,6 +13,7 @@ const random = () => randomBytes(32).toString('base64url');
 export type PanelIdentity = Readonly<{ userId: string; sessionId: string; name: string; clientId: string; scopes: string[]; expiresAt: Date }>;
 
 export function localReturnPath(value: string, origin: string) {
+  // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
   if (!value.startsWith('/') || value.startsWith('//') || /[\\\x00-\x1f\x7f]/.test(value)) throw new Error('Login return path must be local');
   const url = new URL(value, origin);
   if (url.origin !== origin || url.hash) throw new Error('Login return path must be local');

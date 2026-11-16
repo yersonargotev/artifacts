@@ -39,6 +39,7 @@ async function run(name: string, source: string, expectations: object[] = [], en
   };
   const observer = trackProcesses && process.platform !== 'win32' ? setInterval(observe, 100) : undefined;
   let code;
+  const killErrors: unknown[] = [];
   try {
     [code] = await once(child, 'close');
     if (observer) {
@@ -50,10 +51,11 @@ async function run(name: string, source: string, expectations: object[] = [], en
   } finally {
     clearInterval(observer);
     if (observer) for (const item of processes()) if (owned.get(item.pid) === item.started) {
-      try { process.kill(item.pid, 'SIGKILL'); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; }
+      try { process.kill(item.pid, 'SIGKILL'); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) killErrors.push(error); }
     }
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   }
+  if (killErrors.length) throw new AggregateError(killErrors, 'Owned browser processes could not be killed');
   assert.notEqual(code, null, stderr);
   const report = JSON.parse(stdout);
   assert.equal(await readFile(html, 'utf8'), source, 'The source HTML is never rewritten');

@@ -132,6 +132,7 @@ export function createMcpApp(config: ReturnType<typeof mcpConfig>, artifacts?: A
       }
       chunks.push(value);
     }
+    // oxlint-disable-next-line unicorn/no-invalid-fetch-options -- the `!request.body` return above means this request is never GET or HEAD, and the copy keeps its method
     return handler.fetch(new Request(request, { body: Buffer.concat(chunks) }));
   };
 }
