@@ -5,10 +5,8 @@ import { join, resolve } from 'node:path';
 import { unzipSync, zipSync, type Zippable } from 'fflate';
 import type { BrowserContext, Frame, Locator, Page, Response as BrowserResponse } from 'playwright';
 import { artifactReadSchema, decodeFile, type ArtifactRead } from '../../../../packages/contracts/src/index.ts';
-import { documentPolicy, inertPreviewPolicy, previewDocument, previewPolicy, supportsInteractiveHtml } from '../../../../apps/publication/src/document.ts';
-import { markdownPreviewPolicy } from '../../../../apps/dashboard/src/preview.ts';
+import { documentPolicy, frameSandbox, inertPreviewPolicy, markdownPolicy, markdownPreviewSandbox, previewDocument, publicationContent, previewPolicy, supportsInteractiveHtml } from '../../../../apps/publication/src/document.ts';
 import { markdownDocument } from '../../../../packages/artifacts/src/panel/markdown.ts';
-import { markdownPreviewSandbox } from '../../../../packages/artifacts/src/panel/model.ts';
 
 export type ContentExpectation =
   | { kind: 'text'; selector: string; text: string }
@@ -291,7 +289,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
       assert.equal(new URL((await iframe.getAttribute('src'))!, config.panelUrl).href, previewUrl, 'Panel preview URL must pin the exact revision');
       assert.equal(realPreview.url(), previewUrl, 'Actual iframe response must come from the pinned preview URL');
       const { content } = expected.revision.snapshot;
-      await policy(realPreview, content.kind === 'markdown' ? markdownPreviewPolicy : report.interactive ? previewPolicy : inertPreviewPolicy, 'Actual iframe preview response', content.kind === 'markdown' ? 'markdown' : 'document');
+      await policy(realPreview, content.kind === 'markdown' ? markdownPolicy : report.interactive ? previewPolicy : inertPreviewPolicy, 'Actual iframe preview response', content.kind === 'markdown' ? 'markdown' : 'document');
       if (content.kind === 'markdown') assert.equal(unwrapWikiLinks((await realPreview.body()).toString()), markdownDocument(content.text, []), 'Actual Markdown preview differs from the expected retained content outside its wiki links');
       else assert.deepEqual(await realPreview.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
       const frame = await contentFrame(panel, iframe, content.kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts');
@@ -332,7 +330,8 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
         }
         const publishedIframe = publication.locator('main > iframe');
         const legacySrcdoc = await publishedIframe.getAttribute('srcdoc');
-        const publishedFrame = await contentFrame(publication, publishedIframe, report.interactive ? 'allow-scripts' : '');
+        const publishedFrame = await contentFrame(publication, publishedIframe, legacySrcdoc === null ? frameSandbox(expected.revision.snapshot, report.interactive, 'render') : report.interactive ? 'allow-scripts' : '');
+        const published = publicationContent(expected.revision.snapshot, report.interactive, 'render');
         const expectedFrameUrl = legacySrcdoc === null ? contentUrl : 'about:srcdoc';
         if (legacySrcdoc !== null) {
           await policy(response, documentPolicy.replace("script-src 'none'", "script-src 'unsafe-inline'"), 'Legacy protected publication');
@@ -345,9 +344,9 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
           assert.equal(contentResponses.length, 1, 'Publication must load one actual retained content response');
           const contentResponse = contentResponses[0]!;
           assert.equal(contentResponse.frame(), publishedFrame, 'Retained content response must belong to the actual publication iframe');
-          await policy(contentResponse, report.interactive ? previewPolicy : inertPreviewPolicy, 'Protected publication content');
+          await policy(contentResponse, published.policy, 'Protected publication content', published.navigates ? 'markdown' : 'document');
           assert.equal(contentResponse.headers()['cross-origin-opener-policy'], 'same-origin', 'Publication content must isolate cross-origin openers');
-          assert.deepEqual(await contentResponse.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Publication content bytes differ from the retained revision');
+          assert.deepEqual(await contentResponse.body(), Buffer.from(published.document), 'Publication content bytes differ from the retained revision');
         }
         assert.equal(publishedFrame.url(), expectedFrameUrl, 'Publication must display the exact retained content frame');
         await overflow(publication, publishedFrame);

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { framedPreviewError, previewResponse } from '../apps/dashboard/src/preview.ts';
-import { inertPreviewPolicy, previewDocument, previewPolicy } from '../apps/publication/src/document.ts';
+import { inertPreviewPolicy, markdownPreviewSandbox, previewDocument, previewPolicy } from '../apps/publication/src/document.ts';
 import { markdownDocument } from '../packages/artifacts/src/panel/markdown.ts';
-import { brokenLinks, markdownPreviewSandbox, type PageLink } from '../packages/artifacts/src/panel/model.ts';
+import { brokenLinks, type PageLink } from '../packages/artifacts/src/panel/model.ts';
 
 const body = (markdown: string, links: readonly PageLink[] = []) => {
   const document = markdownDocument(markdown, links);

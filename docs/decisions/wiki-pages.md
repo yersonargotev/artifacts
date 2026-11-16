@@ -65,9 +65,17 @@ What shipped in [#117](https://github.com/yersonargotev/artifacts/issues/117), d
 - The panel store's `preview` read authorizes `artifacts:read`, checks the owner, and returns the selected revision with its `links`, without the history or workspace the detail loads. The preview route uses it for every content kind.
 - The Markdown frame's CSP keeps `script-src 'none'` and adds exactly `allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox` to its `sandbox` directive. The iframe's `sandbox` attribute adds the same tokens. Neither grants scripts or `allow-same-origin`. The Markdown response omits `Connection-Allowlist: ()`, because Chrome counts the frame's link navigations as its connections and fails them with `ERR_NETWORK_ACCESS_REVOKED`. The frame cannot run scripts, so the header has no other connection to block. HTML, text, and design previews keep their documents, policies, and empty allowlist.
 - `Enlaces` lists only broken links and is absent when there are none.
-- Publication is unchanged. A published Markdown page still shows its source as inert text.
+- Publication is unchanged here. A later change renders it, described under Published Markdown.
 
-Link resolution: in a Markdown page, a relative link without a scheme (`../concepts/rag.md`, `rag.md#history`) is resolved against the page's own slug as a path, its `.md` suffix is dropped, and it is looked up in the same project. The owner panel's rendered preview turns a resolved link into a navigation to the target artifact, and an unresolved link into marked plain text. This keeps the same link syntax valid in a Git checkout of the wiki and in Artifacts, which is what makes two-way sync possible. Publication keeps its current inert rendering in this decision. Rendering links for viewers requires deciding what a viewer sees when the target is unpublished or not shared, which is out of scope.
+### Published Markdown
+
+A viewer of a published Markdown page reads it rendered, the way its owner reads it in the panel.
+
+- The content frame renders with the panel's `markdownDocument` and an empty link list, so every relative link renders as plain text. External, `mailto:`, and fragment links, raw HTML escaping, and `data:` images follow the panel rules. The frame uses the panel's Markdown policy and sandbox and omits `Connection-Allowlist: ()`.
+- The header carries a `Vista | Código` switch, two GET links. `Vista` is `/a/ID` and opens by default. `Código` is `/a/ID?view=source`, and its frame loads `content?view=source`, which serves the stored text as before with its previous policies. The publication page runs no scripts, so the server picks the frame from the URL, and the mode can be linked and survives Back.
+- `view=source` is the only accepted query, and only on a Markdown page or its content. Any other query, `view=source` on another kind, and any query on a file return 404.
+
+Link resolution: in a Markdown page, a relative link without a scheme (`../concepts/rag.md`, `rag.md#history`) is resolved against the page's own slug as a path, its `.md` suffix is dropped, and it is looked up in the same project. The owner panel's rendered preview turns a resolved link into a navigation to the target artifact, and an unresolved link into marked plain text. This keeps the same link syntax valid in a Git checkout of the wiki and in Artifacts, which is what makes two-way sync possible. Publication renders Markdown, but its relative links stay plain text. Rendering links for viewers requires deciding what a viewer sees when the target is unpublished or not shared, which is out of scope.
 
 ## Full-text search
 

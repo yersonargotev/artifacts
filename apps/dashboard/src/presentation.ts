@@ -1,4 +1,5 @@
-import { markdownPreviewSandbox, projectKey } from '@artifacts/artifacts/panel/model';
+import { projectKey } from '@artifacts/artifacts/panel/model';
+import { markdownPreviewSandbox } from '../../publication/src/document.ts';
 import type { ArtifactDetail, ClientRef, ContentKind, RevisionRef, LibraryPage, LibraryQuery, LibraryScope, LibrarySort, ScopeRequest, SortDirection } from '@artifacts/artifacts/panel/model';
 import { scopeRequestOf, type LibraryLink } from './urls.ts';
 

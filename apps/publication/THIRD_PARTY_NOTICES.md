@@ -1,6 +1,6 @@
 # Third-party notices
 
-The publication home icon uses the paths from [Tabler Icons `home.svg`](https://github.com/tabler/tabler-icons/blob/main/icons/outline/home.svg), with a smaller stroke and display size.
+The publication home icon uses the paths from [Tabler Icons `home.svg`](https://github.com/tabler/tabler-icons/blob/main/icons/outline/home.svg), with a smaller stroke and display size. The Markdown `Vista` and `Código` switch uses the paths from [`eye.svg`](https://github.com/tabler/tabler-icons/blob/main/icons/outline/eye.svg) and [`code.svg`](https://github.com/tabler/tabler-icons/blob/main/icons/outline/code.svg).
 
 ## Tabler Icons
 

@@ -19,7 +19,7 @@ If tools or authentication are unavailable, report the missing connection or log
 
 Read [the tool contract](references/tool-contract.md) before constructing tool arguments. A revision contains the complete `metadata`, `content`, and `files` snapshot.
 
-Choose HTML for a visual or interactive artifact. For several HTML boards in one canvas, choose `design` and read `artifacts-design/references/canvas.md` from the design skill. Choose Markdown or text when those formats match the request. Markdown currently displays as inert text. If the user expects rendered Markdown, produce equivalent self-contained HTML and retain the Markdown as an attachment when useful.
+Choose HTML for a visual or interactive artifact. For several HTML boards in one canvas, choose `design` and read `artifacts-design/references/canvas.md` from the design skill. Choose Markdown or text when those formats match the request. Markdown renders as a document without scripts, and viewers can switch to its source. Choose HTML when the page needs custom layout or interactivity.
 
 Use the user's requested title, language, content, and files. Infer a descriptive title when none is given. Provide `description` and `files` even when they are empty. Do not include unrelated local files or credentials.
 

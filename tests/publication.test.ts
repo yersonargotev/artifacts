@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import { Script } from 'node:vm';
 import { canvasDocument } from '../apps/publication/src/canvas.ts';
-import { previewDocument } from '../apps/publication/src/document.ts';
+import { markdownPolicy, markdownPreviewSandbox, previewDocument } from '../apps/publication/src/document.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { escapeHtml } from '../apps/publication/src/markup.ts';
 import { snapshotSchema, type ArtifactRead } from '../packages/contracts/src/index.ts';
@@ -290,19 +290,59 @@ test('previewDocument keeps HTML, Markdown, and text bytes and renders a design 
   assert.equal(previewDocument({ revision: { snapshot: design } }), shell(inert, canvasDocument(design, false)));
 });
 
-test('a published Markdown page stays an inert source block with links and HTML unrendered', async () => {
-  const text = '# Wiki\n\n[RAG](../concepts/rag.md) [web](https://example.com) <script>alert(1)</script>';
-  const snapshot = { ...artifact.revision.snapshot, content: { kind: 'markdown' as const, text } };
+async function publishedKind(content: { kind: 'html' | 'markdown'; text: string }) {
+  const snapshot = { ...artifact.revision.snapshot, content };
   const handler = createPublicationApp(environment(), async (input) => String(input).endsWith('/consume')
     ? Response.json({ artifactId: 'artifact-a', userId: 'owner-a', sessionId: 'session-a', expiresAt: Date.now() + 60_000 })
     : Response.json({ ...artifact, revision: { ...artifact.revision, snapshot } }));
   const cookie = cookieHeader((await authorize(handler)).admitted);
-  const response = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': 'Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36' } }));
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('content-security-policy')?.endsWith('; sandbox allow-scripts'), true, 'the publication frame policy is unchanged');
-  const body = await response.text();
-  assert(body.includes(`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(text)}</pre>`));
+  const get = (path: string, agent = 'Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36') => handler(new Request(`${publish}${path}`, { headers: { cookie, 'sec-fetch-dest': path.includes('/content') ? 'iframe' : 'document', 'user-agent': agent } }));
+  return { get };
+}
+
+const wiki = '# Wiki\n\n[RAG](../concepts/rag.md) [web](https://example.com) <script>alert(1)</script>';
+
+test('a published Markdown page opens rendered, with relative links as text and raw HTML escaped', async () => {
+  const { get } = await publishedKind({ kind: 'markdown', text: wiki });
+  for (const agent of ['Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36', 'Mozilla/5.0 Firefox/152.0']) {
+    const page = await (await get('/a/artifact-a', agent)).text();
+    assert(page.includes(`sandbox="${markdownPreviewSandbox}"`), 'the rendered frame grants link navigation and no scripts');
+    assert(page.includes('src="/a/artifact-a/r/revision-1/content"'));
+    assert.match(page, /<nav class="view-switch" aria-label="Modo de lectura"><a href="\/a\/artifact-a" aria-current="page" title="Vista">[\s\S]*?<a href="\/a\/artifact-a\?view=source" title="Código">/);
+    const content = await get('/a/artifact-a/r/revision-1/content', agent);
+    assert.equal(content.status, 200);
+    assert.equal(content.headers.get('content-security-policy'), markdownPolicy);
+    assert.equal(content.headers.get('connection-allowlist'), null, 'an empty allowlist would block the external link');
+    const body = await content.text();
+    assert.match(body, /<h1>Wiki<\/h1>/);
+    assert(body.includes('<p>RAG <a href="https://example.com" target="_blank" rel="noopener noreferrer">web</a> &lt;script&gt;alert(1)&lt;/script&gt;</p>'), body);
+    assert(!/<script|concepts\/rag/.test(body));
+  }
+});
+
+test('the Código view of a published Markdown page shows its stored source', async () => {
+  const { get } = await publishedKind({ kind: 'markdown', text: wiki });
+  const page = await (await get('/a/artifact-a?view=source')).text();
+  assert(page.includes('src="/a/artifact-a/r/revision-1/content?view=source"'));
+  assert(page.includes('sandbox="allow-scripts"'));
+  assert.match(page, /<a href="\/a\/artifact-a" title="Vista">[\s\S]*?<a href="\/a\/artifact-a\?view=source" aria-current="page" title="Código">/);
+  const content = await get('/a/artifact-a/r/revision-1/content?view=source');
+  assert.equal(content.headers.get('connection-allowlist'), '()');
+  assert(content.headers.get('content-security-policy')!.endsWith('; sandbox allow-scripts'));
+  assert(content.headers.get('content-security-policy')!.includes("script-src 'unsafe-inline'"));
+  const body = await content.text();
+  assert(body.includes(`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(wiki)}</pre>`));
   assert(!/<h1|<a |<script/.test(body));
+});
+
+test('only a Markdown page or its content accepts view=source, and no other query', async () => {
+  const markdown = await publishedKind({ kind: 'markdown', text: wiki });
+  for (const path of ['/a/artifact-a?view=render', '/a/artifact-a?view=source&x=1', '/a/artifact-a?view=SOURCE', '/a/artifact-a/r/revision-1/files/nested/file.html?view=source']) {
+    assert.equal((await markdown.get(path)).status, 404, path);
+  }
+  const html = await publishedKind({ kind: 'html', text: '<h1>Hi</h1>' });
+  for (const path of ['/a/artifact-a?view=source', '/a/artifact-a/r/revision-1/content?view=source']) assert.equal((await html.get(path)).status, 404, path);
+  assert(!(await (await html.get('/a/artifact-a')).text()).includes('class="view-switch"'), 'only Markdown offers the switch');
 });
 
 test('a design content response carries the same headers as an HTML content response', async () => {

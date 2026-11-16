@@ -85,7 +85,46 @@ export async function driveLinks({ page, panel, checks, call, login, capture, re
   await section.waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px detail with Enlaces does not overflow');
   await capture(page, 'links-section-390');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { url: publication } = await call('artifacts_publish', { requestId: randomUUID(), artifactId: source.artifactId, revisionId: source.revision.id, expectedPublicationVersion: 0 });
+  assert.equal(typeof publication, 'string', 'Publishing returns the publication URL');
+  await record('Open the published source page', { url: publication });
+  await page.goto(publication);
+  const published = page.frameLocator('main > iframe');
+  await published.getByRole('heading', { level: 1, name: 'Karpathy', exact: true }).waitFor();
+  assert.equal(await page.locator('main > iframe').getAttribute('sandbox'), 'allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox', 'The published Markdown frame adds only link navigation to its sandbox');
+  const modes = page.getByRole('navigation', { name: 'Modo de lectura', exact: true });
+  assert.equal(await modes.getByRole('link', { name: 'Vista', exact: true }).getAttribute('aria-current'), 'page', 'The publication opens in Vista');
+  assert.equal(await published.getByRole('cell', { name: 'Retrieval', exact: true }).count(), 1, 'The published table renders');
+  assert.equal(await published.getByRole('link', { name: 'the RAG concept', exact: true }).count(), 0, 'A relative link is plain text for viewers');
+  assert.equal(await published.locator('p').filter({ hasText: 'See the RAG concept, the missing page, and the site.' }).count(), 1, 'The relative link text stays visible');
+  assert.equal(await published.locator('.broken-link').count(), 0, 'Viewers see no broken-link marker');
+  assert.equal(await published.getByRole('link', { name: 'the site', exact: true }).getAttribute('target'), '_blank', 'The external link opens a new tab');
+  assert.equal(await published.locator('script, img').count(), 0, 'Published raw HTML creates no script or image element');
+  await capture(page, 'links-published-view', false);
+
+  await record('Switch the publication to Código', {});
+  await modes.getByRole('link', { name: 'Código', exact: true }).click();
+  await page.waitForURL((url) => url.search === '?view=source');
+  await published.getByText('# Karpathy', { exact: false }).waitFor();
+  assert.equal(await published.locator('pre').innerText(), sourceText, 'Código shows the stored Markdown');
+  assert.equal(await published.getByRole('heading').count(), 0, 'Código renders no heading');
+  assert.equal(await modes.getByRole('link', { name: 'Código', exact: true }).getAttribute('aria-current'), 'page', 'Código is the current mode');
+  await capture(page, 'links-published-source', false);
+
+  await record('Go back to Vista', {});
+  await page.goBack();
+  await published.getByRole('heading', { level: 1, name: 'Karpathy', exact: true }).waitFor();
+  assert.equal(new URL(page.url()).search, '', 'Back returns to the Vista URL');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await published.getByRole('heading', { level: 1, name: 'Karpathy', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'The 390px publication with the mode switch does not overflow');
+  assert(await modes.getByRole('link', { name: 'Código', exact: true }).isVisible(), 'The mode switch stays visible at 390px');
+  await capture(page, 'links-published-390', false);
   assert.deepEqual(messages, [], 'No raw HTML in the page ran');
 
+  checks.push('The publication opens the Markdown rendered with relative links as text, and Código shows the stored source and survives Back', 'The 390px publication with the mode switch does not overflow');
   checks.push('HTTP MCP create of two Markdown pages with project and slug', 'The Markdown iframe sandbox adds only top navigation by user activation and popups', 'The panel preview renders headings, lists, emphasis, tables, and fenced code', 'Raw script and image HTML show as text and never run', 'The external link opens a new tab with noopener noreferrer', 'The broken link is marked text with No existe, not a link', 'Enlaces lists only the broken link', 'Clicking the resolved link inside the preview navigates the main window to the target detail with the panel session', 'The 390px detail with Enlaces does not overflow');
 }
