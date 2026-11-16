@@ -65,3 +65,7 @@ pnpm 12 rejects `-s`. To shorten output, pipe it to `tail`, for example `pnpm ch
 - [Production operations](docs/deployment.md#production-operations) covers the Workers, the Turso database, the `cf` CLI, Workers Paid, and the search reindex.
 - [Diagnose a failed run](docs/ci-cd.md#diagnose-a-failed-run) covers background CI watches and failed proof logs.
 - [Release the public npm beta](docs/npm-release.md) lists the files that carry the version.
+
+<!-- packy:project:instruction:matty-codex-project:start -->
+Packy manages the Matty skill trees in .agents/skills.
+<!-- packy:project:instruction:matty-codex-project:end -->

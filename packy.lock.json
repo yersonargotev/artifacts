@@ -125,6 +125,948 @@
     },
     {
       "pack": {
+        "id": "matty",
+        "version": "5.0.1",
+        "catalog_snapshot": "98a26757d6ce780bd6f0c17c0690662031ea8f07"
+      },
+      "surface": "agents",
+      "readiness_obligations": [
+        "runtime-usability",
+        "surface-authorization"
+      ],
+      "external_requirements": [],
+      "selection": {
+        "mode": "custom",
+        "roots": [
+          {
+            "kind": "skill",
+            "id": "ask-matt"
+          },
+          {
+            "kind": "skill",
+            "id": "chief-of-staff"
+          },
+          {
+            "kind": "skill",
+            "id": "claude-handoff"
+          },
+          {
+            "kind": "skill",
+            "id": "code-review"
+          },
+          {
+            "kind": "skill",
+            "id": "codebase-design"
+          },
+          {
+            "kind": "skill",
+            "id": "diagnosing-bugs"
+          },
+          {
+            "kind": "skill",
+            "id": "domain-modeling"
+          },
+          {
+            "kind": "skill",
+            "id": "grill-me"
+          },
+          {
+            "kind": "skill",
+            "id": "grill-with-docs"
+          },
+          {
+            "kind": "skill",
+            "id": "grilling"
+          },
+          {
+            "kind": "skill",
+            "id": "handoff"
+          },
+          {
+            "kind": "skill",
+            "id": "improve-codebase-architecture"
+          },
+          {
+            "kind": "skill",
+            "id": "loop-me"
+          },
+          {
+            "kind": "skill",
+            "id": "pr"
+          },
+          {
+            "kind": "skill",
+            "id": "prototype"
+          },
+          {
+            "kind": "skill",
+            "id": "research"
+          },
+          {
+            "kind": "skill",
+            "id": "retro"
+          },
+          {
+            "kind": "skill",
+            "id": "setup-matt-pocock-skills"
+          },
+          {
+            "kind": "skill",
+            "id": "setup-ts-deep-modules"
+          },
+          {
+            "kind": "skill",
+            "id": "software-factory"
+          },
+          {
+            "kind": "skill",
+            "id": "to-questionnaire"
+          },
+          {
+            "kind": "skill",
+            "id": "to-spec"
+          },
+          {
+            "kind": "skill",
+            "id": "to-tickets"
+          },
+          {
+            "kind": "skill",
+            "id": "triage"
+          },
+          {
+            "kind": "skill",
+            "id": "wait-what"
+          },
+          {
+            "kind": "skill",
+            "id": "wayfinder"
+          },
+          {
+            "kind": "skill",
+            "id": "wizard"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-beats"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-for-agents"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-fragments"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-shape"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "kind": "instruction",
+          "id": "matty-codex-project"
+        },
+        {
+          "kind": "notice",
+          "id": "mit"
+        },
+        {
+          "kind": "skill",
+          "id": "ask-matt"
+        },
+        {
+          "kind": "skill",
+          "id": "chief-of-staff"
+        },
+        {
+          "kind": "skill",
+          "id": "claude-handoff"
+        },
+        {
+          "kind": "skill",
+          "id": "code-review"
+        },
+        {
+          "kind": "skill",
+          "id": "codebase-design"
+        },
+        {
+          "kind": "skill",
+          "id": "diagnosing-bugs"
+        },
+        {
+          "kind": "skill",
+          "id": "domain-modeling"
+        },
+        {
+          "kind": "skill",
+          "id": "grill-me"
+        },
+        {
+          "kind": "skill",
+          "id": "grill-with-docs"
+        },
+        {
+          "kind": "skill",
+          "id": "grilling"
+        },
+        {
+          "kind": "skill",
+          "id": "handoff"
+        },
+        {
+          "kind": "skill",
+          "id": "improve-codebase-architecture"
+        },
+        {
+          "kind": "skill",
+          "id": "loop-me"
+        },
+        {
+          "kind": "skill",
+          "id": "pr"
+        },
+        {
+          "kind": "skill",
+          "id": "prototype"
+        },
+        {
+          "kind": "skill",
+          "id": "research"
+        },
+        {
+          "kind": "skill",
+          "id": "retro"
+        },
+        {
+          "kind": "skill",
+          "id": "setup-matt-pocock-skills"
+        },
+        {
+          "kind": "skill",
+          "id": "setup-ts-deep-modules"
+        },
+        {
+          "kind": "skill",
+          "id": "software-factory"
+        },
+        {
+          "kind": "skill",
+          "id": "to-questionnaire"
+        },
+        {
+          "kind": "skill",
+          "id": "to-spec"
+        },
+        {
+          "kind": "skill",
+          "id": "to-tickets"
+        },
+        {
+          "kind": "skill",
+          "id": "triage"
+        },
+        {
+          "kind": "skill",
+          "id": "wait-what"
+        },
+        {
+          "kind": "skill",
+          "id": "wayfinder"
+        },
+        {
+          "kind": "skill",
+          "id": "wizard"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-beats"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-for-agents"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-fragments"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-shape"
+        }
+      ],
+      "projections": [
+        {
+          "id": "skill:ask-matt",
+          "target": ".agents/skills/ask-matt",
+          "digest": "b6bbc2320348263bd4b577e42ffece81cf07c6f60766c1468437a0502c29d059",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:chief-of-staff",
+          "target": ".agents/skills/chief-of-staff",
+          "digest": "7480d61b5812a5ea92b1722a3c6d75b25e086fb81d4b1df59cc1dbcf9871c693",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:claude-handoff",
+          "target": ".agents/skills/claude-handoff",
+          "digest": "7f88986ff39cffc01a35a26aae7a69d8cbae142c1ae431519ae8ca5dbba55c60",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:code-review",
+          "target": ".agents/skills/code-review",
+          "digest": "cc0ac29ad0493f5cc6e05bdaf5d2abde8f7be1c4ad68a61c631fc72124d323a5",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:codebase-design",
+          "target": ".agents/skills/codebase-design",
+          "digest": "7400a980a87f014a048377308d17f565ea5a3ea976f8003b093cb5d999b8d91f",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:diagnosing-bugs",
+          "target": ".agents/skills/diagnosing-bugs",
+          "digest": "e4defcd7c41cfa985eb51c206af51830aed456b3839935f83d8237689542ab38",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:domain-modeling",
+          "target": ".agents/skills/domain-modeling",
+          "digest": "492f41d4d322add221ac94fa33812515d95e8c953d218c6f2f52216aed9bcd52",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grill-me",
+          "target": ".agents/skills/grill-me",
+          "digest": "b6a3d1141615795991f049bdf87f81be826ae7d452d0059ab165d9dba1f680a0",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grill-with-docs",
+          "target": ".agents/skills/grill-with-docs",
+          "digest": "03e949369f2e9db6e33bf331920eb473de280957ae0e46d07b39ce2b9c45ec04",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grilling",
+          "target": ".agents/skills/grilling",
+          "digest": "3f8c1413ff9843c8a11d99b391d57cd9c2e2bc0f80ee7901280ae5f1bcd5734a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:handoff",
+          "target": ".agents/skills/handoff",
+          "digest": "4c525ce0c7aebb2b06ef6ea037843f1dcb4be5441b373f8bc74ed181c653edab",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:improve-codebase-architecture",
+          "target": ".agents/skills/improve-codebase-architecture",
+          "digest": "dede233ff487b569958ebe46d8a57ac360268d52029c1437fb568aafa2e31643",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:loop-me",
+          "target": ".agents/skills/loop-me",
+          "digest": "dc3544be3e33fc60fa93f936a6fbbf0f500ddd122366087722ecbfebc427fae6",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:pr",
+          "target": ".agents/skills/pr",
+          "digest": "12eed8c3e4cf9693e212e9b2fea3fafc7da0b48821625e7b2870b6bff0c9fa24",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:prototype",
+          "target": ".agents/skills/prototype",
+          "digest": "85a8dd665b2bc11c94b0c9f728e2f1fbd6d29a9c3397b5da253edfbe493794df",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:research",
+          "target": ".agents/skills/research",
+          "digest": "e38fb2ff717bee13dd0e3d6e7589f7c1b184611b63fa372a32f8143975114844",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:retro",
+          "target": ".agents/skills/retro",
+          "digest": "c6bf2a627a59b2d7dfcfcd2b0e5671c1bc67355dc685ae27e33dec6456a3007f",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:setup-matt-pocock-skills",
+          "target": ".agents/skills/setup-matt-pocock-skills",
+          "digest": "b21ea5565d3604972e46d1081622fd86d674c3cb444486a9781fe0361bc785e2",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:setup-ts-deep-modules",
+          "target": ".agents/skills/setup-ts-deep-modules",
+          "digest": "695a5b9a6a1e23159656c229bd6e8ba5e25790ca25c99ac16fa738a60728c6b1",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:software-factory",
+          "target": ".agents/skills/software-factory",
+          "digest": "f8d94a53ae26de24c85d57d33b601ab261f3b2d00da6cf8dfba6adb605d85f6d",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-questionnaire",
+          "target": ".agents/skills/to-questionnaire",
+          "digest": "d4bdd023c80b6a06c9a704066c39aa37750774ab61603edee74f6b5bf52e8dda",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-spec",
+          "target": ".agents/skills/to-spec",
+          "digest": "a0f79a913dc450a18df610a282c3dfd3bddcd2b3d4e894bc749e958c1c9b4a94",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-tickets",
+          "target": ".agents/skills/to-tickets",
+          "digest": "9c882ce2c60c2d6ec9747d6b387cb1ec994914c824437c654ccef692d820fc90",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:triage",
+          "target": ".agents/skills/triage",
+          "digest": "4c2b49966581105ec44b85897ac4b9de145687b6eec98c4b3a5868bfacff552a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wait-what",
+          "target": ".agents/skills/wait-what",
+          "digest": "b9ce0d7db28479ebd7242c85313b8471da3d3ff088a44553cf6a31fde720d1a6",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wayfinder",
+          "target": ".agents/skills/wayfinder",
+          "digest": "e6eb721c2e2776f0fb7831567a0d26f43476431de6352586832cdc68f8587ba7",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wizard",
+          "target": ".agents/skills/wizard",
+          "digest": "330b7269122c96daf3b9ffdb6892b7388d7a91b6d1164c026c4ebdd27a7c0ee2",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-beats",
+          "target": ".agents/skills/writing-beats",
+          "digest": "9c01763b369d958ff07f077bfe1b6267ca3655a59fdfe7c7e0b178c2e4fc1496",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-for-agents",
+          "target": ".agents/skills/writing-for-agents",
+          "digest": "ccf92002b84cbb74322b57c4b2290f6234130d83b14b31f70b6fbcd904b746bb",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-fragments",
+          "target": ".agents/skills/writing-fragments",
+          "digest": "24b92defc4dde0f0f7bc507d7e20e42baa993aafc3ab15a3f583f8bbbf0fc776",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-shape",
+          "target": ".agents/skills/writing-shape",
+          "digest": "b4433d684d7e139dde62cb525a4aba53f06dfd85c87061989af51883342ae89a",
+          "file_mode": 493
+        },
+        {
+          "id": "instruction:matty-codex-project",
+          "target": "AGENTS.md",
+          "digest": "fe6a99ffac4720c8a70db327139160708a693d0c4c9d5a11a453cf65625243d1",
+          "file_mode": 420
+        },
+        {
+          "id": "notice:pack-matty-agents",
+          "target": "PACKY-NOTICES.md",
+          "digest": "ec2b76bbad2d926938ac46fd9cb647fec20b7d6720e32ee8963ae12d09de52ba",
+          "file_mode": 420
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "matty",
+        "version": "5.0.1",
+        "catalog_snapshot": "98a26757d6ce780bd6f0c17c0690662031ea8f07"
+      },
+      "surface": "claude",
+      "readiness_obligations": [
+        "runtime-usability",
+        "surface-authorization"
+      ],
+      "external_requirements": [],
+      "selection": {
+        "mode": "custom",
+        "roots": [
+          {
+            "kind": "skill",
+            "id": "ask-matt"
+          },
+          {
+            "kind": "skill",
+            "id": "chief-of-staff"
+          },
+          {
+            "kind": "skill",
+            "id": "claude-handoff"
+          },
+          {
+            "kind": "skill",
+            "id": "code-review"
+          },
+          {
+            "kind": "skill",
+            "id": "codebase-design"
+          },
+          {
+            "kind": "skill",
+            "id": "diagnosing-bugs"
+          },
+          {
+            "kind": "skill",
+            "id": "domain-modeling"
+          },
+          {
+            "kind": "skill",
+            "id": "grill-me"
+          },
+          {
+            "kind": "skill",
+            "id": "grill-with-docs"
+          },
+          {
+            "kind": "skill",
+            "id": "grilling"
+          },
+          {
+            "kind": "skill",
+            "id": "handoff"
+          },
+          {
+            "kind": "skill",
+            "id": "improve-codebase-architecture"
+          },
+          {
+            "kind": "skill",
+            "id": "loop-me"
+          },
+          {
+            "kind": "skill",
+            "id": "pr"
+          },
+          {
+            "kind": "skill",
+            "id": "prototype"
+          },
+          {
+            "kind": "skill",
+            "id": "research"
+          },
+          {
+            "kind": "skill",
+            "id": "retro"
+          },
+          {
+            "kind": "skill",
+            "id": "setup-matt-pocock-skills"
+          },
+          {
+            "kind": "skill",
+            "id": "setup-ts-deep-modules"
+          },
+          {
+            "kind": "skill",
+            "id": "software-factory"
+          },
+          {
+            "kind": "skill",
+            "id": "to-questionnaire"
+          },
+          {
+            "kind": "skill",
+            "id": "to-spec"
+          },
+          {
+            "kind": "skill",
+            "id": "to-tickets"
+          },
+          {
+            "kind": "skill",
+            "id": "triage"
+          },
+          {
+            "kind": "skill",
+            "id": "wait-what"
+          },
+          {
+            "kind": "skill",
+            "id": "wayfinder"
+          },
+          {
+            "kind": "skill",
+            "id": "wizard"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-beats"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-for-agents"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-fragments"
+          },
+          {
+            "kind": "skill",
+            "id": "writing-shape"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "kind": "notice",
+          "id": "mit"
+        },
+        {
+          "kind": "skill",
+          "id": "ask-matt"
+        },
+        {
+          "kind": "skill",
+          "id": "chief-of-staff"
+        },
+        {
+          "kind": "skill",
+          "id": "claude-handoff"
+        },
+        {
+          "kind": "skill",
+          "id": "code-review"
+        },
+        {
+          "kind": "skill",
+          "id": "codebase-design"
+        },
+        {
+          "kind": "skill",
+          "id": "diagnosing-bugs"
+        },
+        {
+          "kind": "skill",
+          "id": "domain-modeling"
+        },
+        {
+          "kind": "skill",
+          "id": "grill-me"
+        },
+        {
+          "kind": "skill",
+          "id": "grill-with-docs"
+        },
+        {
+          "kind": "skill",
+          "id": "grilling"
+        },
+        {
+          "kind": "skill",
+          "id": "handoff"
+        },
+        {
+          "kind": "skill",
+          "id": "improve-codebase-architecture"
+        },
+        {
+          "kind": "skill",
+          "id": "loop-me"
+        },
+        {
+          "kind": "skill",
+          "id": "pr"
+        },
+        {
+          "kind": "skill",
+          "id": "prototype"
+        },
+        {
+          "kind": "skill",
+          "id": "research"
+        },
+        {
+          "kind": "skill",
+          "id": "retro"
+        },
+        {
+          "kind": "skill",
+          "id": "setup-matt-pocock-skills"
+        },
+        {
+          "kind": "skill",
+          "id": "setup-ts-deep-modules"
+        },
+        {
+          "kind": "skill",
+          "id": "software-factory"
+        },
+        {
+          "kind": "skill",
+          "id": "to-questionnaire"
+        },
+        {
+          "kind": "skill",
+          "id": "to-spec"
+        },
+        {
+          "kind": "skill",
+          "id": "to-tickets"
+        },
+        {
+          "kind": "skill",
+          "id": "triage"
+        },
+        {
+          "kind": "skill",
+          "id": "wait-what"
+        },
+        {
+          "kind": "skill",
+          "id": "wayfinder"
+        },
+        {
+          "kind": "skill",
+          "id": "wizard"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-beats"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-for-agents"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-fragments"
+        },
+        {
+          "kind": "skill",
+          "id": "writing-shape"
+        }
+      ],
+      "projections": [
+        {
+          "id": "skill:ask-matt",
+          "target": ".claude/skills/ask-matt",
+          "digest": "b6bbc2320348263bd4b577e42ffece81cf07c6f60766c1468437a0502c29d059",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:chief-of-staff",
+          "target": ".claude/skills/chief-of-staff",
+          "digest": "7480d61b5812a5ea92b1722a3c6d75b25e086fb81d4b1df59cc1dbcf9871c693",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:claude-handoff",
+          "target": ".claude/skills/claude-handoff",
+          "digest": "7f88986ff39cffc01a35a26aae7a69d8cbae142c1ae431519ae8ca5dbba55c60",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:code-review",
+          "target": ".claude/skills/code-review",
+          "digest": "cc0ac29ad0493f5cc6e05bdaf5d2abde8f7be1c4ad68a61c631fc72124d323a5",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:codebase-design",
+          "target": ".claude/skills/codebase-design",
+          "digest": "7400a980a87f014a048377308d17f565ea5a3ea976f8003b093cb5d999b8d91f",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:diagnosing-bugs",
+          "target": ".claude/skills/diagnosing-bugs",
+          "digest": "e4defcd7c41cfa985eb51c206af51830aed456b3839935f83d8237689542ab38",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:domain-modeling",
+          "target": ".claude/skills/domain-modeling",
+          "digest": "492f41d4d322add221ac94fa33812515d95e8c953d218c6f2f52216aed9bcd52",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grill-me",
+          "target": ".claude/skills/grill-me",
+          "digest": "b6a3d1141615795991f049bdf87f81be826ae7d452d0059ab165d9dba1f680a0",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grill-with-docs",
+          "target": ".claude/skills/grill-with-docs",
+          "digest": "03e949369f2e9db6e33bf331920eb473de280957ae0e46d07b39ce2b9c45ec04",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:grilling",
+          "target": ".claude/skills/grilling",
+          "digest": "3f8c1413ff9843c8a11d99b391d57cd9c2e2bc0f80ee7901280ae5f1bcd5734a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:handoff",
+          "target": ".claude/skills/handoff",
+          "digest": "4c525ce0c7aebb2b06ef6ea037843f1dcb4be5441b373f8bc74ed181c653edab",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:improve-codebase-architecture",
+          "target": ".claude/skills/improve-codebase-architecture",
+          "digest": "dede233ff487b569958ebe46d8a57ac360268d52029c1437fb568aafa2e31643",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:loop-me",
+          "target": ".claude/skills/loop-me",
+          "digest": "dc3544be3e33fc60fa93f936a6fbbf0f500ddd122366087722ecbfebc427fae6",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:pr",
+          "target": ".claude/skills/pr",
+          "digest": "12eed8c3e4cf9693e212e9b2fea3fafc7da0b48821625e7b2870b6bff0c9fa24",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:prototype",
+          "target": ".claude/skills/prototype",
+          "digest": "85a8dd665b2bc11c94b0c9f728e2f1fbd6d29a9c3397b5da253edfbe493794df",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:research",
+          "target": ".claude/skills/research",
+          "digest": "e38fb2ff717bee13dd0e3d6e7589f7c1b184611b63fa372a32f8143975114844",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:retro",
+          "target": ".claude/skills/retro",
+          "digest": "c6bf2a627a59b2d7dfcfcd2b0e5671c1bc67355dc685ae27e33dec6456a3007f",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:setup-matt-pocock-skills",
+          "target": ".claude/skills/setup-matt-pocock-skills",
+          "digest": "b21ea5565d3604972e46d1081622fd86d674c3cb444486a9781fe0361bc785e2",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:setup-ts-deep-modules",
+          "target": ".claude/skills/setup-ts-deep-modules",
+          "digest": "695a5b9a6a1e23159656c229bd6e8ba5e25790ca25c99ac16fa738a60728c6b1",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:software-factory",
+          "target": ".claude/skills/software-factory",
+          "digest": "f8d94a53ae26de24c85d57d33b601ab261f3b2d00da6cf8dfba6adb605d85f6d",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-questionnaire",
+          "target": ".claude/skills/to-questionnaire",
+          "digest": "d4bdd023c80b6a06c9a704066c39aa37750774ab61603edee74f6b5bf52e8dda",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-spec",
+          "target": ".claude/skills/to-spec",
+          "digest": "a0f79a913dc450a18df610a282c3dfd3bddcd2b3d4e894bc749e958c1c9b4a94",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:to-tickets",
+          "target": ".claude/skills/to-tickets",
+          "digest": "9c882ce2c60c2d6ec9747d6b387cb1ec994914c824437c654ccef692d820fc90",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:triage",
+          "target": ".claude/skills/triage",
+          "digest": "4c2b49966581105ec44b85897ac4b9de145687b6eec98c4b3a5868bfacff552a",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wait-what",
+          "target": ".claude/skills/wait-what",
+          "digest": "b9ce0d7db28479ebd7242c85313b8471da3d3ff088a44553cf6a31fde720d1a6",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wayfinder",
+          "target": ".claude/skills/wayfinder",
+          "digest": "e6eb721c2e2776f0fb7831567a0d26f43476431de6352586832cdc68f8587ba7",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:wizard",
+          "target": ".claude/skills/wizard",
+          "digest": "330b7269122c96daf3b9ffdb6892b7388d7a91b6d1164c026c4ebdd27a7c0ee2",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-beats",
+          "target": ".claude/skills/writing-beats",
+          "digest": "9c01763b369d958ff07f077bfe1b6267ca3655a59fdfe7c7e0b178c2e4fc1496",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-for-agents",
+          "target": ".claude/skills/writing-for-agents",
+          "digest": "ccf92002b84cbb74322b57c4b2290f6234130d83b14b31f70b6fbcd904b746bb",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-fragments",
+          "target": ".claude/skills/writing-fragments",
+          "digest": "24b92defc4dde0f0f7bc507d7e20e42baa993aafc3ab15a3f583f8bbbf0fc776",
+          "file_mode": 493
+        },
+        {
+          "id": "skill:writing-shape",
+          "target": ".claude/skills/writing-shape",
+          "digest": "b4433d684d7e139dde62cb525a4aba53f06dfd85c87061989af51883342ae89a",
+          "file_mode": 493
+        },
+        {
+          "id": "notice:pack-matty-claude",
+          "target": "PACKY-NOTICES.md",
+          "digest": "8c56bb4aec9c08b70462124d1fe7f1f65563980e1809187de7e1d13cf42b1d90",
+          "file_mode": 420
+        }
+      ]
+    },
+    {
+      "pack": {
         "id": "pstack",
         "version": "6.2.0",
         "catalog_snapshot": "98a26757d6ce780bd6f0c17c0690662031ea8f07"
