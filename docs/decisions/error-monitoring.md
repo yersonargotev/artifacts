@@ -11,6 +11,7 @@ Worse, the code hid unexpected errors. Before rollout step 2, each of these path
 - `apps/mcp/src/http.ts`, in `execute`, for any error that is not an `ArtifactError`.
 - `packages/rest/src/index.ts`, in the route handler's final branch.
 - `packages/rest/src/identity.ts`, when token introspection fails.
+- `apps/publication/src/http.ts`, the view handler's final branch. Rollout step 3 added this path after a review found it.
 
 A broken database connection, a bad migration, or a bug in the store therefore looked like a clean 503 in Workers Observability, with no message and no stack.
 
@@ -36,7 +37,9 @@ Each Worker entry wraps its handler with `withMonitoring` from `packages/monitor
 Artifacts hold the owner's private documents, and requests carry session cookies, bearer tokens, share grants, and publication cookies. Sentry receives none of them.
 
 - `dataCollection` turns off user info, cookies, request bodies, query parameters, response headers, database query data, and stack frame variables, and keeps only the `user-agent` and `cf-ray` request headers. SDK 11 replaced `sendDefaultPii` with this option.
-- `beforeSend` removes the request body, cookies, the query string, and every header except `user-agent` and `cf-ray`. It drops breadcrumbs with request or response bodies, removes the query from every URL, and replaces every email address with `[email]`.
+- `beforeSend` removes the request body, cookies, the query string, and every header except `user-agent` and `cf-ray`. It drops console breadcrumbs and breadcrumbs with request or response bodies.
+- `beforeSend` also rewrites every string in the event. It removes the query from absolute and relative URLs, replaces `Bearer` and `Basic` credentials with `[token]`, replaces every email address with `[email]`, and replaces the bound values of a failed Drizzle query, which follow `params:` in its message, with `[redacted]`. It walks the event as data, so a quoted URL cannot break the event.
+- The SDK's console integration is off. `reportError` calls `console.error` for Workers Observability, and that integration would copy the raw error into a breadcrumb.
 - The user context holds only the opaque user ID, never the email address.
 - Error messages from the store must not embed artifact content. The current `ArtifactError` messages already meet this, and they are not reported anyway.
 
@@ -50,7 +53,7 @@ Events go to the `artifacts` project in the `sparkydevs` organization, in the US
 
 `scripts/build-workers.ts` turns on esbuild source maps. The release uploads them with `sentry-cli` under the release name `artifacts@<git SHA>`, then deletes them from the bundle before deployment, so the deployed Worker does not serve them. The upload uses a `SENTRY_AUTH_TOKEN` environment secret in GitHub, scoped to release and source map upload only. A failed upload fails the release before any deployment.
 
-`environment` is `production`. `tracesSampleRate` is `0` at first, so Sentry records errors only and the project stays within the 5,000 errors per month of the organization's Developer plan. Tracing can be enabled later if Workers Observability is not enough for latency.
+`environment` is `production`. The options set no `tracesSampleRate` and no `tracesSampler`, so tracing is off and Sentry records errors only. A rate of `0` would still enable tracing, and a client's sampled `sentry-trace` header would then make the Worker send spans that skip `beforeSend`. With tracing off, the project stays within the 5,000 errors per month of the organization's Developer plan. Tracing can be enabled later if Workers Observability is not enough for latency.
 
 ### Alert
 

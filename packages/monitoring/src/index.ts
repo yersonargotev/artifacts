@@ -3,18 +3,23 @@ import { captureException, withSentry, type Breadcrumb, type CloudflareOptions, 
 export type MonitoringEnvironment = { SENTRY_DSN?: string };
 
 const keptHeaders = new Set(['user-agent', 'cf-ray']);
-const emailAddress = /[^\s"'<>()[\]{},;:@\\]+@[^\s"'<>()[\]{},;:@\\]+\.[A-Za-z]{2,}/g;
-const urlQuery = /(https?:\/\/[^\s"'?#]+)[?#][^\s"']*/g;
+const redactions: [RegExp, string][] = [
+  [/(\nparams: )[\s\S]*$/, '$1[redacted]'],
+  [/\b(Bearer|Basic)\s+[\w~+/=.-]+/gi, '$1 [token]'],
+  [/(https?:\/\/[^\s"'<>?#]+)[?#][^\s"'<>]*/g, '$1'],
+  [/\?[\w.~%-]+=[^\s"'<>]*/g, ''],
+  [/[^\s"'<>()[\]{},;:@\\]+@[^\s"'<>()[\]{},;:@\\]+\.[A-Za-z]{2,}/g, '[email]'],
+];
 
-function withoutQuery(url: string) {
-  return url.replace(/[?#].*$/s, '');
+function scrubValue(value: unknown): unknown {
+  if (typeof value === 'string') return redactions.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
+  if (Array.isArray(value)) return value.map(scrubValue);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, scrubValue(item)]));
+  return value;
 }
 
-function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
-  const data = breadcrumb.data;
-  if (!data) return breadcrumb;
-  if (Object.keys(data).some((key) => /body/i.test(key) && !key.endsWith('_size'))) return null;
-  return { ...breadcrumb, data: typeof data.url === 'string' ? { ...data, url: withoutQuery(data.url) } : data };
+function keepBreadcrumb(breadcrumb: Breadcrumb) {
+  return breadcrumb.category !== 'console' && !Object.keys(breadcrumb.data ?? {}).some((key) => /body/i.test(key) && !key.endsWith('_size'));
 }
 
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
@@ -22,11 +27,11 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
   const scrubbed: ErrorEvent = { ...rest };
   if (request) {
     const headers = Object.fromEntries(Object.entries(request.headers ?? {}).filter(([name]) => keptHeaders.has(name.toLowerCase())));
-    scrubbed.request = { ...(request.method ? { method: request.method } : {}), ...(request.url ? { url: withoutQuery(request.url) } : {}), headers };
+    scrubbed.request = { ...(request.method ? { method: request.method } : {}), ...(request.url ? { url: request.url.replace(/[?#].*$/s, '') } : {}), headers };
   }
   if (user?.id !== undefined) scrubbed.user = { id: user.id };
-  if (breadcrumbs) scrubbed.breadcrumbs = breadcrumbs.map(scrubBreadcrumb).filter((breadcrumb) => breadcrumb !== null);
-  return JSON.parse(JSON.stringify(scrubbed).replace(urlQuery, '$1').replace(emailAddress, '[email]'));
+  if (breadcrumbs) scrubbed.breadcrumbs = breadcrumbs.filter(keepBreadcrumb);
+  return { ...(scrubValue(scrubbed) as ErrorEvent), type: undefined };
 }
 
 export function sentryOptions(service: string) {
@@ -46,7 +51,7 @@ export function sentryOptions(service: string) {
       queues: false,
       stackFrameVariables: false,
     },
-    tracesSampleRate: 0,
+    integrations: (defaults) => defaults.filter((integration) => integration.name !== 'Console'),
     initialScope: { tags: { service } },
     beforeSend: scrubEvent,
   });
@@ -56,8 +61,16 @@ type ExecutionContext = { waitUntil(task: Promise<unknown>): void };
 type FetchHandler<Env> = { fetch(request: Request, env: Env, context?: ExecutionContext): Promise<Response> };
 
 export function withMonitoring<Env extends MonitoringEnvironment>(service: string, handler: FetchHandler<Env>): FetchHandler<Env> {
-  const monitored = withSentry<Env>(sentryOptions(service), { fetch: handler.fetch });
-  return { fetch: (request, env, context) => env.SENTRY_DSN ? monitored.fetch(request, env, context) : handler.fetch(request, env, context) };
+  const environments = new WeakMap<Request, Env>();
+  const inner: FetchHandler<Env> = { fetch: (request, env, context) => handler.fetch(request, environments.get(request) ?? env, context) };
+  const monitored = withSentry<Env>(sentryOptions(service), inner);
+  return {
+    fetch: (request, env, context) => {
+      if (!env.SENTRY_DSN) return handler.fetch(request, env, context);
+      environments.set(request, env);
+      return monitored.fetch(request, env, context);
+    },
+  };
 }
 
 export function reportError(error: unknown) {

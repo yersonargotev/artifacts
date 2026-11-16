@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
+import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import { fixture } from './helpers.ts';
-import { scrubEvent } from '../packages/monitoring/src/index.ts';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
+import { reportError, scrubEvent, withMonitoring } from '../packages/monitoring/src/index.ts';
 
 const secrets = {
   cookie: 'session-cookie-value',
@@ -19,7 +21,12 @@ test('beforeSend removes cookies, tokens, bodies, query strings, and email addre
   const event: Parameters<typeof scrubEvent>[0] = {
     type: undefined,
     message: `Lookup failed for ${secrets.email}`,
-    exception: { values: [{ type: 'Error', value: `fetch https://artifacts.example/v1/lookup?grant=${secrets.query} failed for ${secrets.email}` }] },
+    exception: { values: [
+      { type: 'Error', value: `fetch https://artifacts.example/v1/lookup?grant=${secrets.query} failed for ${secrets.email}` },
+      { type: 'TypeError', value: `Invalid URL "https://artifacts.example/x?token=${secrets.query}"` },
+      { type: 'Error', value: `GET /v1/artifacts?share=${secrets.query} rejected Bearer ${secrets.token}` },
+      { type: 'DrizzleQueryError', value: `Failed query: select * from session where token = ? and body = ?\nparams: ${secrets.token},${secrets.body}` },
+    ] },
     request: {
       method: 'POST',
       url: `https://artifacts.example/v1/artifacts?share=${secrets.query}#${secrets.query}`,
@@ -51,9 +58,15 @@ test('beforeSend removes cookies, tokens, bodies, query strings, and email addre
   assert(!serialized.includes('203.0.113.7'), 'the client IP address survived beforeSend');
   assert.deepEqual(scrubbed.request, { method: 'POST', url: 'https://artifacts.example/v1/artifacts', headers: { 'User-Agent': 'artifacts-cli/1.0', 'cf-ray': '8f1d2c3b4a5e6f70-IAD' } });
   assert.deepEqual(scrubbed.user, { id: 'user-123' });
-  assert.deepEqual(scrubbed.breadcrumbs?.map((breadcrumb) => breadcrumb.data?.url ?? breadcrumb.message), ['https://auth.example/oauth2/introspect', 'signed in [email]']);
+  assert.deepEqual(scrubbed.breadcrumbs?.map((breadcrumb) => breadcrumb.data?.url), ['https://auth.example/oauth2/introspect'], 'console and body breadcrumbs are dropped');
   assert.equal(scrubbed.breadcrumbs?.[0]?.data?.status_code, 500);
-  assert.equal(scrubbed.exception?.values?.[0]?.value, 'fetch https://artifacts.example/v1/lookup failed for [email]');
+  assert.deepEqual(scrubbed.extra, { contact: '[email]' });
+  assert.deepEqual(scrubbed.exception?.values?.map(({ value }) => value), [
+    'fetch https://artifacts.example/v1/lookup failed for [email]',
+    'Invalid URL "https://artifacts.example/x"',
+    'GET /v1/artifacts rejected Bearer [token]',
+    'Failed query: select * from session where token = ? and body = ?\nparams: [redacted]',
+  ]);
 });
 
 test('each Worker sends a scrubbed error event to the configured DSN and nothing without one', async () => {
@@ -106,4 +119,86 @@ test('each Worker sends a scrubbed error event to the configured DSN and nothing
     ingest.close();
     await app.close();
   }
+});
+
+let shared: Promise<Awaited<ReturnType<typeof startIngest>>> | undefined;
+async function ingest() {
+  const sink = await (shared ??= startIngest());
+  sink.envelopes.length = 0;
+  return sink;
+}
+test.after(async () => { (await shared)?.server.close(); });
+
+async function startIngest() {
+  const envelopes: string[] = [];
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => { envelopes.push(Buffer.concat(chunks).toString('utf8')); response.writeHead(200).end('{}'); });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  return { server, envelopes, origin: `http://127.0.0.1:${address.port}`, dsn: `http://public@127.0.0.1:${address.port}/1` };
+}
+
+type TestEnv = { SENTRY_DSN?: string };
+
+async function call(handler: ReturnType<typeof withMonitoring<TestEnv>>, request: Request, env: TestEnv) {
+  const tasks: Promise<unknown>[] = [];
+  const response = await handler.fetch(request, env, { waitUntil: (task) => tasks.push(task) });
+  const status = response.status;
+  await response.text();
+  await Promise.allSettled(tasks);
+  return status;
+}
+
+async function settle(envelopes: string[]) {
+  for (let attempt = 0; attempt < 40 && !envelopes.some((envelope) => envelope.includes('"type":"event"')); attempt++) await delay(50);
+}
+
+test('a monitored handler receives the exact env object, so runtime caches keyed by env still hit', async () => {
+  const sink = await ingest();
+  try {
+    const env: TestEnv = { SENTRY_DSN: sink.dsn };
+    const received: unknown[] = [];
+    const handler = withMonitoring<TestEnv>('artifacts-test', { fetch: async (_request, current) => { received.push(current); return new Response('ok'); } });
+    for (let index = 0; index < 2; index++) assert.equal(await call(handler, new Request('https://worker.example/'), env), 200);
+    assert.equal(received.length, 2);
+    assert(received.every((current) => current === env), 'the handler saw a different env object');
+  } finally { sink.envelopes.length = 0; }
+});
+
+test('a failed query reported through reportError reaches Sentry without its bound parameters', async () => {
+  const sink = await ingest();
+  try {
+    const handler = withMonitoring<TestEnv>('artifacts-test', { fetch: async () => {
+      reportError(new DrizzleQueryError('select * from session where token = ? and body = ?', [secrets.token, secrets.body], new Error(`database unavailable for ${secrets.email}`)));
+      return new Response('unavailable', { status: 503 });
+    } });
+    assert.equal(await call(handler, new Request('https://worker.example/'), { SENTRY_DSN: sink.dsn }), 503);
+    await settle(sink.envelopes);
+    const sent = sink.envelopes.join('\n');
+    assert.match(sent, /Failed query: select \* from session/);
+    for (const [name, value] of Object.entries(secrets)) assert(!sent.includes(value), `${name} reached Sentry`);
+  } finally { sink.envelopes.length = 0; }
+});
+
+test('a sampled sentry-trace header from a client does not make the Worker send spans', async () => {
+  const sink = await ingest();
+  try {
+    const handler = withMonitoring<TestEnv>('artifacts-test', { fetch: async () => {
+      await fetch(`${sink.origin}/outbound`);
+      reportError(new Error('traced failure'));
+      return new Response('ok');
+    } });
+    const request = new Request('https://worker.example/a/artifact-id', { headers: { 'sentry-trace': `${'a'.repeat(32)}-${'b'.repeat(16)}-1` } });
+    assert.equal(await call(handler, request, { SENTRY_DSN: sink.dsn }), 200);
+    await settle(sink.envelopes);
+    await delay(200);
+    const items = sink.envelopes.flatMap((envelope) => envelope.split('\n').filter((line) => line.startsWith('{"type"')).map((line) => (JSON.parse(line) as { type: string }).type));
+    assert(items.includes('event'), `the error event was sent, items were ${items.join(', ')}`);
+    assert.deepEqual(items.filter((type) => type === 'transaction' || type === 'span'), []);
+  } finally { sink.envelopes.length = 0; }
 });
