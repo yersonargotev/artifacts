@@ -255,7 +255,9 @@ try {
   await page.waitForTimeout(100);
   assert.deepEqual(collected, []);
   const viewerHeader = viewerCookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
-  assert.equal((await fetch(oldAttachment, { headers: { cookie: viewerHeader }, redirect: 'manual' })).status, 403);
+  const staleAttachment = await fetch(oldAttachment, { headers: { cookie: viewerHeader }, redirect: 'manual' });
+  assert.equal(staleAttachment.status, 404, 'a replaced revision answers 404');
+  assert.equal(staleAttachment.headers.get('set-cookie'), null, 'a replaced revision keeps the viewer cookie');
   await page.locator('.title-menu > summary').click();
   await page.locator('summary').filter({ hasText: /^Archivos \(/ }).click();
   const attachment = new URL((await page.getByRole('link', { name: 'nested/file.html', exact: true }).getAttribute('href'))!, publish).href;
