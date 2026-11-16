@@ -22,6 +22,7 @@ if (reader?.querySelector('[data-reader-pane]')) {
     const template = reader.querySelector<HTMLTemplateElement>(`template[data-reader-template="${CSS.escape(item.dataset.artifactId!)}"]`)!;
     // A new frame loads without adding a history entry, so Back keeps walking the reader URLs instead of the frame.
     const next = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+    next.toggleAttribute('data-reader-swapped', true);
     enhance(next);
     pane().replaceWith(next);
     item.scrollIntoView({ block: 'nearest' });
