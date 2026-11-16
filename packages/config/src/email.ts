@@ -25,6 +25,7 @@ export function emailTransportConfiguration(env: Environment, origin: string): E
     const from = required('EMAIL_FROM', env).trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) throw new Error('EMAIL_FROM must be an email address');
     const apiKey = required('RESEND_API_KEY', env);
+    // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
     if (/[\s\x00-\x1f\x7f]/.test(apiKey)) throw new Error('RESEND_API_KEY must not contain whitespace or control characters');
     return { transport: 'resend', from, apiKey };
   }

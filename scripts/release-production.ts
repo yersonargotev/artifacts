@@ -40,6 +40,7 @@ export function projectRuntimeSecrets(environment: Environment): Record<Service,
   if (entries.some(([name]) => !required.has(name))) throw new Error('ARTIFACTS_RUNTIME_SECRETS contains undeclared bindings');
   const values = Object.fromEntries(entries);
   for (const name of required) {
+    // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
     if (typeof values[name] !== 'string' || !values[name].trim() || /[\x00-\x1f\x7f]/.test(values[name])) throw new Error(`${name} must be a nonempty string without control characters`);
   }
   const secrets = values as RuntimeSecrets;
@@ -60,6 +61,7 @@ export function projectRuntimeSecrets(environment: Environment): Record<Service,
 function cloudflareCredentials(environment: Environment) {
   const token = environment.CLOUDFLARE_API_TOKEN;
   const accountId = environment.CLOUDFLARE_ACCOUNT_ID;
+  // oxlint-disable-next-line no-control-regex -- rejecting control characters is the point of this pattern
   if (!token || /[\s\x00-\x1f\x7f]/.test(token)) throw new Error('CLOUDFLARE_API_TOKEN is missing or malformed');
   if (!accountId || !/^[a-f0-9]{32}$/i.test(accountId)) throw new Error('CLOUDFLARE_ACCOUNT_ID must contain 32 hexadecimal characters');
   return { token, accountId: accountId.toLowerCase() };
