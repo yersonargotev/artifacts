@@ -25,6 +25,279 @@
       ]
     },
     {
+      "id": "matty",
+      "surface_intents": [
+        {
+          "surface": "agents",
+          "version": "5.0.1",
+          "selection": {
+            "mode": "custom",
+            "roots": [
+              {
+                "kind": "skill",
+                "id": "ask-matt"
+              },
+              {
+                "kind": "skill",
+                "id": "chief-of-staff"
+              },
+              {
+                "kind": "skill",
+                "id": "claude-handoff"
+              },
+              {
+                "kind": "skill",
+                "id": "code-review"
+              },
+              {
+                "kind": "skill",
+                "id": "codebase-design"
+              },
+              {
+                "kind": "skill",
+                "id": "diagnosing-bugs"
+              },
+              {
+                "kind": "skill",
+                "id": "domain-modeling"
+              },
+              {
+                "kind": "skill",
+                "id": "grill-me"
+              },
+              {
+                "kind": "skill",
+                "id": "grill-with-docs"
+              },
+              {
+                "kind": "skill",
+                "id": "grilling"
+              },
+              {
+                "kind": "skill",
+                "id": "handoff"
+              },
+              {
+                "kind": "skill",
+                "id": "improve-codebase-architecture"
+              },
+              {
+                "kind": "skill",
+                "id": "loop-me"
+              },
+              {
+                "kind": "skill",
+                "id": "pr"
+              },
+              {
+                "kind": "skill",
+                "id": "prototype"
+              },
+              {
+                "kind": "skill",
+                "id": "research"
+              },
+              {
+                "kind": "skill",
+                "id": "retro"
+              },
+              {
+                "kind": "skill",
+                "id": "setup-matt-pocock-skills"
+              },
+              {
+                "kind": "skill",
+                "id": "setup-ts-deep-modules"
+              },
+              {
+                "kind": "skill",
+                "id": "software-factory"
+              },
+              {
+                "kind": "skill",
+                "id": "to-questionnaire"
+              },
+              {
+                "kind": "skill",
+                "id": "to-spec"
+              },
+              {
+                "kind": "skill",
+                "id": "to-tickets"
+              },
+              {
+                "kind": "skill",
+                "id": "triage"
+              },
+              {
+                "kind": "skill",
+                "id": "wait-what"
+              },
+              {
+                "kind": "skill",
+                "id": "wayfinder"
+              },
+              {
+                "kind": "skill",
+                "id": "wizard"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-beats"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-for-agents"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-fragments"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-shape"
+              }
+            ]
+          },
+          "aliases": []
+        },
+        {
+          "surface": "claude",
+          "version": "5.0.1",
+          "selection": {
+            "mode": "custom",
+            "roots": [
+              {
+                "kind": "skill",
+                "id": "ask-matt"
+              },
+              {
+                "kind": "skill",
+                "id": "chief-of-staff"
+              },
+              {
+                "kind": "skill",
+                "id": "claude-handoff"
+              },
+              {
+                "kind": "skill",
+                "id": "code-review"
+              },
+              {
+                "kind": "skill",
+                "id": "codebase-design"
+              },
+              {
+                "kind": "skill",
+                "id": "diagnosing-bugs"
+              },
+              {
+                "kind": "skill",
+                "id": "domain-modeling"
+              },
+              {
+                "kind": "skill",
+                "id": "grill-me"
+              },
+              {
+                "kind": "skill",
+                "id": "grill-with-docs"
+              },
+              {
+                "kind": "skill",
+                "id": "grilling"
+              },
+              {
+                "kind": "skill",
+                "id": "handoff"
+              },
+              {
+                "kind": "skill",
+                "id": "improve-codebase-architecture"
+              },
+              {
+                "kind": "skill",
+                "id": "loop-me"
+              },
+              {
+                "kind": "skill",
+                "id": "pr"
+              },
+              {
+                "kind": "skill",
+                "id": "prototype"
+              },
+              {
+                "kind": "skill",
+                "id": "research"
+              },
+              {
+                "kind": "skill",
+                "id": "retro"
+              },
+              {
+                "kind": "skill",
+                "id": "setup-matt-pocock-skills"
+              },
+              {
+                "kind": "skill",
+                "id": "setup-ts-deep-modules"
+              },
+              {
+                "kind": "skill",
+                "id": "software-factory"
+              },
+              {
+                "kind": "skill",
+                "id": "to-questionnaire"
+              },
+              {
+                "kind": "skill",
+                "id": "to-spec"
+              },
+              {
+                "kind": "skill",
+                "id": "to-tickets"
+              },
+              {
+                "kind": "skill",
+                "id": "triage"
+              },
+              {
+                "kind": "skill",
+                "id": "wait-what"
+              },
+              {
+                "kind": "skill",
+                "id": "wayfinder"
+              },
+              {
+                "kind": "skill",
+                "id": "wizard"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-beats"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-for-agents"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-fragments"
+              },
+              {
+                "kind": "skill",
+                "id": "writing-shape"
+              }
+            ]
+          },
+          "aliases": []
+        }
+      ]
+    },
+    {
       "id": "pstack",
       "surface_intents": [
         {
