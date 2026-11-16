@@ -76,6 +76,40 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  verify:
+    name: Verify drives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: ./.github/actions/prepare-native
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chrome
+      - run: pnpm verify identity authoring cli projects slugs links search batch preview publication export sharing design
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: failure()
+        with:
+          name: verify-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .test-artifacts/verify-artifacts/*/*/*/result.json
+            .test-artifacts/verify-artifacts/*/*/*/actions.jsonl
+            .test-artifacts/verify-artifacts/*/*/*/*.png
+            .test-artifacts/verify-artifacts/*/*/*/*.aria.yml
+            .test-artifacts/verify-artifacts/*/*/*.log
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
   workers:
     name: Build Workers
     runs-on: ubuntu-24.04
@@ -117,7 +151,7 @@ jobs:
   production:
     name: Release production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [checks, browser, workers]
+    needs: [checks, browser, verify, workers]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production

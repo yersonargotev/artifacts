@@ -217,7 +217,8 @@ export async function driveProjects({ page, browser, context, instance, director
     if (!element.checkVisibility() || (style.boxShadow === 'none' && !style.backgroundImage.includes('gradient('))) return [];
     return [{ tag: element.tagName, className: element.className, allowed: element.matches('.project-cover, .rail-brand, .rail-panel, [aria-current], [aria-selected="true"], [aria-pressed="true"], [data-variant="primary"]') }];
   }));
-  assert(effects.length > 0 && effects.every((effect) => effect.allowed), `Only project covers and the active navigation carry effects: ${JSON.stringify(effects.filter((effect) => !effect.allowed))}`);
+  const disallowed = effects.filter((effect) => !effect.allowed);
+  assert(effects.length > 0 && disallowed.length === 0, `Only project covers and the active navigation carry effects; also found: ${JSON.stringify(disallowed)}`);
   await record('Inspect active effects', effects);
   await capture(page, 'projects-effects-1440');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -261,7 +262,7 @@ export async function driveProjects({ page, browser, context, instance, director
   const visibleHeaderEffects = headerEffects.filter((effect) => effect.visible);
   assert(visibleHeaderEffects.length > 0 && visibleHeaderEffects.every((effect) => effect.allowed));
   assert.equal(await header.locator('[data-variant="primary"]').count(), 0, 'Copy remains a secondary action');
-  await record('Inspect project header effects and real tally', { effects: headerEffects, count: 5, published: 2, pending: 1 });
+  await record('Inspect project header effects and real tally', { effects: headerEffects, count: 5, published: 1, pending: 1 });
   await capture(page, 'project-effects');
   for (const [label, state, count] of [['Publicados', 'published', 1], ['Cambios pendientes', 'pending', 1], ['Sin publicar', 'unpublished', 3]] as const) {
     await page.getByRole('navigation', { name: 'Filtrar por publicación', exact: true }).getByRole('link', { name: `${label} (${count})`, exact: true }).click();
@@ -466,6 +467,6 @@ export async function driveProjects({ page, browser, context, instance, director
   assert.equal(await page.getByRole('checkbox').count(), 0);
   await capture(page, 'no-checkboxes-1440');
   checks.push('Two externally associated checkboxes derive count 2 at 1440 and 390 without overflow', 'Native reset clears checks, count and enhanced bar', 'Bulk removal lands in Sin proyecto and exact MCP reads retain revision and publication with project null', 'Dialog native repeated-ID POST creates Delta and CLI projects/list plus MCP projects/read confirm count 2 and unchanged retained data', 'Biblioteca has no selection controls');
-  checks.push('Projects index empty and unfiled-only owners', 'Index project counts match source CLI lists', 'Inclusive publication count and partitioned current/pending/unpublished tally', 'Top-three recent titles use actual IDs and head order', 'Index has exactly one active navigation item', 'Native project, detail, and unfiled links work without JavaScript', 'Long project names and titles fit at 390px', 'Only covers and active navigation carry effects', 'CLI assignment removes the unfiled aside and fills the grid', 'Last-member MCP move removes the project without changing head or publication');
+  checks.push('Projects index empty and unfiled-only owners', 'Index project counts match source CLI lists', 'Current-publication count and partitioned current/pending/unpublished tally', 'Top-three recent titles use actual IDs and head order', 'Index has exactly one active navigation item', 'Native project, detail, and unfiled links work without JavaScript', 'Long project names and titles fit at 390px', 'Only covers and active navigation carry effects', 'CLI assignment removes the unfiled aside and fills the grid', 'Last-member MCP move removes the project without changing head or publication');
   checks.push('MCP create reuses Alpha case-insensitively and leaves an unfiled artifact', 'MCP list by project and projects_list counts', 'Source CLI move, list --project and projects over REST', 'Independent MCP read keeps the head revision after move', 'Panel Proyectos navigation counts, card project chips and Beta selection with aria-current', 'Detail page highlights the project and shows it under Información', 'Projects library at 390px without overflow', 'Card menu Mover a proyecto rejects a blank name with 400, then moves C into a new Gamma project', 'Independent MCP read shows Gamma with the same head revision', 'Detail title menu opens the move dialog sheet at 390px without overflow', 'Quitar del proyecto removes Gamma from Proyectos and MCP reads project null with the same head revision', 'Resubmitting the retained Gamma form replays 303 without moving C again and a changed one returns 409');
 }
