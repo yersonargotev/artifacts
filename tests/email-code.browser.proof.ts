@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -6,7 +8,11 @@ import { chromium, type BrowserContext } from 'playwright';
 import { createArtifactHttpClient } from '../packages/client/src/index.ts';
 import { grant, callWhoami } from './helpers.ts';
 
-const run = resolve(process.argv[process.argv.indexOf('--run') + 1] ?? '');
+const execute = promisify(execFile);
+const control = (command: string[]) => execute(process.execPath, ['--import', 'tsx', '.agents/skills/verify-artifacts/scripts/control.ts', ...command], { maxBuffer: 1024 * 1024 });
+const providedRun = process.argv.includes('--run');
+const run = resolve(providedRun ? process.argv[process.argv.indexOf('--run') + 1]! : `.test-artifacts/verify-artifacts/email-code-${randomUUID()}`);
+if (!providedRun) await control(['launch', '--email-code', '--allow-guests', '--run', run]);
 const instance = JSON.parse(await readFile(join(run, 'instance.json'), 'utf8')) as { auth: string; api: string; mcp: string; panel: string; ownerId: string };
 const credentials = JSON.parse(await readFile(join(run, 'runtime/credentials.json'), 'utf8')) as { accessToken: string; restAccessToken: string; password: string };
 const sink = JSON.parse(await readFile(join(run, 'runtime/email-code.json'), 'utf8')) as { path: string };
@@ -140,4 +146,7 @@ try {
   records.push({ lane: 6, status: 'PASS', result: 'Eleventh IP reservation returns 429 across different addresses' });
   await writeFile(join(directory, 'result.json'), JSON.stringify({ status: 'PASS', scope: 'Disposable local Node HTTP, actual Chrome panel/publication, real MCP OAuth tokens', browser: browser.version(), records }, null, 2));
   console.log(JSON.stringify({ status: 'PASS', lanes: records.length, directory }));
-} finally { await browser.close(); }
+} finally {
+  await browser.close();
+  if (!providedRun) await control(['cleanup', '--run', run]);
+}

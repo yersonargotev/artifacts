@@ -14,7 +14,7 @@ A terminal user runs the `artifacts` CLI against an Artifacts resource. The CLI 
 - `cli-publish` selects a retained revision with `--expected-version 0`.
 - `cli-export` writes the exact ZIP for an older revision and reports its SHA-256.
 - `cli-login` performs browser OAuth with PKCE and stores private credentials. The local drive does not cover it.
-- `cli-retry` replays a retained operation after a lost response. The local drive does not cover it.
+- `cli-retry` replays a retained operation with `retry REQUEST_ID`. The `cli` drive does not cover it. The [`batch` drive](./batch.md) replays a batch receipt with it.
 - `cli-skills` lists, prints, and installs bundled skills offline. `pnpm test:cli-skills` covers it from the packed tarball.
 
 ## How to get to it (user POV)

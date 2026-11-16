@@ -53,4 +53,5 @@ Evidence under `<run>/batch/` includes `actions.jsonl`, the `ingest.json`, `stal
 
 - A batch command file carries its own `requestId`. The CLI retains every submitted command and refuses a second command under a retained request ID, so a corrected batch needs a new `requestId`, and `retry` resends only the retained command.
 - An `edit` is prepared by the CLI: it reads the page head and sends an `update` with that `expectedRevisionId`, so the retained command holds the update, not the edit. An edit of a page the same batch creates or writes fails, so the drive edits only the log, which exists before the batch.
+- The drive reaches REST `POST /v1/batch` only through the CLI and never calls MCP `artifacts_batch`. `tests/rest.test.ts` calls both directly. Report MCP `artifacts_batch` as unverified by this drive.
 - Raced writes, such as a competing update between the batch's reads and its write request, are covered by `tests/batch.test.ts`, not driven here.
