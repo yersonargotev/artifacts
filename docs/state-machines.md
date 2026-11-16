@@ -117,7 +117,7 @@ States: `Pending`, `Expired` (row present, past `expiresAt`), `Consumed` (row de
 | --- | --- | --- | --- | --- |
 | — | `GET /auth/login` | none | `Pending` (600 s); the cookie is overwritten | `apps/dashboard/src/identity.ts` `startLogin` |
 | `Pending` | `GET /auth/callback` | cookie token matches, not expired, `state` and code valid | `Consumed`, panel session created | `identity.ts` `completeLogin` |
-| `Pending` | 600 s pass | — | `Expired` | no transition removes the row |
+| `Pending` | 600 s pass | — | `Expired`; the next `GET /auth/login` deletes the row | `identity.ts` `startLogin` |
 | any | callback | — | cookie deleted | `apps/dashboard/src/pages/auth/callback.ts` |
 
 ## Panel session
@@ -148,7 +148,7 @@ Better Auth owns these rows. The app adds admission checks on sign-in, refresh, 
 
 The publication Worker admits a viewer through three stages: a transaction cookie, a one-use grant row, and a viewer cookie.
 
-States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `Grant` (`publication_grant` row, at most 60 s, one use), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
+States: `NoCookie`, `Transaction(artifact, state)` (encrypted cookie, 300 s), `Grant` (`publication_grant` row, at most 60 s, one use; once expired, the next `issuePublicationGrant` deletes it), `Viewer(artifact)` (encrypted cookie per artifact, at most 1 h and never past the central session).
 
 | From | Event | Guard | To | Code |
 | --- | --- | --- | --- | --- |
