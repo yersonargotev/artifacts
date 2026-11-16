@@ -103,7 +103,7 @@ A share is an `artifact_share` row: `Absent`, `Active`, `Removed`. Removing a sh
 | `Active` | `share` | `requireNew` | unchanged, `conflict` (`share_exists`) | `index.ts` `share` |
 | `Active` | `share` | not `requireNew` | unchanged, success | `index.ts` `share` |
 | `Active` | `unshare` | — | `Removed` | `index.ts` `unshare` |
-| `Removed` | `unshare` with a new request ID | — | `not_found` | `index.ts` `unshare` |
+| `Removed` | `unshare` with a new request ID | — | `not_found`; the panel reports it as confirmed because it read the artifact first | `index.ts` `unshare`, `share.ts` `submitShare` |
 
 The notification has its own outcome: `skipped(disabled)`, `skipped(rate_limited)`, or `requested`. The day budget resets when `date('now')` differs from the stored day, and it is read and written in the share's transaction. The email is sent after the commit and only on a fresh receipt. A lost send stays `requested`, and an exact retry does not resend it.
 
@@ -198,7 +198,7 @@ Every panel mutation is a server-rendered POST followed by a redirect, so the pa
 | Selection bar removal | on each submit | as move |
 | Share dialog | per loaded view | confirmed, invalid, conflict, share limit, uncertain, denied |
 
-The share dialog moves `Loading → Ready → Submitting → Ready | Uncertain | Denied`. `Uncertain` disables the inputs and allows only a retry of the same command. A generation counter discards a load that lands while a submit is in flight.
+The share dialog moves `Loading → Ready → Submitting → Ready | Uncertain | Denied`. `Uncertain` disables the inputs and allows only a retry of the same command. A generation counter discards a load that lands while a submit is in flight. Removing a share that another tab already removed confirms and reloads the list. `Denied` comes only from an artifact the owner cannot read.
 
 ## Findings
 
