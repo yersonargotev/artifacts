@@ -100,7 +100,7 @@ JOB=$(gh run view $RUN --json jobs -q '.jobs[] | select(.conclusion == "failure"
 gh api --allow-escape-sequences repos/yersonargotev/artifacts/actions/jobs/$JOB/logs | sed 's/\x1b\[[0-9;]*m//g' | grep -n -B2 -A22 'TimeoutError\|proof.ts:'
 ```
 
-`scripts/browser-proofs.ts` lists the proofs with their CI times and assigns each one to the shard with the least time so far, longest first. Without `--shard` it runs every proof in order, as `pnpm test:browser` does locally. It prints each proof's time, so refresh the weights from a CI log when a proof's time changes a lot.
+`scripts/browser-proofs.ts` lists the proofs with their CI times and assigns each one to the shard with the least time so far, longest first. Without `--shard` it runs every proof in order, as `pnpm test:browser` does locally. It prints each proof's time next to its weight. When a time differs from its weight by more than 25% and more than 10 s, the shard prints a `Browser proof weight drift` warning, which GitHub shows on the run summary. Refresh that weight from the printed time. The same weights always produce the same shards.
 
 The Chrome proofs are deterministic since [#109](https://github.com/yersonargotev/artifacts/pull/109) removed the last focus race. Treat a failed proof as a real failure and read its log before you rerun the job.
 
