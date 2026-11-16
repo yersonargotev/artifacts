@@ -87,6 +87,6 @@ export function publicationConfig(env: Environment = process.env) {
 
 export function listener(prefix: 'AUTH' | 'MCP', defaultPort: number) {
   const port = Number(process.env[`${prefix}_PORT`] ?? defaultPort);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`${prefix}_PORT must be a valid TCP port`);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`${prefix}_PORT must be a valid TCP port, or 0 for any free port`);
   return { hostname: process.env[`${prefix}_BIND_HOST`] ?? '127.0.0.1', port };
 }
