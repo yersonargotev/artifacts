@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { eq } from 'drizzle-orm';
 import { decodeJwt } from 'jose';
 import { createPanelIdentity } from '../apps/dashboard/src/identity.ts';
-import { session } from '../packages/db/src/schema.ts';
+import { oidcTransaction, session } from '../packages/db/src/schema.ts';
 import { fixture } from './helpers.ts';
 
 async function panel(app: Awaited<ReturnType<typeof fixture>>) {
@@ -36,6 +36,20 @@ test('OIDC validates signed identity and durable one-use state, then panel logou
     await browser.identity.logout(local.token);
     assert.equal(await browser.identity.load(local.token), undefined);
     assert(await app.db.select().from(session).where(eq(session.id, identity.sessionId)).get());
+  } finally { await app.close(); }
+});
+
+test('a new login deletes expired login transactions and keeps live ones', async () => {
+  const app = await fixture();
+  try {
+    const browser = await panel(app);
+    for (let index = 0; index < 3; index++) await browser.identity.startLogin();
+    await app.db.update(oidcTransaction).set({ expiresAt: new Date(Date.now() - 1000) });
+    const live = await browser.login();
+    await browser.identity.startLogin();
+    assert.equal((await app.db.select().from(oidcTransaction).all()).length, 2);
+    const local = await browser.identity.completeLogin(live.callback, live.transaction.token);
+    assert.equal((await browser.identity.load(local.token))?.userId, app.ownerId);
   } finally { await app.close(); }
 });
 

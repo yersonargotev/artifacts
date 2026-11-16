@@ -42,7 +42,7 @@ The three publication methods call `canView` inside their own transaction on eve
 
 No cookie, grant, viewer, or cache holds an email, a verification state, or an access decision. A revocation, an unverified email, or a deletion therefore denies the next request.
 
-A denied user sees one of two fixed results. A fresh open goes through the panel's `/publication/open`, which answers `404` with `No se puede abrir este artefacto.` A request that still carries a viewer cookie gets `403` from the publication Worker with `Tu sesión o esta publicación ya no están disponibles.`, and the Worker clears that artifact's viewer cookie. Error messages never reach the browser.
+A denied user sees one of two fixed results. A fresh open goes through the panel's `/publication/open`, which answers `404` with `No se puede abrir este artefacto.` A request that still carries a viewer cookie gets `403` from the publication Worker with `Tu sesión o esta publicación ya no están disponibles.`, and the Worker clears that artifact's viewer cookie. The Worker always reads the current publication and compares a content or file request's revision itself, so a link to a revision that a republish replaced answers `404` and keeps the viewer cookie. Error messages never reach the browser.
 
 The publication Worker parses the read response as either the owner shape or the shared shape, each strictly. It still compares `ownerId` with the viewer's user ID when the response has the owner shape. That check costs nothing and turns a store bug that sends the owner shape to a viewer into a `503` instead of a page with the owner's project.
 
@@ -63,6 +63,8 @@ No unpublish operation exists. A share on an artifact that the owner never publi
 While the artifact exists, a share receipt keeps the address even after `unshare`. The receipt keeps its original result and the hash of its input, so a retry gets the original answer.
 
 Deleting an artifact deletes its shares through the foreign-key cascade. In the same transaction, the delete command rewrites every receipt whose result names the artifact. It replaces the result with a deletion marker and clears the payload hash. After the delete commits, no share row or receipt row for that artifact holds the address or a hash of it. A later request under one of those request IDs gets `not_found` with any arguments, because the store can no longer compare them. The delete command's own receipt is the exception. The delete writes it after the rewrite, so it keeps its hash and its `{ artifactId }` result. An exact delete retry replays success, and a delete retry with changed arguments gets `request_conflict`. This covers the logical rows only. SQLite can keep the deleted bytes in free pages and in the write-ahead log until it overwrites them.
+
+An `unshare` or a delete that removes an address's last share revokes that guest in the same transaction. When the address is no longer admitted, the store deletes every central session of the accounts that carry it, along with their OAuth access tokens, refresh tokens, and consents. The panel sessions and pending publication grants go with the central sessions through their foreign keys. A guest who still holds another share, owns an artifact, or uses the owner address keeps every credential. A later share therefore admits the guest only after a new sign-in. Without this revocation the inert credentials would work again as soon as the address regained admission.
 
 ## Domain shares are an enterprise feature
 

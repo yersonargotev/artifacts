@@ -55,6 +55,8 @@ export async function submitShare(store: Store, actor: Actor, artifactId: string
       return { outcome: 'uncertain' };
     }
     if (error.code === 'request_conflict') return { outcome: 'conflict' };
+    // The read above proved the owner holds the artifact, so this not_found means another tab already removed the share.
+    if (error.code === 'not_found' && intent === 'unshare') return { outcome: 'confirmed' };
     if (error.code === 'conflict' && error.details.reason === 'share_limit' && (error.details.scope === 'artifact' || error.details.scope === 'owner')) return { outcome: 'share_limit', scope: error.details.scope };
     throw error;
   }

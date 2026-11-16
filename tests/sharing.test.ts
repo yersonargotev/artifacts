@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
-import { artifactCommand, artifactShare, session, user } from '../packages/db/src/schema.ts';
+import { artifactCommand, artifactShare, oauthRefreshToken, panelSession, session, user } from '../packages/db/src/schema.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import { consumeGrantSchema, type Actor, type Snapshot } from '../packages/contracts/src/index.ts';
 import { canonicalJson, sha256 } from '../packages/contracts/src/serialization.ts';
@@ -257,6 +257,43 @@ test('revoking a share denies the next read, the pending grant, and new grants',
     await assert.rejects(app.store.readPublished(viewer, { artifactId: first.artifactId }), { code: 'forbidden', message: 'A live owner session is required' });
     await assert.rejects(app.store.consumePublicationGrant({ artifactId: first.artifactId, state, code: pending.code }), { code: 'invalid_grant', message: 'Publication grant is invalid or expired' });
     await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'forbidden', message: 'A live owner session is required' });
+  } finally { await app.close(); }
+});
+
+test('removing a guest\'s last share revokes their sessions and tokens, so sharing again does not revive them', async () => {
+  const app = await setup();
+  try {
+    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot });
+    const second = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot });
+    await app.publish(first.artifactId, first.revision.id);
+    const shares = [await app.share(app.owner, first.artifactId, 'guest@example.test'), await app.share(app.owner, second.artifactId, 'guest@example.test')];
+    await app.db.insert(panelSession).values({ tokenHash: randomUUID(), authSessionId: app.guest.sessionId, issuer: 'issuer', subject: app.guest.userId, clientId: 'panel-client', scopes: [], expiresAt: new Date(Date.now() + 60_000) });
+    await app.db.insert(oauthRefreshToken).values({ id: randomUUID(), token: randomUUID(), clientId: app.mcpOptions.clientId, sessionId: app.guest.sessionId, userId: app.guest.userId, expiresAt: new Date(Date.now() + 60_000), createdAt: new Date(), scopes: ['artifacts:read'] });
+    const credentials = async () => ({
+      sessions: (await app.db.select().from(session).where(eq(session.userId, app.guest.userId))).length,
+      panelSessions: (await app.db.select().from(panelSession).where(eq(panelSession.subject, app.guest.userId))).length,
+      refreshTokens: (await app.db.select().from(oauthRefreshToken).where(eq(oauthRefreshToken.userId, app.guest.userId))).length,
+    });
+    const ownerSessions = async () => (await app.db.select().from(session).where(eq(session.userId, app.ownerId))).length;
+    const before = await ownerSessions();
+    await app.store.unshare(app.owner, { requestId: randomUUID(), artifactId: second.artifactId, shareId: shares[1]!.shareId });
+    assert.deepEqual(await credentials(), { sessions: 1, panelSessions: 1, refreshTokens: 1 }, 'a guest with another share keeps their credentials');
+    await app.store.unshare(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, shareId: shares[0]!.shareId });
+    assert.deepEqual(await credentials(), { sessions: 0, panelSessions: 0, refreshTokens: 0 }, 'the last unshare revokes the guest');
+    assert.equal(await ownerSessions(), before, 'the owner keeps their sessions');
+    await app.share(app.owner, first.artifactId, 'guest@example.test');
+    await assert.rejects(app.admit(app.guest, first.artifactId), { code: 'forbidden', message: 'A live owner session is required' });
+  } finally { await app.close(); }
+});
+
+test('deleting the artifact that holds a guest\'s last share revokes their sessions', async () => {
+  const app = await setup();
+  try {
+    const first = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: publishedSnapshot });
+    await app.share(app.owner, first.artifactId, 'guest@example.test');
+    await app.store.delete(app.owner, { requestId: randomUUID(), artifactId: first.artifactId, expectedRevisionId: first.revision.id, expectedPublicationVersion: 0 });
+    assert.equal((await app.db.select().from(session).where(eq(session.userId, app.guest.userId))).length, 0);
+    assert.equal((await app.db.select().from(session).where(eq(session.userId, app.other.userId))).length, 1, 'an unrelated user keeps their session');
   } finally { await app.close(); }
 });
 
