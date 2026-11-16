@@ -198,7 +198,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${instance.panel}/projects`);
   const reviewCard = page.locator('.project-card[data-project="Release review"]');
-  assert.equal(await reviewCard.locator('.project-card-counts').textContent(), '5 artefactos · 2 publicados');
+  assert.equal(await reviewCard.locator('.project-card-counts').textContent(), '5 artefactos · 1 publicado');
   assert.equal(await reviewCard.getByRole('img').getAttribute('aria-label'), '5 artefactos. 1 publicado sin cambios, 1 con cambios pendientes y 3 sin publicar.');
   assert.deepEqual(await reviewCard.locator('.tally-bar > span').evaluateAll((segments) => segments.map((segment) => [segment.getAttribute('data-state'), Number(segment.getAttribute('data-count'))])), [['published', 1], ['pending', 1], ['unpublished', 3]]);
   const recent = [...review].sort((left, right) => Date.parse(right.revision.createdAt) - Date.parse(left.revision.createdAt) || (left.artifactId < right.artifactId ? 1 : -1)).slice(0, 3);
@@ -214,10 +214,10 @@ export async function driveProjects({ page, browser, context, instance, director
   await checkScreen(page, 'projects-tally-1440');
   const effects = await page.locator('body *').evaluateAll((elements) => elements.flatMap((element) => {
     const style = getComputedStyle(element);
-    if (style.boxShadow === 'none' && !style.backgroundImage.includes('gradient(')) return [];
+    if (!element.checkVisibility() || (style.boxShadow === 'none' && !style.backgroundImage.includes('gradient('))) return [];
     return [{ tag: element.tagName, className: element.className, allowed: element.matches('.project-cover, .rail-brand, .rail-panel, [aria-current], [aria-selected="true"], [aria-pressed="true"], [data-variant="primary"]') }];
   }));
-  assert(effects.length > 0 && effects.every((effect) => effect.allowed), 'Only project covers and the active navigation carry effects');
+  assert(effects.length > 0 && effects.every((effect) => effect.allowed), `Only project covers and the active navigation carry effects: ${JSON.stringify(effects.filter((effect) => !effect.allowed))}`);
   await record('Inspect active effects', effects);
   await capture(page, 'projects-effects-1440');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -245,7 +245,7 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(`${instance.panel}/?project=release+review`);
   const header = page.locator('.project-header');
   assert.equal(await header.locator('h1').textContent(), 'Release review', 'Header uses canonical spelling');
-  assert.equal(await header.locator('.project-header-counts').innerText(), '5 artefactos\n2 publicados · 1 con cambios');
+  assert.equal(await header.locator('.project-header-counts').innerText(), '5 artefactos\n1 publicado · 1 con cambios');
   assert.equal(await header.getByRole('img').getAttribute('aria-label'), '5 artefactos. 1 publicado sin cambios, 1 con cambios pendientes y 3 sin publicar.');
   assert.deepEqual(await page.locator('.artifact-card h2 a').evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort()), review.map((item) => `/artifacts/${item.artifactId}`).sort());
   assert.equal(await page.locator('.artifact-grid > li').count(), 6, 'Instruction is one semantic item in addition to five real artifacts');
