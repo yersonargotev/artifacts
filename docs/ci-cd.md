@@ -9,7 +9,7 @@ Each job runs in its own Ubuntu 24.04 workspace with Node 24 and the package man
 | Job | Commands and evidence |
 | --- | --- |
 | `checks` | Frozen dependency installation, `pnpm check`, and `pnpm test`. A newer validation can cancel stale checks for the same ref. |
-| `browser` | Frozen installation, `playwright install --with-deps chrome`, and `pnpm test:browser`. The existing proofs require real Google Chrome, IPv6 loopback, and an active UDP control. |
+| `browser` | Three matrix shards. Each runs a frozen installation, `playwright install --with-deps chrome`, and `pnpm test:browser --shard <n>/3`, then uploads its evidence as `browser-<n>-…`. Shard 1 also runs the REST and CLI browser proof. The proofs require real Google Chrome, IPv6 loopback, and an active UDP control. |
 | `workers` | Frozen installation, `pnpm build:workers`, and `deploy:worker --dry-run` for all four services without production credentials. |
 
 The browser and Worker jobs use different workspaces because their Astro build targets replace the same panel output directory. Browser evidence includes only three fixture screenshots and `publication-network.json`. Uploads exclude authentication state, traces, databases, browser profiles, and downloaded artifacts.
@@ -99,6 +99,8 @@ RUN=$(gh run list --branch <branch> --limit 1 --json databaseId -q '.[0].databas
 JOB=$(gh run view $RUN --json jobs -q '.jobs[] | select(.conclusion == "failure") | .databaseId')
 gh api --allow-escape-sequences repos/yersonargotev/artifacts/actions/jobs/$JOB/logs | sed 's/\x1b\[[0-9;]*m//g' | grep -n -B2 -A22 'TimeoutError\|proof.ts:'
 ```
+
+`scripts/browser-proofs.ts` lists the proofs with their CI times and assigns each one to the shard with the least time so far, longest first. Without `--shard` it runs every proof in order, as `pnpm test:browser` does locally. It prints each proof's time, so refresh the weights from a CI log when a proof's time changes a lot.
 
 The Chrome proofs are deterministic since [#109](https://github.com/yersonargotev/artifacts/pull/109) removed the last focus race. Treat a failed proof as a real failure and read its log before you rerun the job.
 
