@@ -112,7 +112,7 @@ Keep `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as separate deployment c
 
 ## Native producer and package proofs
 
-The checks, browser, Workers, and production jobs prepare the pinned native package before dependency installation. The npm beta preparation job does the same because its checks and first-use proof load the workspace database. Preparation owns its CMake environment and Cargo output. The existing job budgets remain unchanged.
+The checks, browser, Workers, and production jobs prepare the pinned native package before dependency installation. The npm beta preparation job does the same because its checks and first-use proof load the workspace database. Preparation owns its CMake environment and Cargo output. The `prepare-native` action restores `.native/libsql` from the Actions cache. Its key is the runner image, the architecture, and the hashes of `inputs.json`, the patch, and `scripts/prepare-native.mjs`. A hit skips the Rust build, and preparation only verifies the restored package. A miss builds it and saves it when the job succeeds. The existing job budgets remain unchanged.
 
 The checks job also runs `pnpm test:packages:native` on Linux x64 with glibc. This verifies the actual private native bundle through ordinary external npm installation, strict native controls, encryption compatibility, and installed auth/REST contention and recovery. The default portable seven-package build and three-package public allowlist remain unchanged.
 
