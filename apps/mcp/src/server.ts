@@ -9,5 +9,4 @@ process.loadEnvFile();
 const config = mcpConfig();
 const { db } = await openDatabase({ url: required('DATABASE_URL'), authToken: process.env.DATABASE_AUTH_TOKEN });
 const artifacts = createArtifactStore(db, { access: accessPolicy(), publishOrigin: serviceUrl('PUBLISH_URL'), sendInvitation: createEmailSender(process.env, serviceUrl('MCP_URL')) });
-serve({ fetch: createResourceApp(config, artifacts), ...listener('MCP', 4101) });
-console.log(`MCP listening at ${config.resource}`);
+serve({ fetch: createResourceApp(config, artifacts), ...listener('MCP', 4101) }, ({ port }) => console.log(`MCP listening at ${config.resource} on port ${port}`));
