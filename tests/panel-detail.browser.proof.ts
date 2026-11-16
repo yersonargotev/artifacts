@@ -70,11 +70,9 @@ try {
   await loginPage.goto(app.dashboard);
   await loginPage.getByRole('link', { name: 'Iniciar sesión', exact: true }).press('Enter');
   await loginPage.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
-  const context = await browser.newContext({ storageState: await setup.storageState(), viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'], recordVideo: { dir: join(evidence, 'videos'), size: { width: 1440, height: 900 } } });
+  const context = await browser.newContext({ storageState: await setup.storageState(), viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   await setup.close();
   const page = await context.newPage();
-  const video = page.video()!;
-  const started = Date.now();
   const errors: string[] = [];
   const browsingRequests: string[] = [];
   let browsing = false;
@@ -131,7 +129,6 @@ try {
       assert.equal(await page.locator('.preview').count(), tab === 'preview' ? 1 : 0);
       if (tab === 'information') assert.equal(await page.locator('#information dt:text-is("Slug") + dd').textContent(), 'entregas/revision-inicial');
       await capture(`${tab}-${width}`);
-      await page.waitForTimeout(1200);
     }
   }
   browsing = false;
@@ -158,11 +155,8 @@ try {
   await page.goto(`${url}?revisionId=${updated.revision.id}`);
   await page.frameLocator('.preview').getByRole('heading', { name: 'Entrega revisada', exact: true }).waitFor();
   await capture('published-current-1440');
-  const remaining = 32_000 - (Date.now() - started);
-  if (remaining > 0) await page.waitForTimeout(remaining);
   const storageState = await context.storageState();
   await context.close();
-  await video.saveAs(join(evidence, 'review.webm'));
   const noScript = await browser.newContext({ storageState, javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const native = await noScript.newPage();
   await native.goto(`${url}?revisionId=${updated.revision.id}`);

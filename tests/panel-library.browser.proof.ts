@@ -57,7 +57,7 @@ try {
   await login.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   const storageState = await setup.storageState();
   storageState.cookies.push(cardsViewCookie(app.dashboard));
-  const context = await browser.newContext({ storageState, viewport: { width: 1440, height: 900 }, recordVideo: { dir: join(evidence, 'videos'), size: { width: 1440, height: 900 } } });
+  const context = await browser.newContext({ storageState, viewport: { width: 1440, height: 900 } });
   await setup.close();
   page = await context.newPage();
   page.setDefaultTimeout(10_000);
@@ -68,8 +68,6 @@ try {
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => { if (request.method() !== 'GET') requests.push(`${request.method()} ${new URL(request.url()).pathname}`); });
-  const video = page.video()!;
-  const started = Date.now();
   const current = page;
   async function capture(name: string) {
     await current.evaluate(async () => { await document.fonts.ready; await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))); });
@@ -237,12 +235,9 @@ try {
   await page.goto(`${app.dashboard}/?unfiled=1`);
   await page.getByRole('heading', { name: 'No hay artefactos sin proyecto', exact: true }).waitFor();
   await capture('empty-unfiled-1440');
-  const duration = Date.now() - started;
-  if (duration < 32_000) await page.waitForTimeout(32_000 - duration);
   assert.deepEqual(errors, []);
   assert.deepEqual(requests, [], 'Library browsing sends only GET requests');
   await context.close();
-  await video.saveAs(join(evidence, 'review.webm'));
   await writeFile(join(evidence, 'result.json'), JSON.stringify({ status: 'passed', browser: browser.version(), stats: [30, 3, 1, 10], statusCounts: [30, 2, 27, 1], checks: ['literal source CLI totals in the status bar and the Sin proyecto chip', 'status partition chips', 'scoped project filter preserves search and status and clears cursor', 'empty owner connection', 'no results and scoped clear', 'vanished project', 'empty unfiled scope', 'exhausted continuation', 'Space and Enter menu, arrow focus, final destructive item, Escape return', 'head ZIP equals MCP export', '256-character title and 8192-character description clamp', '25 plus 5 cards in recent order', 'native no-JS GET links, search and project chips', 'pending banner names both revisions, links the comparison, and publishes without JavaScript', '1440 and 390 overflow', 'no console or page errors', 'no non-GET browsing requests'], authFavicon404, errors, requests }, null, 2));
   console.log(JSON.stringify({ status: 'passed', evidence }));
 } catch (error) {
