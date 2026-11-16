@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 const proofs: { file: string; seconds: number; test?: true }[] = [
   { file: 'tests/browser.proof.ts', seconds: 7 },
   { file: 'tests/sign-in-code.browser.proof.ts', seconds: 79 },
+  { file: 'tests/email-code.browser.proof.ts', seconds: 21 },
   { file: 'tests/artifact-browser.proof.ts', seconds: 23 },
   { file: 'tests/artifact-deletion.browser.proof.ts', seconds: 5 },
   { file: 'tests/publication-network.proof.ts', seconds: 11 },
