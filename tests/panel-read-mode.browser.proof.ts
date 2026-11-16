@@ -147,7 +147,10 @@ try {
   checks.push('clicking a row swaps the iframe to that head revision, header and aria-current in the same document and pushes the reader URL');
 
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('j');
+  assert.equal(await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true, cancelable: true }));
+    return getComputedStyle(document.querySelector('.reader-document')!).opacity;
+  }), '1', 'j replaces the pane with the next document at full opacity, without fading it in over the panel background');
   await showsPreview(page, published, 'Cuerpo de Guía publicada');
   assert.equal(artifactParam(page), published.artifactId);
   assert.deepEqual(await current(page), ['Guía publicada']);
