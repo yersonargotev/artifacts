@@ -248,17 +248,23 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           ? or(beyond(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), beyond(artifact.id, cursorId!)))
           : or(beyond(sortColumns[sort], cursorKey(sort, key)), and(eq(sortColumns[sort], cursorKey(sort, key)), or(lt(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), lt(artifact.id, cursorId!)))));
         const rows = await connection.select({
-          artifactId: artifact.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
-          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`, project: artifact.project, slug: artifact.slug,
+          artifactId: artifact.id, project: artifact.project, slug: artifact.slug,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version, revisionId: artifactPublication.revisionId },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
         }).from(artifact).innerJoin(artifactRevision, headJoin).leftJoin(artifactPublication, publicationJoin)
           .leftJoin(publishedRevision, and(eq(publishedRevision.artifactId, artifact.id), eq(publishedRevision.id, artifactPublication.revisionId)))
           .where(and(matching, statuses[input.status], before)).orderBy(...order).limit(libraryPageSize + 1);
+        const page = rows.slice(0, libraryPageSize);
+        // SQLite computes every selected column before it sorts, so reading card text in the page query would parse every head snapshot the owner has.
+        const texts = page.length === 0 ? [] : await connection.select({
+          revisionId: artifactRevision.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
+          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`,
+        }).from(artifactRevision).where(inArray(artifactRevision.id, page.map(({ head }) => head.revisionId)));
+        const text = new Map(texts.map(({ revisionId, ...card }) => [revisionId, card]));
         const [counts] = await connection.select(tally).from(artifact).innerJoin(artifactRevision, headJoin).leftJoin(artifactPublication, publicationJoin).where(matching);
-        const cards: ArtifactCard[] = rows.slice(0, libraryPageSize).map(({ publication, published, project, ...row }) => ({
-          ...row, project: project as ProjectName | null,
+        const cards: ArtifactCard[] = page.map(({ publication, published, project, ...row }) => ({
+          ...row, ...text.get(row.head.revisionId)!, project: project as ProjectName | null,
           publication: publication ? { state: publication.revisionId === row.head.revisionId ? 'published' : 'pending', url: access.publicationUrl(row.artifactId), version: publication.version, revision: published! } : { state: 'unpublished' },
         }));
         const last = cards.at(-1);
