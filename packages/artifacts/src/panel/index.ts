@@ -256,7 +256,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           .leftJoin(publishedRevision, and(eq(publishedRevision.artifactId, artifact.id), eq(publishedRevision.id, artifactPublication.revisionId)))
           .where(and(matching, statuses[input.status], before)).orderBy(...order).limit(libraryPageSize + 1);
         const page = rows.slice(0, libraryPageSize);
-        // SQLite computes every selected column before it sorts, so reading card text in the page query would parse every head snapshot the owner has.
+        // SQLite computes every selected column before it sorts, so reading card text in the page query would parse every matching head snapshot.
         const texts = page.length === 0 ? [] : await connection.select({
           revisionId: artifactRevision.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
           kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`,
