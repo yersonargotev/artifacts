@@ -1,3 +1,5 @@
+import { followFrameLinks } from '../../frame-links.ts';
+
 const preview = document.querySelector<HTMLElement>('.preview-card');
 const frame = preview?.querySelector<HTMLIFrameElement>('iframe.preview');
 if (preview && frame) {
@@ -7,6 +9,7 @@ if (preview && frame) {
     preview.dataset.previewSize = button.dataset.previewSize;
     for (const size of sizes) size.setAttribute('aria-pressed', String(size === button));
   });
+  followFrameLinks(() => [frame], (url) => location.assign(url.href));
   preview.querySelector('[data-preview-fullscreen]')!.addEventListener('click', () => {
     void frame.requestFullscreen().catch(() => { preview.querySelector<HTMLElement>('.preview-feedback')!.textContent = 'No se pudo abrir la pantalla completa.'; });
   });

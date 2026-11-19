@@ -33,11 +33,12 @@ const renderers: Record<Snapshot['content']['kind'], (snapshot: RenderedSnapshot
   design: canvasDocument,
 };
 
-export function previewDocument(artifact: { revision: { snapshot: RenderedSnapshot } }, interactive = false) {
+/** `head` adds markup the panel's preview runs before the content, after the policy. */
+export function previewDocument(artifact: { revision: { snapshot: RenderedSnapshot } }, interactive = false, head = '') {
   const { snapshot } = artifact.revision;
   const body = renderers[snapshot.content.kind](snapshot, interactive);
   const policy = interactive ? framePolicy : framePolicy.replace("script-src 'unsafe-inline'", "script-src 'none'");
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><meta name="referrer" content="no-referrer"></head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><meta name="referrer" content="no-referrer">${head}</head><body>${body}</body></html>`;
 }
 
 const rendersMarkdown = (snapshot: RenderedSnapshot, view: ContentView) => snapshot.content.kind === 'markdown' && view === 'render';
