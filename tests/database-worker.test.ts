@@ -27,6 +27,60 @@ const bindings = {
   ALLOW_GUEST_ACCESS: 'false', MCP_INTROSPECTION_CLIENT_ID: 'diagnostic', MCP_INTROSPECTION_CLIENT_SECRET: 'diagnostic',
 };
 
+test('panel runtime recovers when an earlier startup outlives its request', { timeout: 15_000 }, async () => {
+  const source = `import { getRuntime } from './apps/dashboard/src/runtime.ts';
+    let first;
+    let winner;
+    export default { async fetch(request, env, ctx) {
+      const path = new URL(request.url).pathname;
+      if (path === '/seed') {
+        first = getRuntime();
+        ctx.waitUntil(first.catch(() => {}));
+        return Response.json({ seeded: true });
+      }
+      if (path === '/first') return Response.json({ same: await first === winner });
+      const runtime = await getRuntime();
+      winner ??= runtime;
+      await runtime.identity.logout('test-token');
+      return Response.json({ same: runtime === winner });
+    }};`;
+  const bundled = await build({ stdin: { contents: source, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'browser', conditions: ['workerd', 'browser'], external: ['node:*', 'cloudflare:*'], target: 'es2024' });
+  const started = Promise.withResolvers<void>();
+  const gate = Promise.withResolvers<void>();
+  let opens = 0;
+  let statements = 0;
+  const simulator = new Miniflare(convertV4MiniflareOptions({
+    unsafeDirectSockets: [{ host: '127.0.0.1' }], modules: true, script: bundled.outputFiles[0]!.text,
+    compatibilityDate: workerCompatibility.compatibilityDate, compatibilityFlags: workerCompatibility.compatibilityFlags,
+    bindings: { ...bindings, PANEL_CLIENT_ID: 'panel', PANEL_CLIENT_SECRET: 'panel-secret' },
+    outboundService: async (request) => {
+      const pipeline = await request.json() as Pipeline;
+      statements++;
+      if (pipeline.requests.some((item) => item.type === 'execute' && /^pragma/i.test(item.stmt.sql))) {
+        opens++;
+        if (opens === 1) { started.resolve(); await gate.promise; }
+      }
+      return WorkerResponse.json(reply(pipeline));
+    },
+  }));
+  try {
+    await simulator.ready;
+    const origin = await simulator.unsafeGetDirectURL();
+    assert.deepEqual(await (await fetch(new URL('/seed', origin))).json(), { seeded: true });
+    await started.promise;
+    const recovered = await fetch(origin, { signal: AbortSignal.timeout(8000) });
+    assert.equal(recovered.status, 200, 'a second request can start while the first database call is pending');
+    assert.deepEqual(await recovered.json(), { same: true });
+    gate.resolve();
+    assert.deepEqual(await (await fetch(new URL('/first', origin), { signal: AbortSignal.timeout(2000) })).json(), { same: true });
+    const opened = opens;
+    const beforeWarm = statements;
+    assert.deepEqual(await (await fetch(origin, { signal: AbortSignal.timeout(2000) })).json(), { same: true });
+    assert.equal(opens, opened, 'warm access does not reopen the database');
+    assert.equal(statements, beforeWarm + 1, 'warm access can still execute SQL');
+  } finally { gate.resolve(); await simulator.dispose(); }
+});
+
 for (const [service, faultAt] of [['mcp', 1], ['auth', 3]] as const) {
   for (const fault of ['headers', 'body'] as const) {
     test(`${service} Worker recovers in the same environment after stalled database ${fault}`, { timeout: 15_000 }, async () => {
