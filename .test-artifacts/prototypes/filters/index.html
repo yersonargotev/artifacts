@@ -1,0 +1,614 @@
+<!doctype html>
+<!--
+PROTOTYPE, throwaway. Question: how should the library filter bar let an owner pick one project
+when there are 3, 15, or 60 of them? Three structurally different variants on one page,
+switchable with ?variant=A|B|C and the floating bar. Fake in-memory data, no panel code.
+Agreed deviation from the prototype skill: a standalone HTML file instead of a variant on the
+real Astro route, so it runs without building the panel.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTIPO · Filtros de proyecto</title>
+<style>
+:root {
+  --preview-background: white;
+
+  --accent-a1: color-mix(in srgb, var(--accent) 9%, transparent);
+  --accent-a2: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-a3: color-mix(in srgb, var(--accent) 32%, transparent);
+  --warn-a1: color-mix(in srgb, var(--warn) 9%, transparent);
+  --warn-a3: color-mix(in srgb, var(--warn) 30%, transparent);
+  --ok-a1: color-mix(in srgb, var(--ok) 9%, transparent);
+  --ok-a3: color-mix(in srgb, var(--ok) 30%, transparent);
+
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 999px;
+
+  --dur-1: 90ms;
+  --dur-2: 160ms;
+  --dur-3: 260ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+
+  --row: 38px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1e1e2e;
+  --bg-chrome: #181825;
+  --bg-sunken: #11111b;
+  --bg-raised: #25263a;
+  --bg-hover: #2a2b3d;
+  --border-subtle: #2a2b3d;
+  --border: #363849;
+  --border-strong: #585b70;
+  --text: #cdd6f4;
+  --text-2: #a6adc8;
+  --text-3: #9399b2;
+  --accent: #89b4fa;
+  --on-accent: #11111b;
+  --sapphire: #74c7ec;
+  --ok: #a6e3a1;
+  --warn: #f9e2af;
+  --danger: #f38ba8;
+  --peach: #fab387;
+  --teal: #94e2d5;
+  --pink: #f5c2e7;
+  --sky: #89dceb;
+  --lavender: #b4befe;
+  --flamingo: #f2cdcd;
+  --maroon: #eba0ac;
+  --accent-fill: linear-gradient(120deg, var(--accent), var(--sapphire));
+  --shadow-1: 0 1px 2px #0006;
+  --shadow-2: 0 16px 48px #000a;
+  --scrim: #11111bb3;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eff1f5;
+  --bg-chrome: #e6e9ef;
+  --bg-sunken: #dce0e8;
+  --bg-raised: #ffffff;
+  --bg-hover: #e4e7ee;
+  --border-subtle: #dde0e8;
+  --border: #ccd0da;
+  --border-strong: #9ca0b0;
+  --text: #2e3048;
+  --text-2: #494c66;
+  --text-3: #54576f;
+  --accent: #0042c7;
+  --on-accent: #ffffff;
+  --sapphire: #056271;
+  --ok: #145e02;
+  --warn: #724703;
+  --danger: #af012c;
+  --peach: #9b3902;
+  --teal: #066368;
+  --pink: #992a80;
+  --sky: #045f86;
+  --lavender: #404cbd;
+  --flamingo: #97393d;
+  --maroon: #b4022c;
+  --accent-fill: linear-gradient(120deg, #1e66f5, var(--accent));
+  --shadow-1: 0 1px 2px #4c4f6922;
+  --shadow-2: 0 16px 48px #4c4f6940;
+  --scrim: #4c4f6966;
+}
+
+[data-tone="peach"] { --tone: var(--peach); }
+[data-tone="teal"] { --tone: var(--teal); }
+[data-tone="pink"] { --tone: var(--pink); }
+[data-tone="sky"] { --tone: var(--sky); }
+[data-tone="lavender"] { --tone: var(--lavender); }
+[data-tone="flamingo"] { --tone: var(--flamingo); }
+[data-tone="sapphire"] { --tone: var(--sapphire); }
+[data-tone="maroon"] { --tone: var(--maroon); }
+
+[data-tone] {
+  --cover-wash: linear-gradient(120deg, color-mix(in srgb, var(--tone, var(--accent)) 18%, transparent), color-mix(in srgb, var(--tone, var(--accent)) 3%, transparent));
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg-sunken); color: var(--text); font: 14px/1.4 var(--font-sans); }
+button { font: inherit; color: inherit; }
+#stage { position: relative; }
+#stage.desktop { height: 100vh; }
+#stage.mobile { width: 390px; height: 800px; margin: 16px auto 0; border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; }
+.app { display: grid; grid-template-columns: 56px minmax(0, 1fr); height: 100%; background: var(--bg); }
+.mobile .app { grid-template-columns: minmax(0, 1fr); }
+.mobile .rail { display: none; }
+.rail { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; background: var(--bg-chrome); border-right: 1px solid var(--border-subtle); }
+.rail i { width: 32px; height: 32px; border-radius: var(--r-md); background: var(--bg-hover); }
+.rail i.on { background: var(--accent-a2); box-shadow: inset 3px 0 0 var(--accent); }
+.rail i.brand { background: var(--accent-fill); }
+.main { display: grid; grid-template-rows: 52px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
+.top { display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--border-subtle); }
+.mobile .top { padding: 0 12px; }
+.top h1 { margin: 0; font-size: var(--text-lg); white-space: nowrap; }
+.top .back { color: var(--text-2); font-size: var(--text-sm); }
+.search { position: relative; display: flex; align-items: center; gap: 6px; width: 320px; height: 32px; margin-left: auto; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-raised); }
+.mobile .search { width: auto; flex: 1; }
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: inherit; font: inherit; font-size: var(--text-sm); }
+.search:focus-within { border-color: var(--accent); }
+.search .kbd, kbd { padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-3); font: 11px var(--font-mono); }
+.token { display: inline-flex; align-items: center; gap: 5px; flex: none; max-width: 170px; height: 22px; padding: 0 4px 0 7px; border-radius: var(--r-sm); background: var(--accent-a2); color: var(--text); font-size: var(--text-xs); }
+.token b { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.token em { color: var(--text-3); font-style: normal; }
+.token button { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: none; cursor: pointer; }
+.suggest { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; right: 0; padding: 6px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--bg-chrome); box-shadow: var(--shadow-2); }
+.content { min-height: 0; overflow: auto; padding: 0 20px 24px; }
+.mobile .content { padding: 0 0 24px; }
+.statusbar { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 0 14px; overflow: hidden; border-top: 1px solid var(--border-subtle); background: var(--bg-chrome); color: var(--text-3); font: 11px var(--font-mono); white-space: nowrap; }
+.statusbar .url { color: var(--accent); overflow: hidden; text-overflow: ellipsis; }
+.statusbar .hints { margin-left: auto; display: flex; gap: 10px; }
+
+/* Shared bar pieces, copied from panel.css */
+.library-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 4px; margin: 0 -20px; padding: 10px 20px; border-bottom: 1px solid var(--border-subtle); }
+.mobile .library-bar { flex-direction: column; align-items: stretch; margin: 0; padding: 10px 12px; }
+.tabs { display: flex; gap: 4px; flex: none; }
+.mobile .tabs { overflow-x: auto; }
+.tabs button, .chip { display: inline-flex; flex: none; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--text-2); font-size: var(--text-sm); white-space: nowrap; cursor: pointer; }
+.tabs button span, .chip .count { color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tabs button:hover, .chip:hover { background: var(--bg-hover); color: var(--text); }
+.tabs button[aria-current], .chip[aria-current] { border-color: var(--border); background: var(--bg-raised); color: var(--text); }
+.divider { flex: none; width: 1px; height: 18px; margin: 0 8px; background: var(--border); }
+.mobile .divider { display: none; }
+.end { display: flex; flex: none; align-items: center; gap: 6px; margin-left: auto; }
+.mobile .end { margin-left: 0; }
+.menu-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-2); font-size: var(--text-sm); cursor: default; }
+.view-toggle { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.view-toggle i { width: 24px; height: 22px; border-radius: 5px; } .view-toggle i.on { background: var(--bg-hover); }
+.dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tone, var(--text-3)); }
+.dot.hollow { background: none; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader .chip { height: 24px; padding: 0 8px; border-radius: var(--r-full); font-size: var(--text-xs); gap: 5px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+td, th { height: var(--row); padding: 0 10px; border-bottom: 1px solid var(--border-subtle); text-align: left; white-space: nowrap; }
+th { color: var(--text-3); font-size: var(--text-xs); font-weight: 500; }
+td.t { max-width: 1px; width: 100%; overflow: hidden; text-overflow: ellipsis; font-weight: 550; }
+td.t small { margin-left: 8px; color: var(--text-3); font: 11px var(--font-mono); }
+tr.group th { height: 30px; background: var(--bg-chrome); color: var(--text-2); font-weight: 600; }
+tr.group th span { display: inline-flex; align-items: center; gap: 8px; }
+.state { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: var(--text-xs); }
+.state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.mobile td:not(.t):not(.u), .mobile thead { display: none; }
+tr.group th { max-width: 1px; overflow: hidden; text-overflow: ellipsis; }
+.empty { padding: 48px 0; color: var(--text-3); text-align: center; }
+
+/* Picker list, used by every variant in its own container */
+.pick-search { display: flex; align-items: center; gap: 8px; height: 34px; margin: 0 0 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-raised); }
+.pick-search:focus-within { border-color: var(--accent); }
+.pick-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: inherit; font: inherit; font-size: var(--text-sm); }
+.pick-list { overflow: auto; }
+.pick-title { padding: 8px 10px 4px; color: var(--text-3); font-size: var(--text-2xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.pick { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 32px; padding: 4px 10px; border: 0; border-radius: var(--r-md); background: none; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+.mobile .pick { min-height: 44px; }
+.pick:hover, .pick.active { background: var(--bg-hover); }
+.pick .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick .label mark { background: none; color: var(--accent); font-weight: 700; }
+.pick .count { color: var(--text-3); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.pick[aria-current] { color: var(--accent); }
+.pick[aria-current] .label { font-weight: 600; }
+.pick .check { width: 14px; color: var(--accent); font-size: 12px; }
+.pick-foot { display: flex; gap: 12px; padding: 8px 10px 2px; border-top: 1px solid var(--border-subtle); margin-top: 6px; color: var(--text-3); font-size: var(--text-2xs); }
+.pick-empty { padding: 16px 10px; color: var(--text-3); font-size: var(--text-sm); }
+
+/* Overlays */
+.layer { position: absolute; inset: 0; z-index: 40; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.layer.clear .scrim { background: none; }
+.pop { position: absolute; display: flex; flex-direction: column; width: 340px; max-height: 460px; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--bg-chrome); box-shadow: var(--shadow-2); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; max-height: 78%; padding: 8px 12px 16px; border-radius: 18px 18px 0 0; background: var(--bg-chrome); box-shadow: var(--shadow-2); }
+.sheet::before { content: ""; align-self: center; width: 36px; height: 4px; margin: 2px 0 10px; border-radius: 2px; background: var(--border-strong); }
+.sheet h2, .drawer h2 { margin: 0 4px 10px; font-size: var(--text-md); }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column; width: 84%; padding: 14px 12px; background: var(--bg-chrome); box-shadow: var(--shadow-2); }
+
+/* Variant A */
+.combo { display: inline-flex; align-items: center; gap: 8px; max-width: 280px; height: 28px; padding: 0 8px 0 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-raised); font-size: var(--text-sm); cursor: pointer; }
+.combo:hover { border-color: var(--border-strong); }
+.combo .k { color: var(--text-3); }
+.combo .name { font-weight: 600; }
+.combo.all .name { font-weight: 500; color: var(--text-2); }
+.combo-clear { width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-3); cursor: pointer; }
+.mobile .combo { max-width: none; height: 40px; width: 100%; }
+.mobile .combo .name { max-width: none; flex: 1; text-align: left; }
+.recent-strip { display: flex; gap: 4px; margin-left: 6px; }
+.recent-strip .chip { height: 24px; padding: 0 8px; font-size: var(--text-xs); color: var(--text-3); }
+
+/* Variant B */
+.bwrap { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100%; margin: 0 -20px; }
+.bwrap.collapsed { grid-template-columns: 48px minmax(0, 1fr); }
+.bwrap > .bmain { padding: 0 20px; min-width: 0; }
+.bwrap > .bmain .library-bar { margin: 0 -20px; }
+.side { position: sticky; top: 0; display: flex; flex-direction: column; height: calc(100vh - 82px); padding: 10px 8px; border-right: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-chrome) 55%, var(--bg)); }
+.side-head { display: flex; align-items: center; gap: 4px; margin: 0 2px 8px; }
+.side-head h2 { flex: 1; margin: 0 0 0 4px; color: var(--text-2); font-size: var(--text-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.seg button { height: 20px; padding: 0 6px; border: 0; border-radius: 4px; background: none; color: var(--text-3); font-size: var(--text-2xs); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--bg-hover); color: var(--text); }
+.icon-btn { width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-3); cursor: pointer; }
+.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+.side .pick { min-height: 30px; }
+.side .pick[aria-current] { background: var(--accent-a2); box-shadow: inset 3px 0 0 var(--accent); color: var(--text); }
+.side .pick-search { height: 30px; }
+.side-strip { display: flex; flex-direction: column; align-items: center; gap: 4px; overflow: auto; }
+.strip-item { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 0; border-radius: var(--r-md); background: none; cursor: pointer; font-size: 11px; font-weight: 700; color: var(--tone, var(--text-3)); }
+.strip-item:hover { background: var(--bg-hover); }
+.strip-item[aria-current] { background: var(--accent-a2); box-shadow: inset 3px 0 0 var(--accent); }
+.bmobile-btn { display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-raised); font-size: var(--text-sm); cursor: pointer; }
+.bmobile-btn .name { flex: 1; max-width: none; text-align: left; font-weight: 600; }
+
+/* Variant C */
+.chips { display: flex; flex: 1 1 320px; gap: 4px; min-width: 0; }
+.chips-scroll { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.mobile .chips, .rfilters .chips { flex: none; max-width: 100%; }
+.chips > .chip { flex: none; }
+.mobile .library-bar > * { min-width: 0; max-width: 100%; }
+.chip.more { border-style: dashed; border-color: var(--border); color: var(--text-2); }
+.chip-clear { width: 28px; padding: 0; justify-content: center; }
+
+/* Reader */
+.reader { display: grid; grid-template-columns: 340px minmax(0, 1fr); height: 100%; margin: 0 -20px -24px; }
+.reader.with-strip { grid-template-columns: 48px 320px minmax(0, 1fr); }
+.reader.with-side { grid-template-columns: 220px 320px minmax(0, 1fr); }
+.mobile .reader, .mobile .reader.with-strip, .mobile .reader.with-side { grid-template-columns: 1fr; grid-template-rows: 44% 1fr; margin: 0; }
+.rlist { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border-subtle); background: var(--bg-chrome); }
+.rfilters { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); }
+.rfilters .tabs { overflow-x: auto; }
+.rfilters .tabs button { height: 24px; padding: 0 8px; border-radius: var(--r-full); font-size: var(--text-xs); }
+.rrows { flex: 1; min-height: 0; overflow: auto; }
+.ritem { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 8px 14px; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.ritem:first-child { background: var(--accent-a1); }
+.ritem b { overflow: hidden; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.ritem time, .ritem small { color: var(--text-3); font-size: var(--text-2xs); }
+.rgroup { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg); color: var(--text-2); font-size: var(--text-xs); font-weight: 600; }
+.rpane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.rpane header { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); font-weight: 600; }
+.rpane .frame { flex: 1; margin: 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: repeating-linear-gradient(135deg, var(--bg-raised) 0 12px, var(--bg) 12px 24px); display: grid; place-items: center; color: var(--text-3); }
+.reader .side { height: auto; min-height: 0; }
+
+/* Prototype chrome, deliberately off-brand */
+.proto { position: fixed; z-index: 100; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: #111; color: #fff; box-shadow: 0 8px 30px #0008; font: 12px var(--font-sans); }
+.proto button { height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: #2a2a2a; color: #fff; cursor: pointer; }
+.proto button.on { background: #fff; color: #111; }
+.proto .label { min-width: 190px; text-align: center; font-weight: 700; }
+.proto .sep { width: 1px; height: 18px; background: #444; }
+.notes { position: fixed; z-index: 100; left: 50%; bottom: 64px; transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); max-height: 50vh; overflow: auto; padding: 14px 18px; border-radius: 14px; background: #111; color: #eee; box-shadow: 0 8px 30px #0008; font-size: 13px; }
+.notes h3 { margin: 0 0 6px; font-size: 13px; } .notes ul { margin: 0 0 10px; padding-left: 18px; } .notes li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="proto"></div>
+<script>
+// ---------- Fake data (deterministic) ----------
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const NAMES = ['artifacts-panel', 'Onboarding', 'Informe trimestral Q3', 'Wiki interna', 'Pagos', 'Rediseño del flujo de registro para clientes empresariales', 'Docs API pública', 'Investigación de usuarios 2026', 'Marca', 'Experimentos de precios', 'Landing primavera', 'Soporte', 'Roadmap', 'Comunidad', 'Diseño de búsqueda',
+  'Cliente Acme · propuesta', 'Cliente Globex · auditoría', 'Migración a Turso', 'Charlas y talleres', 'Notas de lanzamiento', 'Accesibilidad', 'Métricas de crecimiento', 'Plantillas de correo', 'Estrategia de contenido para redes sociales del segundo semestre', 'Seguridad', 'App móvil', 'Facturación', 'Legal y privacidad', 'Equipo de datos', 'Retrospectivas',
+  'Cliente Initech · integración', 'Cliente Umbrella', 'Hackathon', 'Formación interna', 'Prototipos', 'Kit de prensa', 'Partners', 'Analítica de producto', 'Recetas', 'Viaje a Lisboa', 'Tesis', 'Curso de TLA+', 'Benchmarks', 'Ideas sueltas', 'Portafolio',
+  'Cliente Hooli · rediseño', 'Cliente Stark · dashboard', 'Ventas LATAM', 'Ventas EMEA', 'Encuestas NPS', 'OKR 2027', 'Mantenimiento', 'Infraestructura', 'Observabilidad y alertas', 'Experimentos con IA', 'Documentación de diseño', 'Iconografía', 'Ilustraciones', 'Videos', 'Archivo'];
+const TONES = ['peach', 'teal', 'pink', 'sky', 'lavender', 'flamingo', 'sapphire', 'maroon'];
+const NOUNS = ['Resumen', 'Diagrama', 'Propuesta', 'Checklist', 'Informe', 'Mockup', 'Guía', 'Comparativa', 'Plan', 'Notas', 'Tablero', 'Borrador', 'Especificación', 'Encuesta'];
+const STATES = [['published', 'Publicado', 'var(--ok)'], ['pending', 'Con cambios', 'var(--warn)'], ['draft', 'Borrador', 'var(--text-3)']];
+function buildData(n) {
+  const r = rng(n * 7919);
+  const projects = NAMES.slice(0, n).map((name, i) => ({ name, tone: TONES[i % TONES.length] }));
+  const artifacts = [];
+  const sizes = projects.map((_, i) => Math.max(1, Math.round(70 / Math.pow(1 + ((i * 37) % n), 1.15) * (0.6 + r()))));
+  const owners = [...projects.map((p, i) => ({ p, size: sizes[i] })), { p: null, size: 9 }];
+  for (const { p, size } of owners) for (let j = 0; j < size; j++) {
+    const s = r(); const st = s < 0.6 ? STATES[0] : s < 0.78 ? STATES[1] : STATES[2];
+    artifacts.push({ title: NOUNS[Math.floor(r() * NOUNS.length)] + ' ' + (p ? p.name.split(' ')[0].toLowerCase() : 'suelto') + ' ' + (j + 1), slug: 'a-' + Math.floor(r() * 1e6).toString(36), project: p ? p.name : null, state: st, hours: Math.floor(Math.pow(r(), 2.2) * 24 * 90), rev: 1 + Math.floor(r() * 9) });
+  }
+  for (const p of projects) { const mine = artifacts.filter((a) => a.project === p.name); p.count = mine.length; p.hours = Math.min(...mine.map((a) => a.hours)); }
+  return { projects, artifacts, unfiled: artifacts.filter((a) => !a.project).length };
+}
+
+// ---------- State ----------
+const params = new URLSearchParams(location.search);
+const VARIANTS = { A: 'Combobox con búsqueda', B: 'Columna lateral', C: 'Chips con desborde + token' };
+const S = {
+  variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
+  n: [3, 15, 60].includes(Number(params.get('n'))) ? Number(params.get('n')) : 15,
+  device: params.get('device') === 'mobile' ? 'mobile' : 'desktop',
+  mode: params.get('mode') === 'reader' ? 'reader' : 'library',
+  theme: params.get('theme') === 'light' ? 'light' : 'dark',
+  scope: { kind: 'all' }, status: 'all', q: '', overlay: null, notes: false,
+  sideSort: 'recent', sideCollapsed: false,
+};
+let D = buildData(S.n);
+function syncUrl() { const p = new URLSearchParams({ variant: S.variant, n: S.n, device: S.device, mode: S.mode, theme: S.theme }); history.replaceState(null, '', '?' + p); }
+function panelUrl() {
+  const p = new URLSearchParams();
+  if (S.scope.kind === 'project') p.set('project', S.scope.name); if (S.scope.kind === 'unfiled') p.set('unfiled', '1');
+  if (S.status !== 'all') p.set('status', S.status); if (S.q) p.set('q', S.q);
+  return (S.mode === 'reader' ? '/read' : '/') + (p.size ? '?' + p : '');
+}
+
+// ---------- Helpers ----------
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const ago = (h) => h < 1 ? 'ahora' : h < 24 ? 'hace ' + h + ' h' : 'hace ' + Math.floor(h / 24) + ' d';
+const toneOf = (name) => D.projects.find((p) => p.name === name)?.tone;
+const isCurrent = (scope) => scope.kind === S.scope.kind && (scope.kind !== 'project' || scope.name === S.scope.name);
+const scopeLabel = () => S.scope.kind === 'all' ? 'Todos los proyectos' : S.scope.kind === 'unfiled' ? 'Sin proyecto' : S.scope.name;
+const byRecent = (a, b) => a.hours - b.hours;
+const byAlpha = (a, b) => a.name.localeCompare(b.name, 'es');
+function highlight(label, q) {
+  if (!q) return esc(label);
+  const i = fold(label).indexOf(fold(q));
+  return i < 0 ? esc(label) : esc(label.slice(0, i)) + '<mark>' + esc(label.slice(i, i + q.length)) + '</mark>' + esc(label.slice(i + q.length));
+}
+const ALL = () => ({ kind: 'all', label: 'Todos los proyectos', count: D.artifacts.length });
+const UNFILED = () => ({ kind: 'unfiled', label: 'Sin proyecto', count: D.unfiled });
+const PROJ = (p) => ({ kind: 'project', name: p.name, label: p.name, count: p.count, tone: p.tone, hours: p.hours });
+function matches(q) { const f = fold(q); return [...D.projects.filter((p) => fold(p.name).includes(f)).sort((a, b) => fold(a.name).indexOf(f) - fold(b.name).indexOf(f) || byRecent(a, b)).map(PROJ), ...(fold('Sin proyecto').includes(f) ? [UNFILED()] : [])]; }
+function scoped() { return D.artifacts.filter((a) => S.scope.kind === 'all' || (S.scope.kind === 'unfiled' ? !a.project : a.project === S.scope.name)); }
+function visible() { const f = fold(S.q); return scoped().filter((a) => (S.status === 'all' || a.state[0] === S.status) && (!f || fold(a.title).includes(f))).sort((a, b) => a.hours - b.hours).slice(0, 25); }
+
+// ---------- Shared bar pieces ----------
+function statusTabs(short) {
+  const all = scoped(); const c = (k) => k === 'all' ? all.length : all.filter((a) => a.state[0] === k).length;
+  const tabs = [['all', 'Todos', 'Todos'], ['published', 'Publicados', 'Publ.'], ['pending', 'Con cambios', 'Cambios'], ['draft', 'Borradores', 'Borr.']];
+  return '<nav class="tabs" aria-label="Filtrar por publicación">' + tabs.map(([k, l, s]) => '<button data-status="' + k + '"' + (S.status === k ? ' aria-current="page"' : '') + '>' + (short ? s : l) + '<span>' + c(k) + '</span></button>').join('') + '</nav>';
+}
+function endMenus() { const g = S.scope.kind === 'all' && S.device === 'desktop' ? '<span class="menu-btn">Agrupar: Proyecto ▾</span>' : ''; return '<div class="end">' + g + '<span class="menu-btn">Orden: Actualizado ↓</span><span class="view-toggle"><i class="on"></i><i></i></span></div>'; }
+function table(rows) {
+  if (!rows.length) return '<p class="empty">Nada coincide con estos filtros.</p>';
+  if (S.device === 'mobile') return '<div>' + readerRows(rows) + '</div>';
+  const group = S.scope.kind === 'all';
+  const tr = (a) => '<tr><td class="t">' + esc(a.title) + '<small>' + a.slug + '</small></td><td><span class="state" style="--c:' + a.state[2] + '">' + a.state[1] + '</span></td><td>HTML</td><td>rev. ' + a.rev + '</td><td class="u">' + ago(a.hours) + '</td></tr>';
+  let body = '';
+  if (group) {
+    const order = [...D.projects.map((p) => p.name), null];
+    for (const name of order) { const g = rows.filter((a) => a.project === name); if (!g.length) continue; body += '<tr class="group"><th colspan="5"><span><i class="dot' + (name ? '' : ' hollow') + '" data-tone="' + (name ? toneOf(name) : '') + '"></i>' + esc(name ?? 'Sin proyecto') + ' · ' + g.length + ' en esta página</span></th></tr>' + g.map(tr).join(''); }
+  } else body = rows.map(tr).join('');
+  return '<table><thead><tr><th>Título</th><th>Estado</th><th>Tipo</th><th>Revisión</th><th>Actualizado</th></tr></thead><tbody>' + body + '</tbody></table>';
+}
+function readerRows(rows) {
+  if (!rows.length) return '<p class="empty">Nada coincide.</p>';
+  let out = '', last;
+  for (const a of rows) { if (S.scope.kind === 'all' && a.project !== last) { last = a.project; out += '<div class="rgroup"><i class="dot' + (a.project ? '' : ' hollow') + '" data-tone="' + (toneOf(a.project) ?? '') + '"></i>' + esc(a.project ?? 'Sin proyecto') + '</div>'; } out += '<div class="ritem"><b>' + esc(a.title) + '</b><time>' + ago(a.hours) + '</time><small>' + a.state[1] + ' · rev. ' + a.rev + '</small></div>'; }
+  return out;
+}
+function pane(rows) { const a = rows[0]; return '<section class="rpane"><header>' + (a ? esc(a.title) + '<span class="state" style="--c:' + a.state[2] + '">' + a.state[1] + '</span>' : '—') + '</header><div class="frame">vista previa</div></section>'; }
+
+// ---------- Picker (list + keyboard), each variant mounts it in its own container ----------
+function pickItem(item, q, i) {
+  const scope = 'data-scope="' + item.kind + '"' + (item.name ? ' data-name="' + esc(item.name) + '"' : '');
+  const dot = item.kind === 'project' ? '<i class="dot" data-tone="' + item.tone + '"></i>' : item.kind === 'unfiled' ? '<i class="dot hollow"></i>' : '<span class="check">' + (isCurrent(item) ? '✓' : '') + '</span>';
+  return '<button class="pick" data-i="' + i + '" ' + scope + (isCurrent(item) ? ' aria-current="true"' : '') + ' title="' + esc(item.label) + '">' + (item.kind === 'all' ? dot : dot) + '<span class="label">' + highlight(item.label, q) + '</span>' + (item.hours !== undefined && !q ? '' : '') + '<span class="count">' + item.count + '</span></button>';
+}
+function pickGroups(groups, q) {
+  let i = 0, html = '';
+  for (const g of groups) { if (!g.items.length) continue; if (g.title) html += '<div class="pick-title">' + g.title + '</div>'; html += g.items.map((it) => pickItem(it, q, i++)).join(''); }
+  return html || '<p class="pick-empty">Ningún proyecto contiene «' + esc(q) + '».</p>';
+}
+// Wires the search input inside root: typing re-renders only the list, arrows move the active row, Enter picks.
+function mountPicker(root, groupsFor) {
+  const input = root.querySelector('.pick-search input'); const list = root.querySelector('.pick-list');
+  let active = 0;
+  const paint = () => { list.innerHTML = pickGroups(groupsFor(input ? input.value.trim() : ''), input ? input.value.trim() : ''); const items = list.querySelectorAll('.pick'); active = Math.min(active, items.length - 1); items.forEach((el, i) => el.classList.toggle('active', i === active)); items[active]?.scrollIntoView({ block: 'nearest' }); };
+  paint();
+  if (!input) return;
+  input.addEventListener('input', () => { active = 0; paint(); });
+  input.addEventListener('keydown', (e) => {
+    const items = list.querySelectorAll('.pick');
+    if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % items.length; paint(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = (active - 1 + items.length) % items.length; paint(); }
+    else if (e.key === 'Enter') { e.preventDefault(); items[active]?.click(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (input.value) { input.value = ''; paint(); } else close(); }
+  });
+  setTimeout(() => input.focus(), 0);
+}
+
+// ---------- Variant A: one combobox button, popover (sheet on mobile) ----------
+const A = {
+  name: VARIANTS.A,
+  button(compact) {
+    const all = S.scope.kind === 'all';
+    const dot = S.scope.kind === 'project' ? '<i class="dot" data-tone="' + toneOf(S.scope.name) + '"></i>' : S.scope.kind === 'unfiled' ? '<i class="dot hollow"></i>' : '';
+    const count = S.scope.kind === 'all' ? D.artifacts.length : S.scope.kind === 'unfiled' ? D.unfiled : D.projects.find((p) => p.name === S.scope.name).count;
+    return '<span style="display:inline-flex;align-items:center;gap:2px;' + (S.device === 'mobile' ? 'width:100%' : '') + '"><button class="combo' + (all ? ' all' : '') + '" data-act="open-picker" aria-haspopup="listbox"><span class="k">' + (compact ? '' : 'Proyecto') + '</span>' + dot + '<span class="name">' + esc(all ? 'Todos' : scopeLabel()) + '</span><span class="count" style="color:var(--text-3)">' + count + '</span><span style="color:var(--text-3)">▾</span></button>' + (all ? '' : '<button class="combo-clear" data-scope="all" title="Todos los proyectos">✕</button>') + '</span>';
+  },
+  // Quick switch to the three most recent projects, so the common case stays one click.
+  recents() {
+    if (S.device === 'mobile') return '';
+    const r = [...D.projects].sort(byRecent).filter((p) => !isCurrent(PROJ(p))).slice(0, 3);
+    return '<span class="recent-strip" aria-label="Recientes">' + r.map((p) => '<button class="chip" data-scope="project" data-name="' + esc(p.name) + '" title="' + esc(p.name) + '"><i class="dot" data-tone="' + p.tone + '"></i><span class="name" style="max-width:110px">' + esc(p.name) + '</span></button>').join('') + '</span>';
+  },
+  groups(q) {
+    if (q) return [{ items: matches(q) }];
+    const recent = [...D.projects].sort(byRecent).slice(0, 5).map(PROJ);
+    return [{ items: [ALL(), UNFILED()] }, ...(D.projects.length > 6 ? [{ title: 'Recientes', items: recent }] : []), { title: D.projects.length > 6 ? 'Todos · A–Z' : 'Proyectos', items: [...D.projects].sort(byAlpha).map(PROJ) }];
+  },
+  library() { return '<div class="library-bar">' + statusTabs(false) + '<span class="divider"></span>' + A.button(false) + A.recents() + endMenus() + '</div>' + table(visible()); },
+  reader() { const rows = visible(); return '<div class="reader"><section class="rlist"><div class="rfilters">' + statusTabs(true) + A.button(true) + '</div><div class="rrows">' + readerRows(rows) + '</div></section>' + pane(rows) + '</div>'; },
+  overlay() {
+    if (S.overlay !== 'picker') return '';
+    const body = '<div class="pick-search"><span style="color:var(--text-3)">⌕</span><input placeholder="Buscar proyecto…" aria-label="Buscar proyecto"><span class="kbd">esc</span></div><div class="pick-list" role="listbox"></div><div class="pick-foot"><span><kbd>↑</kbd><kbd>↓</kbd> mover</span><span><kbd>↵</kbd> elegir</span><span><kbd>g</kbd> abrir desde cualquier lugar</span></div>';
+    if (S.device === 'mobile') return '<div class="layer"><div class="scrim" data-act="close"></div><div class="sheet" data-picker><h2>Proyecto</h2>' + body + '</div></div>';
+    const btn = document.querySelector('.combo').getBoundingClientRect(); const st = document.getElementById('stage').getBoundingClientRect();
+    return '<div class="layer clear"><div class="scrim" data-act="close"></div><div class="pop" data-picker style="top:' + (btn.bottom - st.top + 6) + 'px;left:' + Math.min(btn.left - st.left, st.width - 352) + 'px">' + body + '</div></div>';
+  },
+  key() { open('picker'); },
+  notes: ['<h3>Idea</h3><ul><li>Un solo control «Proyecto ▾» reemplaza la fila de chips: la barra mide lo mismo con 3 o con 60 proyectos.</li><li>Al lado van los 3 proyectos más recientes como atajos de un clic. Desaparecen en móvil.</li><li>El popover tiene la lista de recientes y luego todos de la A a la Z (con 6 o menos proyectos, solo la lista). La búsqueda ignora tildes y mayúsculas.</li></ul>',
+    '<h3>Sin JavaScript</h3><ul><li>Un <code>details</code> nativo con todos los proyectos como enlaces GET, sin búsqueda ni teclado. Con 60 proyectos queda una lista larga, pero funciona.</li></ul>',
+    '<h3>Móvil</h3><ul><li>El botón ocupa todo el ancho y abre una hoja inferior con filas de 44px.</li></ul>',
+    '<h3>Preguntas abiertas</h3><ul><li>¿Los atajos de recientes valen el ruido visual que agregan?</li><li>¿Qué tecla abre el selector? (<kbd>g</kbd> en el prototipo, porque <kbd>p</kbd> ya es publicar).</li></ul>'],
+};
+
+// ---------- Variant B: persistent project column ----------
+const B = {
+  name: VARIANTS.B,
+  groups(q) {
+    if (q) return [{ items: matches(q) }];
+    const list = [...D.projects].sort(S.sideSort === 'recent' ? byRecent : byAlpha).map(PROJ);
+    return [{ items: [ALL(), UNFILED()] }, { title: 'Proyectos · ' + D.projects.length, items: list }];
+  },
+  side(reader) {
+    if (S.sideCollapsed) {
+      const items = [ALL(), UNFILED(), ...[...D.projects].sort(S.sideSort === 'recent' ? byRecent : byAlpha).map(PROJ)];
+      return '<aside class="side" style="padding:10px 0;align-items:center"><button class="icon-btn" data-act="expand" title="Mostrar proyectos">»</button><div class="side-strip">' + items.map((it) => '<button class="strip-item" data-scope="' + it.kind + '"' + (it.name ? ' data-name="' + esc(it.name) + '" data-tone="' + it.tone + '"' : '') + (isCurrent(it) ? ' aria-current="true"' : '') + ' title="' + esc(it.label) + ' (' + it.count + ')">' + (it.kind === 'all' ? '∗' : it.kind === 'unfiled' ? '○' : esc(it.label.slice(0, 2))) + '</button>').join('') + '</div></aside>';
+    }
+    const search = D.projects.length > 8 ? '<div class="pick-search"><span style="color:var(--text-3)">⌕</span><input placeholder="Filtrar proyectos" aria-label="Filtrar proyectos"><span class="kbd">g</span></div>' : '';
+    return '<aside class="side" data-picker><div class="side-head"><h2>Proyectos</h2><span class="seg"><button data-act="sort-recent" aria-pressed="' + (S.sideSort === 'recent') + '">Recientes</button><button data-act="sort-alpha" aria-pressed="' + (S.sideSort === 'alpha') + '">A–Z</button></span><button class="icon-btn" data-act="collapse" title="Ocultar">«</button></div>' + search + '<div class="pick-list"></div></aside>';
+  },
+  mobileBtn() { return '<button class="bmobile-btn" data-act="open-drawer">' + (S.scope.kind === 'project' ? '<i class="dot" data-tone="' + toneOf(S.scope.name) + '"></i>' : '☰') + '<span class="name">' + esc(scopeLabel()) + '</span><span style="color:var(--text-3)">Proyectos ›</span></button>'; },
+  library() {
+    if (S.device === 'mobile') return '<div class="library-bar">' + B.mobileBtn() + statusTabs(false) + endMenus() + '</div>' + table(visible());
+    return '<div class="bwrap' + (S.sideCollapsed ? ' collapsed' : '') + '">' + B.side(false) + '<div class="bmain"><div class="library-bar"><strong style="margin-right:8px">' + esc(scopeLabel()) + '</strong>' + statusTabs(false) + endMenus() + '</div>' + table(visible()) + '</div></div>';
+  },
+  reader() {
+    const rows = visible();
+    if (S.device === 'mobile') return '<div class="reader"><section class="rlist"><div class="rfilters">' + B.mobileBtn() + statusTabs(true) + '</div><div class="rrows">' + readerRows(rows) + '</div></section>' + pane(rows) + '</div>';
+    return '<div class="reader ' + (S.sideCollapsed ? 'with-strip' : 'with-side') + '">' + B.side(true) + '<section class="rlist"><div class="rfilters">' + statusTabs(true) + '</div><div class="rrows">' + readerRows(rows) + '</div></section>' + pane(rows) + '</div>';
+  },
+  after() { const side = document.querySelector('.side[data-picker]'); if (side) mountSide(side); },
+  overlay() {
+    if (S.overlay !== 'drawer') return '';
+    return '<div class="layer"><div class="scrim" data-act="close"></div><div class="drawer" data-picker><h2>Proyectos</h2><div class="pick-search"><span style="color:var(--text-3)">⌕</span><input placeholder="Filtrar proyectos" aria-label="Filtrar proyectos"></div><div class="pick-list"></div></div></div>';
+  },
+  key() { if (S.device === 'mobile') return open('drawer'); if (S.sideCollapsed) { S.sideCollapsed = false; render(); } document.querySelector('.side .pick-search input')?.focus(); },
+  notes: ['<h3>Idea</h3><ul><li>Los proyectos dejan la barra y pasan a una columna fija, como un explorador de carpetas. Siempre se ve el proyecto en que estás, y los demás quedan a un clic.</li><li>La columna permite ordenar por actividad reciente o de la A a la Z. El filtro de texto aparece con más de 8 proyectos.</li><li>Colapsada, queda una tira de 48px con las iniciales y el color de cada proyecto.</li><li>En lectura, la columna queda a la izquierda de la lista, así que hay tres columnas.</li></ul>',
+    '<h3>Sin JavaScript</h3><ul><li>Es la que mejor se degrada: la columna es una lista de enlaces GET. Solo se pierden el filtro de texto (o lo resuelve un formulario GET) y el colapso (que se puede guardar en una cookie, como <code>panel_view</code>).</li></ul>',
+    '<h3>Móvil</h3><ul><li>La columna se convierte en un botón «Proyecto actual · Proyectos ›» que abre un cajón lateral.</li></ul>',
+    '<h3>Preguntas abiertas</h3><ul><li>¿Cuánto ancho le resta a la tabla? En lectura quedan tres columnas.</li><li>¿Sigue teniendo sentido la página Proyectos si esta columna existe?</li></ul>'],
+};
+function mountSide(root) {
+  const input = root.querySelector('.pick-search input'); const list = root.querySelector('.pick-list');
+  const paint = () => { const q = input ? input.value.trim() : ''; list.innerHTML = pickGroups(B.groups(q), q); };
+  paint();
+  if (input) { input.addEventListener('input', paint); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); list.querySelector('.pick')?.click(); } if (e.key === 'Escape') { input.value = ''; paint(); input.blur(); } }); }
+}
+
+// ---------- Variant C: top chips + "+N más" + proyecto: token in search ----------
+const C = {
+  name: VARIANTS.C,
+  chips(k) {
+    const top = [...D.projects].sort(byRecent).slice(0, k);
+    if (S.scope.kind === 'project' && !top.some((p) => p.name === S.scope.name)) top.unshift(D.projects.find((p) => p.name === S.scope.name));
+    const rest = D.projects.length - top.length;
+    const chip = (it) => '<button class="chip" data-scope="' + it.kind + '"' + (it.name ? ' data-name="' + esc(it.name) + '"' : '') + (isCurrent(it) ? ' aria-current="page"' : '') + ' title="' + esc(it.label) + '"><i class="dot' + (it.kind === 'unfiled' ? ' hollow' : '') + '" data-tone="' + (it.tone ?? '') + '"></i><span class="name">' + esc(it.label) + '</span><span class="count">' + it.count + '</span></button>';
+    return '<div class="chips"><div class="chips-scroll">' + top.map((p) => chip(PROJ(p))).join('') + chip(UNFILED()) + '</div>' + (rest > 0 ? '<button class="chip more" data-act="open-more">+' + rest + ' más</button>' : '') + (S.scope.kind !== 'all' ? '<button class="chip chip-clear" data-scope="all" title="Todos los proyectos">✕</button>' : '') + '</div>';
+  },
+  groups(q) { return q ? [{ items: matches(q) }] : [{ title: 'Todos · A–Z', items: [...D.projects].sort(byAlpha).map(PROJ) }]; },
+  library() { return '<div class="library-bar">' + statusTabs(false) + '<span class="divider"></span>' + C.chips(S.device === 'mobile' ? 3 : 5) + endMenus() + '</div>' + table(visible()); },
+  reader() { const rows = visible(); return '<div class="reader"><section class="rlist"><div class="rfilters">' + statusTabs(true) + C.chips(3) + '</div><div class="rrows">' + readerRows(rows) + '</div></section>' + pane(rows) + '</div>'; },
+  overlay() {
+    if (S.overlay !== 'more') return '';
+    const body = '<div class="pick-search"><span style="color:var(--text-3)">⌕</span><input placeholder="Buscar en ' + D.projects.length + ' proyectos…" aria-label="Buscar proyecto"></div><div class="pick-list"></div><div class="pick-foot"><span>Tip: escribe <kbd>proyecto:</kbd> en la búsqueda</span></div>';
+    if (S.device === 'mobile') return '<div class="layer"><div class="scrim" data-act="close"></div><div class="sheet" data-picker><h2>Todos los proyectos</h2>' + body + '</div></div>';
+    const btn = document.querySelector('.chip.more').getBoundingClientRect(); const st = document.getElementById('stage').getBoundingClientRect();
+    return '<div class="layer clear"><div class="scrim" data-act="close"></div><div class="pop" data-picker style="top:' + (btn.bottom - st.top + 6) + 'px;left:' + Math.min(btn.left - st.left, st.width - 352) + 'px">' + body + '</div></div>';
+  },
+  key() { if (document.querySelector('.chip.more')) open('more'); else document.querySelector('.search input').focus(); },
+  notes: ['<h3>Idea</h3><ul><li>Se mantienen los chips de hoy, pero solo los 5 proyectos más recientes (3 en lectura y en móvil). El proyecto elegido siempre se ve aunque no sea reciente, y el resto queda detrás de «+N más».</li><li>Para el teclado: en la búsqueda de arriba, <code>proyecto:</code> abre sugerencias y la elección queda como un token. Prueba escribir <kbd>proyecto:pag</kbd>. En la versión real, ⌘K ya lista proyectos.</li><li>Es el cambio más chico respecto del panel actual.</li></ul>',
+    '<h3>Sin JavaScript</h3><ul><li>Los chips son enlaces GET. «+N más» es un <code>details</code> con la lista completa. El token se puede resolver en el servidor: <code>q=proyecto:pagos</code> se traduce a <code>project=Pagos</code>.</li></ul>',
+    '<h3>Móvil</h3><ul><li>Una fila de chips con desplazamiento lateral y «+N más» como hoja inferior.</li></ul>',
+    '<h3>Preguntas abiertas</h3><ul><li>¿Los chips deberían mantener una posición estable? Ordenarlos por actividad hace que cambien de lugar.</li><li>¿El token debe vivir en la búsqueda (mezcla dos conceptos) o solo en ⌘K?</li></ul>'],
+};
+const V = { A, B, C };
+
+// ---------- Search box (variant C adds the proyecto: token) ----------
+function searchBox() {
+  const token = S.variant === 'C' && S.scope.kind !== 'all' ? '<span class="token"><em>proyecto:</em><b>' + esc(scopeLabel()) + '</b><button data-scope="all" title="Quitar">✕</button></span>' : '';
+  const ph = S.variant === 'C' ? 'Buscar… (proyecto: para filtrar)' : 'Buscar artefactos';
+  return '<label class="search"><span style="color:var(--text-3)">⌕</span>' + token + '<input id="q" value="' + esc(S.q) + '" placeholder="' + ph + '" autocomplete="off"><span class="kbd">⌘K</span><div class="suggest" hidden></div></label>';
+}
+function wireSearch() {
+  const input = document.getElementById('q'); const box = input.parentElement.querySelector('.suggest'); let active = 0, items = [];
+  const tokenQuery = () => S.variant === 'C' ? /(?:^|\s)proyecto:(\S*)$/i.exec(input.value) : null;
+  const paint = () => {
+    const m = tokenQuery(); if (!m) { box.hidden = true; return; }
+    items = (m[1] ? matches(m[1]) : [...D.projects].sort(byRecent).map(PROJ)).slice(0, 8); active = Math.min(active, Math.max(0, items.length - 1));
+    box.hidden = false; box.innerHTML = '<div class="pick-title">proyecto:</div>' + (items.length ? items.map((it, i) => pickItem(it, m[1], i)).join('') : '<p class="pick-empty">Sin coincidencias</p>');
+    box.querySelectorAll('.pick').forEach((el, i) => el.classList.toggle('active', i === active));
+  };
+  const strip = () => input.value.replace(/(?:^|\s)proyecto:\S*$/i, '').trim();
+  input.addEventListener('input', () => { active = 0; paint(); });
+  box.addEventListener('mousedown', (e) => { const b = e.target.closest('.pick'); if (b) { e.preventDefault(); S.q = strip(); input.value = S.q; } });
+  input.addEventListener('keydown', (e) => {
+    if (!box.hidden && items.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % items.length; return paint(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); active = (active - 1 + items.length) % items.length; return paint(); }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); const it = items[active]; S.q = strip(); S.scope = it.kind === 'project' ? { kind: 'project', name: it.name } : { kind: it.kind }; render(); document.getElementById('q').focus(); return; }
+    }
+    if (e.key === 'Backspace' && !input.value && S.variant === 'C' && S.scope.kind !== 'all') { S.scope = { kind: 'all' }; render(); document.getElementById('q').focus(); return; }
+    if (e.key === 'Escape') { box.hidden = true; input.blur(); }
+    if (e.key === 'Enter') { S.q = input.value.trim(); render(); }
+  });
+}
+
+// ---------- Render ----------
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  const v = V[S.variant]; const stage = document.getElementById('stage'); stage.className = S.device;
+  const reader = S.mode === 'reader';
+  const top = reader ? '<span class="back">← Biblioteca</span><h1>Modo lectura</h1>' + (S.device === 'desktop' ? searchBox() : '') : '<h1>Biblioteca</h1>' + searchBox();
+  const hints = reader ? '<span>j k siguiente</span><span>g proyecto</span><span>esc volver</span>' : '<span>j k mover</span><span>g proyecto</span><span>↵ leer</span>';
+  stage.innerHTML = '<div class="app"><nav class="rail"><i class="brand"></i><i class="' + (reader ? '' : 'on') + '"></i><i></i><i class="' + (reader ? 'on' : '') + '"></i></nav><div class="main"><header class="top">' + top + '</header><main class="content' + (reader ? ' reader-host' : '') + '">' + (reader ? v.reader() : v.library()) + '</main><footer class="statusbar"><span>' + D.artifacts.length + ' artefactos · ' + D.projects.length + ' proyectos</span><span class="url">' + esc(panelUrl()) + '</span><span class="hints">' + hints + '</span></footer></div></div><div id="layer"></div>';
+  if (reader) stage.querySelector('.content').style.overflow = 'hidden';
+  v.after?.();
+  if (document.getElementById('q')) wireSearch();
+  renderOverlay(); renderProto(); syncUrl();
+}
+function renderOverlay() { const host = document.getElementById('layer'); host.innerHTML = V[S.variant].overlay(); const p = host.querySelector('[data-picker]'); if (p) mountPicker(p, V[S.variant].groups); }
+function open(kind) { S.overlay = kind; renderOverlay(); }
+function close() { S.overlay = null; renderOverlay(); }
+function renderProto() {
+  const keys = Object.keys(VARIANTS);
+  const seg = (field, opts) => opts.map(([val, label]) => '<button data-proto="' + field + '" data-val="' + val + '" class="' + (String(S[field]) === String(val) ? 'on' : '') + '">' + label + '</button>').join('');
+  document.getElementById('proto').innerHTML = '<div class="proto"><button data-proto-step="-1">←</button><span class="label">' + S.variant + ' · ' + VARIANTS[S.variant] + '</span><button data-proto-step="1">→</button><span class="sep"></span>' + seg('n', [[3, '3'], [15, '15'], [60, '60']]) + '<span class="sep"></span>' + seg('device', [['desktop', 'Escritorio'], ['mobile', 'Móvil']]) + '<span class="sep"></span>' + seg('mode', [['library', 'Biblioteca'], ['reader', 'Lectura']]) + '<span class="sep"></span><button data-proto-theme>' + (S.theme === 'dark' ? '☾' : '☀') + '</button><button data-proto-notes class="' + (S.notes ? 'on' : '') + '">Notas</button></div>' + (S.notes ? '<div class="notes">' + V[S.variant].notes.join('') + '</div>' : '');
+  void keys;
+}
+
+// ---------- Events ----------
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-scope],[data-status],[data-act],[data-proto],[data-proto-step],[data-proto-theme],[data-proto-notes]'); if (!t) return;
+  if (t.dataset.scope) { S.scope = t.dataset.scope === 'project' ? { kind: 'project', name: t.dataset.name } : { kind: t.dataset.scope }; S.overlay = null; S.status = 'all'; return render(); }
+  if (t.dataset.status) { S.status = t.dataset.status; return render(); }
+  const act = t.dataset.act;
+  if (act === 'open-picker') return open('picker');
+  if (act === 'open-more') return open('more');
+  if (act === 'open-drawer') return open('drawer');
+  if (act === 'close') return close();
+  if (act === 'collapse' || act === 'expand') { S.sideCollapsed = act === 'collapse'; return render(); }
+  if (act === 'sort-recent' || act === 'sort-alpha') { S.sideSort = act.slice(5); return render(); }
+  if (t.dataset.protoStep) { const k = Object.keys(VARIANTS); S.variant = k[(k.indexOf(S.variant) + Number(t.dataset.protoStep) + k.length) % k.length]; S.overlay = null; return render(); }
+  if (t.dataset.proto) { const f = t.dataset.proto; S[f] = f === 'n' ? Number(t.dataset.val) : t.dataset.val; if (f === 'n') { D = buildData(S.n); S.scope = { kind: 'all' }; } S.overlay = null; return render(); }
+  if (t.hasAttribute('data-proto-theme')) { S.theme = S.theme === 'dark' ? 'light' : 'dark'; return render(); }
+  if (t.hasAttribute('data-proto-notes')) { S.notes = !S.notes; return renderProto(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const typing = e.target.closest('input, textarea, [contenteditable]');
+  if (e.key === 'Escape' && S.overlay) return close();
+  if (typing || S.overlay) return;
+  if (e.key === 'g') { e.preventDefault(); return V[S.variant].key(); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const k = Object.keys(VARIANTS); S.variant = k[(k.indexOf(S.variant) + (e.key === 'ArrowRight' ? 1 : -1) + 3) % 3]; render(); }
+});
+window.addEventListener('resize', () => S.overlay && renderOverlay());
+render();
+</script>
+</body>
+</html>
