@@ -8,7 +8,8 @@ import { groupCards } from '../components/library/groups.ts';
 import { detachedRow, readerRows } from '../components/reader/rows.ts';
 import Panel from '../layouts/Panel.astro';
 import StatusTabs from '../components/library/StatusTabs.astro';
-import ProjectFilter from '../components/library/ProjectFilter.astro';
+import ProjectPicker from '../components/reader/ProjectPicker.tsx';
+import type { PickerData } from '../components/reader/picker.ts';
 import ReaderPane from '../components/reader/ReaderPane.astro';
 import Icon from '../components/Icon.astro';
 const identity = Astro.locals.identity;
@@ -46,10 +47,19 @@ const rowsOf = (cards: readonly ArtifactCard[]) => cards.map((card) => rows.find
 const total = page.counts[page.status];
 const filtered = Boolean(page.q || page.status !== 'all');
 const paged = Boolean(page.next || page.continued);
+const picker: PickerData = {
+  current: query.scope.kind === 'project' ? `project:${query.scope.name}` : query.scope.kind,
+  choices: [
+    { id: 'all', label: 'Todos los proyectos', count: workspace.total.count, href: readerHref(query, { scope: { kind: 'all' } }) },
+    { id: 'unfiled', label: 'Sin proyecto', count: workspace.unfiled.count, href: readerHref(query, { scope: { kind: 'unfiled' } }) },
+    ...workspace.projects.map(({ name, count, updatedAt }) => ({ id: `project:${name}`, label: name, count, tone: tone(name), updated: updatedAt.getTime(), href: readerHref(query, { scope: { kind: 'project', name } }) })),
+  ],
+};
 ---
 <Panel share title="Modo lectura" workspace={workspace} location={{ kind: 'read', scope: query.scope }} search={query} back={{ href: libraryHref(query), label: 'Salir del modo lectura' }} summary={`Leyendo ${total} ${total === 1 ? 'artefacto' : 'artefactos'}`} artifacts={rows.map(({ card, href }) => ({ title: card.title, project: card.project, tone: card.project ? tone(card.project) : undefined, href }))}>
   <Fragment slot="status">
     <span data-key-hint="move" hidden><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> siguiente y anterior</span>
+    <span data-key-hint="project" hidden><kbd class="kbd">g</kbd> proyecto</span>
     <span data-key-hint="fullscreen" hidden><kbd class="kbd">f</kbd> pantalla completa</span>
     <span data-key-hint="publish" hidden><kbd class="kbd">p</kbd> publicar</span>
     <span data-key-hint="back" hidden><kbd class="kbd">Esc</kbd> volver</span>
@@ -58,7 +68,7 @@ const paged = Boolean(page.next || page.continued);
     <section class="reader-list" aria-label="Lista de lectura">
       <div class="reader-filters">
         <StatusTabs page={page} query={query} reader />
-        <ProjectFilter workspace={workspace} query={query} reader />
+        <ProjectPicker data={JSON.stringify(picker)} client:load />
       </div>
       {rows.length ? <nav class="reader-rows" aria-label="Artefactos">{groups.map((item) => <div class="reader-group">
         {item.project !== undefined && <h2><span class="project-dot" data-tone={item.project === null ? undefined : tone(item.project)} aria-hidden="true"></span><span>{item.project ?? 'Sin proyecto'}</span> <span class="reader-group-count">{item.cards.length}{paged && ' en esta página'}</span></h2>}

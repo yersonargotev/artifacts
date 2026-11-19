@@ -6,6 +6,13 @@ import type { DetailQuery, LibraryPage, LibraryQuery, LibraryScope, ScopeRequest
 export const listViews = ['table', 'cards'] as const;
 export type ListView = typeof listViews[number];
 export const viewCookie = 'panel_view';
+export const projectSorts = ['recent', 'name'] as const;
+export type ProjectSort = typeof projectSorts[number];
+export const projectSortCookie = 'panel_project_sort';
+export const projectColumnCookie = 'panel_project_column';
+export const isProjectSort = (value: unknown): value is ProjectSort => projectSorts.some((sort) => sort === value);
+/** The library's project column lists the most recently updated projects first unless the owner chose A–Z, and stays open unless they collapsed it. */
+export const readProjectColumn = (cookies: { sort: string | undefined; column: string | undefined }) => ({ sort: isProjectSort(cookies.sort) ? cookies.sort : 'recent' as ProjectSort, collapsed: cookies.column === 'collapsed' });
 /**
  * A library query plus the view, grouping, and offset the URL names. They stay out of the panel query because only the dashboard renders them.
  * The offset counts the artifacts before a cursor's page, so read mode can number its rows.

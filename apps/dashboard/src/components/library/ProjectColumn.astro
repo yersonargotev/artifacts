@@ -1,0 +1,56 @@
+---
+import type { ScopeRequest, Workspace } from '@artifacts/artifacts/panel/model';
+import { projectTones } from '../../presentation.ts';
+import { libraryHref, projectColumnCookie, projectSortCookie, type LibraryLink, type ProjectSort } from '../../urls.ts';
+import Icon from '../Icon.astro';
+interface Props { workspace: Workspace; query: LibraryLink; sort: ProjectSort; collapsed: boolean }
+const { workspace, query, sort, collapsed } = Astro.props;
+const tone = projectTones(workspace.projects);
+// `workspace.projects` is already in name order; the recent order keeps it for ties.
+const ordered = sort === 'recent' ? [...workspace.projects].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()) : workspace.projects;
+const nameOrder = new Map(workspace.projects.map(({ name }, index) => [name, index]));
+const isCurrent = (scope: ScopeRequest) => scope.kind === query.scope.kind && (scope.kind !== 'project' || (query.scope.kind === 'project' && scope.name === query.scope.name));
+const current = query.scope.kind === 'project' ? query.scope.name : query.scope.kind === 'unfiled' ? 'Sin proyecto' : 'Todos los proyectos';
+const returnPath = `${Astro.url.pathname}${Astro.url.search}`;
+---
+<aside class="project-column" aria-label="Proyectos" data-project-column data-collapsed={collapsed ? '' : undefined} data-sort-cookie={projectSortCookie} data-column-cookie={projectColumnCookie}>
+  <details class="project-column-details" open data-project-column-details>
+    <summary class="project-column-summary">
+      <span class="project-dot" data-tone={query.scope.kind === 'project' ? tone(query.scope.name) : undefined} data-kind={query.scope.kind} aria-hidden="true"></span>
+      <span class="project-column-current">{current}</span><span class="project-column-open">Proyectos</span><Icon name="chevron-down" size={16} />
+    </summary>
+    <div class="project-column-head">
+      <h2>Proyectos</h2>
+      <form method="post" action="/project-column" class="project-column-sort" data-project-column-form>
+        <input type="hidden" name="return" value={returnPath} />
+        <button type="submit" name="sort" value="recent" aria-pressed={sort === 'recent' ? 'true' : 'false'} title="Actualizados más recientemente primero">Recientes</button>
+        <button type="submit" name="sort" value="name" aria-pressed={sort === 'name' ? 'true' : 'false'} title="Por nombre">A–Z</button>
+      </form>
+      <form method="post" action="/project-column" class="project-column-toggle" data-project-column-form>
+        <input type="hidden" name="return" value={returnPath} />
+        <button type="submit" name="column" value={collapsed ? 'expanded' : 'collapsed'} aria-label={collapsed ? 'Mostrar la columna de proyectos' : 'Ocultar la columna de proyectos'} title={collapsed ? 'Mostrar proyectos' : 'Ocultar proyectos'}><Icon name="chevron-left" size={16} /></button>
+      </form>
+    </div>
+    <label class="project-column-search" data-project-search hidden>
+      <Icon name="search" size={14} />
+      <input type="search" placeholder="Filtrar proyectos" aria-label="Filtrar proyectos" autocomplete="off" maxlength="120" />
+      <kbd class="kbd" aria-hidden="true">g</kbd>
+    </label>
+    <nav class="project-filter project-column-list" aria-label="Filtrar por proyecto">
+      <a href={libraryHref(query, { scope: { kind: 'all' } })} aria-current={isCurrent({ kind: 'all' }) ? 'page' : undefined} aria-label={`Todos los proyectos (${workspace.total.count})`} title="Todos los proyectos" data-kind="all">
+        <span class="project-dot" data-kind="all" aria-hidden="true"></span><span class="project-name">Todos los proyectos</span><span class="project-count">{workspace.total.count}</span>
+      </a>
+      <a href={libraryHref(query, { scope: { kind: 'unfiled' } })} aria-current={isCurrent({ kind: 'unfiled' }) ? 'page' : undefined} aria-label={`Sin proyecto (${workspace.unfiled.count})`} title="Sin proyecto" data-kind="unfiled">
+        <span class="project-dot" data-kind="unfiled" aria-hidden="true"></span><span class="project-name">Sin proyecto</span><span class="project-count">{workspace.unfiled.count}</span>
+      </a>
+      {ordered.length > 0 && <p class="project-column-label">Proyectos · {ordered.length}</p>}
+      {ordered.map(({ name, count, updatedAt }) => <a href={libraryHref(query, { scope: { kind: 'project', name } })} aria-current={isCurrent({ kind: 'project', name }) ? 'page' : undefined} aria-label={`${name} (${count})`} title={name} data-project-name={name} data-updated={updatedAt.getTime()} data-name-order={nameOrder.get(name)}>
+        <span class="project-dot" data-tone={tone(name)} aria-hidden="true"></span><span class="project-name">{name}</span><span class="project-count">{count}</span>
+      </a>)}
+      <p class="project-column-empty" data-project-empty hidden>Ningún proyecto coincide.</p>
+    </nav>
+  </details>
+</aside>
+<script>
+  import './project-column.ts';
+</script>

@@ -63,8 +63,15 @@ export async function driveProjects({ page, browser, context, instance, director
   await page.goto(instance.panel);
   await page.getByRole('heading', { name: 'Biblioteca', exact: true }).waitFor();
   const projects = page.getByRole('navigation', { name: 'Filtrar por proyecto', exact: true });
-  const projectLinks = async () => page.locator('.project-filter a[href*="project="]').evaluateAll((links) => links.map((link) => ({ name: `${link.children[1]?.textContent} (${link.querySelector('.project-count')?.textContent})`, href: new URL(link.getAttribute('href')!, location.href).search.replace(/&.*$/, ''), current: link.getAttribute('aria-current') })));
-  const openProjectFilter = async () => { await projects.waitFor(); };
+  // The column lists the most recently updated project first; these checks compare membership and the current mark, so they read it by name.
+  const projectLinks = async () => (await page.locator('.project-filter a[href*="project="]').evaluateAll((links) => links.map((link) => ({ name: `${link.children[1]?.textContent} (${link.querySelector('.project-count')?.textContent})`, href: new URL(link.getAttribute('href')!, location.href).search.replace(/&.*$/, ''), current: link.getAttribute('aria-current') })))).sort((left, right) => left.name.localeCompare(right.name));
+  // At 390px the column folds into a disclosure that the drive opens before it reads the links.
+  const openProjectFilter = async () => {
+    await projects.waitFor({ state: 'attached' });
+    const details = page.locator('[data-project-column-details]');
+    if (!await details.evaluate((element) => (element as HTMLDetailsElement).open)) await details.locator('summary').click();
+    await projects.waitFor();
+  };
   assert.deepEqual(await projectLinks(), [{ name: 'Alpha (1)', href: '?project=Alpha', current: null }, { name: 'Beta (1)', href: '?project=Beta', current: null }]);
   await openProjectFilter();
   for (const name of ['Alpha', 'Beta']) assert.equal(await projects.getByRole('link', { name: `${name} (1)`, exact: true }).count(), 1, `Project filter link ${name}`);
