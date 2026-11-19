@@ -86,7 +86,7 @@ try {
 
   await page.goto(`${app.dashboard}/?project=Lectura`);
   await hydrated(page);
-  assert.deepEqual(await visibleHints(page), ['j k mover', '↵ leer', 'p publicar', 't tema'], 'the library lists the prototype hints for the keys that work on it');
+  assert.deepEqual(await visibleHints(page), ['j k mover', 'g proyecto', '↵ leer', 'p publicar', 't tema'], 'the library lists the prototype hints for the keys that work on it');
   const trigger = page.getByRole('button', { name: 'Abrir la paleta de comandos', exact: true });
   const mac = process.platform === 'darwin';
   assert.equal(await trigger.textContent(), mac ? '⌘K' : 'Ctrl K');
@@ -245,7 +245,7 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForURL(`${app.dashboard}/read?project=Lectura&artifact=${pending.artifactId}`);
   checks.push('Enter on the selected library row opens read mode on it');
-  assert.deepEqual(await visibleHints(page), ['j k siguiente y anterior', 'f pantalla completa', 'p publicar', 'Esc volver'], 'read mode lists the prototype hints, with p for a pending selection');
+  assert.deepEqual(await visibleHints(page), ['j k siguiente y anterior', 'g proyecto', 'f pantalla completa', 'p publicar', 'Esc volver'], 'read mode lists the prototype hints, with p for a pending selection');
   assert.deepEqual(await page.locator('.reader-item[aria-current] .reader-item-title').allTextContents(), ['Borrador con cambios']);
   await page.keyboard.press('f');
   await page.waitForFunction(() => document.fullscreenElement?.matches('iframe.reader-preview'));
@@ -253,7 +253,7 @@ try {
   await page.waitForFunction(() => !document.fullscreenElement);
   await page.keyboard.press('j');
   await page.waitForFunction(() => document.querySelector('.reader-item[aria-current] .reader-item-title')?.textContent !== 'Borrador con cambios');
-  assert.deepEqual(await visibleHints(page), ['j k siguiente y anterior', 'f pantalla completa', 'Esc volver'], 'the p hint leaves with a selection that has nothing to publish');
+  assert.deepEqual(await visibleHints(page), ['j k siguiente y anterior', 'g proyecto', 'f pantalla completa', 'Esc volver'], 'the p hint leaves with a selection that has nothing to publish');
   await page.keyboard.press('p');
   assert.equal(await page.locator('dialog[open]').count(), 0, 'p does nothing in read mode on an artifact without pending changes');
   await page.keyboard.press('k');

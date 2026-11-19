@@ -1,11 +1,12 @@
 ---
 import { getRuntime } from '../runtime.ts';
 import { artifactErrorResponse, panelActor } from '../publication.ts';
-import { libraryHref, pageOffset, readLibraryUrl, readListGroup, readListOffset, readListView, readerHref, viewCookie } from '../urls.ts';
+import { libraryHref, pageOffset, projectColumnCookie, projectSortCookie, readLibraryUrl, readListGroup, readListOffset, readListView, readProjectColumn, readerHref, viewCookie } from '../urls.ts';
 import { locationOf, projectTones, searchFor } from '../presentation.ts';
 import Panel from '../layouts/Panel.astro';
 import LibraryHeading from '../components/library/LibraryHeading.astro';
 import LibraryFilters from '../components/library/LibraryFilters.astro';
+import ProjectColumn from '../components/library/ProjectColumn.astro';
 import PendingBanner from '../components/library/PendingBanner.astro';
 import ArtifactGrid from '../components/library/ArtifactGrid.astro';
 import SharedWithMe from '../components/library/SharedWithMe.astro';
@@ -18,6 +19,7 @@ let query;
 try { query = readLibraryUrl(Astro.url); }
 catch (error) { return artifactErrorResponse(error); }
 const { view, named: namedView } = readListView(Astro.url, Astro.cookies.get(viewCookie)?.value);
+const column = readProjectColumn({ sort: Astro.cookies.get(projectSortCookie)?.value, column: Astro.cookies.get(projectColumnCookie)?.value });
 const actor = identity && panelActor(identity);
 const snapshot = actor ? await panel.library(actor, query).catch(artifactErrorResponse) : undefined;
 if (snapshot instanceof Response) return snapshot;
@@ -39,20 +41,24 @@ const paletteArtifacts = snapshot && link ? snapshot.page.cards.map((card) => ({
   {link && <a slot="bar" class="button secondary reader-link" href={readerHref(link)}><Icon name="book" size={16} /><span>Modo lectura</span><kbd class="kbd" data-key-hint="reader" aria-hidden="true" hidden>r</kbd></a>}
   {snapshot && <Fragment slot="status">
     <span data-key-hint="move" hidden><kbd class="kbd">j</kbd> <kbd class="kbd">k</kbd> mover</span>
+    <span data-key-hint="project" hidden><kbd class="kbd">g</kbd> proyecto</span>
     <span data-key-hint="read" hidden><kbd class="kbd">↵</kbd> leer</span>
     <span data-key-hint="publish" hidden><kbd class="kbd">p</kbd> publicar</span>
     <span data-key-hint="theme" hidden><kbd class="kbd">t</kbd> tema</span>
   </Fragment>}
-  {snapshot && link ? <>
+  {snapshot && link ? <div class="library-layout">
+    {snapshot.workspace.total.count > 0 && <ProjectColumn workspace={snapshot.workspace} query={link} sort={column.sort} collapsed={column.collapsed} />}
+    <div class="library-body">
     <LibraryHeading scope={snapshot.page.scope} tone={tone} />
     <SharedWithMe items={shared.items} />
     {snapshot.workspace.total.count === 0 && shared.items.length > 0 && <p class="library-note">Aún no tienes artefactos propios. <a href="#connect-tools" data-open-tools>Conectar herramientas</a></p>}
     {(snapshot.workspace.total.count > 0 || shared.items.length === 0) && <>
-      <LibraryFilters workspace={snapshot.workspace} page={snapshot.page} query={link} view={view} />
+      <LibraryFilters page={snapshot.page} query={link} view={view} />
       {pending?.page.cards[0] && <PendingBanner card={pending.page.cards[0]} count={pending.page.counts.pending} pendingHref={libraryHref(link, { status: 'pending' })} />}
       <ArtifactGrid page={snapshot.page} workspace={snapshot.workspace} query={link} cursor={query.cursor} offset={offset} now={new Date()} view={view} />
     </>}
-  </> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
+    </div>
+  </div> : <section class="welcome logged-out"><div class="welcome-mark" aria-hidden="true"><Icon name="layers-intersect" size={48} /></div><h1>Un espacio propio<br />para lo que creas.</h1><p>Entra a tu cuenta para ver tus artefactos y conectar tus herramientas.</p>{failed && <p role="alert">No se pudo completar el inicio de sesión. Vuelve a intentarlo.</p>}{revoked && <p role="status">Se cerraron todas tus sesiones.</p>}<a class="button" data-variant="primary" href="/auth/login">Iniciar sesión</a></section>}
 </Panel>
 <script>
   import '../components/library/keys.ts';

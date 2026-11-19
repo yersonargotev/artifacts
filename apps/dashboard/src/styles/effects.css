@@ -23,6 +23,7 @@
 
 .rail-link[aria-current]::before,
 .reader-item[aria-current]::before,
+.project-filter a[aria-current]::before,
 .artifact-card:is(:has(input:checked), [data-selected])::before,
 .artifact-table tbody tr:is(:has(input:checked), :has(:focus-visible), [data-selected]) > :first-child::before {
   content: '';
