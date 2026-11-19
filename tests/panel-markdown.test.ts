@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { framedPreviewError, previewResponse } from '../apps/dashboard/src/preview.ts';
+import { frameLinkScript } from '../apps/dashboard/src/frame-links.ts';
 import { inertPreviewPolicy, markdownPreviewSandbox, previewDocument, previewPolicy } from '../apps/publication/src/document.ts';
 import { markdownDocument } from '../packages/artifacts/src/panel/markdown.ts';
 import { brokenLinks, type PageLink } from '../packages/artifacts/src/panel/model.ts';
@@ -76,7 +77,7 @@ test('the panel preview of HTML and text keeps its document and policy', async (
     const supported = previewResponse(preview(kind, text), chrome);
     assert.equal(supported.headers.get('content-security-policy'), previewPolicy);
     assert.equal(supported.headers.get('connection-allowlist'), '()');
-    assert.equal(await supported.text(), previewDocument({ revision: { snapshot: snapshot(kind, text) } }, true));
+    assert.equal(await supported.text(), previewDocument({ revision: { snapshot: snapshot(kind, text) } }, true, kind === 'html' ? frameLinkScript : ''), 'only interactive HTML gets the link script');
     const unsupported = previewResponse(preview(kind, text), firefox);
     assert.equal(unsupported.headers.get('content-security-policy'), inertPreviewPolicy);
     assert.equal(await unsupported.text(), previewDocument({ revision: { snapshot: snapshot(kind, text) } }, false));

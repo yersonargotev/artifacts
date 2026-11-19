@@ -7,6 +7,7 @@ import type { BrowserContext, Frame, Locator, Page, Response as BrowserResponse 
 import { artifactReadSchema, decodeFile, type ArtifactRead } from '../../../../packages/contracts/src/index.ts';
 import { documentPolicy, frameSandbox, inertPreviewPolicy, markdownPolicy, markdownPreviewSandbox, previewDocument, publicationContent, previewPolicy, supportsInteractiveHtml } from '../../../../apps/publication/src/document.ts';
 import { markdownDocument } from '../../../../packages/artifacts/src/panel/markdown.ts';
+import { panelPreviewDocument } from '../../../../apps/dashboard/src/preview.ts';
 
 export type ContentExpectation =
   | { kind: 'text'; selector: string; text: string }
@@ -291,7 +292,7 @@ export async function verifyRetainedArtifact(context: BrowserContext, input: Ret
       const { content } = expected.revision.snapshot;
       await policy(realPreview, content.kind === 'markdown' ? markdownPolicy : report.interactive ? previewPolicy : inertPreviewPolicy, 'Actual iframe preview response', content.kind === 'markdown' ? 'markdown' : 'document');
       if (content.kind === 'markdown') assert.equal(unwrapWikiLinks((await realPreview.body()).toString()), markdownDocument(content.text, []), 'Actual Markdown preview differs from the expected retained content outside its wiki links');
-      else assert.deepEqual(await realPreview.body(), Buffer.from(previewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
+      else assert.deepEqual(await realPreview.body(), Buffer.from(panelPreviewDocument(expected, report.interactive)), 'Actual iframe response bytes differ from the expected retained content');
       const frame = await contentFrame(panel, iframe, content.kind === 'markdown' ? markdownPreviewSandbox : 'allow-scripts');
       assert.equal(frame.url(), previewUrl, 'Actual content frame must load the exact pinned preview URL');
       const titleMenu = panel.locator('.artifact-title-trigger');

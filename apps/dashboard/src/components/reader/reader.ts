@@ -1,5 +1,6 @@
 import { bindKeys, revealHint, shortcutAllowed } from '../shell/keys.ts';
 import { confirmPublish } from '../shell/publish.ts';
+import { followFrameLinks } from '../../frame-links.ts';
 
 const reader = document.querySelector<HTMLElement>('[data-reader]');
 if (reader?.querySelector('[data-reader-pane]')) {
@@ -16,21 +17,23 @@ if (reader?.querySelector('[data-reader-pane]')) {
   enhance(pane());
 
   // The server renders each row's pane into a template, so the pane after a client-side move matches the page a link would load.
-  const show = (item: HTMLAnchorElement) => {
+  const show = (item: HTMLAnchorElement, hash = '') => {
     for (const other of items) other.removeAttribute('aria-current');
     item.setAttribute('aria-current', 'page');
     const template = reader.querySelector<HTMLTemplateElement>(`template[data-reader-template="${CSS.escape(item.dataset.artifactId!)}"]`)!;
     // A new frame loads without adding a history entry, so Back keeps walking the reader URLs instead of the frame.
     const next = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
     next.toggleAttribute('data-reader-swapped', true);
+    const frame = next.querySelector<HTMLIFrameElement>('[data-reader-frame]')!;
+    if (hash) frame.src = `${frame.getAttribute('src')}${hash}`;
     enhance(next);
     pane().replaceWith(next);
     item.scrollIntoView({ block: 'nearest' });
   };
 
-  const select = (item: HTMLAnchorElement) => {
-    if (item.hasAttribute('aria-current')) return;
-    show(item);
+  const select = (item: HTMLAnchorElement, hash = '') => {
+    if (item.hasAttribute('aria-current') && !hash) return;
+    show(item, hash);
     history.pushState(null, '', item.href);
   };
 
@@ -89,6 +92,14 @@ if (reader?.querySelector('[data-reader-pane]')) {
   revealHint('move', items.length > 0);
   revealHint('fullscreen', document.fullscreenEnabled);
   revealHint('back', Boolean(back));
+
+  // A link in the artifact to a page of this list opens it in place and keeps the list's filters; any other panel link loads its page.
+  followFrameLinks(() => reader.querySelectorAll<HTMLIFrameElement>('[data-reader-frame]'), (url) => {
+    const artifactId = url.pathname === '/read' ? url.searchParams.get('artifact') : null;
+    const item = artifactId ? items.find((candidate) => candidate.dataset.artifactId === artifactId) : undefined;
+    if (item) select(item, url.hash);
+    else location.assign(url.href);
+  });
 
   addEventListener('popstate', () => {
     const params = new URL(location.href).searchParams;

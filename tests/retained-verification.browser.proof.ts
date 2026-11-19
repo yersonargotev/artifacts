@@ -11,6 +11,7 @@ import { unzipSync, zipSync } from 'fflate';
 import type { ArtifactRead } from '../packages/contracts/src/index.ts';
 import { previewDocument, previewPolicy, documentPolicy, publicationDocument } from '../apps/publication/src/document.ts';
 import { escapeHtml } from '../apps/publication/src/markup.ts';
+import { panelPreviewDocument } from '../apps/dashboard/src/preview.ts';
 import { expectedRetainedArchive, verifyRetainedArtifact, type RetainedVerificationConfig } from '../.agents/skills/verify-artifacts/scripts/retained.ts';
 
 const snapshot = { metadata: { title: 'Retained cost document', description: 'Exact complete snapshot', custom: { retained: true } }, content: { kind: 'html' as const, text: '<h1>Retained revision</h1><button id="change">Change cost</button><output id="total">5.00</output><script>document.querySelector("#change").onclick=()=>document.querySelector("#total").textContent="28.40"</script>' }, files: [{ path: 'nested/bytes.bin', mediaType: 'application/octet-stream', encoding: 'base64' as const, data: 'AAH/' }] };
@@ -42,7 +43,7 @@ async function run(mode: 'markers' | 'legacy', failure: Failure, falseExpectatio
       response.setHeader('connection-allowlist', '()');
       response.setHeader('x-dns-prefetch-control', 'off');
       response.setHeader('content-type', 'text/html; charset=utf-8');
-      response.end(previewDocument(expected, true));
+      response.end(panelPreviewDocument(expected, true));
     } else if (url.pathname.endsWith('/export')) {
       response.setHeader('content-type', 'application/zip');
       response.setHeader('content-disposition', 'attachment; filename="artifact-retained-revision-one.zip"');
