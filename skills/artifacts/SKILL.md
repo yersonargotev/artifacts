@@ -27,7 +27,7 @@ Keep HTML self-contained. Inline styles and scripts, and embed required assets a
 
 Keep the full revision within 1 MiB of decoded content, metadata, file names, media types, and attachment bytes. Base64 expansion does not change the decoded limit. Use at most 32 attachments. If required content cannot fit, explain the limit without silently dropping content.
 
-Interactive HTML follows the server's current Chrome compatibility policy. Other browsers may display escaped source. Do not promise interaction in every browser.
+Interactive HTML follows the server's current Chrome compatibility policy. Other browsers render it without scripts. Do not promise interaction in every browser.
 
 ## Author HTML
 

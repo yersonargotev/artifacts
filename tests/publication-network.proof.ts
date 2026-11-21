@@ -75,10 +75,12 @@ try {
       await trigger.click();
       await document.getByRole('button', { name: 'Interaction works', exact: true }).waitFor();
     } else {
-      assert.equal(await document.locator('script').count(), 0);
-      assert.equal(await document.getByRole('button').count(), 0);
-      assert.match(await document.locator('body').innerText(), /<script>/);
+      await document.getByRole('heading', { name: 'Interactive document' }).waitFor();
+      await document.getByRole('button', { name: 'Try interaction', exact: true }).click();
+      assert.equal(await document.locator('#ready').textContent(), 'pending', 'the fallback renders the script without running it');
+      assert.equal(await document.getByRole('button', { name: 'Interaction works', exact: true }).count(), 0, 'the fallback runs no inline handler');
       assert.equal(await page.locator('iframe').getAttribute('sandbox'), '');
+      assert.equal(await page.locator('.static-notice').count(), 1, 'the wrapper names the missing interactivity');
     }
     await page.waitForTimeout(2200);
     if (path === '/control') assert(packets > 0, 'Unrestricted control proves the UDP collector and browser API are active');

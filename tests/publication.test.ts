@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import { Script } from 'node:vm';
 import { canvasDocument } from '../apps/publication/src/canvas.ts';
-import { markdownPolicy, markdownPreviewSandbox, previewDocument } from '../apps/publication/src/document.ts';
+import { markdownPolicy, markdownPreviewSandbox, previewDocument, publicationDocument, staticHtmlNotice } from '../apps/publication/src/document.ts';
 import { createPublicationApp } from '../apps/publication/src/http.ts';
 import { escapeHtml } from '../apps/publication/src/markup.ts';
 import { snapshotSchema, type ArtifactRead } from '../packages/contracts/src/index.ts';
@@ -144,12 +144,13 @@ test('encrypted publication handoff binds state and artifact, clears the callbac
   const inert = await handler(new Request(`${publish}/a/artifact-a`, { headers: { cookie, 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
   const inertBody = await inert.text();
   assert(inertBody.includes('sandbox=""'));
+  assert(inertBody.includes(staticHtmlNotice), 'the wrapper says the HTML runs without scripts');
   const inertContent = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/content`, { headers: { cookie, 'sec-fetch-dest': 'iframe', 'user-agent': 'Mozilla/5.0 Firefox/152.0' } }));
   assert.equal(inertContent.status, 200);
   assert.match(inertContent.headers.get('content-security-policy')!, /script-src 'none'/);
   assert.match(inertContent.headers.get('content-security-policy')!, /; sandbox$/);
   assert.equal(inertContent.headers.get('connection-allowlist'), '()');
-  assert((await inertContent.text()).includes('&lt;script&gt;window.secret = 1&lt;/script&gt;'));
+  assert((await inertContent.text()).includes('<script>window.secret = 1</script>'), 'the HTML renders, and the policy above keeps its script from running');
   const download = await handler(new Request(`${publish}/a/artifact-a/r/revision-1/files/nested/file.html`, { headers: { cookie } }));
   assert.equal(download.status, 200);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), Buffer.from(artifact.revision.snapshot.files[0]!.data, 'base64'));
@@ -369,7 +370,8 @@ test('previewDocument keeps HTML, Markdown, and text bytes and renders a design 
   const read = (content: { kind: 'html' | 'markdown' | 'text'; text: string }) => ({ revision: { snapshot: { content, files: [] } } });
   const pre = (text: string) => `<pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:17px/1.6 system-ui">${escapeHtml(text)}</pre>`;
   assert.equal(previewDocument(read({ kind: 'html', text: '<h1>Hi</h1>' }), true), shell(scripts, '<h1>Hi</h1>'));
-  assert.equal(previewDocument(read({ kind: 'html', text: '<h1>Hi</h1>' })), shell(inert, `<p>Vista de código. Abre este HTML en Chrome 152 o posterior para usar su versión interactiva.</p>${pre('<h1>Hi</h1>')}`));
+  assert.equal(previewDocument(read({ kind: 'html', text: '<h1>Hi</h1>' })), shell(inert, '<h1>Hi</h1>'), 'an unsupported browser renders the HTML without scripts');
+  assert.equal(previewDocument(read({ kind: 'html', text: '<link rel=preconnect href=//x.test><LINK\nrel=preconnect><link/><linked>' })), shell(inert, '<link-inert rel=preconnect href=//x.test><link-inert\nrel=preconnect><link-inert/><linked>'), 'no link element survives in a document without scripts');
   assert.equal(previewDocument(read({ kind: 'markdown', text: '# <Hi>' }), true), shell(scripts, pre('# <Hi>')));
   assert.equal(previewDocument(read({ kind: 'text', text: 'a & b' }), true), shell(scripts, pre('a & b')));
   assert.equal(previewDocument({ revision: { snapshot: design } }, true), shell(scripts, canvasDocument(design, true)));
@@ -447,4 +449,12 @@ test('a design content response carries the same headers as an HTML content resp
   }
   assert.deepEqual(headers['design Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36'], headers['html Mozilla/5.0 Chrome/156.0.0.0 Safari/537.36']);
   assert.deepEqual(headers['design Mozilla/5.0 Firefox/152.0'], headers['html Mozilla/5.0 Firefox/152.0']);
+});
+
+test('the publication names the missing interactivity only for HTML rendered without scripts', () => {
+  const urls = { library: 'https://panel.example.test/', project: (name: string) => name, content: '/content', attachment: (path: string) => path, view: () => '/a' };
+  const html = { ...artifact, revision: { ...artifact.revision, snapshot: { ...artifact.revision.snapshot, content: { kind: 'html' as const, text: '<h1>Hi</h1>' } } } };
+  assert(publicationDocument(html, urls, false).includes(`<p class="static-notice">${staticHtmlNotice}</p>`));
+  assert(!publicationDocument(html, urls, true).includes('static-notice'));
+  assert(!publicationDocument({ ...html, revision: { ...html.revision, snapshot: { ...html.revision.snapshot, content: { kind: 'text', text: 'x' } } } }, urls, false).includes('class="static-notice"'));
 });

@@ -32,7 +32,7 @@ An owner finds an artifact in their panel, opens its current draft, follows reta
 Preconditions:
 
 - `.test-artifacts/verify-artifacts/preview-run` does not exist before launch.
-- Actual Chrome is available at version 152 or newer for the interactive path. Source-only fallback cannot pass an interaction assertion.
+- Actual Chrome is available at version 152 or newer for the interactive path. The static fallback runs no scripts, so it cannot pass an interaction assertion.
 
 - **Launch and inspect.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts launch --run .test-artifacts/verify-artifacts/preview-run`, then `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts doctor --run .test-artifacts/verify-artifacts/preview-run`.
 - **Create and browse.** Run `node --import tsx .agents/skills/verify-artifacts/scripts/control.ts drive preview --run .test-artifacts/verify-artifacts/preview-run`. The recipe creates two retained revisions through HTTP MCP, signs in through the panel's login UI, waits for the visible `Biblioteca` library heading, and chooses `getByRole('link', { name: 'Verification artifact', exact: true })`. The detail page exposes `getByRole('heading', { name: 'Historial', exact: true })`, contains two revision rows, and its actual preview initially shows `Verification revision 2`.
@@ -48,7 +48,7 @@ Preconditions:
 
 - Direct navigation to `/artifacts/<artifactId>/preview?revisionId=<revisionId>` is deliberately denied with 403. Use the real detail-page iframe; changing request headers manually would bypass the user entry point.
 - The iframe accessible title is `Vista previa de la revisión N`; `.preview` is the existing stable frame selector. Keep button/heading checks inside that frame.
-- Unsupported browser user agents display escaped HTML source with scripts disabled. Text remains inert even in supported Chrome. Markdown renders without scripts in every browser, with raw HTML escaped, under a sandbox that adds only `allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox` and without `Connection-Allowlist: ()`, which would block its link navigations. Report those paths separately from interactive HTML.
+- Unsupported browser user agents render HTML without scripts, with every `<link` tag made inert, and the reader and detail headings say Vista sin interactividad. Text remains inert even in supported Chrome. Markdown renders without scripts in every browser, with raw HTML escaped, under a sandbox that adds only `allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox` and without `Connection-Allowlist: ()`, which would block its link navigations. Report those paths separately from interactive HTML.
 - `tests/artifact-browser.proof.ts` checks historical content, preview denial, and containment using store-seeded artifact fixtures. `tests/publication-network.proof.ts` adds renderer/UDP probes. Neither a screenshot nor a raw HTML render proves the complete sandbox, network, and authentication behavior.
 - The fixed drive has a two-revision verification artifact and three library documents. It cannot prove pagination, empty-list state, arbitrary content kinds, or every mobile browser. The extended identity proof captures the empty library.
 - The `Más reciente` and `Publicada` badges describe different pointers. A historical selection may show neither; this is not a failed preview.
