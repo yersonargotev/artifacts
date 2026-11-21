@@ -7,6 +7,7 @@ import * as schema from '../packages/db/src/schema.ts';
 import { createArtifactStore } from '../packages/artifacts/src/index.ts';
 import type { Actor, Snapshot } from '../packages/contracts/src/index.ts';
 import { createPanel, panelLibraryQuerySchema } from '../packages/artifacts/src/panel/index.ts';
+import { revisionMetadata } from '../packages/artifacts/src/revision.ts';
 import { readDetailUrl, detailQuery, detailHref, previewHref, exportHref, readLibraryUrl, readListGroup, readListView, libraryHref, scopeHref, readReaderUrl, readerHref, pageOffset, nextOffset, type LibraryLink } from '../apps/dashboard/src/urls.ts';
 import { detachedRow, readerRows } from '../apps/dashboard/src/components/reader/rows.ts';
 import { artifact, artifactShare, session } from '../packages/db/src/schema.ts';
@@ -378,7 +379,7 @@ test('detail comparison falls through self, publication, head, parent, and the c
     assert.equal(parent.detail.compared?.sequence, 1);
     assert.equal(parent.detail.comparison?.content.before.text, 'One');
     const detachedId = randomUUID();
-    await app.db.insert(schema.artifactRevision).values({ id: detachedId, artifactId: first.artifactId, parentRevisionId: null, sequence: 3, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: second.revision.sha256, snapshot: JSON.stringify(second.revision.snapshot) });
+    await app.db.insert(schema.artifactRevision).values({ id: detachedId, artifactId: first.artifactId, parentRevisionId: null, sequence: 3, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: second.revision.sha256, ...revisionMetadata(second.revision.snapshot), snapshot: JSON.stringify(second.revision.snapshot) });
     await app.db.update(schema.artifact).set({ headRevisionId: detachedId }).where(eq(schema.artifact.id, first.artifactId));
     const history = await panel.artifact(actor, input);
     assert.equal(history.detail.compared?.sequence, 2);

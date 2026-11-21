@@ -1,11 +1,12 @@
 import type { McpWorkerEnvironment } from '@artifacts/config';
-import { sentryDsn, workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
+import { sentryDsn, workerCompatibility, workerObservability, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
 
 export default {
   worker: {
     name: 'artifacts-api',
     ...workerCompatibility,
     entrypoint: './src/worker.ts',
+    observability: workerObservability,
     env: {
       SENTRY_DSN: { type: 'text', value: sentryDsn },
       OWNER_EMAIL: { type: 'secret' },

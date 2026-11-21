@@ -46,6 +46,10 @@ export const artifactRevision = sqliteTable('artifact_revision', {
   authorClientId: text('author_client_id').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   sha256: text('sha256').notNull(),
+  // These copies of the snapshot's metadata precede it because SQLite reads a column stored after a large value by walking that value's overflow pages.
+  title: text('title').notNull().default(''),
+  description: text('description').notNull().default(''),
+  kind: text('kind').notNull().default(''),
   snapshot: text('snapshot').notNull(),
 }, (table): SQLiteTableExtraConfigValue[] => [
   uniqueIndex('artifact_revision_membership_idx').on(table.artifactId, table.id),

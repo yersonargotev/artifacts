@@ -2,7 +2,7 @@
 
 `createArtifactStore(db, { publishOrigin })` owns retained snapshots, draft heads, publication pointers, retry receipts, and publication grants. MCP, REST, and panel callers use this API. `@yargote/artifacts-contracts` owns the database-free schemas and workflow helpers. Import them from that package. This package does not re-export them. HTTP consumers use [the client package](../client/README.md).
 
-A snapshot contains `metadata`, `content`, and `files`. Metadata retains the title, description, and optional JSON custom value. Content contains its kind and text. Files retain normalized relative paths, media types, the original UTF-8 or base64 encoding, and their data. Each revision stores the entire snapshot, parent, sequence, author, creation time, and SHA-256 of canonical snapshot JSON. Unknown fields are rejected.
+A snapshot contains `metadata`, `content`, and `files`. Metadata retains the title, description, and optional JSON custom value. Content contains its kind and text. Files retain normalized relative paths, media types, the original UTF-8 or base64 encoding, and their data. Each revision stores the entire snapshot, parent, sequence, author, creation time, and SHA-256 of canonical snapshot JSON. It also stores copies of the snapshot's title, description, and content kind, which lists and the panel read instead of the snapshot. Unknown fields are rejected.
 
 The initial product limit is 1 MiB of decoded content, file bytes, file names, media types, and serialized metadata, with at most 32 attachments. Published HTML is self-contained. Attachments remain downloadable and exportable. Arbitrary relative JavaScript imports and multi-file websites are outside this contract.
 
