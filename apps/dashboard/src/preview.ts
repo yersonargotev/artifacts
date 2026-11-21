@@ -3,6 +3,11 @@ import type { PreviewSnapshot } from '@artifacts/artifacts/panel/model';
 import { frameLinkScript } from './frame-links.ts';
 import { inertPreviewPolicy, markdownPolicy, previewDocument, previewPolicy, supportsInteractiveHtml } from '../../publication/src/document.ts';
 
+export { staticHtmlNotice } from '../../publication/src/document.ts';
+
+/** This browser renders the HTML artifact without its scripts. */
+export const rendersStaticHtml = (kind: string, userAgent: string | null) => kind === 'html' && !supportsInteractiveHtml(userAgent);
+
 /** The document the panel frames for HTML, text, and design: the shared preview document, plus the link script in interactive HTML. */
 export const panelPreviewDocument = (artifact: { revision: { snapshot: PreviewSnapshot['revision']['snapshot'] } }, interactive: boolean) =>
   previewDocument(artifact, interactive, interactive && artifact.revision.snapshot.content.kind === 'html' ? frameLinkScript : '');

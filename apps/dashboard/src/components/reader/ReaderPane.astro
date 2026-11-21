@@ -1,6 +1,7 @@
 ---
 import { absoluteTime, previewSandbox, publicationStates, relativeTime } from '../../presentation.ts';
 import { detailHref, previewHref, shareHref } from '../../urls.ts';
+import { rendersStaticHtml, staticHtmlNotice } from '../../preview.ts';
 import type { ReaderRow } from './rows.ts';
 import PublicationForm from '../PublicationForm.astro';
 import PublishConfirm from '../PublishConfirm.astro';
@@ -14,7 +15,7 @@ const steps = [{ direction: -1, label: 'Anterior', key: 'k', icon: 'chevron-up',
   <header class="reader-head">
     <div class="reader-head-title">
       <h2 id="reader-title" title={card.title}>{card.title}</h2>
-      <p class="reader-head-meta"><span class="artifact-status" data-state={publication.state}>{publicationStates[publication.state].label}</span><span>Rev. {head.sequence}</span><time datetime={head.createdAt.toISOString()} title={absoluteTime(head.createdAt)}>{relativeTime(head.createdAt, now)}</time>{card.slug && <code title={card.slug}>{card.slug}</code>}</p>
+      <p class="reader-head-meta"><span class="artifact-status" data-state={publication.state}>{publicationStates[publication.state].label}</span><span>Rev. {head.sequence}</span><time datetime={head.createdAt.toISOString()} title={absoluteTime(head.createdAt)}>{relativeTime(head.createdAt, now)}</time>{card.slug && <code title={card.slug}>{card.slug}</code>}{rendersStaticHtml(card.kind, Astro.request.headers.get('user-agent')) && <span class="static-notice" title={staticHtmlNotice}>Sin interactividad</span>}</p>
     </div>
     <div class="reader-head-actions">
       {position && <span class="reader-position">{position}</span>}

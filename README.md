@@ -132,7 +132,7 @@ Matching mutation retries use the same `requestId` and arguments. Changed argume
 
 Snapshots support self-contained HTML, Markdown, and text, plus downloadable attachments. The initial limit is 1 MiB decoded total and 32 files per revision. Relative executable assets and multi-file websites are outside this increment. A published Markdown page opens rendered and offers a `Código` view of its source. Text displays as inert text.
 
-Interactive HTML runs in an opaque sandbox with no parent access, cookies, storage, forms, popups, or top navigation. Chrome 152 and newer receives the enforced connection allowlist; current acceptance uses Chrome 154. Other browsers receive escaped HTML source with scripts disabled. This compatibility fallback preserves authentication, downloads, and export. [Chrome's documentation](https://developer.chrome.com/blog/connection-allowlist-announcement) explains why CSP alone does not cover WebRTC and all navigation channels.
+Interactive HTML runs in an opaque sandbox with no parent access, cookies, storage, forms, popups, or top navigation. Chrome 152 and newer receives the enforced connection allowlist; current acceptance uses Chrome 154. Other browsers render the HTML without scripts and say so outside the frame. This compatibility fallback preserves authentication, downloads, and export. [Chrome's documentation](https://developer.chrome.com/blog/connection-allowlist-announcement) explains why CSP alone does not cover WebRTC and all navigation channels.
 
 ## Run locally
 

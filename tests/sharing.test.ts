@@ -395,9 +395,9 @@ test('owner publication responses preserve current main document, content and at
   const firefox = 'Mozilla/5.0 Firefox/152.0';
   const trunk = {
     'document chrome': ['/a/artifact-a', { 'user-agent': chrome }, 'b496c2e5c39bfb33d6b3067254b16d8cf9c557fbc0d3b35724c35389a2387f56', '2112e8cc538b94315c53d41727626486783661ef8fad44f3790ec82d11f7839e'],
-    'document firefox': ['/a/artifact-a', { 'user-agent': firefox }, '2267388758feadde1f1b9337eb473204da26f0005f0675c770ad2d906276da1d', '2112e8cc538b94315c53d41727626486783661ef8fad44f3790ec82d11f7839e'],
+    'document firefox': ['/a/artifact-a', { 'user-agent': firefox }, 'd1afba6dd76a1445f0dbbbc7a38f3e32d8ed0342c68ad2593be68cfeb3c0d06d', '2112e8cc538b94315c53d41727626486783661ef8fad44f3790ec82d11f7839e'],
     'content chrome': ['/a/artifact-a/r/revision-1/content', { 'user-agent': chrome, 'sec-fetch-dest': 'iframe' }, 'e57c5fe3812eedcc2548d1fc2810317bf0788e0fec03255aff808341df6fce0a', '890084d63cbd10604c34d16c30c212f776cb017092fb54a4213cb9e7bff69baf'],
-    'content firefox': ['/a/artifact-a/r/revision-1/content', { 'user-agent': firefox, 'sec-fetch-dest': 'iframe' }, '91cb14088fd3a2d934e17c6181cc3a7232649a16ebecaaf8a818befa8a957fa8', '67f49211de7298a23e5c65ae4c68d18417deb98e83b3365d78a613d97ac268c1'],
+    'content firefox': ['/a/artifact-a/r/revision-1/content', { 'user-agent': firefox, 'sec-fetch-dest': 'iframe' }, 'd7fbdf0406e5f58f94302a5a1b1709983a350cd2c7d9afd61d0071e24654cacf', '67f49211de7298a23e5c65ae4c68d18417deb98e83b3365d78a613d97ac268c1'],
     file: ['/a/artifact-a/r/revision-1/files/notes.txt', {}, '0e54cea37ef73ea17d1c7a0b959f535b01292aa4f02b8abe9a55ee86a102ef2f', '7fec148ca4fb9a57917ac5e1cde34c647c1aa7d3a9c0fcd5e79e8dbae49e9a56'],
   } as const;
   for (const [name, [path, headers, body, headerList]] of Object.entries(trunk)) {
