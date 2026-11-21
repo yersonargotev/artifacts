@@ -44,6 +44,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: sentry-io[bot]
           branch_prefix: fix/sentry-
+          label_trigger: sentry
           track_progress: true
           prompt: |
             /poteto-mode Fix the production error that Sentry reported in issue #${{ github.event.issue.number }} of ${{ github.repository }}.
