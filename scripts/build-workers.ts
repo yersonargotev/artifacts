@@ -90,7 +90,7 @@ if (import.meta.main) for (const name of names) {
     external: ['node:*', 'cloudflare:*'],
     metafile: true,
     sourcemap: true,
-    define: { 'process.env.SENTRY_RELEASE': JSON.stringify(release) },
+    define: { 'process.env.SENTRY_RELEASE': JSON.stringify(release), 'process.env.WORKER_NAME': JSON.stringify(worker.name) },
   });
   if (!result.metafile) throw new Error('Worker bundle evidence is missing');
   const inputs = Object.keys(result.metafile.inputs);
