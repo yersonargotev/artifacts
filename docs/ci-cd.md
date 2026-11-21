@@ -89,6 +89,21 @@ unset DATABASE_URL DATABASE_AUTH_TOKEN
 
 3. Merge the pull request. If the change affects search indexing, rebuild the index after the release as described in [Production operations](deployment.md#production-operations).
 
+## Sentry autofix
+
+`.github/workflows/sentry-autofix.yml` runs when an open issue gets the `sentry` label. It installs the workspace like `checks`, then runs `anthropics/claude-code-action` with `/poteto-mode`. Claude reproduces the error with a test, fixes it, and opens a pull request that says `Fixes #<issue>`. The normal validation jobs run on that pull request. A maintainer reviews and merges it. The workflow never migrates, deploys, or merges.
+
+The workflow listens only for `labeled`, so an issue that Sentry creates with the label runs once. Labeling an issue by hand runs it too. Claude runs only for users with write access and for the `sentry-io[bot]` app.
+
+| Repository entry | Kind | Contract |
+| --- | --- | --- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Secret | Output of `claude setup-token` for a Claude Pro or Max account. Runs count against that account's usage limits. |
+| `SENTRY_READ_TOKEN` | Secret | A Sentry token with `event:read` and `project:read` only. It lets Claude read the full event. Don't reuse `SENTRY_AUTH_TOKEN`. |
+
+Sentry needs its GitHub integration installed on this repository and an issue alert rule on the `artifacts` project. The rule fires on a new or regressed issue in `production` and runs **Create a GitHub issue** with the `sentry` label.
+
+This repository is public. Each Sentry issue publishes its error message and stack trace. The error message can carry text from an outside request, so the prompt treats the issue body as data, and `--allowedTools` limits Claude to the workspace commands that the fix needs.
+
 ## Diagnose a failed run
 
 A pull request run takes 13 to 15 minutes. That is longer than the 10-minute limit on a foreground agent command, so start the watch as a background task:
