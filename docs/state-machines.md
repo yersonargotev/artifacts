@@ -19,7 +19,7 @@ States: `Absent`, `Live(head = rₙ)`, `Deleted`.
 
 Invariants:
 
-- Revisions are immutable. A trigger rejects every `UPDATE` on `artifact_revision` (migration `0001`).
+- Revisions are immutable. A trigger rejects every `UPDATE` on `artifact_revision` (migration `0001`, recreated by the table rebuild in `0007`).
 - Sequences are dense per artifact: 1, 2, …, n. The `artifact_revision_sequence_idx` unique index rejects a second revision with the same sequence.
 - The head and the parent of each revision belong to the same artifact (composite foreign keys `artifact_head_membership_fk` and `artifact_parent_membership_fk`, deferred).
 - The head is the revision with the highest sequence. Only create, update, and batch write revisions, and each one moves the head in the same commit.

@@ -50,6 +50,13 @@
       "when": 1794033459051,
       "tag": "0006_artifact_search",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795240374833,
+      "tag": "0007_revision_metadata",
+      "breakpoints": true
     }
   ]
 }

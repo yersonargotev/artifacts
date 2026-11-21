@@ -148,6 +148,44 @@ async function sharedLibrary() {
   return { ...app, owner, guest, store, create, publish, share };
 }
 
+test('lists, projects, move subjects, and shares show the metadata of the revision they name through create, update, restore, and batch', async () => {
+  const app = await sharedLibrary();
+  try {
+    const panel = createPanel(app.db, { access: app.config.access, publishOrigin: 'https://published.example.test' });
+    const page = (title: string, kind: 'html' | 'markdown' | 'text'): Snapshot => ({ metadata: { title, description: `About ${title}` }, content: { kind, text: title }, files: [] });
+    const created = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: page('First draft', 'markdown'), project: 'Notes' });
+    const updated = await app.store.update(app.owner, { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: created.revision.id, snapshot: page('Published edition', 'html') });
+    await app.store.publish(app.owner, { requestId: randomUUID(), artifactId: created.artifactId, revisionId: updated.revision.id, expectedPublicationVersion: 0 });
+    await app.share(created.artifactId);
+    const restored = await app.store.update(app.owner, { requestId: randomUUID(), artifactId: created.artifactId, expectedRevisionId: updated.revision.id, snapshot: created.revision.snapshot });
+    assert.equal(restored.revision.sha256, created.revision.sha256, 'a restored snapshot keeps its digest');
+    const other = await app.store.create(app.owner, { requestId: randomUUID(), snapshot: page('Before batch', 'text'), project: 'Notes' });
+    const { results } = await app.store.batch(app.owner, { requestId: randomUUID(), operations: [
+      { op: 'create', snapshot: page('Batch created', 'text'), project: 'Notes' },
+      { op: 'update', artifactId: other.artifactId, expectedRevisionId: other.revision.id, snapshot: page('Batch updated', 'markdown') },
+    ] });
+    const batched = results[0]!.artifactId;
+    const expected = [
+      { artifactId: created.artifactId, title: 'First draft', description: 'About First draft', kind: 'markdown' },
+      { artifactId: other.artifactId, title: 'Batch updated', description: 'About Batch updated', kind: 'markdown' },
+      { artifactId: batched, title: 'Batch created', description: 'About Batch created', kind: 'text' },
+    ].sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+    const ids = expected.map(({ artifactId }) => artifactId);
+    const titles = expected.map(({ artifactId, title }) => ({ artifactId, title }));
+    const byId = (left: { artifactId: string }, right: { artifactId: string }) => left.artifactId.localeCompare(right.artifactId);
+
+    const { page: library } = await panel.library(app.owner);
+    assert.deepEqual(library.cards.map(({ artifactId, title, description, kind }) => ({ artifactId, title, description, kind })).sort(byId), expected, 'library cards show the head revision');
+    assert.deepEqual((await panel.library(app.owner, { q: 'published edition' })).page.cards, [], 'the library searches head titles only');
+    assert.deepEqual((await panel.library(app.owner, { sort: 'title', direction: 'asc' })).page.cards.map(({ title }) => title), ['Batch created', 'Batch updated', 'First draft']);
+    assert.deepEqual((await app.store.list(app.owner)).items.map(({ artifactId, title }) => ({ artifactId, title })), titles, 'the store list shows the head revision');
+    const projects = await panel.projectsIndex(app.owner);
+    assert.deepEqual(projects.overview.projects.map(({ project, recent }) => ({ name: project.name, recent: recent.map(({ artifactId, title }) => ({ artifactId, title })).sort(byId) })), [{ name: 'Notes', recent: titles }], 'projects show the head revision');
+    assert.deepEqual((await panel.moveSubject(app.owner, ids)).items.map(({ artifactId, title }) => ({ artifactId, title })), titles, 'move subjects show the head revision');
+    assert.deepEqual((await app.store.listSharedWithMe(app.guest)).items.map(({ title }) => title), ['Published edition'], 'a share shows the published revision');
+  } finally { await app.close(); }
+});
+
 test('shared library lists only current published shares, keeps published titles private from drafts, and follows revoke, re-share, publish, and delete', async () => {
   const app = await sharedLibrary();
   try {

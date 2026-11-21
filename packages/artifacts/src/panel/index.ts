@@ -60,7 +60,6 @@ const panelMoveResultSchema = z.strictObject({ project: z.string().nullable(), m
 const publishedRevision = alias(artifactRevision, 'published_revision');
 const headJoin = and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId));
 const publicationJoin = eq(artifactPublication.artifactId, artifact.id);
-const title = sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String);
 const tally = {
   count: count(),
   published: sql<number>`coalesce(sum(case when ${artifactPublication.revisionId} = ${artifact.headRevisionId} then 1 else 0 end), 0)`.mapWith(Number),
@@ -69,7 +68,7 @@ const tally = {
 const zeroTally = (): Tally => ({ count: 0, published: 0, pending: 0 });
 // Pending sorts first, then unpublished, then published.
 const stateRank = sql<number>`case when ${artifactPublication.artifactId} is null then 1 when ${artifactPublication.revisionId} != ${artifact.headRevisionId} then 0 else 2 end`;
-const sortColumns = { title: sql`${title} collate nocase`, state: stateRank, revision: sql`${artifactRevision.sequence}` } as const;
+const sortColumns = { title: sql`${artifactRevision.title} collate nocase`, state: stateRank, revision: sql`${artifactRevision.sequence}` } as const;
 const stateRanks = { pending: 0, unpublished: 1, published: 2 } as const;
 
 function resolveScope(workspace: Workspace, request: ScopeRequest): LibraryScope {
@@ -96,7 +95,7 @@ async function resolveLinks(connection: Connection, ownerId: string, page: { pro
   if (selected.snapshot.content.kind !== 'markdown') return null;
   const candidates = pageLinks(selected.snapshot.content.text, page.slug);
   const slugs = [...new Set(candidates.flatMap(({ candidate }) => candidate.kind === 'slug' ? [candidate.slug] : []))];
-  const targets = slugs.length === 0 ? [] : await connection.select({ artifactId: artifact.id, slug: artifact.slug, title }).from(artifact).innerJoin(artifactRevision, headJoin)
+  const targets = slugs.length === 0 ? [] : await connection.select({ artifactId: artifact.id, slug: artifact.slug, title: artifactRevision.title }).from(artifact).innerJoin(artifactRevision, headJoin)
     .where(and(eq(artifact.ownerId, ownerId), page.project === null ? isNull(artifact.project) : eq(artifact.project, page.project), inArray(artifact.slug, slugs)));
   const bySlug = new Map(targets.map((target) => [target.slug, target]));
   return candidates.map(({ href, text, candidate }) => {
@@ -133,7 +132,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       const ids = panelMoveIdsSchema.parse(value);
       return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
-        const items = await connection.select({ artifactId: artifact.id, title, project: artifact.project }).from(artifact).innerJoin(artifactRevision, headJoin)
+        const items = await connection.select({ artifactId: artifact.id, title: artifactRevision.title, project: artifact.project }).from(artifact).innerJoin(artifactRevision, headJoin)
           .where(and(eq(artifact.ownerId, actor.userId), inArray(artifact.id, ids))).orderBy(artifact.id);
         return { workspace: await readWorkspace(connection, actor.userId), items: items.map((item) => ({ ...item, project: item.project as ProjectName | null })) };
       });
@@ -142,7 +141,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
       return access.read(async (connection) => {
         await access.authorize(connection, actor, 'artifacts:read');
         const workspace = await readWorkspace(connection, actor.userId);
-        const ranked = connection.select({ artifactId: artifact.id, project: artifact.project, title: title.as('title'), createdAt: artifactRevision.createdAt,
+        const ranked = connection.select({ artifactId: artifact.id, project: artifact.project, title: artifactRevision.title, createdAt: artifactRevision.createdAt,
           rank: sql<number>`row_number() over (partition by ${artifact.project} order by ${artifactRevision.createdAt} desc, ${artifact.id} desc)`.as('rank'),
         }).from(artifact).innerJoin(artifactRevision, headJoin).where(eq(artifact.ownerId, actor.userId)).as('ranked');
         const rows = await connection.select({ artifactId: ranked.artifactId, project: ranked.project, title: ranked.title }).from(ranked)
@@ -230,7 +229,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
         const scope = resolveScope(workspace, input.scope);
         if (scope.kind === 'vanishedProject') return { workspace, page: { scope, status: input.status, q: input.q, sort: input.sort ?? 'updated', direction: input.direction ?? defaultDirections[input.sort ?? 'updated'], cards: [], counts: { all: 0, published: 0, unpublished: 0, pending: 0 }, next: null, continued: Boolean(input.cursor) } };
         const matching = and(eq(artifact.ownerId, actor.userId), scope.kind === 'project' ? eq(artifact.project, scope.project.name) : scope.kind === 'unfiled' ? isNull(artifact.project) : undefined,
-          input.q ? or(sql`instr(lower(${title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
+          input.q ? or(sql`instr(lower(${artifactRevision.title}), lower(${input.q})) > 0`, sql`instr(lower(${artifact.id}), lower(${input.q})) > 0`) : undefined);
         const statuses = {
           all: undefined,
           published: eq(artifactPublication.revisionId, artifact.headRevisionId),
@@ -248,7 +247,7 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           ? or(beyond(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), beyond(artifact.id, cursorId!)))
           : or(beyond(sortColumns[sort], cursorKey(sort, key)), and(eq(sortColumns[sort], cursorKey(sort, key)), or(lt(artifactRevision.createdAt, at), and(eq(artifactRevision.createdAt, at), lt(artifact.id, cursorId!)))));
         const rows = await connection.select({
-          artifactId: artifact.id, project: artifact.project, slug: artifact.slug,
+          artifactId: artifact.id, title: artifactRevision.title, description: artifactRevision.description, kind: sql<ContentKind>`${artifactRevision.kind}`, project: artifact.project, slug: artifact.slug,
           head: { revisionId: artifactRevision.id, sequence: artifactRevision.sequence, createdAt: artifactRevision.createdAt },
           publication: { version: artifactPublication.version, revisionId: artifactPublication.revisionId },
           published: { revisionId: publishedRevision.id, sequence: publishedRevision.sequence, createdAt: publishedRevision.createdAt },
@@ -256,15 +255,9 @@ export function createPanel(db: Database, options: { publishOrigin: string; acce
           .leftJoin(publishedRevision, and(eq(publishedRevision.artifactId, artifact.id), eq(publishedRevision.id, artifactPublication.revisionId)))
           .where(and(matching, statuses[input.status], before)).orderBy(...order).limit(libraryPageSize + 1);
         const page = rows.slice(0, libraryPageSize);
-        // SQLite computes every selected column before it sorts, so reading card text in the page query would parse every matching head snapshot.
-        const texts = page.length === 0 ? [] : await connection.select({
-          revisionId: artifactRevision.id, title, description: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.description')`.mapWith(String),
-          kind: sql<ContentKind>`json_extract(${artifactRevision.snapshot}, '$.content.kind')`,
-        }).from(artifactRevision).where(inArray(artifactRevision.id, page.map(({ head }) => head.revisionId)));
-        const text = new Map(texts.map(({ revisionId, ...card }) => [revisionId, card]));
         const [counts] = await connection.select(tally).from(artifact).innerJoin(artifactRevision, headJoin).leftJoin(artifactPublication, publicationJoin).where(matching);
         const cards: ArtifactCard[] = page.map(({ publication, published, project, ...row }) => ({
-          ...row, ...text.get(row.head.revisionId)!, project: project as ProjectName | null,
+          ...row, project: project as ProjectName | null,
           publication: publication ? { state: publication.revisionId === row.head.revisionId ? 'published' : 'pending', url: access.publicationUrl(row.artifactId), version: publication.version, revision: published! } : { state: 'unpublished' },
         }));
         const last = cards.at(-1);

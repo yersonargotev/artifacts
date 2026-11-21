@@ -71,6 +71,60 @@ test('the search migration backfills Markdown and text heads, and an owner delet
   }
 });
 
+test('the revision metadata migration copies every revision with its title, description, and kind, and keeps publications and immutability', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'artifacts-db-'));
+  const migrations = fileURLToPath(new URL('../packages/db/migrations', import.meta.url));
+  const before = join(directory, 'migrations');
+  await cp(migrations, before, { recursive: true });
+  const journal = JSON.parse(await readFile(join(before, 'meta/_journal.json'), 'utf8'));
+  journal.entries = journal.entries.filter((entry: { tag: string }) => entry.tag < '0007');
+  await writeFile(join(before, 'meta/_journal.json'), JSON.stringify(journal));
+  const url = `file:${join(directory, 'metadata.db')}`;
+  const { db, client } = await openDatabase({ url });
+  try {
+    await migrate(db, { migrationsFolder: before });
+    await client.execute("INSERT INTO user (id, name, email) VALUES ('owner', 'Owner', 'owner@example.test')");
+    const revisions: [string, string, string | null, Snapshot | string][] = [
+      ['r1', 'a1', null, { metadata: { title: 'Página publicada', description: 'Primera' }, content: { kind: 'html', text: '<p>Uno</p>' }, files: [] }],
+      ['r2', 'a1', 'r1', { metadata: { title: 'Página actual', description: '' }, content: { kind: 'markdown', text: 'Dos' }, files: [] }],
+      ['r3', 'a2', null, designSnapshot()],
+      ['r4', 'a3', null, '{"metadata":{"title":"Sin descripción"},"content":{"kind":"text","text":"Tres"},"files":[]}'],
+    ];
+    for (const [id, artifactId, parent, snapshot] of revisions) {
+      await client.batch([
+        { sql: 'INSERT INTO artifact (id, owner_id, head_revision_id, created_at) VALUES (?, ?, ?, 0) ON CONFLICT (id) DO UPDATE SET head_revision_id = excluded.head_revision_id', args: [artifactId, 'owner', id] },
+        { sql: "INSERT INTO artifact_revision (id, artifact_id, parent_revision_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES (?, ?, ?, ?, 'owner', 'client', 0, '', ?)", args: [id, artifactId, parent, parent ? 2 : 1, typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot)] },
+      ], 'write');
+    }
+    await client.execute("INSERT INTO artifact_publication (artifact_id, revision_id, version) VALUES ('a1', 'r1', 1)");
+    await migrateDatabase(url);
+    await migrateDatabase(url);
+    const rows = (await client.execute('SELECT id, parent_revision_id, title, description, kind, snapshot FROM artifact_revision ORDER BY id')).rows;
+    assert.deepEqual(rows.map(({ id, parent_revision_id, title, description, kind, snapshot }) => {
+      const parsed = JSON.parse(String(snapshot));
+      assert.equal(title, parsed.metadata.title, `${id} title matches its snapshot`);
+      assert.equal(description, parsed.metadata.description ?? '', `${id} description matches its snapshot`);
+      assert.equal(kind, parsed.content.kind, `${id} kind matches its snapshot`);
+      return { id, parent_revision_id, title, description, kind };
+    }), [
+      { id: 'r1', parent_revision_id: null, title: 'Página publicada', description: 'Primera', kind: 'html' },
+      { id: 'r2', parent_revision_id: 'r1', title: 'Página actual', description: '', kind: 'markdown' },
+      { id: 'r3', parent_revision_id: null, title: 'Design canvas', description: '3 boards', kind: 'design' },
+      { id: 'r4', parent_revision_id: null, title: 'Sin descripción', description: '', kind: 'text' },
+    ]);
+    assert.equal((await client.execute("SELECT count(*) AS empty FROM artifact_revision WHERE title = '' OR kind = ''")).rows[0]!.empty, 0);
+    assert.deepEqual((await client.execute('SELECT artifact_id, revision_id, version FROM artifact_publication')).rows.map((row) => ({ ...row })), [{ artifact_id: 'a1', revision_id: 'r1', version: 1 }], 'rebuilding the revisions keeps their publication');
+    assert.deepEqual((await client.execute('PRAGMA foreign_key_check')).rows, []);
+    await assert.rejects(client.execute("UPDATE artifact_revision SET title = 'Rewritten' WHERE id = 'r1'"), /immutable/);
+    await assert.rejects(client.execute("INSERT INTO artifact_revision (id, artifact_id, parent_revision_id, sequence, author_user_id, author_client_id, created_at, sha256, snapshot) VALUES ('r5', 'a2', 'r1', 2, 'owner', 'client', 0, '', '{}')"), /FOREIGN KEY/, 'a parent must belong to the same artifact');
+    await db.delete(user).where(eq(user.id, 'owner'));
+    assert.equal((await client.execute('SELECT count(*) AS total FROM artifact_revision')).rows[0]!.total, 0, 'deleting the owner still cascades to revisions');
+  } finally {
+    client.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('reindexSearch rebuilds one row per head for every kind and converges when run again', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'artifacts-db-'));
   const url = `file:${join(directory, 'reindex.db')}`;

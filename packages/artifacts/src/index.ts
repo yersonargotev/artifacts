@@ -12,7 +12,7 @@ import { canonicalJson, sha256 } from '@yargote/artifacts-contracts/serializatio
 import { createAccess, isBusy, isConstraint, writeTransaction, type Connection } from './access.ts';
 import { planBatch } from './batch.ts';
 import { projectKey } from './panel/model.ts';
-import { revision } from './revision.ts';
+import { revision, revisionMetadata } from './revision.ts';
 import { invitation, type InvitationSender } from './invitation.ts';
 
 // drizzle-kit does not model FTS5, so the table lives here instead of schema.ts and migration 0006 creates it by hand.
@@ -152,7 +152,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         const slug = input.slug ?? null;
         await claimSlug(connection, actor.userId, project, slug);
         await connection.insert(artifact).values({ id: artifactId, ownerId: actor.userId, headRevisionId: revisionId, createdAt, project, slug });
-        await connection.insert(artifactRevision).values({ id: revisionId, artifactId, parentRevisionId: null, sequence: 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt, sha256: digest, snapshot });
+        await connection.insert(artifactRevision).values({ id: revisionId, artifactId, parentRevisionId: null, sequence: 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt, sha256: digest, ...revisionMetadata(input.snapshot), snapshot });
         await indexHead(connection, artifactId, input.snapshot);
         return readOwned(connection, actor.userId, artifactId);
       });
@@ -178,7 +178,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         const current = await readOwned(connection, actor.userId, input.artifactId);
         if (current.headRevisionId !== input.expectedRevisionId) throw new ArtifactError('conflict', 'Artifact head changed', { currentRevisionId: current.headRevisionId });
         const revisionId = crypto.randomUUID();
-        await connection.insert(artifactRevision).values({ id: revisionId, artifactId: input.artifactId, parentRevisionId: current.headRevisionId, sequence: current.revision.sequence + 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: digest, snapshot });
+        await connection.insert(artifactRevision).values({ id: revisionId, artifactId: input.artifactId, parentRevisionId: current.headRevisionId, sequence: current.revision.sequence + 1, authorUserId: actor.userId, authorClientId: actor.clientId, createdAt: new Date(), sha256: digest, ...revisionMetadata(input.snapshot), snapshot });
         const changed = await connection.update(artifact).set({ headRevisionId: revisionId }).where(and(eq(artifact.id, input.artifactId), eq(artifact.ownerId, actor.userId), eq(artifact.headRevisionId, input.expectedRevisionId))).returning({ id: artifact.id });
         if (changed.length !== 1) throw new ArtifactError('conflict', 'Artifact head changed');
         await indexHead(connection, input.artifactId, input.snapshot);
@@ -222,11 +222,11 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
           const { text, digest } = snapshots[write.index]!;
           if (write.op === 'create') return [
             statement(db.insert(artifact).values({ id: write.artifactId, ownerId: actor.userId, headRevisionId: write.revisionId, createdAt, project: write.project, slug: write.slug })),
-            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: null, sequence: 1, ...author, sha256: digest, snapshot: text })),
+            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: null, sequence: 1, ...author, sha256: digest, ...revisionMetadata(write.snapshot), snapshot: text })),
             statement(db.insert(artifactSearch).values(searchRow(write.artifactId, write.snapshot))),
           ];
           return [
-            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: write.parentRevisionId, sequence: write.sequence, ...author, sha256: digest, snapshot: text })),
+            statement(db.insert(artifactRevision).values({ id: write.revisionId, artifactId: write.artifactId, parentRevisionId: write.parentRevisionId, sequence: write.sequence, ...author, sha256: digest, ...revisionMetadata(write.snapshot), snapshot: text })),
             statement(db.update(artifact).set({ headRevisionId: write.revisionId }).where(and(eq(artifact.id, write.artifactId), eq(artifact.ownerId, actor.userId), eq(artifact.headRevisionId, write.parentRevisionId)))),
             statement(db.delete(artifactSearch).where(eq(artifactSearch.artifactId, write.artifactId))),
             statement(db.insert(artifactSearch).values(searchRow(write.artifactId, write.snapshot))),
@@ -339,7 +339,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
         await authorize(connection, actor, 'artifacts:read');
         const viewer = alias(user, 'viewer');
         const owner = alias(user, 'owner');
-        const rows = await connection.select({ artifactId: artifact.id, title: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String), ownerName: owner.name }).from(artifactShare)
+        const rows = await connection.select({ artifactId: artifact.id, title: artifactRevision.title, ownerName: owner.name }).from(artifactShare)
           .innerJoin(viewer, and(eq(viewer.id, actor.userId), eq(viewer.emailVerified, true), eq(artifactShare.value, sql`lower(${viewer.email})`)))
           .innerJoin(artifact, eq(artifact.id, artifactShare.artifactId))
           .innerJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
@@ -393,7 +393,7 @@ export function createArtifactStore(db: Database, options: { publishOrigin: stri
       return read(async (connection) => {
         await authorize(connection, actor, 'artifacts:read');
         const project = input.project === undefined ? undefined : eq(artifact.project, await projectSpelling(connection, actor.userId, input.project));
-        const rows = await connection.select({ artifact, title: sql<string>`json_extract(${artifactRevision.snapshot}, '$.metadata.title')`.mapWith(String), publication: artifactPublication }).from(artifact)
+        const rows = await connection.select({ artifact, title: artifactRevision.title, publication: artifactPublication }).from(artifact)
           .innerJoin(artifactRevision, and(eq(artifactRevision.artifactId, artifact.id), eq(artifactRevision.id, artifact.headRevisionId)))
           .leftJoin(artifactPublication, eq(artifactPublication.artifactId, artifact.id))
           .where(and(eq(artifact.ownerId, actor.userId), project, input.cursor ? gt(artifact.id, input.cursor) : undefined)).orderBy(asc(artifact.id)).limit(input.limit + 1);
