@@ -3,6 +3,9 @@ export const workerCompatibility = {
   compatibilityFlags: ['nodejs_compat', 'nodejs_compat_populate_process_env', 'global_fetch_strictly_public'],
 };
 
+// Every invocation is sampled so production latency per route can be read from Workers Observability.
+export const workerObservability = { enabled: true, headSamplingRate: 1 };
+
 export const workerOrigins = {
   AUTH_URL: 'https://artifacts-auth.yersonargotev.workers.dev',
   API_URL: 'https://artifacts-api.yersonargotev.workers.dev',
@@ -22,6 +25,7 @@ export type WorkerConfiguration<Environment> = {
     compatibilityDate: string;
     compatibilityFlags: string[];
     entrypoint: string;
+    observability: { enabled: boolean; headSamplingRate: number };
     env: { [Name in keyof Environment]-?: Binding };
   };
 };

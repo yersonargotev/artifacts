@@ -1,11 +1,12 @@
 import type { AuthWorkerEnvironment } from '@artifacts/config';
-import { sentryDsn, workerCompatibility, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
+import { sentryDsn, workerCompatibility, workerObservability, workerOrigins, type WorkerConfiguration } from '../../scripts/cloudflare.ts';
 
 export default {
   worker: {
     name: 'artifacts-auth',
     ...workerCompatibility,
     entrypoint: './src/worker.ts',
+    observability: workerObservability,
     env: {
       SENTRY_DSN: { type: 'text', value: sentryDsn },
       ALLOW_GUEST_ACCESS: { type: 'text', value: 'false' },

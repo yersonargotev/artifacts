@@ -109,10 +109,31 @@ pnpm exec cf accounts subscriptions get
 ```
 
 - `cf accounts subscriptions get` lists the account's plans. Production needs `Workers Paid` in that list.
-- `cf o11y telemetry query` reads Workers Observability, including CPU time per invocation. Run `cf o11y telemetry query --help` for its options.
+- `cf o11y telemetry query` reads Workers Observability, including CPU time per invocation. Run `cf o11y telemetry query --help` for its options. [Read Worker invocations](#read-worker-invocations) shows a query per service.
 - `cf workers delete NAME --force` deletes a Worker and all its versions, for example a throwaway spike Worker. Never run it on a production Worker.
 
 For another task, run `cf cli search "<task>"` once and then `<command> --help`. Nested `--help` output starts with a notice that asks agents to search instead.
+
+### Read Worker invocations
+
+The four Workers send every invocation to Workers Observability. `workerObservability` in `scripts/cloudflare.ts` sets `enabled` and a head sampling rate of 1, and `tests/worker-config.test.ts` fails when a Worker config drops it. The build writes it as `headSamplingRate` in `worker.config.json`, because `cf deploy --prebuilt` rejects the snake-case key there.
+
+Filter by `$workers.scriptName` to read one service. This query returns the invocation count and p99 wall time per path of the panel over the last 24 hours. Replace `artifacts-panel` with another Worker name from the table above.
+
+```sh
+now=$(date +%s000)
+pnpm exec cf o11y telemetry query --body "$(cat <<EOF
+{"queryId": "invocations-by-path", "view": "calculations", "chartType": "aggregate",
+ "timeframe": {"from": $((now - 86400000)), "to": $now},
+ "parameters": {
+   "filters": [{"key": "\$workers.scriptName", "operation": "eq", "type": "string", "value": "artifacts-panel"}],
+   "calculations": [{"operator": "count"}, {"operator": "p99", "key": "\$workers.wallTimeMs", "keyType": "number"}],
+   "groupBys": [{"type": "string", "value": "\$workers.event.path"}]}}
+EOF
+)"
+```
+
+Use `"view": "events"` with the same filter to list single invocations, each with its `$workers.wallTimeMs` and `$workers.outcome`. `cf o11y telemetry keys` lists every other field.
 
 ### Read errors in Sentry
 
